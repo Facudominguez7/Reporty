@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { MapPin, Camera, Send, CheckCircle2, FileText, Info, FilePlus2 } from "lucide-react"
+import { MapPin, Send, CheckCircle2, FileText, Info, FilePlus2 } from "lucide-react"
 import Link from "next/link"
 import { PUNTOS } from "@/database/queries/puntos"
 import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/loading-skeletons"
@@ -678,7 +678,7 @@ export default function NuevoReportePage() {
                 <div className="rounded-md border border-dashed border-border bg-card p-6 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-card">
-                      <Camera className="w-6 h-6 text-muted-foreground" />
+                      <FilePlus2 className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">Agregá una foto del problema (opcional)</p>
@@ -686,26 +686,12 @@ export default function NuevoReportePage() {
                     <div className="flex flex-wrap justify-center gap-2">
                       <Button type="button" size="sm" asChild>
                         <label htmlFor="images" className="cursor-pointer">
-                          <Camera className="h-4 w-4" />
-                          Tomar foto
+                          <FilePlus2 className="h-4 w-4" />
+                          Cargar imagen
                         </label>
                       </Button>
                       <input
                         id="images"
-                        type="file"
-                        accept={REPORT_IMAGE_ACCEPT_ATTR}
-                        capture="environment"
-                        onChange={handleImageUpload}
-                        className="sr-only"
-                      />
-                      <Button type="button" size="sm" variant="outline" asChild>
-                        <label htmlFor="report-image-gallery" className="cursor-pointer">
-                          <FilePlus2 className="h-4 w-4" />
-                          Elegir de galería
-                        </label>
-                      </Button>
-                      <input
-                        id="report-image-gallery"
                         type="file"
                         accept={REPORT_IMAGE_ACCEPT_ATTR}
                         onChange={handleImageUpload}
