@@ -32,7 +32,7 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
   if (!user) {
     return (
       <div className="page-shell">
-        <div className="page-container max-w-3xl page-stack">
+        <div className="page-container page-stack">
           <PageTitleBar
             icon={<ClipboardList className="size-4" />}
             title="Mis reportes"
@@ -78,7 +78,7 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
 
   return (
     <div className="page-shell">
-      <div className="page-container max-w-3xl page-stack">
+      <div className="page-container page-stack">
         <PageTitleBar
           icon={<ClipboardList className="size-4" />}
           title="Mis reportes"

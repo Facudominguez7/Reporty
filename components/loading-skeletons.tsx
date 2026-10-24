@@ -223,7 +223,7 @@ export function DashboardLoadingSkeleton() {
 export function MisReportesLoadingSkeleton() {
   return (
     <div className="page-shell">
-      <div className="page-container max-w-3xl page-stack">
+      <div className="page-container page-stack">
         <SectionHeaderSkeleton />
         <div className="space-y-3">
           {Array.from({ length: 4 }, (_, index) => <ReportCardSkeleton key={index} />)}

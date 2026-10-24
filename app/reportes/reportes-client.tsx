@@ -5,7 +5,6 @@ import { SlidersHorizontal, X } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 
 import { FiltrosReportes } from "@/components/filtros-reportes"
-import { LoadingState } from "@/components/loading-state"
 import { Button } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 
@@ -44,12 +43,6 @@ export function ReportesClientWrapper({ categorias, estados, prioridades }: Repo
 
   return (
     <>
-      {isPending && (
-        <div className="flex min-h-12 w-full items-center justify-center">
-          <LoadingState text="Cargando reportes..." className="h-12 w-auto flex-row gap-2 px-4" showSkeleton={false} />
-        </div>
-      )}
-
       <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
         <DrawerTrigger asChild>
           <Button
@@ -63,7 +56,7 @@ export function ReportesClientWrapper({ categorias, estados, prioridades }: Repo
             <span>{showFilters ? "Cerrar" : activeFiltersLabel}</span>
           </Button>
         </DrawerTrigger>
-        <DrawerContent className="max-h-[85dvh] bg-card">
+        <DrawerContent className="max-h-[85dvh] bg-card md:inset-x-[15%]">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FiltrosReportes
               categorias={categorias}

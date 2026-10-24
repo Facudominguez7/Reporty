@@ -135,7 +135,7 @@
     height: env(safe-area-inset-top);
     z-index: 50;
     pointer-events: none;
-    background: white;
+    background: var(--secondary);
   }
 
   nav[aria-label="Navegación principal"]::after {
@@ -144,7 +144,7 @@
     inset-inline: 0;
     bottom: 0;
     height: env(safe-area-inset-bottom);
-    background: #000;
+    background: var(--secondary);
     pointer-events: none;
   }
 
@@ -209,7 +209,7 @@
   }
 
   .page-container {
-    @apply relative z-50 mx-auto flex w-full max-w-[120rem] flex-1 flex-col rounded-[2.25rem] border border-white/70 bg-card/88 px-3 py-3 shadow-[0_22px_70px_-32px_color-mix(in_oklab,var(--foreground)_45%,transparent)] backdrop-blur-sm sm:px-6 md:py-5 lg:px-8 lg:py-7;
+    @apply relative z-50 mx-auto flex w-full flex-1 flex-col rounded-[2.25rem] border border-white/70 bg-card/88 px-3 py-3 shadow-[0_22px_70px_-32px_color-mix(in_oklab,var(--foreground)_45%,transparent)] backdrop-blur-sm sm:px-6 md:w-[70%] md:py-5 lg:px-8 lg:py-7;
   }
 
   .incident-shell {

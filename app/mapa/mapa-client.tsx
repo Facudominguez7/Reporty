@@ -128,7 +128,7 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
         </div>
       </div>
 
-        <DrawerContent className="max-h-[85dvh] bg-card">
+        <DrawerContent className="max-h-[85dvh] bg-card md:inset-x-[15%]">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FiltrosReportes
               categorias={categorias}
