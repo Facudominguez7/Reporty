@@ -27,6 +27,7 @@ import Link from "next/link"
 import { PUNTOS } from "@/database/queries/puntos"
 import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/loading-skeletons"
 import { REPORT_IMAGE_ACCEPT_ATTR } from "@/lib/media/report-images"
+import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import { createReportImageThumbnail, optimizeReportImage } from "@/lib/media/optimize-report-image"
 import { toast } from "sonner"
 import { 
@@ -34,8 +35,6 @@ import {
   getPrioridades, 
   verificarPuedeCrearReporte
 } from "@/database/queries/reportes/nuevo"
-import { useIsMobile } from "@/hooks/use-mobile"
-import { useMounted } from "@/hooks/use-mounted"
 import dynamic from "next/dynamic"
 import { crearReporteAction } from "./actions"
 import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
@@ -104,7 +103,7 @@ const LocationPickerMap = dynamic(
  *
  * Funciona sin cuenta: si no hay sesión, el navegador crea la sesión de invitado recién al confirmar el envío.
  * Carga las categorías y prioridades disponibles,
- * obtiene la geolocalización automáticamente en móviles o permite la selección manual en escritorio,
+ * permite elegir manualmente la ubicación en cualquier dispositivo, ofrece la geolocalización como atajo,
  * permite adjuntar una única imagen, muestra un diálogo de confirmación y realiza el envío final
  * del reporte (creación, subida de imagen si existe, asignación de puntos y redirección).
  *
@@ -127,7 +126,7 @@ export default function NuevoReportePage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [puedeCrear, setPuedeCrear] = useState(false)
-  const [geoStatus, setGeoStatus] = useState<"pending" | "ok" | "error">("pending")
+  const [isLocatingLocation, setIsLocatingLocation] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isOptimizingImage, setIsOptimizingImage] = useState(false)
@@ -141,9 +140,6 @@ export default function NuevoReportePage() {
 
   const supabase = createClient()
   const router = useRouter()
-  const isMobile = useIsMobile()
-  const mounted = useMounted()
-  
   useEffect(() => {
     const checkUserAndLoadData = async () => {
       try {
@@ -182,38 +178,6 @@ export default function NuevoReportePage() {
 
     checkUserAndLoadData()
   }, [])
-
-  // Desktop: no necesita geolocalización, el usuario selecciona manualmente
-  if (mounted && isMobile === false && geoStatus === "pending") {
-    setGeoStatus("ok")
-  }
-
-  // Mobile sin soporte de geolocalización: marcar error
-  if (mounted && isMobile === true && typeof window !== "undefined" && !("geolocation" in navigator) && geoStatus === "pending") {
-    setGeoStatus("error")
-  }
-
-  // Mobile con geolocalización: obtener posición automáticamente (API imperativa, callbacks asíncronos)
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (isMobile !== true) return
-    if (!("geolocation" in navigator)) return
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setFormData((prev) => ({
-          ...prev,
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-        }))
-        setGeoStatus("ok")
-      },
-      () => {
-        setGeoStatus("error")
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
-  }, [isMobile])
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -263,16 +227,20 @@ export default function NuevoReportePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validar que se haya seleccionado una ubicación
-    if (!formData.lat || !formData.lon) {
+    if (formData.lat === null || formData.lon === null) {
       toast.error("Ubicación requerida", {
-        description: isMobile 
-          ? "Por favor, permite el acceso a tu ubicación" 
-          : "Por favor, selecciona una ubicación en el mapa"
+        description: "Marcá en el mapa dónde está el problema o usá tu ubicación actual."
       })
       return
     }
-    
+
+    if (!isWithinReportCoverage(formData.lat, formData.lon)) {
+      toast.error("Ubicación fuera del área de cobertura", {
+        description: "Elegí un punto en Posadas, Garupá o Candelaria."
+      })
+      return
+    }
+
     // Mostrar el diálogo de confirmación
     setShowConfirmDialog(true)
   }
@@ -285,8 +253,42 @@ export default function NuevoReportePage() {
     }))
   }
 
+  const handleUseCurrentLocation = () => {
+    if (!("geolocation" in navigator)) {
+      toast.error("No pudimos obtener tu ubicación", {
+        description: "No hace falta habilitar el GPS: podés marcar el punto en el mapa."
+      })
+      return
+    }
+
+    setIsLocatingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setIsLocatingLocation(false)
+        if (!isWithinReportCoverage(coords.latitude, coords.longitude)) {
+          toast.error("Tu ubicación está fuera del área de cobertura", {
+            description: "Podés marcar manualmente en el mapa si el problema ocurrió en Posadas, Garupá o Candelaria."
+          })
+          return
+        }
+
+        handleLocationSelect(coords.latitude, coords.longitude)
+      },
+      () => {
+        setIsLocatingLocation(false)
+        toast.error("No pudimos obtener tu ubicación", {
+          description: "No hace falta habilitar el GPS: podés marcar el punto en el mapa."
+        })
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
   const isGuestMode = !user || user.is_anonymous === true
   const needsCaptcha = !user && TURNSTILE_SITE_KEY !== ""
+
+  const locationIsValid =
+    formData.lat !== null && formData.lon !== null && isWithinReportCoverage(formData.lat, formData.lon)
 
   const canSubmitReport =
     (!needsCaptcha || captchaToken !== null) &&
@@ -294,8 +296,7 @@ export default function NuevoReportePage() {
     formData.description.trim().length >= 10 &&
     formData.category !== "" &&
     formData.priority !== "" &&
-    formData.lat !== null &&
-    formData.lon !== null &&
+    locationIsValid &&
     !loading &&
     !isSubmitting &&
     // Submitting mid-optimization would silently send the report without its photo.
@@ -636,53 +637,39 @@ export default function NuevoReportePage() {
 
               {/* Location */}
               <div className="space-y-2">
-                <Label>Ubicación *</Label>
-                
-                {/* Mobile: Ubicación automática */}
-                {isMobile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="w-4 h-4" />
-                    {geoStatus === "ok" && formData.lat && formData.lon && (
-                      <span>
-                        Lat: {formData.lat.toFixed(5)}, Lon: {formData.lon.toFixed(5)}
-                      </span>
-                    )}
-                    {geoStatus === "pending" && <span>Detectando ubicación…</span>}
-                    {geoStatus === "error" && (
-                      <span>No se pudo obtener tu ubicación. Permití el acceso al GPS.</span>
-                    )}
-                  </div>
-                )}
-                {(!formData.lat || !formData.lon) && (
-                  <p className="text-xs text-destructive">Seleccioná una ubicación en el mapa.</p>
-                )}
-
-                {/* Desktop: Selección manual en mapa */}
-                {!isMobile && (
-                  <div className="space-y-2">
+                <Label>Ubicación del problema *</Label>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm text-muted-foreground">
-                      Haz clic en el mapa para seleccionar la ubicación del problema
+                      Marcá en el mapa dónde está el problema; no tiene que ser donde estás vos.
                     </p>
-                    <LocationPickerMap 
-                      onLocationSelect={handleLocationSelect}
-                      initialLat={formData.lat}
-                      initialLon={formData.lon}
-                    />
-                    {formData.lat && formData.lon && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        <span>
-                          Ubicación seleccionada: {formData.lat.toFixed(5)}, {formData.lon.toFixed(5)}
-                        </span>
-                      </div>
-                    )}
-                    {!formData.lat && !formData.lon && (
-                      <p className="tone-warning-inline text-sm">
-                        ⚠️ Debes seleccionar una ubicación en el mapa
-                      </p>
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUseCurrentLocation}
+                      disabled={isLocatingLocation}
+                    >
+                      <MapPin className="h-4 w-4" />
+                      {isLocatingLocation ? "Buscando ubicación…" : "Usar mi ubicación"}
+                    </Button>
                   </div>
-                )}
+                  <LocationPickerMap
+                    onLocationSelect={handleLocationSelect}
+                    initialLat={formData.lat}
+                    initialLon={formData.lon}
+                  />
+                  {formData.lat !== null && formData.lon !== null ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                      <MapPin className="h-4 w-4" />
+                      <span>
+                        Ubicación seleccionada: {formData.lat.toFixed(5)}, {formData.lon.toFixed(5)}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-destructive">Tocá o hacé clic en el mapa para marcar la ubicación.</p>
+                  )}
+                </div>
               </div>
 
               {/* Image Upload */}
@@ -694,27 +681,39 @@ export default function NuevoReportePage() {
                       <Camera className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Toma una foto del problema</p>
-                      <p className="text-xs text-muted-foreground">Usa tu cámara para capturar la imagen en el momento</p>
+                      <p className="text-sm font-medium">Agregá una foto del problema (opcional)</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap justify-center gap-2">
                       <Button type="button" size="sm" asChild>
                         <label htmlFor="images" className="cursor-pointer">
-                          <Camera className="w-4 h-4" />
-                          Tomar Foto
+                          <Camera className="h-4 w-4" />
+                          Tomar foto
                         </label>
                       </Button>
                       <input
                         id="images"
                         type="file"
-                         accept={REPORT_IMAGE_ACCEPT_ATTR}
-                         capture="environment"
-                         onChange={handleImageUpload}
-                         className="hidden"
-                       />
+                        accept={REPORT_IMAGE_ACCEPT_ATTR}
+                        capture="environment"
+                        onChange={handleImageUpload}
+                        className="sr-only"
+                      />
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <label htmlFor="report-image-gallery" className="cursor-pointer">
+                          <FilePlus2 className="h-4 w-4" />
+                          Elegir de galería
+                        </label>
+                      </Button>
+                      <input
+                        id="report-image-gallery"
+                        type="file"
+                        accept={REPORT_IMAGE_ACCEPT_ATTR}
+                        onChange={handleImageUpload}
+                        className="sr-only"
+                      />
                     </div>
                     <p className="text-xs text-muted-foreground text-center">
-                      1 imagen · JPG, PNG o WebP · se optimiza antes de subir
+                      1 imagen · JPG, PNG o WebP
                     </p>
                     {isOptimizingImage && (
                       <p className="text-xs text-primary">Optimizando imagen...</p>

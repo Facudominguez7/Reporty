@@ -7,7 +7,8 @@ import "leaflet/dist/leaflet.css"
 import { toast } from "sonner"
 import { useMounted } from "@/hooks/use-mounted"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
-import { MAP_MAX_ZOOM, POSADAS_BOUNDS as POSADAS_AREA, POSADAS_MIN_ZOOM } from "@/lib/map/initial-view"
+import { REPORT_COVERAGE_BOUNDS, REPORT_COVERAGE_SOURCE, isWithinReportCoverage } from "@/lib/map/report-coverage"
+import { MAP_MAX_ZOOM } from "@/lib/map/initial-view"
 
 // Configurar el ícono del marcador
 const markerIcon = new L.Icon({
@@ -20,17 +21,6 @@ const markerIcon = new L.Icon({
   shadowSize: [41, 41],
 })
 
-// Límites geográficos de Posadas, Misiones, Argentina (compartidos con el mapa de reportes)
-const POSADAS_BOUNDS: L.LatLngBoundsExpression = [
-  [POSADAS_AREA[0], POSADAS_AREA[1]], // Suroeste
-  [POSADAS_AREA[2], POSADAS_AREA[3]], // Noreste
-]
-
-// Verificar si una coordenada está dentro de los límites de Posadas
-const isWithinPosadasBounds = (lat: number, lng: number): boolean => {
-  const bounds = L.latLngBounds(POSADAS_BOUNDS)
-  return bounds.contains([lat, lng])
-}
 
 interface LocationPickerMapProps {
   onLocationSelect: (lat: number, lon: number) => void
@@ -39,9 +29,9 @@ interface LocationPickerMapProps {
 }
 
 /**
- * Muestra y controla un marcador en el mapa que permite seleccionar una ubicación mediante clics y notifica las coordenadas seleccionadas.
+ * Muestra y controla un marcador que permite seleccionar una ubicación mediante clics y notifica las coordenadas seleccionadas.
  *
- * Mantiene el estado del marcador inicializado desde `initialLat`/`initialLon` si se proporcionan, actualiza su posición al hacer clic en el mapa (solo si la ubicación está dentro de los límites definidos) y llama a `onLocationSelect` con la latitud y longitud seleccionadas.
+ * Mantiene el marcador sincronizado con `initialLat`/`initialLon`, actualiza su posición al hacer clic (solo dentro del área de cobertura) y llama a `onLocationSelect` con la latitud y longitud seleccionadas.
  *
  * @param onLocationSelect - Callback invocado con `lat` y `lon` cuando el usuario selecciona una ubicación válida
  * @param initialLat - Latitud inicial del marcador; si no se proporciona, el marcador no aparece hasta que el usuario haga clic
@@ -50,17 +40,16 @@ interface LocationPickerMapProps {
  */
 function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPickerMapProps) {
   const [position, setPosition] = useState<[number, number] | null>(
-    initialLat && initialLon ? [initialLat, initialLon] : null
+    initialLat != null && initialLon != null ? [initialLat, initialLon] : null
   )
 
   const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng
       
-      // Validar que la ubicación esté dentro de los límites de Posadas
-      if (!isWithinPosadasBounds(lat, lng)) {
-        toast.error("Ubicación fuera de rango", {
-          description: "Por favor, selecciona una ubicación dentro de Posadas, Misiones."
+      if (!isWithinReportCoverage(lat, lng)) {
+        toast.error("Ubicación fuera del área de cobertura", {
+          description: "Elegí un punto en Posadas, Garupá o Candelaria."
         })
         return
       }
@@ -76,7 +65,8 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
   })
 
   useEffect(() => {
-    if (initialLat && initialLon) {
+    if (initialLat != null && initialLon != null) {
+      setPosition([initialLat, initialLon])
       map.setView([initialLat, initialLon], 13)
     }
   }, [initialLat, initialLon, map])
@@ -87,9 +77,8 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
 /**
  * Renderiza un mapa interactivo centrado en Posadas que permite seleccionar una ubicación vía clic.
  *
- * Muestra un marcador en la posición seleccionada (o en las coordenadas iniciales si se proporcionan),
- * restringe la navegación al área definida de Posadas y llama a `onLocationSelect` con latitud y longitud
- * cuando el usuario selecciona una posición válida dentro de los límites.
+ * Mantiene el marcador en la posición seleccionada y restringe la navegación
+ * a la zona de Posadas, Garupá y Candelaria.
  *
  * @param onLocationSelect - Callback que recibe `(lat, lon)` cuando el usuario selecciona una ubicación válida
  * @param initialLat - Latitud inicial opcional para centrar el mapa y posicionar el marcador
@@ -108,8 +97,8 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon }: 
   }
 
   // Posadas, Misiones, Argentina como centro por defecto
-  const defaultCenter: [number, number] = initialLat && initialLon 
-    ? [initialLat, initialLon] 
+  const defaultCenter: [number, number] = initialLat != null && initialLon != null
+    ? [initialLat, initialLon]
     : [-27.3671, -55.8961]
 
   return (
@@ -120,17 +109,17 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon }: 
         style={{ height: "100%", width: "100%", zIndex: 0 }}
         scrollWheelZoom={true}
         zoomControl={true}
-        maxBounds={POSADAS_BOUNDS}
+        maxBounds={REPORT_COVERAGE_BOUNDS as L.LatLngBoundsExpression}
         maxBoundsViscosity={1.0}
-        minZoom={POSADAS_MIN_ZOOM}
+        minZoom={10}
         maxZoom={MAP_MAX_ZOOM}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution={`&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="${REPORT_COVERAGE_SOURCE.url}">${REPORT_COVERAGE_SOURCE.attribution}</a>`}
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <LocationMarker 
-          onLocationSelect={onLocationSelect} 
+        <LocationMarker
+          onLocationSelect={onLocationSelect}
           initialLat={initialLat}
           initialLon={initialLon}
         />
