@@ -123,11 +123,6 @@
     background-attachment: fixed;
   }
 
-  body:has(.app-header) {
-    background-color: rgb(255 255 255 / 0.45);
-    background-blend-mode: screen;
-  }
-
   body::before {
     content: "";
     position: fixed;
