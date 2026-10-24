@@ -11,6 +11,7 @@ import {
   validateUploadedReportThumbnail,
 } from "@/lib/media/report-image-validation.server"
 import { isAnonymousUser } from "@/lib/authz/roles"
+import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import {
   claimReportSubmission,
   hashClientIp,
@@ -28,6 +29,9 @@ const createReportSchema = z.object({
   lat: z.coerce.number().min(-90, "Seleccioná una ubicación en el mapa." ).max(90, "Seleccioná una ubicación en el mapa."),
   lon: z.coerce.number().min(-180, "Seleccioná una ubicación en el mapa.").max(180, "Seleccioná una ubicación en el mapa."),
   submissionId: z.string().uuid("No pudimos identificar el envío. Recargá la página e intentá nuevamente."),
+}).refine(({ lat, lon }) => isWithinReportCoverage(lat, lon), {
+  path: ["lat"],
+  message: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria.",
 })
 
 type ReportActorResult =
