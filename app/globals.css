@@ -119,7 +119,8 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     background-image: var(--map-background);
     background-position: center;
-    background-size: cover;
+    background-size: auto 100vh;
+    background-repeat: no-repeat;
     background-attachment: fixed;
   }
 

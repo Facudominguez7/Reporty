@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <section className="welcome-screen flex min-h-0 flex-1 items-center justify-center p-3 sm:p-6" aria-labelledby="welcome-title">
-      <div className="page-container items-center justify-center gap-4 px-5 py-6 text-center sm:gap-6 sm:px-10 sm:py-10">
+      <div className="page-container items-center justify-center gap-4 px-5 py-6 text-center sm:gap-6 sm:px-10 sm:py-10 md:!w-[40%]">
         <Image
           src="/logos/logoSinBg.png"
           alt="Reporty"
