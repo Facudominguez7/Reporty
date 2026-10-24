@@ -641,7 +641,7 @@ export default function NuevoReportePage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm text-muted-foreground">
-                      Marcá en el mapa dónde está el problema; no tiene que ser donde estás vos.
+                      Marcá en el mapa dónde está el problema.
                     </p>
                     <Button
                       type="button"
