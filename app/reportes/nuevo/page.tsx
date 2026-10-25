@@ -1,5 +1,7 @@
 "use client"
 
+/** Formulario ciudadano con resultado de fotografía independiente del reporte creado. */
+
 import type React from "react"
 import type { AuthError, User } from "@supabase/supabase-js"
 
@@ -109,6 +111,7 @@ const LocationPickerMap = dynamic(
  *
  * @returns El elemento JSX que renderiza la interfaz completa para crear y enviar un reporte.
  */
+/** Conserva el formulario y presenta estados de moderación sin pedir reenviar el texto. */
 export default function NuevoReportePage() {
   const [formData, setFormData] = useState({
     title: "",
@@ -353,6 +356,7 @@ export default function NuevoReportePage() {
     setCreatedReport(null)
   }
 
+  /** Envía una sola vez y diferencia revisión privada, rechazo y fallo de publicación. */
   const confirmSubmit = async () => {
     if (submitLockRef.current) return
     submitLockRef.current = true
@@ -360,7 +364,7 @@ export default function NuevoReportePage() {
     try {
       setIsSubmitting(true)
 
-      // Reuse the current session; create a guest one only if there is none.
+      // Reutilizar la sesión; crear una invitada solo si no existe.
       if (!user && !(await ensureGuestSession())) {
         return
       }
@@ -378,10 +382,6 @@ export default function NuevoReportePage() {
         payload.set("image", formData.images[0])
       }
 
-      if (formData.imageThumbnail) {
-        payload.set("imageThumbnail", formData.imageThumbnail)
-      }
-
       const result = await crearReporteAction(payload)
 
       if (!result.success) {
@@ -394,9 +394,14 @@ export default function NuevoReportePage() {
       const imageFailed = formData.images.length > 0 && !result.data.imageUploaded
 
       if (imageFailed) {
-        toast.warning("Reporte creado, pero hubo un error al subir la imagen.", {
-          description: "El reporte se creó correctamente pero sin imagen"
-        })
+        const moderacion = result.data.imageModeration
+        toast.warning(
+          moderacion?.estado === "REVIEW" ? "Reporte creado: fotografía pendiente de revisión"
+            : moderacion?.estado === "REJECTED" ? "Reporte creado: fotografía no publicada"
+            : moderacion?.estado === "APPROVED" ? "Reporte creado: publicación de fotografía pendiente"
+            : "Reporte creado sin fotografía",
+          { description: moderacion?.motivos[0] ?? "No necesitás reenviar el reporte. La fotografía no está publicada." },
+        )
       }
 
       toast.success(
@@ -749,7 +754,7 @@ export default function NuevoReportePage() {
                 >
                   <Send className="w-4 h-4" />
                   {isSubmitting
-                    ? "Enviando..."
+                    ? (formData.images.length > 0 ? "Procesando fotografía..." : "Enviando...")
                     : isOptimizingImage
                       ? "Optimizando imagen..."
                       : canSubmitReport
@@ -829,7 +834,7 @@ export default function NuevoReportePage() {
               {isSubmitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                  Enviando...
+                  {formData.images.length > 0 ? "Procesando fotografía..." : "Enviando..."}
                 </>
               ) : (
                 <>
