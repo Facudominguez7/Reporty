@@ -61,6 +61,25 @@ function plainText(lines: Array<string | null | undefined | false>) {
   return lines.filter(Boolean).join("\n\n");
 }
 
+/** Sólo el consumidor del outbox aporta el destinatario persistido. Payload estable para Resend. */
+export async function sendReportWithdrawalEmail({ destinatario, reporteId }: { destinatario: string; reporteId: number }) {
+  const advertencia = "Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material";
+  return getResendClient().emails.send({
+    from: SENDER,
+    to: [destinatario],
+    subject: "Advertencia: reporte retirado",
+    html: renderEmailLayout({
+      assetBaseUrl: getAppUrl(),
+      title: "Reporte retirado",
+      kicker: "Normas de contenido",
+      preheader: "Tu reporte fue retirado por la fotografía adjunta.",
+      heading: "Reporte retirado",
+      body: emailParagraph(advertencia),
+    }),
+    text: advertencia,
+  }, { idempotencyKey: `retiro-reporte/${reporteId}` });
+}
+
 export async function sendCommentNotificationEmail({
   ownerEmail,
   ownerUsername,

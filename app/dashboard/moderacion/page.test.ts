@@ -11,6 +11,16 @@ it.each([401, 403])("denegación %s no renderiza cola", async (estado) => {
   dobles.listar.mockRejectedValue({ estado })
   await expect(Pagina({ searchParams: Promise.resolve({}) })).rejects.toThrow(estado === 401 ? "/auth" : "/dashboard")
 })
+it.each([false, true])("retiro sin enlace al detalle; conciliación=%s sin email", async (conciliacion) => {
+  dobles.listar.mockResolvedValue([{ id: "solicitud", reporteId: 7, decision: "REJECTED", estado: "rechazada", motivos: ["Rechazo"], fecha: "2026-01-01", cargaPendiente: false, aviso: { estado: "reclamado", intentos: 2, conciliacion } }])
+  const html = renderToStaticMarkup(await Pagina({ searchParams: Promise.resolve({ terminales: "1" }) }))
+  expect(html).toContain("retirado")
+  expect(html).not.toContain('href="/reportes/7"')
+  expect(html).not.toContain("/api/moderacion/imagenes/solicitud")
+  expect(html).toContain(conciliacion ? "Confirmar aceptación verificada en Resend" : "Reintentar advertencia al autor")
+  expect(html).not.toContain(conciliacion ? "Reintentar advertencia al autor" : "Confirmar aceptación verificada en Resend")
+  expect(html).not.toContain("@ejemplo")
+})
 it("página dinámica no indexable con preview exclusivamente autenticado", async () => {
   dobles.listar.mockResolvedValue([{ id: "solicitud", reporteId: 7, decision: "REVIEW", estado: "pendiente", motivos: ["Revisión necesaria"], fecha: "2026-01-01", cargaPendiente: false }])
   const html = renderToStaticMarkup(await Pagina({ searchParams: Promise.resolve({ pagina: "0" }) }))

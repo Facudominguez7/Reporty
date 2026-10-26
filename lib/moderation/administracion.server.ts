@@ -5,11 +5,13 @@ import { createClient } from "@/utils/supabase/server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { getUserRoleContext, isAdminRole } from "@/lib/authz/roles"
 import { publicarImagenModerada, limpiarImagenModerada } from "./imagenes-reporte.server"
+import { enviarAvisoRetiro, VENTANA_REINTENTO_MS } from "./avisos-retiro.server"
 
-export type OperacionRevision = "aprobar" | "rechazar" | "recuperar" | "publicar" | "limpiar"
+export type OperacionRevision = "aprobar" | "rechazar" | "recuperar" | "publicar" | "limpiar" | "avisar" | "conciliar"
 export type ImagenAdministrativa = {
   id: string; reporteId: number; decision: string; estado: string
   motivos: string[]; fecha: string; cargaPendiente: boolean
+  aviso?: { estado: string; conciliacion: boolean; intentos: number }
 }
 export type ResultadoRevision = { exito: boolean; mensaje: string; reporteId?: number }
 type Evidencia = {
@@ -44,11 +46,23 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
     .in("estado_publicacion", terminales ? ["publicada", "rechazada"] : ["pendiente", "reclamada", "publicando"])
     .order("creado_at", { ascending: true }).order("id", { ascending: true }).range(indice * 20, indice * 20 + 19)
   if (error) fallar(503)
-  return (data ?? []).map((fila) => ({
+  return Promise.all((data ?? []).map(async (fila) => ({
     id: fila.id, reporteId: fila.reporte_id, decision: fila.decision, estado: fila.estado_publicacion,
     fecha: fila.creado_at, cargaPendiente: fila.motivos?.includes("carga_privada_pendiente") ?? false,
     motivos: describirMotivos(fila.motivos),
-  }))
+    ...(fila.decision === "REJECTED" ? { aviso: await estadoAviso(servicio, fila.reporte_id) } : {}),
+  })))
+}
+
+/** Proyección administrativa sin email ni token del outbox. */
+async function estadoAviso(servicio: ReturnType<typeof createAdminClient>, reporteId: number) {
+  const { data, error } = await servicio.from("avisos_retiro_reporte")
+    .select("estado,intentos,primer_intento_at").eq("reporte_id", reporteId).maybeSingle()
+  if (error) fallar(503)
+  // Rechazos históricos anteriores a T1 no se completan infiriendo destinatarios.
+  if (!data) return undefined
+  return { estado: data.estado, intentos: data.intentos,
+    conciliacion: data.estado === "reclamado" && Date.now() - Date.parse(data.primer_intento_at) >= VENTANA_REINTENTO_MS }
 }
 
 /** Traduce únicamente códigos conocidos: motivos remotos o futuros nunca se filtran al HTML. */
@@ -102,10 +116,25 @@ export async function obtenerImagenPrivada(id: string): Promise<Uint8Array> {
 /** Ejecuta decisiones humanas y recuperaciones explícitas; nunca llama al clasificador ni reserva cuota. */
 export async function ejecutarRevision(id: string, operacion: OperacionRevision): Promise<ResultadoRevision> {
   validarId(id)
-  if (!["aprobar", "rechazar", "recuperar", "publicar", "limpiar"].includes(operacion)) fallar(400)
+  if (!["aprobar", "rechazar", "recuperar", "publicar", "limpiar", "avisar", "conciliar"].includes(operacion)) fallar(400)
   const { servicio, administradorId } = await autorizarAdministracion()
   const fila = await leerEvidencia(servicio, id)
   const conflicto = { exito: false, mensaje: "Otro proceso modificó la imagen. Actualizá la cola antes de decidir." }
+  if (operacion === "avisar" || operacion === "conciliar") {
+    if (fila.decision !== "REJECTED" || fila.estado_publicacion !== "rechazada") return conflicto
+    if (operacion === "avisar") {
+      await enviarAvisoRetiro(servicio, fila.reporte_id)
+      return { exito: true, reporteId: fila.reporte_id, mensaje: "Reporte retirado. Aviso procesado; consultá su estado antes de reintentar." }
+    }
+    const aviso = await servicio.from("avisos_retiro_reporte").select("token").eq("reporte_id", fila.reporte_id).single()
+    if (aviso.error || !aviso.data) fallar(503)
+    const conciliacion = await servicio.rpc("conciliar_aviso_retiro", {
+      p_reporte_id: fila.reporte_id, p_token: aviso.data.token, p_administrador: administradorId,
+    })
+    if (conciliacion.error) fallar(503)
+    return conciliacion.data === true
+      ? { exito: true, reporteId: fila.reporte_id, mensaje: "Aceptación conciliada y auditada; no se envió otro correo." } : conflicto
+  }
   if (operacion === "limpiar") {
     if (!["publicada", "rechazada"].includes(fila.estado_publicacion)) return conflicto
     const avisos = await limpiarImagenModerada(servicio, id)
@@ -128,8 +157,9 @@ export async function ejecutarRevision(id: string, operacion: OperacionRevision)
     if (data !== true) return conflicto
     if (recuperar) return { exito: true, reporteId: fila.reporte_id, mensaje: "Reclamo devuelto a revisión. El token anterior quedó invalidado; ahora podés decidir." }
     if (operacion === "rechazar") {
+      await enviarAvisoRetiro(servicio, fila.reporte_id)
       const avisos = await limpiarImagenModerada(servicio, id)
-      return { exito: true, reporteId: fila.reporte_id, mensaje: avisos.length ? "Rechazo registrado; limpieza pendiente. Reintentá el borrado." : "Rechazo registrado y archivo privado eliminado." }
+      return { exito: true, reporteId: fila.reporte_id, mensaje: avisos.length ? "Reporte retirado; advertencia registrada y limpieza pendiente. Reintentá el borrado." : "Reporte retirado; advertencia registrada y archivo privado eliminado." }
     }
   }
   const publicacion = await publicarImagenModerada(servicio, id)

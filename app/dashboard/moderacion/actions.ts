@@ -8,7 +8,7 @@ export async function revisarImagenAction(id: string, operacion: OperacionRevisi
   try {
     const resultado = await ejecutarRevision(id, operacion)
     if (resultado.exito) {
-      for (const ruta of ["/dashboard/moderacion", `/reportes/${resultado.reporteId}`, "/mapa", "/reportes", "/mis-reportes", "/dashboard"]) revalidatePath(ruta)
+      for (const ruta of ["/dashboard/moderacion", `/reportes/${resultado.reporteId}`, "/mapa", "/reportes", "/mis-reportes", "/dashboard", "/", "/sitemap.xml"]) revalidatePath(ruta)
     }
     return resultado
   } catch {

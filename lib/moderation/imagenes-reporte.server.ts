@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { prepararImagenReporte } from "@/lib/media/preparar-imagen-reporte.server"
 import { moderarImagen } from "./sightengine.server"
 import type { ResultadoModeracion } from "./tipos"
+import { enviarAvisoRetiro } from "./avisos-retiro.server"
 
 const BUCKET_PRIVADO = "reportes-pendientes"
 const BUCKET_PUBLICO = "reportes"
@@ -38,7 +39,7 @@ function resultado(fila?: FilaImagen | null, advertencias: string[] = []): Resul
   return {
     estado,
     publicada: fila?.estado_publicacion === "publicada",
-    motivos: estado === "REJECTED" ? ["La fotografía no cumple las normas y no se publicó. Tu reporte fue creado."]
+    motivos: estado === "REJECTED" ? ["Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material"]
       : estado === "REVIEW" ? ["La fotografía quedó privada y pendiente de revisión. No necesitás reenviar el reporte."]
       : estado === "ERROR_PRIVADO" ? ["No pudimos guardar la fotografía. Tu reporte fue creado sin imagen."] : [],
     advertencias,
@@ -233,6 +234,12 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
       p_id: id, p_token: reclamo.data, p_decision: clasificacion.decision, p_motivos: clasificacion.motivos,
     })
     if (decision.error || decision.data !== true) return resultado(fila, ["decision_pendiente"])
+    // El CAS exitoso ya retiró el reporte. Una lectura posterior fallida no debe ocultarlo.
+    if (clasificacion.decision === "REJECTED") {
+      fila = { ...fila, decision: "REJECTED", estado_publicacion: "rechazada" }
+      await enviarAvisoRetiro(supabase, fila.reporte_id)
+      return resultado(fila, await limpiarImagenModerada(supabase, id))
+    }
     fila = await leerFila(supabase, id)
     if (fila.decision === "APPROVED") return publicarImagenModerada(supabase, id)
     return resultado(fila, await limpiarImagenModerada(supabase, id))

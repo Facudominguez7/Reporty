@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { sendCommentNotificationEmail, sendCrewAssignedEmail, sendStatusNotificationEmail } from "./report-notifications"
+import { sendCommentNotificationEmail, sendCrewAssignedEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail } from "./report-notifications"
 
 const mocks = vi.hoisted(() => ({ send: vi.fn() }))
 
@@ -46,6 +46,19 @@ describe("report notification emails", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://reporty.com.ar")
   })
 
+  it("advierte sólo al destinatario persistido, sin enlace al reporte retirado", async () => {
+    await sendReportWithdrawalEmail({ destinatario: "autor@ejemplo.invalid", reporteId: 42 })
+    const email = sentEmail()
+    expect(email.to).toEqual(["autor@ejemplo.invalid"])
+    expect(email.from).toBe("Reporty <team@notificaciones.reporty.com.ar>")
+    expect(email.text).toBe("Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material")
+    expect(email.html).toContain(email.text)
+    expect(email.html).toContain(`src="${LOGO}"`)
+    expect(email.html).not.toContain("/reportes/")
+    expect(email).not.toHaveProperty("cc")
+    expect(email).not.toHaveProperty("bcc")
+    expect(mocks.send.mock.calls[0][1]).toEqual({ idempotencyKey: "retiro-reporte/42" })
+  })
   it("sends the new comment email with the refreshed layout", async () => {
     await sendCommentNotificationEmail({
       ownerEmail: "ana@example.com",

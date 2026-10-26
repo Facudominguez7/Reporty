@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import sharp from "sharp"
 import type { SupabaseClient } from "@supabase/supabase-js"
-const { moderarImagen } = vi.hoisted(() => ({ moderarImagen: vi.fn() }))
+const { moderarImagen, enviarAviso } = vi.hoisted(() => ({ moderarImagen: vi.fn(), enviarAviso: vi.fn() }))
+vi.mock("./avisos-retiro.server", () => ({ enviarAvisoRetiro: enviarAviso }))
 vi.mock("./sightengine.server", () => ({ moderarImagen }))
 import { moderarYGuardarImagenReporte, publicarImagenModerada, limpiarImagenModerada } from "./imagenes-reporte.server"
 
@@ -93,6 +94,7 @@ async function entrada() {
 }
 
 beforeEach(() => {
+  enviarAviso.mockReset().mockResolvedValue("pendiente")
   moderarImagen.mockReset().mockResolvedValue({ decision: "APPROVED", motivos: [], operaciones: 2, proveedor: "simulado" })
 })
 describe("orquestación de imágenes", () => {
@@ -127,6 +129,17 @@ describe("orquestación de imágenes", () => {
     const miniatura = e.objetos.get(`reportes/${e.fila().id}/publicacion-miniatura`)!
     expect((await sharp(miniatura).metadata()).format).toBe("webp")
     expect(Buffer.from(miniatura).includes(Buffer.from("contenido no moderado"))).toBe(false)
+  })
+  it("retiro automático advierte y entrega outbox aun si falla correo, sin publicación", async () => {
+    const e = escenario()
+    moderarImagen.mockResolvedValue({ decision: "REJECTED", motivos: [], operaciones: 2 })
+    const r = await moderarYGuardarImagenReporte(e.supabase, await entrada())
+    expect(r.estado).toBe("REJECTED")
+    expect(r.publicada).toBe(false)
+    expect(r.motivos).toEqual(["Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material"])
+    expect(enviarAviso).toHaveBeenCalledWith(e.supabase, 7)
+    expect(e.eventos).not.toContain("subir:reportes")
+    expect(e.eventos).not.toContain("acreditar_puntos_reporte")
   })
   it("rechazada no puede publicarse mediante el helper reutilizable", async () => {
     const e = escenario()

@@ -28,9 +28,9 @@ export default async function PaginaModeracion({ searchParams }: { searchParams:
       <Link href="/dashboard" className="text-sm underline">Volver al dashboard</Link>
       <p className="text-sm text-muted-foreground">Administración · Evidencia privada</p>
       <h1 className="text-3xl font-semibold tracking-tight">Moderación de fotografías</h1>
-      <p className="text-muted-foreground">Revisá el contexto antes de publicar. Las decisiones no cambian el estado municipal del reporte.</p>
+      <p className="text-muted-foreground">Revisá el contexto antes de publicar. Rechazar retira el reporte, revierte su premio de creación registrado y genera una advertencia privada al autor.</p>
     </header>
-    <nav aria-label="Vistas de moderación" className="flex gap-4">
+    <nav aria-label="Vistas de moderación" className="flex flex-wrap gap-4">
       <Link className="underline" aria-current={!terminales ? "page" : undefined} href="/dashboard/moderacion">Revisión y publicación pendientes</Link>
       <Link className="underline" aria-current={terminales ? "page" : undefined} href="?terminales=1">Auditoría y limpieza de terminales</Link>
     </nav>

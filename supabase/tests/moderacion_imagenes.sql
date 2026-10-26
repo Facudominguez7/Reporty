@@ -1,7 +1,16 @@
--- Ejecutar exclusivamente en una base aislada vacía con migraciones aplicadas.
+-- Ejecutar exclusivamente en Supabase local con migraciones aplicadas.
 -- Toda fixture es sintética y se revierte al finalizar.
 \set ON_ERROR_STOP on
 begin;
+set local lock_timeout = '5s';
+-- Aislar la cuota sin UPDATE/DELETE de reservas preexistentes. El cambio de
+-- nombre y la tabla vacía son transaccionales; ROLLBACK restaura el original.
+alter table public.reservas_moderacion rename to reservas_moderacion_prueba_original;
+create table public.reservas_moderacion
+  (like public.reservas_moderacion_prueba_original including all);
+alter table public.reservas_moderacion enable row level security;
+revoke all on public.reservas_moderacion from public, anon, authenticated;
+grant select, insert, update on public.reservas_moderacion to service_role;
 
 -- Un permiso permisivo adicional no debe poder reabrir el almacenamiento.
 create policy prueba_moderacion_permisiva on storage.objects
@@ -89,7 +98,8 @@ $$;
 reset role;
 
 -- Reloj sintético solo en fixtures; no se duerme ni se consume proveedor.
-update public.reservas_moderacion set creado_at = clock_timestamp() - interval '2 seconds', operaciones = 500;
+update public.reservas_moderacion set creado_at = clock_timestamp() - interval '2 seconds', operaciones = 500
+where solicitud = '00000000-0000-0000-0000-000000000001';
 set local role service_role;
 do $$
 begin
@@ -100,7 +110,8 @@ end;
 $$;
 reset role;
 -- Se bajan los acumulados diarios sin liberar consumo mensual: mes en UTC.
-update public.reservas_moderacion set operaciones = 1;
+update public.reservas_moderacion set operaciones = 1
+where solicitud = '00000000-0000-0000-0000-000000000001';
 insert into public.reservas_moderacion(solicitud, operaciones, creado_at)
 select '00000000-0000-0000-0000-000000000010', 1,
   clock_timestamp() - interval '2 seconds';
@@ -132,8 +143,9 @@ insert into auth.users(id, email) values
   ('00000000-0000-0000-0000-000000000091','propietario-moderacion@ejemplo.invalid'),
   ('00000000-0000-0000-0000-000000000092','admin-moderacion@ejemplo.invalid');
 update public.profiles set rol_id = 1 where id = '00000000-0000-0000-0000-000000000092';
-insert into public.reportes(usuario_id,titulo,lat,lon,estado_id)
-values ('00000000-0000-0000-0000-000000000091','Prueba sintética de moderación',0,0,null);
+insert into public.reportes(id,usuario_id,titulo,lat,lon,estado_id) values
+ (-92001,'00000000-0000-0000-0000-000000000091','Prueba sintética de moderación',0,0,null),
+ (-92002,'00000000-0000-0000-0000-000000000091','Prueba sintética publicable',0,0,null);
 insert into public.moderacion_imagenes(id,reporte_id,propietario_id,hash_sha256,path_privado)
 select '00000000-0000-0000-0000-000000000093',id,
   '00000000-0000-0000-0000-000000000091',repeat('a',64),
@@ -188,7 +200,7 @@ insert into public.moderacion_imagenes(id,reporte_id,propietario_id,hash_sha256,
 select '00000000-0000-0000-0000-000000000096',id,
   '00000000-0000-0000-0000-000000000091',repeat('c',64),
   '00000000-0000-0000-0000-000000000091/00000000-0000-0000-0000-000000000096'
-from public.reportes where titulo = 'Prueba sintética de moderación';
+from public.reportes where id = -92002;
 set local role service_role;
 do $$
 declare v_token uuid;
@@ -234,7 +246,7 @@ reset role;
 -- La política histórica requiere un reporte visible: URL legacy sin bucket/path.
 insert into public.fotos_reporte(reporte_id,url)
 select id,'https://ejemplo.invalid/legacy-moderacion' from public.reportes
-where titulo = 'Prueba sintética de moderación';
+where id = -92002;
 set local role anon;
 do $$
 begin

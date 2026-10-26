@@ -1,7 +1,8 @@
 /** Pruebas de autorización DB, lectura privada y decisiones administrativas CAS. */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createHash } from "node:crypto"
-const dobles = vi.hoisted(() => ({ sesion: vi.fn(), servicio: vi.fn(), rol: vi.fn(), publicar: vi.fn(), limpiar: vi.fn() }))
+const dobles = vi.hoisted(() => ({ sesion: vi.fn(), servicio: vi.fn(), rol: vi.fn(), publicar: vi.fn(), limpiar: vi.fn(), avisar: vi.fn() }))
+vi.mock("./avisos-retiro.server", () => ({ enviarAvisoRetiro: dobles.avisar, VENTANA_REINTENTO_MS: (24 * 60 - 5) * 60000 }))
 vi.mock("server-only", () => ({}))
 vi.mock("@/utils/supabase/server", () => ({ createClient: dobles.sesion }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: dobles.servicio }))
@@ -20,6 +21,7 @@ beforeEach(() => {
   consulta = Object.fromEntries(["select", "eq", "in", "order", "range"].map((clave) => [clave, vi.fn()]))
   for (const metodo of Object.values(consulta)) metodo.mockReturnValue(consulta)
   consulta.single = vi.fn(async () => ({ data: fila, error: null }))
+  consulta.maybeSingle = vi.fn(async () => ({ data: fila, error: null }))
   consulta.range.mockImplementation(async () => ({ data: [fila], error: null }))
   rpc = vi.fn(async () => ({ data: true, error: null }))
   descarga = vi.fn(async () => ({ data: new Blob([bytes]), error: null }))
@@ -28,6 +30,7 @@ beforeEach(() => {
   dobles.servicio.mockReturnValue({ from: vi.fn(() => consulta), rpc, storage: { from: vi.fn(() => ({ download: descarga })) } })
   dobles.publicar.mockResolvedValue({ publicada: true, advertencias: [] })
   dobles.limpiar.mockResolvedValue([])
+  dobles.avisar.mockResolvedValue("pendiente")
 })
 describe("frontera administrativa", () => {
   it.each([2, 3, 4, 5, null])("niega rol DB %s aunque metadata diga Admin antes del servicio", async (roleId) => {
@@ -35,7 +38,7 @@ describe("frontera administrativa", () => {
     await expect(autorizarAdministracion()).rejects.toMatchObject({ estado: 403 })
     await expect(listarImagenesAdministrativas(0)).rejects.toMatchObject({ estado: 403 })
     await expect(obtenerImagenPrivada(id)).rejects.toMatchObject({ estado: 403 })
-    for (const operacion of ["aprobar", "rechazar", "recuperar", "publicar", "limpiar"] as const) await expect(ejecutarRevision(id, operacion)).rejects.toMatchObject({ estado: 403 })
+    for (const operacion of ["aprobar", "rechazar", "recuperar", "publicar", "limpiar", "avisar", "conciliar"] as const) await expect(ejecutarRevision(id, operacion)).rejects.toMatchObject({ estado: 403 })
     expect(dobles.servicio).not.toHaveBeenCalled(); expect(dobles.publicar).not.toHaveBeenCalled(); expect(dobles.limpiar).not.toHaveBeenCalled()
   })
   it("sin sesión devuelve 401 sin consultar rol ni servicio", async () => {
@@ -86,6 +89,44 @@ describe("frontera administrativa", () => {
     await ejecutarRevision(id, operacion)
     expect(rpc).toHaveBeenCalledWith("decidir_imagen_moderacion", expect.objectContaining({ p_administrador: "admin-verificado", p_decision: operacion === "aprobar" ? "APPROVED" : "REJECTED" }))
     expect(operacion === "aprobar" ? dobles.publicar : dobles.limpiar).toHaveBeenCalled()
+  })
+  it("rechazo comunica retiro aunque el aviso quede pendiente", async () => {
+    expect(await ejecutarRevision(id, "rechazar")).toMatchObject({ exito: true, reporteId: 7, mensaje: expect.stringContaining("Reporte retirado") })
+    expect(dobles.avisar).toHaveBeenCalledWith(dobles.servicio.mock.results[0].value, 7)
+  })
+  it("reintento de aviso sólo para rechazo terminal, sin proveedor de clasificación", async () => {
+    fila.decision = "REJECTED"; fila.estado_publicacion = "rechazada"
+    expect(await ejecutarRevision(id, "avisar")).toMatchObject({ exito: true })
+    expect(dobles.avisar).toHaveBeenCalledTimes(1)
+    expect(dobles.publicar).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+  it("conciliación usa actor verificado y token releído, nunca envía", async () => {
+    fila.decision = "REJECTED"; fila.estado_publicacion = "rechazada"
+    expect(await ejecutarRevision(id, "conciliar")).toMatchObject({ exito: true, mensaje: expect.stringContaining("no se envió") })
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("conciliar_aviso_retiro", { p_reporte_id: 7, p_token: "token-original", p_administrador: "admin-verificado" })
+    expect(dobles.avisar).not.toHaveBeenCalled()
+    expect(dobles.publicar).not.toHaveBeenCalled()
+  })
+  it("conciliación CAS perdida no afirma éxito ni entrega", async () => {
+    fila.decision = "REJECTED"; fila.estado_publicacion = "rechazada"
+    rpc.mockResolvedValue({ data: false, error: null })
+    expect(await ejecutarRevision(id, "conciliar")).toMatchObject({ exito: false })
+    expect(dobles.avisar).not.toHaveBeenCalled()
+  })
+  it("proyección del aviso no revela destinatario ni token", async () => {
+    Object.assign(fila, { decision: "REJECTED", estado_publicacion: "rechazada", destinatario: "privado@ejemplo.invalid", estado: "reclamado", intentos: 3, primer_intento_at: new Date(Date.now() - 86400000).toISOString() })
+    const lista = await listarImagenesAdministrativas(0, true)
+    expect(lista[0].aviso).toEqual({ estado: "reclamado", intentos: 3, conciliacion: true })
+    expect(JSON.stringify(lista)).not.toMatch(/privado@|token-original/)
+  })
+  it("terminal histórica sin outbox sigue visible sin inferir destinatario", async () => {
+    fila.decision = "REJECTED"; fila.estado_publicacion = "rechazada"
+    consulta.maybeSingle.mockResolvedValue({ data: null, error: null })
+    const lista = await listarImagenesAdministrativas(0, true)
+    expect(lista[0].aviso).toBeUndefined()
+    expect(dobles.avisar).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
   })
   it("CAS perdedor no publica ni limpia", async () => {
     rpc.mockResolvedValue({ data: false, error: null })

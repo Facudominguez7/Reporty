@@ -35,7 +35,7 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
 
   return <Card>
     <CardHeader>
-      <CardTitle><Link href={`/reportes/${imagen.reporteId}`}>Reporte #{imagen.reporteId}</Link></CardTitle>
+      <CardTitle>{imagen.decision === "REJECTED" ? `Reporte #${imagen.reporteId} · retirado` : <Link href={`/reportes/${imagen.reporteId}`}>Reporte #{imagen.reporteId}</Link>}</CardTitle>
       <CardDescription><time dateTime={imagen.fecha}>{imagen.fecha}</time></CardDescription>
       <Badge variant="secondary">{etiquetas[imagen.estado] ?? "Requiere atención"}</Badge>
     </CardHeader>
@@ -45,6 +45,7 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
       <ul className="list-disc pl-5 text-sm text-muted-foreground">{imagen.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
       {reclamada ? <p className="text-sm">Una clasificación pudo interrumpirse. Recuperar invalida su token y devuelve la foto a revisión humana; no vuelve a consumir proveedor. No recuperes trabajo activo.</p> : null}
       {terminal ? <p className="text-sm">La decisión y su auditoría se conservan. El borrado privado puede reintentarse si falló.</p> : null}
+      {imagen.aviso ? <p className="text-sm">Advertencia al autor: {imagen.aviso.conciliacion ? "aceptación incierta; requiere conciliación, sin reenvío" : imagen.aviso.estado}. Intentos: {imagen.aviso.intentos}. No se muestra el destinatario.</p> : null}
       <p role="status" aria-live="polite" aria-atomic="true">{pendiente ? "Procesando decisión…" : mensaje}</p>
     </CardContent>
     <CardFooter className="flex flex-wrap gap-2">
@@ -52,6 +53,11 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
       {reclamada ? <Button variant="outline" disabled={pendiente} onClick={() => actuar("recuperar")}>Recuperar clasificación interrumpida</Button> : null}
       {publicando ? <Button disabled={pendiente} onClick={() => actuar("publicar")}>Reintentar publicación sin reclasificar</Button> : null}
       {terminal ? <Button variant="outline" disabled={pendiente} onClick={() => actuar("limpiar")}>Reintentar limpieza privada</Button> : null}
+      {imagen.aviso && ["pendiente", "reclamado"].includes(imagen.aviso.estado) && !imagen.aviso.conciliacion ? <Button className="h-auto whitespace-normal text-left" variant="outline" disabled={pendiente} onClick={() => actuar("avisar")}>Reintentar advertencia al autor</Button> : null}
+      {imagen.aviso?.conciliacion ? <div className="space-y-2">
+        <p className="text-sm">Verificá manualmente en Resend que aceptó el correo con la clave retiro-reporte/{imagen.reporteId}. Sin evidencia, dejá el aviso pendiente: no confirmes ni reenvíes.</p>
+        <Button className="h-auto whitespace-normal text-left" variant="outline" disabled={pendiente} onClick={() => { if (window.confirm("¿Verificaste en Resend la aceptación de este aviso? Se registrará tu identidad; no se enviará otro correo.")) actuar("conciliar") }}>Confirmar aceptación verificada en Resend</Button>
+      </div> : null}
     </CardFooter>
   </Card>
 }

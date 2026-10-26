@@ -3,7 +3,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { PUNTOS, sumarPuntos } from "@/database/queries/puntos"
+import { PUNTOS } from "@/database/queries/puntos"
 import {
   crearReporte,
   type CrearReporteParams,
@@ -32,7 +32,7 @@ export type CreateReportWorkflowResult = {
   isGuest: boolean
 }
 
-/** Conserva puntos e invitados aunque la fotografía requiera revisión o sea rechazada. */
+/** Acredita creación sólo por ledger serializado con retiro; nunca compensa fallos por fuera. */
 export async function crearReporteWorkflow(
   supabase: SupabaseClient,
   input: CreateReportWorkflowInput,
@@ -51,27 +51,36 @@ export async function crearReporteWorkflow(
   }
   const reporte = await crearReporte(supabase, input)
 
-  const imageModeration = input.image
+  let imageModeration = input.image
     ? await moderarYGuardarImagenReporte(supabase, { reporteId: reporte.id, propietarioId: input.usuarioId, image: input.image })
     : null
-  const imageUploaded = imageModeration?.publicada === true
+  let imageUploaded = imageModeration?.publicada === true
 
   // Los invitados nunca reciben puntos; la RPC de base de datos también lo impide.
   const isGuest = input.actorIsAnonymous === true || isGuestRole(roleResult.data?.roleId)
   let pointsAwarded = 0
 
-  if (!isGuest) {
-    const pointsResult = await sumarPuntos(
-      supabase,
-      input.usuarioId,
-      PUNTOS.CREAR_REPORTE,
-      "Crear nuevo reporte",
-    )
+  if (!isGuest && imageModeration?.estado !== "REJECTED") {
+    try {
+      const { data, error } = await supabase.rpc("acreditar_puntos_reporte", { p_reporte_id: reporte.id })
+      if (!error && data === true) pointsAwarded = PUNTOS.CREAR_REPORTE
+    } catch {
+      // La creación ya ocurrió. Sin fallback agregado ni repetir premios inciertos.
+    }
+  }
 
-    if (pointsResult.success) {
-      pointsAwarded = PUNTOS.CREAR_REPORTE
-    } else {
-      console.error("No pudimos acreditar puntos tras crear el reporte:", pointsResult.error)
+  // Una decisión administrativa pudo retirar el reporte entre moderación y premio.
+  // La RPC serializa el saldo; esta lectura evita anunciar una publicación ya retirada.
+  if (input.image && imageModeration?.estado !== "REJECTED") {
+    const { data: actual } = await supabase.from("reportes").select("deleted_at").eq("id", reporte.id).single()
+    if (actual?.deleted_at) {
+      pointsAwarded = 0
+      imageUploaded = false
+      imageModeration = {
+        estado: "REJECTED", publicada: false,
+        motivos: ["Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material"],
+        advertencias: [],
+      }
     }
   }
 
