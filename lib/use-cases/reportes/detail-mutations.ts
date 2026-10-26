@@ -14,6 +14,7 @@ import {
   sendCommentNotificationEmail,
   sendStatusNotificationEmail,
 } from "@/lib/notifications/report-notifications"
+import { APORTES_COMUNITARIOS, type AporteKey } from "@/lib/reportes/aportes"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -32,6 +33,7 @@ type CommentView = {
   reporte_id: number
   usuario_id: string
   contenido: string
+  tipo_aporte?: string | null
   created_at: string
   profiles: CommentProfileRelation
 }
@@ -588,7 +590,7 @@ export async function votarReparadoWorkflow(
       report,
       REPORT_STATE_IDS.REPARADO,
       actorUserId,
-      "Marcado como reparado por 1 voto de usuarios",
+      `Marcado como reparado por ${voteResult.count} ${voteResult.count === 1 ? "voto" : "votos"} de usuarios`,
     )
 
     if (!stateResult.success) {
@@ -611,12 +613,13 @@ export async function crearComentarioWorkflow(
   supabase: SupabaseClient,
   reporteId: number,
   actorUserId: string,
-  contenido: string,
+  aporteKey: AporteKey,
 ): Promise<MutationResult<CommentCreateResult>> {
-  const cleanContent = contenido.trim()
-  if (!cleanContent) {
-    return { success: false, error: "El comentario no puede estar vacío." }
+  const aporte = APORTES_COMUNITARIOS.find(({ key }) => key === aporteKey)
+  if (!aporte) {
+    return { success: false, error: "Elegí una actualización válida." }
   }
+  const cleanContent = aporte.label
 
   const reportResult = await getReportContext(supabase, reporteId)
   if (!reportResult.success) {
@@ -639,6 +642,7 @@ export async function crearComentarioWorkflow(
       reporte_id: reporteId,
       usuario_id: actorUserId,
       contenido: cleanContent,
+      tipo_aporte: aporte.key,
     })
     .select(
       `

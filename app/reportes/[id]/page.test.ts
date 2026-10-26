@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import ReporteDetallePage from "./page"
+import { crearComentarioAction } from "./actions"
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
   obtenerGestionOperativaDetalle: vi.fn(),
+  crearComentarioWorkflow: vi.fn(),
 }))
 
 vi.mock("./reporte-detalle-client", () => ({ ReporteDetalleClient: () => null }))
@@ -16,6 +18,11 @@ vi.mock("@/lib/moderation/estado-publico.server", () => ({
 }))
 vi.mock("@/utils/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: mocks.getUser } }),
+}))
+vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => ({}) }))
+vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/use-cases/reportes")>()),
+  crearComentarioWorkflow: mocks.crearComentarioWorkflow,
 }))
 vi.mock("@/database/queries/reportes/[id]/index", () => ({
   getReporteDetalle: async () => ({ data: { id: 5, estado_id: 1 }, error: null }),
@@ -47,6 +54,7 @@ const renderPage = () => ReporteDetallePage({ params: Promise.resolve({ id: "5" 
 describe("ReporteDetallePage", () => {
   beforeEach(() => {
     vi.stubEnv("CUADRILLAS_ENABLED", undefined)
+    mocks.crearComentarioWorkflow.mockReset().mockResolvedValue({ success: true, data: {} })
     mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
     mocks.obtenerGestionOperativaDetalle.mockReset().mockResolvedValue({
       puedeOperar: false,
@@ -114,5 +122,24 @@ describe("ReporteDetallePage", () => {
     expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), "user-1", 5)
     expect(page.props.gestionOperativa).toMatchObject({ puedeOperar: false })
     expect(page.props.puedeVotar).toBe(true)
+  })
+
+  it.each([false, true])("allows authenticated %s sessions but never a missing session", async (isAnonymous) => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: isAnonymous } } })
+    await crearComentarioAction(5, "problema_sigue_igual")
+    expect(mocks.crearComentarioWorkflow).toHaveBeenCalledWith(expect.anything(), 5, "user-1", "problema_sigue_igual")
+
+    mocks.crearComentarioWorkflow.mockClear()
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    const result = await crearComentarioAction(5, "problema_sigue_igual")
+    expect(result.success).toBe(false)
+    expect(mocks.crearComentarioWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("rejects free-text contributions before reaching the workflow", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: false } } })
+    const result = await crearComentarioAction(5, "Llamé a la municipalidad")
+    expect(result.success).toBe(false)
+    expect(mocks.crearComentarioWorkflow).not.toHaveBeenCalled()
   })
 })

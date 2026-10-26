@@ -1,6 +1,7 @@
 "use server"
 
 import { z } from "zod"
+import { parseAporteKey } from "@/lib/reportes/aportes"
 
 import {
   cambiarEstadoAdminWorkflow,
@@ -19,7 +20,7 @@ import { createClient } from "@/utils/supabase/server"
 
 const reportIdSchema = z.coerce.number().int().positive()
 const commentIdSchema = z.coerce.number().int().positive()
-const commentSchema = z.string().trim().min(1).max(1000)
+const contributionSchema = z.string().refine((value) => parseAporteKey(value) !== null, "Elegí una actualización válida.")
 const stateIdSchema = z.coerce.number().int().positive()
 
 const GUEST_COMMUNITY_ERROR = "Vinculá tu correo para comentar y votar. Como invitado podés crear y seguir tus reportes."
@@ -78,10 +79,11 @@ export async function votarReparadoAction(reporteId: number) {
   }
 }
 
-export async function crearComentarioAction(reporteId: number, contenido: string) {
+export async function crearComentarioAction(reporteId: number, aporte: string) {
   try {
     const parsedReportId = reportIdSchema.parse(reporteId)
-    const parsedComment = commentSchema.parse(contenido)
+    const parsedAporte = parseAporteKey(contributionSchema.parse(aporte))
+    if (!parsedAporte) return { success: false as const, error: "Elegí una actualización válida." }
     const supabase = await createClient()
     const {
       data: { user },
@@ -91,12 +93,7 @@ export async function crearComentarioAction(reporteId: number, contenido: string
       return { success: false as const, error: "Tenés que iniciar sesión para comentar." }
     }
 
-    const { data: contextoRol } = await getUserRoleContext(supabase, user.id)
-    if (!canParticipateInCommunity(user, contextoRol?.roleId)) {
-      return { success: false as const, error: GUEST_COMMUNITY_ERROR }
-    }
-
-    return await crearComentarioWorkflow(createAdminClient(), parsedReportId, user.id, parsedComment)
+    return await crearComentarioWorkflow(createAdminClient(), parsedReportId, user.id, parsedAporte)
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos publicar tu comentario.") }
   }

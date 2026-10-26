@@ -1,0 +1,1 @@
+drop index if exists public.idx_comentarios_reporte_usuario_aporte_unico;

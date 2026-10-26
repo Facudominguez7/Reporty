@@ -121,6 +121,15 @@ export type ReporteDetalleInicial = {
   isAdmin: boolean;
   estados: Estado[];
   comentarios: Comentario[];
+  historialEstados: Array<{
+    id: number;
+    reporte_id: number;
+    estado_nuevo_id: number;
+    created_at: string;
+    comentario: string | null;
+    estado_nuevo?: { id: number; nombre: string } | { id: number; nombre: string }[] | null;
+    usuario?: { username: string | null } | null;
+  }>;
   fechaCambioEstado: string | null;
   gestionOperativa: GestionOperativaDetalle | null;
   /** Computed on the server from the visitor's role; the vote actions check it again. */
@@ -139,6 +148,7 @@ export function ReporteDetalleClient({
   isAdmin,
   estados,
   comentarios,
+  historialEstados,
   fechaCambioEstado,
   gestionOperativa,
   puedeVotar,
@@ -580,6 +590,7 @@ export function ReporteDetalleClient({
 
             <CommentsSection
               comments={comentarios}
+              statusHistory={historialEstados}
               currentUser={currentUser}
               reportOwnerId={reporte.usuario_id}
               isAdmin={isAdmin}

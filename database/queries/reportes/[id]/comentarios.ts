@@ -7,6 +7,7 @@ export type Comentario = {
   reporte_id: number;
   usuario_id: string;
   contenido: string;
+  tipo_aporte?: string | null;
   created_at: string;
   profiles:
     | {
@@ -49,6 +50,7 @@ export async function getComentariosReporte(
       reporte_id,
       usuario_id,
       contenido,
+      tipo_aporte,
       created_at
     `
     )
