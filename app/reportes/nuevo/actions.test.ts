@@ -31,6 +31,27 @@ beforeEach(() => {
 })
 
 describe("crearReporteAction", () => {
+  it("preserves generic UUID submission identifiers accepted before the upgrade", async () => {
+    const datos = formulario()
+    datos.set("submissionId", "e1a3f644-9c40-0a40-0000-000000000001")
+    expect(await crearReporteAction(datos)).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
+    expect(dobles.claim.mock.calls[0][1].submissionId).toBe("e1a3f644-9c40-0a40-0000-000000000001")
+  })
+  it.each([
+    ["titulo", "ab", "El título debe tener al menos 3 caracteres."],
+    ["descripcion", "corta", "La descripción debe tener al menos 10 caracteres."],
+    ["categoriaId", "0", "Seleccioná una categoría."],
+    ["categoriaId", "bad", "Expected number, received nan"],
+    ["prioridadId", "1.5", "Expected integer, received float"],
+    ["submissionId", "bad", "No pudimos identificar el envío. Recargá la página e intentá nuevamente."],
+  ])("preserves malformed %s feedback before external work", async (field, value, error) => {
+    const datos = formulario(); datos.set(field, value)
+    expect(await crearReporteAction(datos)).toEqual({ success: false, error })
+    expect(createClient).not.toHaveBeenCalled()
+    expect(createAdminClient).not.toHaveBeenCalled()
+    expect(dobles.claim).not.toHaveBeenCalled()
+    expect(dobles.workflow).not.toHaveBeenCalled()
+  })
   it("sin sesión no procesa imagen inválida ni llama workflow", async () => {
     createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } })
     const datos = formulario(); datos.set("image", new File(["invalida"], "x.svg", { type: "image/svg+xml" }))

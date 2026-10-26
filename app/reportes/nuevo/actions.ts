@@ -21,11 +21,12 @@ import { createClient } from "@/utils/supabase/server"
 const createReportSchema = z.object({
   titulo: z.string().trim().min(3).max(120),
   descripcion: z.string().trim().min(10).max(5000),
-  categoriaId: z.coerce.number().int().positive("Seleccioná una categoría."),
-  prioridadId: z.coerce.number().int().positive("Seleccioná una prioridad."),
+  categoriaId: z.coerce.number({ error: "Expected number, received nan" }).refine(Number.isInteger, "Expected integer, received float").positive("Seleccioná una categoría."),
+  prioridadId: z.coerce.number({ error: "Expected number, received nan" }).refine(Number.isInteger, "Expected integer, received float").positive("Seleccioná una prioridad."),
   lat: z.coerce.number().min(-90, "Seleccioná una ubicación en el mapa." ).max(90, "Seleccioná una ubicación en el mapa."),
   lon: z.coerce.number().min(-180, "Seleccioná una ubicación en el mapa.").max(180, "Seleccioná una ubicación en el mapa."),
-  submissionId: z.string().uuid("No pudimos identificar el envío. Recargá la página e intentá nuevamente."),
+  // Zod 3 accepted generic UUID-shaped identifiers, not only RFC-versioned UUIDs.
+  submissionId: z.guid("No pudimos identificar el envío. Recargá la página e intentá nuevamente."),
 }).refine(({ lat, lon }) => isWithinReportCoverage(lat, lon), {
   path: ["lat"],
   message: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria.",
