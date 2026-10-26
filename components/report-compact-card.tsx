@@ -11,6 +11,7 @@ import {
 } from "@/components/report-card"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
 type ReportCompactCardProps = {
   id: number
@@ -22,6 +23,7 @@ type ReportCompactCardProps = {
   image: string | null
   /** Optional category label; rendered only when provided. */
   category?: string
+  isReportListing?: boolean
 }
 
 export function ReportCompactCard({
@@ -33,6 +35,7 @@ export function ReportCompactCard({
   createdAt,
   image,
   category,
+  isReportListing = false,
 }: ReportCompactCardProps) {
   return (
     <Link href={`/reportes/${id}`} className="group block">
@@ -51,10 +54,22 @@ export function ReportCompactCard({
             </div>
 
             <div className="min-w-0 flex-1 space-y-1.5">
-              <h2 className="line-clamp-1 text-sm font-bold tracking-tight text-foreground sm:text-base" title={title}>
+              <h2
+                className={cn(
+                  "line-clamp-1 font-bold tracking-tight text-foreground",
+                  isReportListing ? "text-xs" : "text-sm sm:text-base",
+                )}
+                title={title}
+              >
                 {title}
               </h2>
-              <p className="line-clamp-1 text-xs leading-5 text-muted-foreground sm:text-sm" title={description || undefined}>
+              <p
+                className={cn(
+                  "line-clamp-1 text-muted-foreground",
+                  isReportListing ? "text-[11px] leading-4" : "text-xs leading-5 sm:text-sm",
+                )}
+                title={description || undefined}
+              >
                 {description || "Sin descripción adicional."}
               </p>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground sm:text-xs">

@@ -20,7 +20,7 @@ T3 | S1-S6 | parent: independent security review, contracts/SQL and visible-brow
 T4 | S1,S2,S5 | parent: apply feature migration to authorized local Supabase DB and verify schema/route query | done; local-only, migration recorded; commit: 4118547
 T5 | S1,S2,S5 | parent: apply exactly the feature migration to authorized Supabase production and register version; no deploy | blocked; production schema applied/verified, CLI history reconciliation pending; commit: —
 T6 | S2,S5,S7 | parent: allow multiple active contributions, remove unique index, test same-key repeats and per-entry history | done; local migration and SQL regression pass; commit: 4118547
-T7 | S8,S9 | parent + worker: allow guest sign-out with irreversible warning and move button below email-link card; test order | done; focused tests and lint pass; commit: —
+T7 | S8,S9 | parent + worker: allow guest sign-out with irreversible warning and move button below email-link card; test order | done; focused tests and lint pass; commit: 94e710a
 T8 | S2,S5,S7,S8,S9 | parent: independent risk/reliability verification after updated behavior and layout | done; all five specs pass; commit: —
 
 ## Log
@@ -65,3 +65,4 @@ L37 — T6 implementado: nueva migración `20261026180000_allow_multiple_report_
 L38 — T8 verifier `mvpgxb3b-8-nqrc`: S2/S5/S7/S8/S9 PASS; confirmó en source/tests el premio por aporte exitoso, reversión al borrar, exclusión del dueño, allowlist/legacy/admin delete, logout anónimo fail-closed y ubicación final del botón; preservación de `page-container`. Corrió 4 archivos/21 tests pass, `npx tsc --noEmit` pass, ESLint focal sin errores (3 warnings) y query de esquema local confirmó migration 20261026180000 y ausencia del índice. No corrió SQL regression en su turno; parent ya la había ejecutado tras aplicar la migración, exit0 con rollback y sin fixtures. UX navegador y producción siguen sin verificar/aplicar.
 L39 — User request, verbatim: «commitea y pushea hasta aca». S6 actualizado para autorizar commits de trabajo y push del feature branch; siguen prohibidos deploy, PR y cambios SQL remotos.
 L40 — Commit de actividad `4118547` (13 archivos, 398 líneas cambiadas; migrations/tests incluidos). Native ASSESS del rango comprometido padre `f05a5e0` → `4118547` devolvió `unassessable`, sin candidato y sin escalación de verifier, porque el worktree aún contiene archivos no rastreados destinados a commits posteriores; no se inició review lifecycle.
+L41 — Delivery strategy/slice boundary before the next commit: slice 1 is `4118547` (398 changed lines, unified report activity); slice 2 starts at `94e710a` (guest sign-out) and will close with the separate report-list layout work unit. No PR is created; only the user-authorized push is in scope.
