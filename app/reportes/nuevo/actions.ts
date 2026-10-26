@@ -1,15 +1,12 @@
 "use server"
 
+/** Entrada autenticada de creación con control de envíos previo al procesamiento de imágenes. */
+
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { ZodError, z } from "zod"
 
 import { crearReporteWorkflow, mutationErrorMessage } from "@/lib/use-cases/reportes"
-import { isAcceptedReportImageType } from "@/lib/media/report-images"
-import {
-  validateUploadedReportImage,
-  validateUploadedReportThumbnail,
-} from "@/lib/media/report-image-validation.server"
 import { isAnonymousUser } from "@/lib/authz/roles"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import {
@@ -38,13 +35,7 @@ type ReportActorResult =
   | { success: true; user: User }
   | { success: false; error: string }
 
-/**
- * Resolves who is creating the report from the validated session. The anonymous guest
- * session is created by the browser (`signInAnonymously` in the new-report page) right
- * before calling this action, so Supabase Auth applies its per-IP anonymous sign-in
- * limit and CAPTCHA to the visitor's own IP instead of the server's shared egress IP.
- * This action never creates identities.
- */
+/** Verifica la sesión existente; las identidades invitadas se crean desde el navegador con CAPTCHA. */
 async function resolveReportActor(sessionClient: SupabaseClient): Promise<ReportActorResult> {
   const {
     data: { user },
@@ -60,34 +51,13 @@ async function resolveReportActor(sessionClient: SupabaseClient): Promise<Report
   return { success: true, user }
 }
 
-async function getOptionalImage(formData: FormData) {
-  const image = formData.get("image")
-
-  if (!(image instanceof File) || image.size === 0) {
-    return null
-  }
-
-  if (!isAcceptedReportImageType(image.type)) {
-    throw new Error("La imagen debe estar en formato JPG, PNG o WebP.")
-  }
-
-  const metadata = await validateUploadedReportImage(image)
-
-  return { file: image, metadata }
+/** Extrae el archivo sin leer bytes; toda validación costosa ocurre después de autorizar el rol. */
+function obtenerImagenOpcional(formData: FormData) {
+  const imagen = formData.get("image")
+  return imagen instanceof File && imagen.size > 0 ? imagen : null
 }
 
-async function getOptionalThumbnail(formData: FormData) {
-  const thumbnail = formData.get("imageThumbnail")
-
-  if (!(thumbnail instanceof File) || thumbnail.size === 0) {
-    return null
-  }
-
-  const metadata = await validateUploadedReportThumbnail(thumbnail)
-
-  return { file: thumbnail, metadata }
-}
-
+/** Crea el reporte con sesión y claim válidos, sin confiar en miniaturas enviadas por el cliente. */
 export async function crearReporteAction(formData: FormData) {
   try {
     const parsedInput = createReportSchema.parse({
@@ -99,28 +69,6 @@ export async function crearReporteAction(formData: FormData) {
       lon: formData.get("lon"),
       submissionId: formData.get("submissionId"),
     })
-
-    const image = await getOptionalImage(formData)
-    const imageThumbnail = await getOptionalThumbnail(formData)
-
-    if (imageThumbnail && !image) {
-      return {
-        success: false as const,
-        error: "No pudimos validar la miniatura sin la imagen principal.",
-      }
-    }
-
-    if (
-      image &&
-      imageThumbnail &&
-      (imageThumbnail.metadata.width > image.metadata.width ||
-        imageThumbnail.metadata.height > image.metadata.height)
-    ) {
-      return {
-        success: false as const,
-        error: "La miniatura generada no coincide con la imagen principal.",
-      }
-    }
 
     const sessionClient = await createClient()
     const actor = await resolveReportActor(sessionClient)
@@ -150,8 +98,7 @@ export async function crearReporteAction(formData: FormData) {
         prioridadId: parsedInput.prioridadId,
         lat: parsedInput.lat,
         lon: parsedInput.lon,
-        image: image?.file ?? null,
-        imageThumbnail: imageThumbnail?.file ?? null,
+        image: obtenerImagenOpcional(formData),
       })
 
       if (!result.success) {

@@ -1,5 +1,7 @@
 "use client"
 
+/** Formulario ciudadano con resultado de fotografía independiente del reporte creado. */
+
 import type React from "react"
 import type { AuthError, User } from "@supabase/supabase-js"
 
@@ -63,6 +65,8 @@ type CreatedReport = {
   isGuest: boolean
   pointsAwarded: number
   imageFailed: boolean
+  withdrawn: boolean
+  imageMessage: string
 }
 
 const getPriorityTone = (priority: string) => {
@@ -109,6 +113,7 @@ const LocationPickerMap = dynamic(
  *
  * @returns El elemento JSX que renderiza la interfaz completa para crear y enviar un reporte.
  */
+/** Conserva el formulario y presenta estados de moderación sin pedir reenviar el texto. */
 export default function NuevoReportePage() {
   const [formData, setFormData] = useState({
     title: "",
@@ -353,6 +358,7 @@ export default function NuevoReportePage() {
     setCreatedReport(null)
   }
 
+  /** Envía una sola vez y diferencia revisión privada, rechazo y fallo de publicación. */
   const confirmSubmit = async () => {
     if (submitLockRef.current) return
     submitLockRef.current = true
@@ -360,7 +366,7 @@ export default function NuevoReportePage() {
     try {
       setIsSubmitting(true)
 
-      // Reuse the current session; create a guest one only if there is none.
+      // Reutilizar la sesión; crear una invitada solo si no existe.
       if (!user && !(await ensureGuestSession())) {
         return
       }
@@ -378,10 +384,6 @@ export default function NuevoReportePage() {
         payload.set("image", formData.images[0])
       }
 
-      if (formData.imageThumbnail) {
-        payload.set("imageThumbnail", formData.imageThumbnail)
-      }
-
       const result = await crearReporteAction(payload)
 
       if (!result.success) {
@@ -392,14 +394,21 @@ export default function NuevoReportePage() {
       }
 
       const imageFailed = formData.images.length > 0 && !result.data.imageUploaded
+      const withdrawn = result.data.imageModeration?.estado === "REJECTED"
+      const imageMessage = result.data.imageModeration?.motivos[0] ?? "La fotografía no está publicada."
 
       if (imageFailed) {
-        toast.warning("Reporte creado, pero hubo un error al subir la imagen.", {
-          description: "El reporte se creó correctamente pero sin imagen"
-        })
+        const moderacion = result.data.imageModeration
+        toast.warning(
+          moderacion?.estado === "REVIEW" ? "Reporte creado: fotografía pendiente de revisión"
+            : moderacion?.estado === "REJECTED" ? "Reporte retirado por la fotografía adjunta"
+            : moderacion?.estado === "APPROVED" ? "Reporte creado: publicación de fotografía pendiente"
+            : "Reporte creado sin fotografía",
+          { description: moderacion?.motivos[0] ?? "No necesitás reenviar el reporte. La fotografía no está publicada." },
+        )
       }
 
-      toast.success(
+      if (!withdrawn) toast.success(
         result.data.pointsAwarded > 0
           ? `¡Reporte creado exitosamente! +${result.data.pointsAwarded} puntos`
           : "¡Reporte creado exitosamente!",
@@ -410,6 +419,8 @@ export default function NuevoReportePage() {
         isGuest: result.data.isGuest,
         pointsAwarded: result.data.pointsAwarded,
         imageFailed,
+        withdrawn,
+        imageMessage,
       })
       // Refresh server components so the navigation reflects the new guest session.
       router.refresh()
@@ -466,23 +477,24 @@ export default function NuevoReportePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle2 className="size-5 text-primary" aria-hidden="true" />
-              ¡Reporte enviado!
+              {createdReport.withdrawn ? "Reporte retirado" : "¡Reporte enviado!"}
             </CardTitle>
             <CardDescription>
-              {createdReport.pointsAwarded > 0
+              {createdReport.withdrawn ? "El reporte no está disponible y no otorga puntos."
+                : createdReport.pointsAwarded > 0
                 ? `Gracias por ayudar a tu ciudad. Sumaste ${createdReport.pointsAwarded} puntos.`
                 : "Gracias por ayudar a tu ciudad. Ya podés seguir su estado."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {createdReport.isGuest && (
+            {createdReport.isGuest && !createdReport.withdrawn && (
               <p className="rounded-xl border border-border/70 bg-muted/60 p-3 text-sm text-muted-foreground">
                 Reportaste como invitado. Podés volver a ver tus reportes desde este navegador en Mis reportes, o
                 guardar tu cuenta con tu correo para no perderlos.
               </p>
             )}
             {createdReport.imageFailed && (
-              <p className="text-sm text-muted-foreground">El reporte se publicó sin la fotografía.</p>
+              <p role="status" className="text-sm text-muted-foreground">{createdReport.imageMessage}</p>
             )}
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild className="flex-1">
@@ -491,9 +503,9 @@ export default function NuevoReportePage() {
                   Ver mis reportes
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="flex-1">
+              {!createdReport.withdrawn && <Button asChild variant="outline" className="flex-1">
                 <Link href={`/reportes/${createdReport.reportId}`}>Ver el reporte</Link>
-              </Button>
+              </Button>}
             </div>
             <Button type="button" variant="ghost" className="w-full" onClick={startNewReport}>
               Crear otro reporte
@@ -749,7 +761,7 @@ export default function NuevoReportePage() {
                 >
                   <Send className="w-4 h-4" />
                   {isSubmitting
-                    ? "Enviando..."
+                    ? (formData.images.length > 0 ? "Procesando fotografía..." : "Enviando...")
                     : isOptimizingImage
                       ? "Optimizando imagen..."
                       : canSubmitReport
@@ -815,7 +827,7 @@ export default function NuevoReportePage() {
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Al confirmar, ganarás <span className="font-bold text-primary">{PUNTOS.CREAR_REPORTE} puntos</span> por crear este reporte.
+                    Podés sumar <span className="font-bold text-primary">{PUNTOS.CREAR_REPORTE} puntos</span> si el reporte no es retirado por la fotografía. El rechazo retira el reporte y revierte su premio.
                   </p>
                 )}
               </div>
@@ -829,7 +841,7 @@ export default function NuevoReportePage() {
               {isSubmitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                  Enviando...
+                  {formData.images.length > 0 ? "Procesando fotografía..." : "Enviando..."}
                 </>
               ) : (
                 <>

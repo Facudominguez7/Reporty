@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCategorias, getEstados, getPrioridades } from "@/database/queries/reportes/get-reportes"
 import { getDashboardPageData } from "@/database/queries/dashboard"
-import { isGuestRole, puedeOperarCuadrillas } from "@/lib/authz/roles"
+import { isAdminRole, isGuestRole, puedeOperarCuadrillas } from "@/lib/authz/roles"
 import { cuadrillasHabilitadas } from "@/lib/features"
 import { cn } from "@/lib/utils"
 import { getUserInitials } from "@/lib/identity/display"
@@ -59,6 +59,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               title="Analíticas de reportes"
               description="Resumen de reportes y tiempos de atención."
             />
+            {isAdminRole(data.roleId) ? (
+              <Button variant="outline" asChild><Link href="/dashboard/moderacion">Revisar fotografías privadas</Link></Button>
+            ) : null}
             {/* Two columns only when the crews button sits next to the resolution time. */}
             <div className={cn("grid gap-3", mostrarCuadrillas && data.tiempoResolucion && "md:grid-cols-2")}>
               {data.tiempoResolucion && (

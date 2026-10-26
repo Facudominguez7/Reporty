@@ -13,6 +13,7 @@ import { verificarEsAdmin, getEstados } from "@/database/queries/admin/index";
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
 import { getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
+import { tieneFotografiaPendiente } from "@/lib/moderation/estado-publico.server";
 import { obtenerGestionOperativaDetalle } from "@/lib/use-cases/cuadrillas/detalle-operativo";
 import { ReporteDetalleClient, type ReporteDetalleInicial } from "./reporte-detalle-client";
 
@@ -115,6 +116,7 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
 
     return {
       reporte: encontrado,
+      fotografiaPendiente: encontrado ? await tieneFotografiaPendiente(encontrado.id) : false,
       currentUser: user ? { id: user.id, is_anonymous: user.is_anonymous } : null,
       isAdmin: adminResult?.isAdmin ?? false,
       estados: adminResult?.isAdmin ? adminResult.estados : [],

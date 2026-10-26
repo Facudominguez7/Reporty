@@ -256,6 +256,30 @@
       "sessions": 3,
       "memories": 3,
       "prompts": 0
+    },
+    {
+      "id": "8093138e",
+      "created_by": "facu",
+      "created_at": "2026-10-26T13:37:02.174540938Z",
+      "sessions": 16,
+      "memories": 12,
+      "prompts": 0
+    },
+    {
+      "id": "3beb3c68",
+      "created_by": "facu",
+      "created_at": "2026-10-26T13:42:11.308939327Z",
+      "sessions": 1,
+      "memories": 1,
+      "prompts": 0
+    },
+    {
+      "id": "fe5f7ec1",
+      "created_by": "facu",
+      "created_at": "2026-10-26T14:14:33.602714855Z",
+      "sessions": 2,
+      "memories": 2,
+      "prompts": 0
     }
   ]
 }
