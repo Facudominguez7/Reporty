@@ -36,7 +36,8 @@ export const esquemaCuadrilla = z.object({
     .transform(normalizarOpcionalANull),
 })
 
-export type DatosCuadrillaInput = z.infer<typeof esquemaCuadrilla>
+/** Contrato histórico del consumidor: datos ya validados y normalizados. */
+export type DatosCuadrillaInput = z.output<typeof esquemaCuadrilla>
 
 /** Estados operativos válidos que puede tomar una asignación de cuadrilla. */
 export const esquemaEstadoOperativo = z.enum(["en_progreso", "cerrada"])

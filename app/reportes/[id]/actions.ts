@@ -10,7 +10,7 @@ import {
   eliminarComentarioPropioWorkflow,
   eliminarReporteAdminWorkflow,
   eliminarReportePropioWorkflow,
-  mutationErrorMessage,
+  mutationErrorMessage as workflowErrorMessage,
   votarNoExisteWorkflow,
   votarReparadoWorkflow,
 } from "@/lib/use-cases/reportes"
@@ -18,10 +18,29 @@ import { canParticipateInCommunity, getUserRoleContext, puedeOperarCuadrillas } 
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
-const reportIdSchema = z.coerce.number().int().positive()
-const commentIdSchema = z.coerce.number().int().positive()
+// Keep the existing integer policy: Zod 4's .int() additionally enforces safe integers.
+const reportIdSchema = z.coerce.number().refine(Number.isInteger, "Expected integer, received float").positive()
+const commentIdSchema = reportIdSchema
 const contributionSchema = z.string().refine((value) => parseAporteKey(value) !== null, "Elegí una actualización válida.")
-const stateIdSchema = z.coerce.number().int().positive()
+const stateIdSchema = reportIdSchema
+
+/** Preserve the scalar validation errors already returned by these public actions. */
+function mutationErrorMessage(error: unknown, fallback: string) {
+  if (!(error instanceof z.ZodError)) return workflowErrorMessage(error, fallback)
+  return JSON.stringify(error.issues.map((issue) => {
+    if (issue.code === "too_small") {
+      return { code: issue.code, minimum: issue.minimum, type: "number", inclusive: issue.inclusive, exact: false, message: "Number must be greater than 0", path: issue.path }
+    }
+    if ((issue.code === "custom" && issue.message === "Expected integer, received float") || (issue.code === "invalid_type" && "received" in issue && issue.received === "Infinity")) {
+      return { code: "invalid_type", expected: "integer", received: "float", message: "Expected integer, received float", path: issue.path }
+    }
+    if (issue.code === "invalid_type" && "received" in issue && issue.received === "NaN") {
+      return { code: issue.code, expected: "number", received: "nan", path: issue.path, message: "Expected number, received nan" }
+    }
+    if (issue.code === "custom") return { code: issue.code, message: issue.message, path: issue.path }
+    return issue
+  }), null, 2)
+}
 
 const GUEST_COMMUNITY_ERROR = "Vinculá tu correo para comentar y votar. Como invitado podés crear y seguir tus reportes."
 

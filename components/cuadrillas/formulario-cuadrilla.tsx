@@ -2,12 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
+import type { z } from "zod"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { esquemaCuadrilla, type DatosCuadrillaInput } from "@/app/dashboard/cuadrillas/esquemas"
+import { esquemaCuadrilla } from "@/app/dashboard/cuadrillas/esquemas"
 
 type ValorInicialFormulario = {
   nombre: string
@@ -15,10 +16,21 @@ type ValorInicialFormulario = {
   telefono?: string | null
 }
 
+// The Server Action parses schema input again; leave normalization to that boundary.
+export const resolverFormularioCuadrilla = zodResolver(esquemaCuadrilla, undefined, { raw: true })
+
+export function valoresInicialesFormularioCuadrilla(valorInicial?: ValorInicialFormulario) {
+  return {
+    nombre: valorInicial?.nombre ?? "",
+    descripcion: valorInicial?.descripcion ?? "",
+    telefono: valorInicial?.telefono ?? "",
+  }
+}
+
 type FormularioCuadrillaProps = {
   valorInicial?: ValorInicialFormulario
   enviando: boolean
-  onEnviar: (datos: DatosCuadrillaInput) => void
+  onEnviar: (datos: z.input<typeof esquemaCuadrilla>) => void
 }
 
 /**
@@ -31,14 +43,10 @@ export function FormularioCuadrilla({ valorInicial, enviando, onEnviar }: Formul
     register,
     handleSubmit,
     formState: { errors, isValid },
-  } = useForm<DatosCuadrillaInput>({
-    resolver: zodResolver(esquemaCuadrilla),
+  } = useForm<z.input<typeof esquemaCuadrilla>, unknown, z.input<typeof esquemaCuadrilla>>({
+    resolver: resolverFormularioCuadrilla,
     mode: "onChange",
-    defaultValues: {
-      nombre: valorInicial?.nombre ?? "",
-      descripcion: valorInicial?.descripcion ?? null,
-      telefono: valorInicial?.telefono ?? null,
-    },
+    defaultValues: valoresInicialesFormularioCuadrilla(valorInicial),
   })
 
   return (

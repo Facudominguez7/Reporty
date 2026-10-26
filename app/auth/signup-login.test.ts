@@ -1,13 +1,14 @@
 import { AuthApiError, AuthRetryableFetchError, AuthWeakPasswordError } from "@supabase/supabase-js"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { crearContrasenaCuenta, login, signup } from "./actions"
+import { crearContrasenaCuenta, login, signup, solicitarRecuperacionContrasena, vincularCorreoInvitado } from "./actions"
 
 const mocks = vi.hoisted(() => ({
   signUp: vi.fn(),
   signInWithPassword: vi.fn(),
   getUser: vi.fn(),
   updateUser: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
 }))
@@ -24,6 +25,7 @@ vi.mock("@/utils/supabase/server", () => ({
       signInWithPassword: mocks.signInWithPassword,
       getUser: mocks.getUser,
       updateUser: mocks.updateUser,
+      resetPasswordForEmail: mocks.resetPasswordForEmail,
     },
   }),
 }))
@@ -50,6 +52,25 @@ const loginForm = () => {
   form.set("next", "/reportes/nuevo")
   return form
 }
+
+describe("email schema consumers", () => {
+  beforeEach(() => vi.resetAllMocks())
+
+  it.each([vincularCorreoInvitado, solicitarRecuperacionContrasena])("rejects malformed email before provider calls", async (action) => {
+    const form = new FormData(); form.set("email", "not-an-email")
+    expect(await action(undefined, form)).toEqual({ error: "Ingresá un correo electrónico válido." })
+    expect(mocks.getUser).not.toHaveBeenCalled()
+    expect(mocks.updateUser).not.toHaveBeenCalled()
+    expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled()
+  })
+
+  it("preserves recovery email normalization and callback", async () => {
+    mocks.resetPasswordForEmail.mockResolvedValue({ error: null })
+    const form = new FormData(); form.set("email", "  ANA@Example.COM  ")
+    expect(await solicitarRecuperacionContrasena(undefined, form)).toEqual({ message: "Si existe una cuenta con ese correo, te enviamos un enlace para crear una nueva contraseña. Abrilo desde este mismo navegador." })
+    expect(mocks.resetPasswordForEmail).toHaveBeenCalledExactlyOnceWith("ana@example.com", { redirectTo: "https://reporty.com.ar/auth/callback?next=%2Fauth%2Fnueva-contrasena" })
+  })
+})
 
 const apiError = (message: string, status: number, code: string) => new AuthApiError(message, status, code)
 
