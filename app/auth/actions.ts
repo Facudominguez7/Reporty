@@ -268,17 +268,16 @@ export async function signup(_prevState: AuthFormState | void, formData: FormDat
 /**
  * Resultado de `signout`. La acción no redirige ni arma textos: el cliente decide qué
  * mostrar y adónde navegar.
- * - `guest`: la sesión es de invitado y no se cierra, porque perdería sus reportes.
  * - `failed`: Supabase no pudo cerrar la sesión y el usuario sigue conectado.
  */
-export type SignOutResult = { ok: true } | { ok: false; reason: 'guest' | 'failed' }
+export type SignOutResult = { ok: true } | { ok: false; reason: 'failed' }
 
 /**
  * Cierra la sesión en todos los dispositivos (el alcance por defecto de Supabase, explícito
  * acá porque la interfaz lo comunica) y refresca el layout autenticado.
  *
- * Las sesiones de invitado se rechazan acá y no solo en la interfaz: una identidad anónima
- * no se puede recuperar, así que cerrarla deja sus reportes sin dueño accesible.
+ * La acción solo se invoca después de que la interfaz confirma el cierre, incluso para
+ * identidades anónimas que perderán acceso a sus reportes.
  */
 export async function signout(): Promise<SignOutResult> {
   const supabase = await createClient()
@@ -291,10 +290,6 @@ export async function signout(): Promise<SignOutResult> {
   // AuthSessionMissingError solo indica que no hay sesión, y cerrarla no tiene riesgo.
   if (userError && !isAuthSessionMissingError(userError)) {
     return { ok: false, reason: 'failed' }
-  }
-
-  if (isAnonymousUser(user)) {
-    return { ok: false, reason: 'guest' }
   }
 
   const { error } = await supabase.auth.signOut({ scope: 'global' })

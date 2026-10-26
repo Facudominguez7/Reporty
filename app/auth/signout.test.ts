@@ -36,12 +36,13 @@ describe("signout", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout")
   })
 
-  it("refuses to sign out a guest session", async () => {
+  it("signs out an anonymous identity after the user confirms", async () => {
     mocks.getUser.mockResolvedValueOnce(userResult(guestUser))
+    mocks.signOut.mockResolvedValueOnce({ error: null })
 
-    await expect(signout()).resolves.toEqual({ ok: false, reason: "guest" })
-    expect(mocks.signOut).not.toHaveBeenCalled()
-    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+    await expect(signout()).resolves.toEqual({ ok: true })
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "global" })
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout")
   })
 
   it("does not sign out when the session cannot be checked, since it may belong to a guest", async () => {

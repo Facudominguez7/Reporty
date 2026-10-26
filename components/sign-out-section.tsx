@@ -23,15 +23,12 @@ const SIGN_OUT_ERROR = "No pudimos cerrar la sesión"
 
 const SIGN_OUT_ERROR_DESCRIPTIONS = {
   failed: "Por favor, intenta nuevamente",
-  guest: "Las cuentas de invitado no pueden cerrar sesión: perderían el acceso a sus reportes.",
 } as const
 
 /**
- * Account section with the sign-out action, confirmed in a dialog. Render it only for accounts
- * with email and password; `signout` also refuses guest sessions on the server, because a guest
- * that signs out loses access to its reports for good.
+ * Sign-out action confirmed in a dialog. Guests receive an explicit irreversible-access warning.
  */
-export function SignOutSection() {
+export function SignOutSection({ guest = false }: { guest?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -74,8 +71,9 @@ export function SignOutSection() {
               <AlertDialogHeader>
                 <AlertDialogTitle>¿Cerrar sesión?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Vas a salir de tu cuenta en todos los dispositivos donde la tengas abierta. Para volver a entrar vas a
-                  necesitar tu email y tu contraseña.
+                  {guest
+                    ? "Esta sesión anónima no se puede recuperar. Si cerrás sesión, perderás el acceso para administrar los reportes que creaste como invitado."
+                    : "Vas a salir de tu cuenta en todos los dispositivos donde la tengas abierta. Para volver a entrar vas a necesitar tu email y tu contraseña."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

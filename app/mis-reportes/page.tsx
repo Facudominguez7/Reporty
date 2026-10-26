@@ -10,6 +10,7 @@ import { LinkEmailForm } from "@/components/guest-account/link-email-form"
 import { SetPasswordForm } from "@/components/guest-account/set-password-form"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { ReportCompactCard } from "@/components/report-compact-card"
+import { SignOutSection } from "@/components/sign-out-section"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -78,7 +79,7 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
 
   return (
     <div className="page-shell">
-      <div className="page-container page-stack">
+      <div className={`page-container ${isGuest ? "space-y-6 md:space-y-8 lg:space-y-10" : "page-stack"}`}>
         <PageTitleBar
           icon={<ClipboardList className="size-4" />}
           title="Mis reportes"
@@ -181,6 +182,8 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
             </CardContent>
           </Card>
         )}
+
+        {isGuest && <SignOutSection guest />}
       </div>
     </div>
   )
