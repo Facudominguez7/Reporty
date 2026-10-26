@@ -4,12 +4,16 @@ import ReporteDetallePage from "./page"
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
+  tieneFotografiaPendiente: vi.fn(),
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
   obtenerGestionOperativaDetalle: vi.fn(),
 }))
 
 vi.mock("./reporte-detalle-client", () => ({ ReporteDetalleClient: () => null }))
+vi.mock("@/lib/moderation/estado-publico.server", () => ({
+  tieneFotografiaPendiente: mocks.tieneFotografiaPendiente,
+}))
 vi.mock("@/utils/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: mocks.getUser } }),
 }))
@@ -43,6 +47,7 @@ const renderPage = () => ReporteDetallePage({ params: Promise.resolve({ id: "5" 
 describe("ReporteDetallePage", () => {
   beforeEach(() => {
     vi.stubEnv("CUADRILLAS_ENABLED", undefined)
+    mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
     mocks.obtenerGestionOperativaDetalle.mockReset().mockResolvedValue({
       puedeOperar: false,
       estadoOperativo: null,
@@ -53,6 +58,20 @@ describe("ReporteDetallePage", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs()
+  })
+
+  it("passes only the pending boolean to anonymous visitors", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.tieneFotografiaPendiente.mockResolvedValue(true)
+    const page = await renderPage()
+    expect(page.props.fotografiaPendiente).toBe(true)
+    expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
+    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1 })
+  })
+
+  it("does not show the notice without a pending photo", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    expect((await renderPage()).props.fotografiaPendiente).toBe(false)
   })
 
   it("lets a citizen vote while crews are turned off", async () => {

@@ -116,6 +116,7 @@ function formatRepairDuration(createdAt: string, repairedAt: string) {
 /** Datos del detalle que la página carga en el servidor antes de renderizar. */
 export type ReporteDetalleInicial = {
   reporte: ReporteDetalle | null;
+  fotografiaPendiente?: boolean;
   currentUser: UsuarioActual | null;
   isAdmin: boolean;
   estados: Estado[];
@@ -133,6 +134,7 @@ export type ReporteDetalleInicial = {
  */
 export function ReporteDetalleClient({
   reporte,
+  fotografiaPendiente = false,
   currentUser,
   isAdmin,
   estados,
@@ -504,6 +506,12 @@ export function ReporteDetalleClient({
                 <p className="mb-4 text-sm leading-relaxed text-foreground md:text-base">
                   {reporte.descripcion}
                 </p>
+
+                {fotografiaPendiente && (
+                  <p role="status" className="mb-4 rounded-lg border border-amber-600/25 bg-amber-500/10 px-4 py-3 text-sm font-medium text-foreground">
+                    Fotografía pendiente de revisión
+                  </p>
+                )}
 
                 {/* Imágenes */}
                 {reporte.fotos_reporte && reporte.fotos_reporte.length > 0 && (
