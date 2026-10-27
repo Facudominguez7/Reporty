@@ -183,6 +183,15 @@
     padding-bottom: var(--bottom-nav-space);
   }
 
+  body:has(.admin-workspace) {
+    background-image: none;
+    background-color: var(--background);
+  }
+
+  body:has(.admin-workspace) .app-main {
+    padding-bottom: 0;
+  }
+
   body:has([data-vaul-drawer-visible="true"]) nav[aria-label="Navegación principal"] {
     pointer-events: none;
     visibility: hidden;

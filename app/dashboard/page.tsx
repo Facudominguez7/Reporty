@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCategorias, getEstados, getPrioridades } from "@/database/queries/reportes/get-reportes"
 import { getDashboardPageData } from "@/database/queries/dashboard"
-import { isAdminRole, isGuestRole, puedeOperarCuadrillas } from "@/lib/authz/roles"
+import { canAccessAdminPanel, isAdminRole, isGuestRole, puedeOperarCuadrillas } from "@/lib/authz/roles"
 import { cuadrillasHabilitadas } from "@/lib/features"
 import { cn } from "@/lib/utils"
 import { getUserInitials } from "@/lib/identity/display"
@@ -145,7 +145,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <MapaCalorZonas zonas={data.zonasCalientes} height="500px" />
           </section>
 
-          <SignOutSection />
+          <SignOutSection fullWidth />
         </div>
       </div>
     )
@@ -167,6 +167,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             icon={<UserRound className="size-4" />}
             title="Mi cuenta"
             description="Tu información y actividad en Reporty."
+            actions={
+              canAccessAdminPanel(data.roleId) ? (
+                <Button variant="outline" asChild>
+                  <Link href="/admin">Ir al panel de admin</Link>
+                </Button>
+              ) : undefined
+            }
           />
           <Card className="overflow-hidden">
             <div className="page-hero-grid lg:items-center">
@@ -262,7 +269,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           )}
         </section>
 
-        <SignOutSection />
+        <SignOutSection fullWidth />
       </div>
     </div>
   )

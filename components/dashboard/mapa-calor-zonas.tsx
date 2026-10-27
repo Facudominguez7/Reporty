@@ -87,7 +87,7 @@ function MapaCalorInterno({ zonas, height }: { zonas: ZonaConReportes[], height:
               display: flex;
               align-items: center;
               justify-content: center;
-              color: white;
+              color: var(--map-marker-foreground);
               font-weight: bold;
               font-size: ${size > 30 ? 14 : 12}px;
               border: 3px solid var(--map-marker-stroke);

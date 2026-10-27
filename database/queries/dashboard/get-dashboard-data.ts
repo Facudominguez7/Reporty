@@ -1,15 +1,11 @@
 import { getPuntosUsuario } from "@/database/queries/puntos"
-import {
-  getEstadisticasInteresado,
-  getReportesPorCategoria,
-  getTiempoPromedioResolucion,
-  getZonasConMasReportes,
-  type ReportesPorCategoria,
-  type TiempoPromedioResolucion,
-  type ZonaConReportes,
+import type {
+  ReportesPorCategoria,
+  TiempoPromedioResolucion,
+  ZonaConReportes,
 } from "@/database/queries/interesado"
 import { getDashboardUserReports, type DashboardUserReport, type FiltrosReportes } from "@/database/queries/reportes/get-reportes"
-import { getUserRoleContext, canViewDashboard } from "@/lib/authz/roles"
+import { getUserRoleContext } from "@/lib/authz/roles"
 import { createClient } from "@/utils/supabase/server"
 
 export type DashboardAnalyticsData = {
@@ -59,29 +55,7 @@ export async function getDashboardPageData(
   }
 
   const { data: roleContext } = await getUserRoleContext(supabase, user.id)
-  const isAnalyticsDashboard = canViewDashboard(roleContext?.roleId)
-
-  if (isAnalyticsDashboard) {
-    const [estadisticas, reportesPorCategoria, tiempoResolucion, zonasCalientes] = await Promise.all([
-      getEstadisticasInteresado(supabase),
-      getReportesPorCategoria(supabase),
-      getTiempoPromedioResolucion(supabase),
-      getZonasConMasReportes(supabase, 10),
-    ])
-
-    return {
-      user: { id: user.id, email: user.email ?? null },
-      isAnalyticsDashboard: true,
-      roleId: roleContext?.roleId ?? null,
-      puntos: 0,
-      userReports: [],
-      estadisticas,
-      reportesPorCategoria,
-      tiempoResolucion,
-      zonasCalientes,
-    }
-  }
-
+  // Role-specific analytics live in /admin; /dashboard is the personal dashboard for every authenticated role.
   const [{ puntos }, { data: userReports }] = await Promise.all([
     getPuntosUsuario(supabase, user.id),
     getDashboardUserReports(user.id, filtros),

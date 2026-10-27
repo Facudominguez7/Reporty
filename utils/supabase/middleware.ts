@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { canCreateReports, puedeOperarCuadrillas } from '@/lib/authz/roles'
+import { canAccessAdminPanel, canCreateReports, puedeOperarCuadrillas } from '@/lib/authz/roles'
 import { GUEST_MODE_PARAM, GUEST_MODE_VALUE, NEW_REPORT_PATH } from '@/lib/routes/guest-report'
 
 export async function updateSession(request: NextRequest) {
@@ -54,7 +54,8 @@ export async function updateSession(request: NextRequest) {
   // /reportes/nuevo sends visitors without a session to /auth so they choose between signing
   // in and continuing as a guest; the guest choice returns with ?modo=invitado and the browser
   // opens the anonymous session only on submit.
-  const protectedPaths = ['/dashboard']
+  const protectedPaths = ['/dashboard', '/admin']
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
   const isNewReportWithoutGuestChoice =
     pathname === NEW_REPORT_PATH && request.nextUrl.searchParams.get(GUEST_MODE_PARAM) !== GUEST_MODE_VALUE
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p)) || isNewReportWithoutGuestChoice
@@ -71,6 +72,20 @@ export async function updateSession(request: NextRequest) {
   // Se comparte una única lectura de `profiles` entre ambas guardas.
   const rutaCrearReporte = request.nextUrl.pathname.startsWith('/reportes/nuevo')
   const rutaCuadrillas = request.nextUrl.pathname.startsWith('/dashboard/cuadrillas')
+
+  if (user && isAdminRoute) {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('rol_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profileData || !canAccessAdminPanel(profileData.rol_id)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/mapa'
+      return redirectWithSupabaseCookies(url)
+    }
+  }
 
   if (user && (rutaCrearReporte || rutaCuadrillas)) {
     const { data: profileData } = await supabase

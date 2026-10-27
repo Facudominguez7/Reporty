@@ -53,7 +53,8 @@ export function HeaderClient({ user }: HeaderClientProps) {
     getAccountNavItem(user),
   ];
 
-  const showTopHeader = pathname !== "/" && pathname !== "/mapa" && !pathname.startsWith("/auth");
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const showTopHeader = !isAdminRoute && pathname !== "/" && pathname !== "/mapa" && !pathname.startsWith("/auth");
   const isReportDetail = /^\/reportes\/\d+$/.test(pathname);
 
   const isActive = (href: string) => {
@@ -91,7 +92,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
           </div>
         </header>
       )}
-      {pathname !== "/" && <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-[60] grid min-h-16 grid-cols-5 rounded-t-[1.5rem] border border-b-0 border-secondary-foreground/15 bg-secondary px-2 pb-[max(env(safe-area-inset-bottom),0.2rem)] pt-0.5 text-secondary-foreground shadow-[0_-10px_30px_rgba(0,0,0,0.2)] sm:px-3">
+      {!isAdminRoute && pathname !== "/" && <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-[60] grid min-h-16 grid-cols-5 rounded-t-[1.5rem] border border-b-0 border-secondary-foreground/15 bg-secondary px-2 pb-[max(env(safe-area-inset-bottom),0.2rem)] pt-0.5 text-secondary-foreground shadow-[0_-10px_30px_rgba(0,0,0,0.2)] sm:px-3">
         {bottomItems.map(({ href, label, icon: Icon }) => {
           const active = isActive(href);
 

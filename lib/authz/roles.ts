@@ -81,6 +81,11 @@ export function canViewDashboard(roleId: number | null | undefined) {
   return DASHBOARD_ROLE_IDS.includes(roleId as (typeof DASHBOARD_ROLE_IDS)[number]);
 }
 
+/** Roles that can enter the role-aware administrative workspace. */
+export function canAccessAdminPanel(roleId: number | null | undefined) {
+  return canViewDashboard(roleId);
+}
+
 export function isAdminRole(roleId: number | null | undefined) {
   return roleId === ROLE_IDS.ADMIN;
 }

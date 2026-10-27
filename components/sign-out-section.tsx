@@ -28,7 +28,7 @@ const SIGN_OUT_ERROR_DESCRIPTIONS = {
 /**
  * Sign-out action confirmed in a dialog. Guests receive an explicit irreversible-access warning.
  */
-export function SignOutSection({ guest = false }: { guest?: boolean }) {
+export function SignOutSection({ guest = false, fullWidth = false }: { guest?: boolean; fullWidth?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -61,7 +61,7 @@ export function SignOutSection({ guest = false }: { guest?: boolean }) {
         <AlertDialogTrigger asChild>
           <Button
             variant="destructive"
-            className="w-full sm:w-auto"
+            className={fullWidth ? "w-full" : "w-full sm:w-auto"}
           >
             <LogOut className="size-4" aria-hidden="true" />
             Cerrar sesión

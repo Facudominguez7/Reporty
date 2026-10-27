@@ -8,7 +8,6 @@ import { cuadrillasHabilitadas } from "@/lib/features";
 export type ReportesPorCategoria = {
   categoria: string;
   cantidad: number;
-  color: string;
 };
 
 /**
@@ -57,25 +56,10 @@ export async function getReportesPorCategoria(
       categoriaMap.set(categoria, (categoriaMap.get(categoria) || 0) + 1);
     });
 
-    // Paleta de colores para las categorías
-    const colores = [
-      "#3b82f6", // azul
-      "#ef4444", // rojo
-      "#10b981", // verde
-      "#f59e0b", // amarillo
-      "#8b5cf6", // morado
-      "#ec4899", // rosa
-      "#14b8a6", // cyan
-      "#f97316", // naranja
-    ];
-
-    // Convertir a array y ordenar por cantidad
+    // Convertir a array y ordenar por cantidad. La presentación de colores vive en el gráfico,
+    // para reutilizar los tokens de globals.css en cualquier superficie.
     return Array.from(categoriaMap.entries())
-      .map(([categoria, cantidad], index) => ({
-        categoria,
-        cantidad,
-        color: colores[index % colores.length],
-      }))
+      .map(([categoria, cantidad]) => ({ categoria, cantidad }))
       .sort((a, b) => b.cantidad - a.cantidad);
   } catch (error) {
     console.error("Error en getReportesPorCategoria:", error);

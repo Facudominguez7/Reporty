@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -56,6 +58,10 @@ export function TarjetaAsignacion({
   onObservacionPublicaChange,
   onSolicitarAccion,
 }: TarjetaAsignacionProps) {
+  const [accionSeleccionada, setAccionSeleccionada] = useState<AccionOperativa | "">("")
+  const accionesDisponibles = ORDEN_ACCIONES.filter((accion) => acciones.includes(accion))
+  const accionEsDestructiva = accionSeleccionada === "cancelar" || accionSeleccionada === "cerrar_rechazado"
+
   return (
     <Card>
       <CardHeader className="space-y-2">
@@ -111,18 +117,33 @@ export function TarjetaAsignacion({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {ORDEN_ACCIONES.filter((accion) => acciones.includes(accion)).map((accion) => (
-            <Button
-              key={accion}
-              size="sm"
-              variant={accion === "cancelar" || accion === "cerrar_rechazado" ? "destructive" : "outline"}
-              disabled={enviando}
-              onClick={() => onSolicitarAccion(accion)}
-            >
-              {ETIQUETA_BOTON[accion]}
-            </Button>
-          ))}
+        <div className="space-y-2">
+          <Label htmlFor={`accion-${asignacion.id}`} className="text-xs text-muted-foreground">
+            Acción operativa
+          </Label>
+          <Select
+            value={accionSeleccionada}
+            onValueChange={(valor) => setAccionSeleccionada(valor as AccionOperativa)}
+            disabled={enviando}
+          >
+            <SelectTrigger id={`accion-${asignacion.id}`} className="w-full text-sm">
+              <SelectValue placeholder="Elegí una acción" />
+            </SelectTrigger>
+            <SelectContent>
+              {accionesDisponibles.map((accion) => (
+                <SelectItem key={accion} value={accion}>{ETIQUETA_BOTON[accion]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            className="w-full sm:w-auto"
+            variant={accionEsDestructiva ? "destructive" : "default"}
+            disabled={enviando || !accionSeleccionada}
+            onClick={() => accionSeleccionada && onSolicitarAccion(accionSeleccionada)}
+          >
+            Aplicar acción
+          </Button>
         </div>
       </CardContent>
     </Card>
