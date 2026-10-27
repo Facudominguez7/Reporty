@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { getPreferredReportListingImageUrl, type ReportImageRow } from "@/lib/media/report-images"
 import { verificarEsAdmin } from "./verificar-admin"
 
 export type AdminReportFilters = {
@@ -20,6 +21,7 @@ export type AdminReport = {
   prioridad: { nombre: string } | null
   estado: { id: number; nombre: string } | null
   autor: { username: string | null } | null
+  imageUrl: string | null
 }
 
 export type AdminReportesResult = {
@@ -67,7 +69,8 @@ export async function getAdminReportes(
        categoria:categorias!reportes_categoria_id_fkey(nombre),
        prioridad:prioridades!reportes_prioridad_id_fkey(nombre),
        estado:estados!reportes_estado_id_fkey(id, nombre),
-       autor:profiles!reportes_usuario_id_fkey(username)`,
+       autor:profiles!reportes_usuario_id_fkey(username),
+       fotos:fotos_reporte(url, bucket, path, thumbnail_url, thumbnail_bucket, thumbnail_path)`,
       { count: "exact" },
     )
     .is("deleted_at", null)
@@ -79,10 +82,13 @@ export async function getAdminReportes(
   const { data, count, error } = await query
     .order("created_at", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1)
-    .returns<AdminReport[]>()
+    .returns<Array<AdminReport & { fotos: ReportImageRow[] | null }>>()
 
   return {
-    data: data ?? [],
+    data: (data ?? []).map(({ fotos, ...report }) => ({
+      ...report,
+      imageUrl: getPreferredReportListingImageUrl(fotos),
+    })),
     count: count ?? 0,
     page,
     pageSize,

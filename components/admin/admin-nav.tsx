@@ -66,7 +66,7 @@ export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | nu
   return (
     <aside className="border-b border-secondary-foreground/10 bg-secondary text-secondary-foreground lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col lg:border-b-0">
       <div className="flex items-center justify-between gap-4 px-5 py-4 lg:block lg:px-6 lg:py-7">
-        <Link href="/admin" className="rounded-lg text-sm font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <Link href="/mapa" className="rounded-lg text-sm font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           REPORTY <span className="text-primary">/ ADMIN</span>
         </Link>
         <details className="group lg:hidden">
@@ -94,7 +94,7 @@ export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | nu
           </Link>
         ))}
       </nav>
-      <div className="hidden lg:block">
+      <div className="hidden lg:mt-auto lg:block">
         <AdminSession email={email} />
       </div>
     </aside>
