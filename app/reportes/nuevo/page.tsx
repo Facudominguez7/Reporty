@@ -301,6 +301,7 @@ export default function NuevoReportePage() {
     formData.description.trim().length >= 10 &&
     formData.category !== "" &&
     formData.priority !== "" &&
+    formData.images.length > 0 &&
     locationIsValid &&
     !loading &&
     !isSubmitting &&
@@ -312,6 +313,7 @@ export default function NuevoReportePage() {
     formData.description.trim().length >= 10 ? null : "descripción",
     formData.category !== "" ? null : "categoría",
     formData.priority !== "" ? null : "prioridad",
+    formData.images.length > 0 ? null : "fotografía",
     formData.lat !== null && formData.lon !== null ? null : "ubicación",
     !needsCaptcha || captchaToken !== null ? null : "verificación de seguridad",
   ].filter(Boolean) as string[]
@@ -686,14 +688,14 @@ export default function NuevoReportePage() {
 
               {/* Image Upload */}
               <div className="space-y-4">
-                <Label>Fotografía</Label>
+                <Label htmlFor="images">Fotografía <span className="text-destructive">(obligatoria)</span></Label>
                 <div className="rounded-md border border-dashed border-border bg-card p-6 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-card">
                       <FilePlus2 className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Agregá una foto del problema (opcional)</p>
+                      <p className="text-sm font-medium">Agregá una foto del problema</p>
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
                       <Button type="button" size="sm" asChild>
@@ -706,6 +708,7 @@ export default function NuevoReportePage() {
                         id="images"
                         type="file"
                         accept={REPORT_IMAGE_ACCEPT_ATTR}
+                        aria-required="true"
                         onChange={handleImageUpload}
                         className="sr-only"
                       />
@@ -815,11 +818,9 @@ export default function NuevoReportePage() {
                     <span className="font-medium text-muted-foreground">Prioridad:</span>{" "}
                     {prioridades.find(p => p.id === parseInt(formData.priority))?.nombre}
                   </div>
-                  {formData.images.length > 0 && (
-                   <div>
-                      <span className="font-medium text-muted-foreground">Imagen:</span> Sí
-                    </div>
-                  )}
+                  <div>
+                    <span className="font-medium text-muted-foreground">Imagen:</span> Sí
+                  </div>
                 </div>
                 {isGuestMode ? (
                   <p className="text-xs text-muted-foreground">

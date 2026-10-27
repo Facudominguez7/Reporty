@@ -19,6 +19,7 @@ import { crearReporteAction } from "./actions"
 function formulario() {
   const datos = new FormData()
   for (const [clave, valor] of Object.entries({ titulo: "Bache", descripcion: "Frente a la plaza principal", categoriaId: "1", prioridadId: "1", lat: "-27.37", lon: "-55.9", submissionId: "e1a3f644-9c40-4a40-9000-000000000001" })) datos.set(clave, valor)
+  datos.set("image", new File(["foto"], "reporte.png", { type: "image/png" }))
   return datos
 }
 
@@ -31,6 +32,17 @@ beforeEach(() => {
 })
 
 describe("crearReporteAction", () => {
+  it("requires a photo before starting the report submission", async () => {
+    const datos = formulario()
+    datos.delete("image")
+
+    expect(await crearReporteAction(datos)).toEqual({ success: false, error: "Adjuntá una fotografía para crear el reporte." })
+    expect(createClient).not.toHaveBeenCalled()
+    expect(createAdminClient).not.toHaveBeenCalled()
+    expect(dobles.claim).not.toHaveBeenCalled()
+    expect(dobles.workflow).not.toHaveBeenCalled()
+  })
+
   it("preserves generic UUID submission identifiers accepted before the upgrade", async () => {
     const datos = formulario()
     datos.set("submissionId", "e1a3f644-9c40-0a40-0000-000000000001")

@@ -63,6 +63,7 @@ export function CommentsSection({
 
   const pathname = usePathname()
   const selectedComment = comments.find((comment) => comment.id === commentToDelete)
+  const newCommentLabel = APORTES_COMUNITARIOS.find(({ key }) => key === newComment)?.label ?? newComment
   const willAwardPoints = Boolean(currentUser && currentUser.id !== reportOwnerId)
   const activity = mergeReportActivity(comments, statusHistory)
 
@@ -141,16 +142,21 @@ export function CommentsSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          {!isClosed && !currentUser && (
+          {!isClosed && (!currentUser || currentUser.is_anonymous) && (
             <p className="rounded-xl border border-border/70 bg-muted/60 p-3 text-xs text-muted-foreground">
-              Para comentar,{" "}
-              <Link href={`/auth?next=${encodeURIComponent(pathname)}`} className="font-medium text-primary hover:underline">
-                iniciá sesión
-              </Link>
-              .
+              {currentUser?.is_anonymous ? (
+                "Para comentar, vinculá tu correo y guardá tu cuenta. Como invitado podés crear y seguir tus reportes."
+              ) : (
+                <>Para comentar,{" "}
+                  <Link href={`/auth?next=${encodeURIComponent(pathname)}`} className="font-medium text-primary hover:underline">
+                    iniciá sesión
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           )}
-          {!isClosed && currentUser && (
+          {!isClosed && currentUser && !currentUser.is_anonymous && (
             <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border/70 bg-muted/30 p-3 sm:p-4">
               <label htmlFor="report-contribution" className="block text-sm font-medium">¿Qué novedad tenés?</label>
               <select id="report-contribution" value={newComment} onChange={(event) => setNewComment(event.target.value)} disabled={isSubmitting} className="min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground">
@@ -192,7 +198,7 @@ export function CommentsSection({
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>Revisá la actualización antes de publicarla.</p>
-                <div className="max-h-40 overflow-y-auto rounded-xl border border-border/70 bg-muted/60 p-3"><p className="whitespace-pre-wrap text-sm text-foreground">{newComment}</p></div>
+                <div className="max-h-40 overflow-y-auto rounded-xl border border-border/70 bg-muted/60 p-3"><p className="whitespace-pre-wrap text-sm text-foreground">{newCommentLabel}</p></div>
                 <p className="text-xs text-muted-foreground">{willAwardPoints ? <>Ganarás <span className="font-bold text-primary">{PUNTOS.COMENTAR_REPORTE} puntos</span> por compartir la actualización.</> : "Como es tu propio reporte, esta actualización no suma puntos."}</p>
               </div>
             </AlertDialogDescription>

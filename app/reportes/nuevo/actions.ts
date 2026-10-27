@@ -53,7 +53,7 @@ async function resolveReportActor(sessionClient: SupabaseClient): Promise<Report
 }
 
 /** Extrae el archivo sin leer bytes; toda validación costosa ocurre después de autorizar el rol. */
-function obtenerImagenOpcional(formData: FormData) {
+function obtenerImagen(formData: FormData) {
   const imagen = formData.get("image")
   return imagen instanceof File && imagen.size > 0 ? imagen : null
 }
@@ -70,6 +70,11 @@ export async function crearReporteAction(formData: FormData) {
       lon: formData.get("lon"),
       submissionId: formData.get("submissionId"),
     })
+
+    const image = obtenerImagen(formData)
+    if (!image) {
+      return { success: false as const, error: "Adjuntá una fotografía para crear el reporte." }
+    }
 
     const sessionClient = await createClient()
     const actor = await resolveReportActor(sessionClient)
@@ -99,7 +104,7 @@ export async function crearReporteAction(formData: FormData) {
         prioridadId: parsedInput.prioridadId,
         lat: parsedInput.lat,
         lon: parsedInput.lon,
-        image: obtenerImagenOpcional(formData),
+        image,
       })
 
       if (!result.success) {

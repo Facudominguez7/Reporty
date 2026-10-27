@@ -112,6 +112,11 @@ export async function crearComentarioAction(reporteId: number, aporte: string) {
       return { success: false as const, error: "Tenés que iniciar sesión para comentar." }
     }
 
+    const { data: contextoRol } = await getUserRoleContext(supabase, user.id)
+    if (!canParticipateInCommunity(user, contextoRol?.roleId)) {
+      return { success: false as const, error: GUEST_COMMUNITY_ERROR }
+    }
+
     return await crearComentarioWorkflow(createAdminClient(), parsedReportId, user.id, parsedAporte)
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos publicar tu comentario.") }

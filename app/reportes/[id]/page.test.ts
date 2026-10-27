@@ -124,12 +124,19 @@ describe("ReporteDetallePage", () => {
     expect(page.props.puedeVotar).toBe(true)
   })
 
-  it.each([false, true])("allows authenticated %s sessions but never a missing session", async (isAnonymous) => {
-    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: isAnonymous } } })
+  it("allows registered users to comment but rejects anonymous guests", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: false } } })
+    mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: ROLE.CIUDADANO }, error: null })
     await crearComentarioAction(5, "problema_sigue_igual")
     expect(mocks.crearComentarioWorkflow).toHaveBeenCalledWith(expect.anything(), 5, "user-1", "problema_sigue_igual")
 
     mocks.crearComentarioWorkflow.mockClear()
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "guest-1", is_anonymous: true } } })
+    mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: ROLE.INVITADO }, error: null })
+    const guestResult = await crearComentarioAction(5, "problema_sigue_igual")
+    expect(guestResult).toEqual({ success: false, error: "Vinculá tu correo para comentar y votar. Como invitado podés crear y seguir tus reportes." })
+    expect(mocks.crearComentarioWorkflow).not.toHaveBeenCalled()
+
     mocks.getUser.mockResolvedValue({ data: { user: null } })
     const result = await crearComentarioAction(5, "problema_sigue_igual")
     expect(result.success).toBe(false)

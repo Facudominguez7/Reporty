@@ -6,21 +6,30 @@
 
 import type React from "react"
 
-import { useActionState, useState } from "react"
+import { useActionState, useEffect, useState } from "react"
 import { useFormStatus } from "react-dom"
+import type { AuthError } from "@supabase/supabase-js"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Lock, Mail, Phone, User, UserRound } from "lucide-react"
 
 import { iniciarSesionOAuth, login, signup, type AuthFormState } from "./actions"
 import { obtenerRutaInternaSegura, RUTA_RECUPERAR_CONTRASENA } from "./rutas-seguras"
-import { GUEST_REPORT_PATH } from "@/lib/routes/guest-report"
+import { createClient } from "@/utils/supabase/client"
+import { TURNSTILE_SITE_KEY, TurnstileWidget } from "@/components/turnstile-widget"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+function guestSessionErrorMessage(error: AuthError) {
+  if (error.status === 429) return "Demasiados intentos desde tu conexión. Probá de nuevo en unos minutos."
+  if (error.code === "anonymous_provider_disabled") return "No está disponible el acceso como invitado. Iniciá sesión para continuar."
+  if (error.message.toLowerCase().includes("captcha")) return "Completá la verificación de seguridad e intentá nuevamente."
+  return "No pudimos preparar tu sesión de invitado. Intentá nuevamente."
+}
 
 /**
  * Renderiza la experiencia principal de ingreso y registro de usuarios.
@@ -29,6 +38,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
  */
 export default function AuthPage() {
   const searchParams = useSearchParams()
+  const supabase = createClient()
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [guestCaptchaToken, setGuestCaptchaToken] = useState<string | null>(null)
+  const [guestCaptchaReset, setGuestCaptchaReset] = useState(0)
+  const [guestError, setGuestError] = useState<string | null>(null)
+  const [guestPending, setGuestPending] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const initialState: AuthFormState = { error: undefined, message: undefined }
@@ -37,6 +52,46 @@ export default function AuthPage() {
   const nextPath = obtenerRutaInternaSegura(searchParams.get("next"))
   const oauthError = searchParams.get("error") === "oauth"
   const enlaceError = searchParams.get("error") === "enlace"
+  const needsGuestCaptcha = TURNSTILE_SITE_KEY !== ""
+
+  useEffect(() => {
+    let cancelled = false
+    createClient().auth.getUser().then(({ data, error }) => {
+      if (cancelled) return
+      if (!error && data.user) {
+        window.location.replace(nextPath)
+        return
+      }
+      setCheckingSession(false)
+    }).catch(() => {
+      if (!cancelled) setCheckingSession(false)
+    })
+    return () => { cancelled = true }
+  }, [nextPath])
+
+  const continueAsGuest = async () => {
+    if (guestPending || (needsGuestCaptcha && !guestCaptchaToken)) return
+
+    setGuestPending(true)
+    setGuestError(null)
+    const { error } = await supabase.auth.signInAnonymously(
+      guestCaptchaToken ? { options: { captchaToken: guestCaptchaToken } } : undefined,
+    )
+
+    if (error) {
+      setGuestPending(false)
+      setGuestCaptchaToken(null)
+      setGuestCaptchaReset((signal) => signal + 1)
+      setGuestError(guestSessionErrorMessage(error))
+      return
+    }
+
+    window.location.assign(nextPath)
+  }
+
+  if (checkingSession) {
+    return <div className="auth-shell px-4 py-6 text-center text-sm text-muted-foreground">Comprobando tu sesión…</div>
+  }
 
   return (
     <div className="auth-shell px-4 py-6">
@@ -273,13 +328,14 @@ export default function AuthPage() {
 
             <div className="space-y-3 border-t border-border pt-5">
               <div className="space-y-1 text-center">
-                <p className="text-sm font-medium">¿Solo querés reportar un problema?</p>
+                <p className="text-sm font-medium">¿Querés continuar como invitado?</p>
+                <p className="text-xs text-muted-foreground">Podés crear y seguir reportes, pero no comentar ni votar.</p>
               </div>
-              <Button asChild variant="outline" className="w-full">
-                <Link href={GUEST_REPORT_PATH}>
-                  <UserRound className="size-4" aria-hidden="true" />
-                  Continuar como invitado
-                </Link>
+              {needsGuestCaptcha && <TurnstileWidget onTokenChange={setGuestCaptchaToken} resetSignal={guestCaptchaReset} />}
+              {guestError && <Alert variant="destructive"><AlertDescription>{guestError}</AlertDescription></Alert>}
+              <Button type="button" variant="outline" className="w-full" onClick={continueAsGuest} disabled={guestPending || (needsGuestCaptcha && !guestCaptchaToken)}>
+                <UserRound className="size-4" aria-hidden="true" />
+                {guestPending ? "Preparando sesión..." : "Continuar como invitado"}
               </Button>
             </div>
           </CardContent>
