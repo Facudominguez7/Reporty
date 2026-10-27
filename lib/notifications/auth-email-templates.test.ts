@@ -65,7 +65,7 @@ describe("Supabase Auth email templates", () => {
         writeFileSync(path, html)
       }
 
-      expect(readFileSync(path, "utf8"), `Regenerate with: npm run email:templates`).toBe(html)
+      expect(readFileSync(path, "utf8").replace(/\r\n/g, "\n"), `Regenerate with: npm run email:templates`).toBe(html)
     },
   )
 })
