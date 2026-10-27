@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { MapPin, Send, CheckCircle2, FileText, Info, FilePlus2 } from "lucide-react"
+import { MapPin, Send, CheckCircle2, CircleX, FileText, Info, FilePlus2, LoaderCircle } from "lucide-react"
 import Link from "next/link"
 import { PUNTOS } from "@/database/queries/puntos"
 import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/loading-skeletons"
@@ -478,7 +478,11 @@ export default function NuevoReportePage() {
         <Card className="w-full max-w-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="size-5 text-primary" aria-hidden="true" />
+              {createdReport.withdrawn ? (
+                <CircleX className="size-5 text-destructive" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="size-5 text-primary" aria-hidden="true" />
+              )}
               {createdReport.withdrawn ? "Reporte retirado" : "¡Reporte enviado!"}
             </CardTitle>
             <CardDescription>
@@ -854,6 +858,20 @@ export default function NuevoReportePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center bg-primary px-6 py-10 text-primary-foreground">
+          <div role="status" aria-live="polite" aria-busy="true" className="flex max-w-md flex-col items-center gap-5 text-center">
+            <LoaderCircle className="size-12 animate-spin" aria-hidden="true" />
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold">La IA está analizando tu foto</h2>
+              <p className="text-sm leading-relaxed opacity-90">
+                Estamos revisando la imagen y terminando de enviar tu reporte. Puede demorar unos segundos; dejá esta pantalla abierta.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

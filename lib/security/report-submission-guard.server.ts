@@ -13,7 +13,7 @@ export const REPORT_SUBMISSION_LIMITS = {
   actorWindowSeconds: 60 * 60,
   actorMax: 5,
   ipWindowSeconds: 60 * 60,
-  ipMax: 20,
+  ipMax: 10,
 } as const
 
 export type ReportSubmissionClaim = "ok" | "duplicate" | "actor_limited" | "ip_limited"
