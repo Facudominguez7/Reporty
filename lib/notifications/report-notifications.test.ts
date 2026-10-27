@@ -59,6 +59,24 @@ describe("report notification emails", () => {
     expect(email).not.toHaveProperty("bcc")
     expect(mocks.send.mock.calls[0][1]).toEqual({ idempotencyKey: "retiro-reporte/42" })
   })
+  // Issue #176: without NEXT_PUBLIC_APP_URL the links must fall back to the production
+  // domain, never to localhost — emails reach recipients outside this server.
+  it("links to the production domain when the app URL is unset", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "")
+    await sendCommentNotificationEmail({
+      ownerEmail: "ana@example.com",
+      ownerUsername: "Ana",
+      commenterUsername: "Beto",
+      reporteId: 42,
+      reporteTitulo: "Bache en Av. Uruguay",
+      comentarioContenido: "Sigue igual",
+    })
+
+    const email = sentEmail()
+    expect(email.html).not.toContain("localhost")
+    expect(email.html).toContain('href="https://reporty.com.ar/reportes/42"')
+  })
+
   it("sends the new comment email with the refreshed layout", async () => {
     await sendCommentNotificationEmail({
       ownerEmail: "ana@example.com",
