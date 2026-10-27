@@ -2,7 +2,8 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 
 import { AdminDashboardShell } from "@/components/admin/dashboard-shell"
-import { canAccessAdminPanel, getUserRoleContext } from "@/lib/authz/roles"
+import { canAccessAdminPanel, getUserRoleContext, isAdminRole } from "@/lib/authz/roles"
+import { getPendingReviewCount } from "@/lib/moderation/pending-count.server"
 import { createClient } from "@/utils/supabase/server"
 
 export const metadata: Metadata = {
@@ -23,8 +24,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/mapa")
   }
 
+  const pendingReviews = isAdminRole(roleContext?.roleId) ? await getPendingReviewCount() : null
+
   return (
-    <AdminDashboardShell email={authData.user.email ?? "Cuenta administrativa"} roleId={roleContext?.roleId ?? null}>
+    <AdminDashboardShell email={authData.user.email ?? "Cuenta administrativa"} roleId={roleContext?.roleId ?? null} pendingReviews={pendingReviews}>
       {children}
     </AdminDashboardShell>
   )

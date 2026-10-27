@@ -55,9 +55,11 @@ function AdminSession({ email, mobile = false }: { email: string; mobile?: boole
   )
 }
 
-export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | null }) {
+export function AdminNav({ email, roleId, pendingReviews }: { email: string; roleId: RoleId | null; pendingReviews: number | null }) {
   const pathname = usePathname()
-  const items = itemsForRole(roleId)
+  const items = itemsForRole(roleId).map((item) => item.href === "/admin/moderacion" && pendingReviews && pendingReviews > 0
+    ? { ...item, count: String(pendingReviews) }
+    : item)
   const closeMobileMenu = (event: MouseEvent<HTMLAnchorElement>) => {
     event.currentTarget.closest("details")?.removeAttribute("open")
   }
@@ -79,7 +81,7 @@ export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | nu
               <Link key={href} href={href} onClick={closeMobileMenu} aria-current={isActive(pathname, href) ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-secondary-foreground/70 hover:bg-secondary-foreground/10 hover:text-secondary-foreground", isActive(pathname, href) && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="flex-1">{label}</span>
-                {count && <span className="text-[0.65rem] opacity-75">{count}</span>}
+                {count && <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-background px-1.5 text-xs font-bold text-foreground" aria-label={`${count} revisiones pendientes`}>{count}</span>}
               </Link>
             ))}
             <AdminSession email={email} mobile />
@@ -91,7 +93,7 @@ export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | nu
           <Link key={href} href={href} aria-current={isActive(pathname, href) ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-secondary-foreground/70 transition-colors hover:bg-secondary-foreground/10 hover:text-secondary-foreground", isActive(pathname, href) && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>
             <Icon className="size-4" aria-hidden="true" />
             <span className="flex-1">{label}</span>
-            {count && <span className="text-[0.65rem] opacity-75">{count}</span>}
+            {count && <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-background px-1.5 text-xs font-bold text-foreground" aria-label={`${count} revisiones pendientes`}>{count}</span>}
           </Link>
         ))}
       </nav>
