@@ -2,6 +2,8 @@ import "server-only";
 
 import { Resend } from "resend";
 
+import { resolveSiteUrl } from "@/lib/seo/site";
+
 import {
   EMAIL_COLORS,
   emailButton,
@@ -49,8 +51,10 @@ function getResendClient() {
   return new Resend(apiKey);
 }
 
+// Falls back to the production domain (never localhost): emails outlive this server and must
+// always link somewhere reachable for the recipient.
 function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return resolveSiteUrl(process.env.NEXT_PUBLIC_APP_URL);
 }
 
 const SENDER = "Reporty <team@notificaciones.reporty.com.ar>";
