@@ -36,7 +36,7 @@ export function UsersAdminList({ users }: { users: AdminUser[] }) {
     const { user, blocked } = pendingUser
     setPendingId(user.id)
     startTransition(async () => {
-      const result = await updateUserAccessAction(user.id, !blocked)
+      const result = await updateUserAccessAction(user.id, blocked)
       setPendingId(null)
       if (!result.success) {
         toast.error(result.error)

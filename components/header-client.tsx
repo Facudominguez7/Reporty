@@ -15,7 +15,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { buttonVariants } from "@/components/ui/button";
-import { HowToUseDialog } from "@/components/how-to-use-dialog";
+import { HowToUseDialog } from "@/components/how-to-use-dialog"
+import { ContactsDialog } from "@/components/contacts-dialog";
 import { BackButton } from "@/components/back-button";
 import { needsPasswordSetup } from "@/lib/authz/guest-account";
 
@@ -87,7 +88,8 @@ export function HeaderClient({ user }: HeaderClientProps) {
               priority
             />
           </Link>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 sm:right-6">
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 sm:right-6 sm:gap-2">
+            <ContactsDialog />
             <HowToUseDialog />
           </div>
         </header>

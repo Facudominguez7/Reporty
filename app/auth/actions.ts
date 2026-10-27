@@ -53,6 +53,10 @@ const obtenerSiguienteRutaSegura = (formData: FormData) => obtenerRutaInternaSeg
  * technical, so they are never shown as is.
  */
 function mensajeErrorLogin(error: AuthError) {
+  if (error.code === "user_banned") {
+    return "Tu usuario está bloqueado. Contactá a la administración para recuperar el acceso."
+  }
+
   if (error.code === "invalid_credentials") {
     return "El correo o la contraseña no son correctos."
   }

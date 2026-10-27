@@ -17,6 +17,10 @@ export const EXCLUDED_TABLES = [
   "auth.oauth_client_states",
   "auth.scim_tokens",
   "auth.audit_log_entries",
+  // The migration creates this singleton before production data is loaded.
+  "public.presupuesto_moderacion",
+  // Local migrations and seed.sql create the app buckets before production objects load.
+  "storage.buckets",
 ]
 
 const SOURCE_FLAGS = { "--production": "production", "--saved": "saved", "--empty": "empty" }

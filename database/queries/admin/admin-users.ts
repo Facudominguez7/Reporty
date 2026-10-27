@@ -8,6 +8,7 @@ const PAGE_SIZE = 25
 const AUTH_PAGE_SIZE = 1000
 
 export type AdminUserFilter = "accounts" | "guests" | "all"
+export type AdminUserSort = "lastAccess" | "createdAt"
 
 type ProfileRow = {
   id: string
@@ -45,7 +46,18 @@ function matchesSearch(user: AdminUser, search: string) {
   return [user.username, user.email].some((field) => field?.toLocaleLowerCase().includes(value))
 }
 
-export async function getAdminUsers(page = 1, filter: AdminUserFilter = "accounts", rawSearch = "") {
+function sortUsers(users: AdminUser[], sort: AdminUserSort) {
+  return users.toSorted((a, b) => {
+    const aDate = Date.parse(sort === "lastAccess" ? a.lastSignInAt ?? "" : a.createdAt ?? "")
+    const bDate = Date.parse(sort === "lastAccess" ? b.lastSignInAt ?? "" : b.createdAt ?? "")
+    if (Number.isNaN(aDate) && Number.isNaN(bDate)) return 0
+    if (Number.isNaN(aDate)) return 1
+    if (Number.isNaN(bDate)) return -1
+    return bDate - aDate
+  })
+}
+
+export async function getAdminUsers(page = 1, filter: AdminUserFilter = "accounts", rawSearch = "", sort: AdminUserSort = "lastAccess") {
   const sessionClient = await createClient()
   const { data: authData } = await sessionClient.auth.getUser()
   if (!authData.user) return { users: [], hasNext: false, unauthorized: true }
@@ -97,14 +109,16 @@ export async function getAdminUsers(page = 1, filter: AdminUserFilter = "account
       reportCount: reportCounts.get(user.id) ?? 0,
     }
   }).filter((user) => matchesFilter(user, filter) && matchesSearch(user, search))
+  const sortedUsers = sortUsers(users, sort)
 
   const offset = (safePage - 1) * PAGE_SIZE
   return {
-    users: users.slice(offset, offset + PAGE_SIZE),
-    hasNext: users.length > offset + PAGE_SIZE,
+    users: sortedUsers.slice(offset, offset + PAGE_SIZE),
+    hasNext: sortedUsers.length > offset + PAGE_SIZE,
     unauthorized: false,
-    total: users.length,
+    total: sortedUsers.length,
     filter,
+    sort,
   }
 }
 

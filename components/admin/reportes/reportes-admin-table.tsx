@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import { Search, Trash2 } from "lucide-react"
+import { Filter, Search, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -37,6 +37,7 @@ export function ReportesAdminTable({ reports, categorias, estados, search = "", 
   const [isPending, startTransition] = useTransition()
   const [busyId, setBusyId] = useState<number | null>(null)
   const [statusChange, setStatusChange] = useState<{ reportId: number; stateId: number; reportTitle: string; stateName: string } | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const updateQuery = (key: string, value: string) => {
     const params = new URLSearchParams()
@@ -87,7 +88,13 @@ export function ReportesAdminTable({ reports, categorias, estados, search = "", 
 
   return (
     <div className="space-y-4">
-      <Card>
+      <div className="flex justify-end md:hidden">
+        <Button type="button" variant="filter" size="sm" className="w-full" onClick={() => setFiltersOpen((value) => !value)}>
+          {filtersOpen ? <X /> : <Filter />}
+          {filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
+        </Button>
+      </div>
+      <Card className={filtersOpen ? "block" : "hidden md:block"}>
         <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-end">
           <label className="flex-1 space-y-1.5 text-sm font-medium">
             Buscar

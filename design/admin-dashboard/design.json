@@ -1,0 +1,10 @@
+{
+  "title": "Reporty admin workspace",
+  "brief": "Responsive administrator workspace for Reporty using existing tokens and shadcn primitives.",
+  "feature": "odd/tasks/admin-dashboard.md",
+  "artboards": [
+    {"file":"01-command-center.html","title":"Command center","tradeoff":"Fast overview and clear next actions; less table density","width":1440,"height":900},
+    {"file":"02-report-operations.html","title":"Report operations","tradeoff":"Dense and highly scannable; less dashboard atmosphere","width":1440,"height":900},
+    {"file":"03-mobile-first.html","title":"Mobile-first admin","tradeoff":"Excellent handheld workflow; desktop uses more whitespace","width":390,"height":844}
+  ]
+}

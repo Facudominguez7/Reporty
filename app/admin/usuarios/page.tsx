@@ -4,11 +4,12 @@ import { redirect } from "next/navigation"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { UsersAdminList } from "@/components/admin/usuarios/users-admin-list"
-import { getAdminUsers, type AdminUserFilter } from "@/database/queries/admin/admin-users"
+import { UsersFilters } from "@/components/admin/usuarios/users-filters"
+import { getAdminUsers, type AdminUserFilter, type AdminUserSort } from "@/database/queries/admin/admin-users"
 
 export const metadata = { title: "Usuarios · Administración", robots: { index: false, follow: false } }
 
-type SearchParams = Promise<{ page?: string; filtro?: string; q?: string }>
+type SearchParams = Promise<{ page?: string; filtro?: string; q?: string; orden?: string }>
 
 function pageNumber(value?: string) {
   const parsed = Number(value)
@@ -19,12 +20,17 @@ function userFilter(value?: string): AdminUserFilter {
   return value === "guests" || value === "all" ? value : "accounts"
 }
 
+function userSort(value?: string): AdminUserSort {
+  return value === "createdAt" ? "createdAt" : "lastAccess"
+}
+
 export default async function AdminUsuariosPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const page = pageNumber(params.page)
   const filter = userFilter(params.filtro)
   const search = params.q?.trim() ?? ""
-  const result = await getAdminUsers(page, filter, search)
+  const sort = userSort(params.orden)
+  const result = await getAdminUsers(page, filter, search, sort)
   if (result.unauthorized) redirect("/mapa")
 
   return (
@@ -39,27 +45,14 @@ export default async function AdminUsuariosPage({ searchParams }: { searchParams
         </div>
       </header>
 
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="text-sm font-semibold">Filtrar usuarios</p><p className="mt-1 text-xs text-muted-foreground">Por defecto se muestran las cuentas con correo.</p></div>
-          <form method="get" className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <input name="q" defaultValue={search} placeholder="Nombre o correo" className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm sm:w-56" aria-label="Buscar usuario por nombre o correo" />
-            <select name="filtro" defaultValue={filter} className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm sm:w-64" aria-label="Filtrar usuarios por tipo">
-              <option value="accounts">Con correo / cuentas</option>
-              <option value="guests">Sin correo / invitados</option>
-              <option value="all">Todos los usuarios</option>
-            </select>
-            <button type="submit" className="min-h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">Aplicar</button>
-          </form>
-        </CardContent>
-      </Card>
+      <UsersFilters filter={filter} search={search} sort={sort} />
 
       <UsersAdminList users={result.users} />
 
       {(page > 1 || result.hasNext) && <nav aria-label="Paginación de usuarios" className="flex items-center justify-between gap-4 text-sm">
-        {page > 1 ? <Link className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline" href={`/admin/usuarios?filtro=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}&page=${page - 1}`}><ChevronLeft className="size-4" /> Anteriores</Link> : <span />}
+        {page > 1 ? <Link className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline" href={`/admin/usuarios?filtro=${filter}&orden=${sort}${search ? `&q=${encodeURIComponent(search)}` : ""}&page=${page - 1}`}><ChevronLeft className="size-4" /> Anteriores</Link> : <span />}
         <span className="text-muted-foreground">Página {page}</span>
-        {result.hasNext ? <Link className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline" href={`/admin/usuarios?filtro=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}&page=${page + 1}`}>Siguientes <ChevronRight className="size-4" /> </Link> : <span />}
+        {result.hasNext ? <Link className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline" href={`/admin/usuarios?filtro=${filter}&orden=${sort}${search ? `&q=${encodeURIComponent(search)}` : ""}&page=${page + 1}`}>Siguientes <ChevronRight className="size-4" /> </Link> : <span />}
       </nav>}
 
       <Card className="border-[var(--semantic-admin)]/25 bg-[var(--semantic-admin)]/5">

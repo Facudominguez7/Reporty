@@ -22,10 +22,14 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/auth?next=/admin")
 
-  const { data: roleContext } = await getUserRoleContext(supabase, user.id)
+  const [{ data: roleContext }, { data: profile }] = await Promise.all([
+    getUserRoleContext(supabase, user.id),
+    supabase.from("profiles").select("username").eq("id", user.id).single(),
+  ])
   if (roleContext?.roleId === ROLE_IDS.INTERESADO) redirect("/admin/metricas")
   if (roleContext?.roleId === ROLE_IDS.OPERADOR) redirect("/admin/operaciones")
 
+  const displayName = profile?.username || user.user_metadata?.name || user.email?.split("@")[0] || "equipo"
   const [stats, reportesResult, filters] = await Promise.all([
     getEstadisticasInteresado(supabase),
     getAdminReportes(supabase, user.id, { pageSize: 5 }),
@@ -38,7 +42,7 @@ export default async function AdminPage() {
     <div className="space-y-8 md:space-y-10">
       <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Buen día, equipo.</h1>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Buen día, {displayName}.</h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">Una vista rápida de lo que necesita atención en Reporty.</p>
         </div>
         <div className="inline-flex items-center gap-2 text-sm text-muted-foreground"><ShieldCheck className="size-4 text-[var(--semantic-admin)]" aria-hidden="true" /> Espacio protegido</div>
@@ -46,7 +50,7 @@ export default async function AdminPage() {
 
       <section aria-labelledby="admin-stats-title" className="space-y-3">
         <h2 id="admin-stats-title" className="sr-only">Indicadores administrativos</h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
           <AdminStatCard label="Reportes activos" value={String(stats.totalReportes)} note={`${stats.reportesPendientes} pendientes`} icon={<FileText className="size-4" />} />
           <AdminStatCard label="Pendientes de revisión" value={String(stats.reportesPendientes)} note="Reportes que requieren atención" icon={<Images className="size-4" />} />
           <AdminStatCard label="Resueltos" value={`${stats.tasaResolucion}%`} note={`${stats.reportesResueltos} reportes reparados`} icon={<CheckCircle2 className="size-4" />} />

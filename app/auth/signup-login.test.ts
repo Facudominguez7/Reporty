@@ -201,6 +201,7 @@ describe("login", () => {
   })
 
   it.each([
+    [apiError("User is banned", 400, "user_banned"), "Tu usuario está bloqueado. Contactá a la administración para recuperar el acceso."],
     [apiError("Invalid login credentials", 400, "invalid_credentials"), "El correo o la contraseña no son correctos."],
     [apiError("Email not confirmed", 400, "email_not_confirmed"), "Primero confirmá tu correo desde el enlace que te enviamos."],
     [apiError("Request rate limit reached", 429, "over_request_rate_limit"), "Hiciste demasiados intentos. Probá de nuevo en unos minutos."],

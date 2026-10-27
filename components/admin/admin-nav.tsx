@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BarChart3, FileText, Images, LayoutDashboard, Users, UsersRound } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import type { MouseEvent } from "react"
 
 import { SignOutSection } from "@/components/sign-out-section"
 import { canAccessAdminPanel, isAdminRole } from "@/lib/authz/roles"
@@ -56,6 +57,9 @@ function AdminSession({ email, mobile = false }: { email: string; mobile?: boole
 export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | null }) {
   const pathname = usePathname()
   const items = itemsForRole(roleId)
+  const closeMobileMenu = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.currentTarget.closest("details")?.removeAttribute("open")
+  }
 
   if (!canAccessAdminPanel(roleId)) return null
 
@@ -71,7 +75,7 @@ export function AdminNav({ email, roleId }: { email: string; roleId: RoleId | nu
           </summary>
           <nav aria-label="Navegación de administración móvil" className="absolute inset-x-0 z-20 grid gap-1 border-t border-secondary-foreground/10 bg-secondary p-3 shadow-xl">
             {items.map(({ href, label, icon: Icon, count }) => (
-              <Link key={href} href={href} aria-current={isActive(pathname, href) ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-secondary-foreground/70 hover:bg-secondary-foreground/10 hover:text-secondary-foreground", isActive(pathname, href) && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>
+              <Link key={href} href={href} onClick={closeMobileMenu} aria-current={isActive(pathname, href) ? "page" : undefined} className={cn("flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-secondary-foreground/70 hover:bg-secondary-foreground/10 hover:text-secondary-foreground", isActive(pathname, href) && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground")}>
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="flex-1">{label}</span>
                 {count && <span className="text-[0.65rem] opacity-75">{count}</span>}
