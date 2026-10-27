@@ -286,15 +286,6 @@ async function syncStorage(status) {
   }
 }
 
-function ensureReportBucket() {
-  localSql(`
-    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-    values ('reportes', 'reportes', true, 102400, array['image/jpeg', 'image/png', 'image/webp'])
-    on conflict (id) do update set public = true, file_size_limit = 102400,
-      allowed_mime_types = excluded.allowed_mime_types;
-  `)
-}
-
 function writeEnvFile(status) {
   const partial = `${ENV_FILE}.partial`
   writeFileSync(partial, envFileContent(status))
@@ -340,8 +331,6 @@ async function main() {
 
   const status = localStatus()
   if (!status) fail("The local stack stopped unexpectedly. Run `npm run db:setup` again.")
-
-  ensureReportBucket()
 
   step("Data")
   if (source === "empty") {

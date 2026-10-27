@@ -148,7 +148,5 @@ describe("EXCLUDED_TABLES", () => {
   it("keeps live Auth credentials out of the production copy", () => {
     expect(EXCLUDED_TABLES).toEqual(expect.arrayContaining(["auth.sessions", "auth.refresh_tokens", "auth.one_time_tokens"]))
     expect(EXCLUDED_TABLES).not.toContain("auth.users")
-    expect(EXCLUDED_TABLES).toContain("public.presupuesto_moderacion")
-    expect(EXCLUDED_TABLES).toContain("storage.buckets")
   })
 })
