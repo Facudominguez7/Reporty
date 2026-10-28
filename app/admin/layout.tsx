@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 
 import { AdminDashboardShell } from "@/components/admin/dashboard-shell"
 import { canAccessAdminPanel, getUserRoleContext, isAdminRole } from "@/lib/authz/roles"
+import { getCantidadRevisionesRechazoReportes } from "@/lib/moderation/report-status-reviews.server"
 import { getPendingReviewCount } from "@/lib/moderation/pending-count.server"
 import { createClient } from "@/utils/supabase/server"
 
@@ -24,7 +25,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/mapa")
   }
 
-  const pendingReviews = isAdminRole(roleContext?.roleId) ? await getPendingReviewCount() : null
+  const pendingReviews = isAdminRole(roleContext?.roleId)
+    ? await Promise.all([getPendingReviewCount(), getCantidadRevisionesRechazoReportes()]).then(([photos, reports]) =>
+        photos === null || reports === null ? null : photos + reports,
+      )
+    : null
 
   return (
     <AdminDashboardShell email={authData.user.email ?? "Cuenta administrativa"} roleId={roleContext?.roleId ?? null} pendingReviews={pendingReviews}>
