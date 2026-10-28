@@ -46,6 +46,7 @@ Tests: Vitest via `npm test`; local SQL assertions via `docker exec ... psql`.
 
 ### S11 — Local commits only
 > “bien, commit hasta aca, recorda q vamos a subirlo a main, pero no push todavia”
+> “lo de las skills commitea tb”
 
 ## Tasks
 - T1 — S5-S6 — Implement secure vote thresholds and persistent admin review decisions, migration, workflow tests, and schema/access documentation — done; commits `5fd9a6f`, `1dd230a`, `7a8d9e7`, `58ea02b` (null-state CAS regression test); independent static review plus local concurrency, SQL threshold/RLS, status/CAS, typecheck, and diff checks passed; Risk item 4 (concurrency).
@@ -55,7 +56,7 @@ Tests: Vitest via `npm test`; local SQL assertions via `docker exec ... psql`.
 - T5 — S7 — Move the update form below the activity list and empty-state message — done; commit `58ea02b`; the existing form follows the complete activity container. Focused Playwright job `job-15`, TypeScript, and `git diff --check` passed.
 - T6 — S8 — Replace the creator's non-final “Avisar resuelto” signal with a repaired vote, while keeping “No existe” unavailable to the creator — done; commit `58ea02b`; independent verifier `mvs605t8-4-rqnq` returned S8 verified. Owner No Existe remains blocked in UI and workflow; admin/operator exclusions remain. Focused Vitest 8/8 and Playwright job `job-20` passed. ASSESS risk item 2 escalated; nativeRisk was unassessable because untracked files were present.
 - T7 — S9,S10 — Add a screen-reader description to the No Existe AlertDialog that currently emits Radix's missing-description warning — done; commit `58ea02b`; both vote dialogs include “Tu voto sumará 1 punto.” Playwright job `job-24` verified copy, aria-describedby targets, and no console warning; TypeScript and diff checks passed. Guest points audit found no standard invited-account points path; no policy change.
-- T8 — S11 — Create local work-unit commits for completed in-scope changes on `feat/report-state-review`, preserve unrelated skill deletions and `skills-lock.json`, and do not push — done; parent route; commits `63dfceb` (T3 admin review queue) and `58ea02b` (T1 regression test, T2, T5, T6, T7) verified. No push, PR, or production SQL.
+- T8 — S11 — Create local work-unit commits for completed in-scope changes on `feat/report-state-review`, include the explicitly requested skills cleanup, and do not push — done; commits `63dfceb` (admin queue), `58ea02b` (report details/votes), `d532982` (task evidence), and `94a142a` (skills cleanup) verified. No push or PR.
 
 ## Log
 
@@ -157,3 +158,5 @@ L94 — Local commit `63dfceb` contains only the seven T3 admin-review queue fil
 L95 — Before the next report-detail commit, focused `npx vitest run lib/use-cases/reportes/detail-mutations.test.ts` passed all 6 tests, including the null-state compare-and-swap case.
 L96 — Local work-unit commit `58ea02b` (`feat(reports): complete community voting and activity UX`) contains T2, T5, T6, T7, and the T1 null-state CAS regression test: 372 insertions/177 deletions. The high-risk owner-vote change is isolated from the admin queue commit. Focused unit 6/6, owner vote E2E job-20, dialog E2E job-24, TypeScript, and diff checks passed. No push.
 L97 — Recorded the work-unit boundary before the next commit: admin review queue T3 is `63dfceb` (321 insertions/34 deletions); report-detail/voting/activity T2/T5/T6/T7 plus the T1 CAS regression test is `58ea02b` (372 insertions/177 deletions). The feature's existing single-PR strategy remains for later review; the user has not authorized push or PR. Current unrelated `.agents/skills` deletions and `skills-lock.json` edits remain unstaged.
+L98 — User correction, verbatim: “lo de las skills commitea tb”. This expands the local commit scope to include the existing project skill deletions and `skills-lock.json` change; no push was authorized.
+L99 — Separate skills cleanup commit `94a142a` (`chore(skills): remove duplicate project skill copies`) deletes four project-local skill files and removes four lock entries, leaving the two Supabase skills. `skills-lock.json` parsed and the focused diff check passed. The feature branch now has 1990 authored changed lines across 7 commits; the report-state work remains in `63dfceb` and `58ea02b`, with the skills cleanup isolated in `94a142a`. Record this slice boundary before any further commit; no push.
