@@ -263,12 +263,17 @@ export async function applyReportStateChange(
   const owner = getOwnerProfile(report.ownerProfile)
   const previousStateId = report.estado_id ?? null
 
-  const { data: updatedReport, error: updateError } = await supabase
+  let updateQuery = supabase
     .from("reportes")
     .update({ estado_id: nextStateId })
     .eq("id", report.id)
     .is("deleted_at", null)
-    .neq("estado_id", nextStateId)
+
+  updateQuery = previousStateId === null
+    ? updateQuery.is("estado_id", null)
+    : updateQuery.eq("estado_id", previousStateId)
+
+  const { data: updatedReport, error: updateError } = await updateQuery
     .select("id")
     .maybeSingle()
 

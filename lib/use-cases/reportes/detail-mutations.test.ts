@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { APORTES_COMUNITARIOS, mergeReportActivity, parseAporteKey } from "@/lib/reportes/aportes"
-import { crearComentarioWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
+import { applyReportStateChange, crearComentarioWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
 
 const mocks = vi.hoisted(() => ({ sumarPuntos: vi.fn() }))
 vi.mock("server-only", () => ({}))
@@ -12,6 +12,60 @@ vi.mock("@/database/queries/puntos", async (importOriginal) => ({
 
 beforeEach(() => {
   mocks.sumarPuntos.mockReset().mockResolvedValue({ success: true, error: null })
+})
+
+describe("report status transition concurrency", () => {
+  it("does not overwrite an admin status change made after the workflow read the report", async () => {
+    let currentState = 3
+    const updateFilters: Array<[string, unknown]> = []
+    const historyInsert = vi.fn().mockResolvedValue({ error: null })
+    const updateQuery = {
+      eq: (column: string, value: unknown) => { updateFilters.push([column, value]); return updateQuery },
+      is: () => updateQuery,
+      neq: () => updateQuery,
+      select: () => updateQuery,
+      maybeSingle: async () => {
+        const hasExpectedState = updateFilters.some(([column, value]) => column === "estado_id" && value === 1)
+        if (currentState !== 1 && !hasExpectedState) {
+          currentState = 2
+          return { data: { id: 4 }, error: null }
+        }
+        return { data: null, error: null }
+      },
+    }
+    const supabase = {
+      from: (table: string) => table === "reportes"
+        ? {
+            update: () => updateQuery,
+            select: () => ({ eq: () => ({ single: async () => ({ data: {
+              id: 4,
+              usuario_id: "owner",
+              titulo: "Reporte",
+              estado_id: currentState,
+              deleted_at: null,
+              reparacion_reportada_at: null,
+              ownerProfile: null,
+            }, error: null }) }) }),
+          }
+        : { insert: historyInsert },
+    } as never
+
+    const result = await applyReportStateChange(supabase, {
+      id: 4,
+      usuario_id: "owner",
+      titulo: "Reporte",
+      estado_id: 1,
+      deleted_at: null,
+      reparacion_reportada_at: null,
+      ownerProfile: null,
+    }, 2, "voter")
+
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining("cambió") })
+    expect(updateFilters).toContainEqual(["estado_id", 1])
+    expect(currentState).toBe(3)
+    expect(historyInsert).not.toHaveBeenCalled()
+    expect(mocks.sumarPuntos).not.toHaveBeenCalled()
+  })
 })
 
 describe("report activity contributions", () => {
