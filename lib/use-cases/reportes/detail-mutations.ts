@@ -3,7 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { actualizarPuntos, PUNTOS, restarPuntos, sumarPuntos } from "@/database/queries/puntos"
-import { REPORT_STATE_IDS } from "@/lib/authz/catalog"
+import { REPORT_STATE_IDS, REPORT_STATUS_VOTE_THRESHOLD } from "@/lib/authz/catalog"
 import { isAdminRole, getUserRoleContext } from "@/lib/authz/roles"
 import {
   getReportImageStorageRefs,
@@ -56,11 +56,13 @@ type ReportContext = {
   estado_id: number | null
   deleted_at: string | null
   ownerProfile: ReportOwnerRelation
+  reparacion_reportada_at?: string | null
 }
 
 type VoteResult = {
   count: number
   stateChangedTo: number | null
+  needsAdminReview: boolean
 }
 
 type StatusChangeResult = {
@@ -213,6 +215,7 @@ export async function getReportContext(
         titulo,
         estado_id,
         deleted_at,
+        reparacion_reportada_at,
         ownerProfile:profiles!reportes_usuario_id_fkey(username, email)
       `,
     )
@@ -528,29 +531,12 @@ export async function votarNoExisteWorkflow(
 
   await sumarPuntos(supabase, actorUserId, PUNTOS.VOTAR_NO_EXISTE, "Votar 'No Existe' en reporte")
 
-  let stateChangedTo: number | null = null
-
-  if (voteResult.count >= 1) {
-    const stateResult = await applyReportStateChange(
-      supabase,
-      report,
-      REPORT_STATE_IDS.RECHAZADO,
-      actorUserId,
-      "Rechazado automáticamente por 1 voto de 'No Existe'",
-    )
-
-    if (!stateResult.success) {
-      return stateResult
-    }
-
-    stateChangedTo = stateResult.data.stateChanged ? stateResult.data.estadoId : null
-  }
-
   return {
     success: true,
     data: {
       count: voteResult.count,
-      stateChangedTo,
+      stateChangedTo: null,
+      needsAdminReview: voteResult.count >= REPORT_STATUS_VOTE_THRESHOLD,
     },
   }
 }
@@ -575,6 +561,10 @@ export async function votarReparadoWorkflow(
     return { success: false, error: "No podés votar un reporte que ya está cerrado." }
   }
 
+  if (report.usuario_id === actorUserId) {
+    return { success: false, error: "No podés votar que tu propio reporte está reparado." }
+  }
+
   const voteResult = await createVote(supabase, "votos_reparado", reporteId, actorUserId)
   if (!voteResult.success) {
     return voteResult
@@ -584,13 +574,13 @@ export async function votarReparadoWorkflow(
 
   let stateChangedTo: number | null = null
 
-  if (voteResult.count >= 1) {
+  if (voteResult.count >= REPORT_STATUS_VOTE_THRESHOLD) {
     const stateResult = await applyReportStateChange(
       supabase,
       report,
       REPORT_STATE_IDS.REPARADO,
       actorUserId,
-      `Marcado como reparado por ${voteResult.count} ${voteResult.count === 1 ? "voto" : "votos"} de usuarios`,
+      `Marcado como reparado por ${voteResult.count} votos de usuarios`,
     )
 
     if (!stateResult.success) {
@@ -605,8 +595,45 @@ export async function votarReparadoWorkflow(
     data: {
       count: voteResult.count,
       stateChangedTo,
+      needsAdminReview: false,
     },
   }
+}
+
+export async function marcarReporteReparadoWorkflow(
+  supabase: SupabaseClient,
+  reporteId: number,
+  actorUserId: string,
+): Promise<MutationResult<{ reported: true }>> {
+  const reportResult = await getReportContext(supabase, reporteId)
+  if (!reportResult.success) return reportResult
+
+  const report = reportResult.data
+  if (report.deleted_at || report.estado_id !== REPORT_STATE_IDS.PENDIENTE) {
+    return { success: false, error: "El reporte ya no está disponible para informar una reparación." }
+  }
+  if (report.usuario_id !== actorUserId) {
+    return { success: false, error: "Solo quien creó el reporte puede informar que se resolvió." }
+  }
+  if (report.reparacion_reportada_at) return { success: true, data: { reported: true } }
+
+  const { data, error } = await supabase.from("reportes")
+    .update({ reparacion_reportada_at: new Date().toISOString() })
+    .eq("id", reporteId)
+    .eq("usuario_id", actorUserId)
+    .eq("estado_id", REPORT_STATE_IDS.PENDIENTE)
+    .is("deleted_at", null)
+    .is("reparacion_reportada_at", null)
+    .select("id")
+    .maybeSingle()
+
+  if (error) return { success: false, error: "No pudimos registrar el aviso de reparación." }
+  if (data) return { success: true, data: { reported: true } }
+
+  const latest = await getReportContext(supabase, reporteId)
+  return latest.success && latest.data.usuario_id === actorUserId && latest.data.reparacion_reportada_at
+    ? { success: true, data: { reported: true } }
+    : { success: false, error: "El reporte cambió mientras registrábamos el aviso. Actualizá e intentá nuevamente." }
 }
 
 export async function crearComentarioWorkflow(

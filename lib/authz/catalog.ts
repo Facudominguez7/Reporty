@@ -15,6 +15,8 @@ export const REPORT_STATE_IDS = {
   RECHAZADO: 3,
 } as const;
 
+export const REPORT_STATUS_VOTE_THRESHOLD = 5;
+
 export type ReportStateId =
   (typeof REPORT_STATE_IDS)[keyof typeof REPORT_STATE_IDS];
 
