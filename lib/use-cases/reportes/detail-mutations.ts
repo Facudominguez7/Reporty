@@ -566,10 +566,6 @@ export async function votarReparadoWorkflow(
     return { success: false, error: "No podés votar un reporte que ya está cerrado." }
   }
 
-  if (report.usuario_id === actorUserId) {
-    return { success: false, error: "No podés votar que tu propio reporte está reparado." }
-  }
-
   const voteResult = await createVote(supabase, "votos_reparado", reporteId, actorUserId)
   if (!voteResult.success) {
     return voteResult

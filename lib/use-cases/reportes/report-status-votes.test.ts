@@ -95,11 +95,17 @@ describe("community report status votes", () => {
     expect(effects.updateReport).not.toHaveBeenCalled()
   })
 
-  it("prevents the report author from voting to close their own report as repaired", async () => {
-    const result = await votarReparadoWorkflow(reportClient({ voteCount: 5 }), 9, "report-owner")
+  it("allows the report author to vote repaired", async () => {
+    const result = await votarReparadoWorkflow(reportClient({ voteCount: 1 }), 9, "report-owner")
 
-    expect(result).toMatchObject({ success: false, error: "No podés votar que tu propio reporte está reparado." })
+    expect(result).toMatchObject({ success: true, data: { count: 1, stateChangedTo: null } })
+    expect(effects.sumarPuntos).toHaveBeenCalled()
+  })
+
+  it("prevents the report author from voting 'No existe'", async () => {
+    const result = await votarNoExisteWorkflow(reportClient({ voteCount: 0 }), 9, "report-owner")
+
+    expect(result).toMatchObject({ success: false, error: "No podés votar 'No Existe' sobre tu propio reporte." })
     expect(effects.sumarPuntos).not.toHaveBeenCalled()
-    expect(effects.updateReport).not.toHaveBeenCalled()
   })
 })

@@ -207,12 +207,6 @@ export function ReporteDetalleClient({
         description: "Tu voto ha sido contabilizado correctamente"
       });
 
-      if (result.data.stateChangedTo) {
-        toast.success("¡Reporte rechazado automáticamente!", {
-          description: "Se alcanzó 1 voto. Redirigiendo..."
-        });
-        setTimeout(() => window.location.reload(), 1500);
-      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al procesar el voto", {
@@ -251,9 +245,7 @@ export function ReporteDetalleClient({
       });
 
       if (result.data.stateChangedTo) {
-        toast.success("¡Reporte marcado como reparado!", {
-          description: "Se alcanzó 1 voto. Redirigiendo..."
-        });
+        toast.success("¡Reporte marcado como reparado!");
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch (error) {
@@ -404,6 +396,12 @@ export function ReporteDetalleClient({
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
     ? formatRepairDuration(reporte.created_at, fechaCambioEstado)
     : null;
+  const showVoteFooter = Boolean(
+    isReporteCerrado ||
+    currentUser?.id === reporte.usuario_id ||
+    reporte.reparacion_reportada_at ||
+    (!isAdmin && (!currentUser || puedeVotar))
+  );
 
   return (
     <div className="page-shell">
@@ -455,34 +453,6 @@ export function ReporteDetalleClient({
                   >
                     <Share2 className="size-4" />
                   </Button>
-                   {currentUser && puedeVotar && !isReporteCerrado && (
-                    <>
-                      <Button
-                        variant={hasVotedReparado ? "secondary" : "default"}
-                        size="icon"
-                        className="size-8"
-                        onClick={handleVoteReparado}
-                        disabled={hasVotedReparado || isVotingReparado}
-                        aria-label={`${hasVotedReparado ? "Ya votaste que está reparado" : "Votar que está reparado"}. ${votosReparadoCount} votos`}
-                        title={`${hasVotedReparado ? "Ya votaste: reparado" : "Votar reparado"} (${votosReparadoCount} / 1)`}
-                      >
-                        <ThumbsUp className="size-4" />
-                      </Button>
-                      {currentUser.id !== reporte.usuario_id && (
-                        <Button
-                          variant={hasVoted ? "secondary" : "destructive"}
-                          size="icon"
-                          className="size-8"
-                          onClick={handleVoteNoExiste}
-                          disabled={hasVoted || isVoting}
-                          aria-label={`${hasVoted ? "Ya votaste que no existe" : "Votar que no existe"}. ${votosCount} votos`}
-                          title={`${hasVoted ? "Ya votaste: no existe" : "Votar no existe"} (${votosCount} / 1)`}
-                        >
-                          <ThumbsDown className="size-4" />
-                        </Button>
-                      )}
-                    </>
-                  )}
                   {isAdmin && (
                     <Button
                       variant="outline"
@@ -542,7 +512,7 @@ export function ReporteDetalleClient({
                 )}
 
                 {/* Autor y Fecha */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Avatar className="size-6">
                       <AvatarFallback className="text-[10px]">
@@ -585,6 +555,54 @@ export function ReporteDetalleClient({
                     </span>
                   </div>
                 )}
+                {showVoteFooter && (
+                  <div className="mt-3">
+                    <hr className="mb-2 border-border" />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {currentUser && puedeVotar && !isReporteCerrado && (
+                        <div role="group" aria-label="Votar sobre el reporte" className="grid w-full grid-cols-2 gap-2">
+                          <Button
+                            variant="default"
+                            size="xs"
+                            className={`min-h-7 w-full px-2.5 text-[11px] ${currentUser.id === reporte.usuario_id ? "col-span-2" : ""}`}
+                            onClick={handleVoteReparado}
+                            disabled={hasVotedReparado || isVotingReparado}
+                          >
+                            <ThumbsUp className="size-3" />
+                            Reparado
+                          </Button>
+                          {currentUser.id !== reporte.usuario_id && (
+                            <Button
+                              variant="destructive"
+                              size="xs"
+                              className="min-h-7 w-full px-2.5 text-[11px]"
+                              onClick={handleVoteNoExiste}
+                              disabled={hasVoted || isVoting}
+                            >
+                              <ThumbsDown className="size-3" />
+                              No existe
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      {!currentUser && !isReporteCerrado && (
+                        <Button asChild variant="outline" size="xs" className="min-h-7 px-2.5 text-[11px]">
+                          <Link href={`/auth?next=/reportes/${reporte.id}`}>Entrar para votar</Link>
+                        </Button>
+                      )}
+                      {reporte.reparacion_reportada_at && currentUser?.id !== reporte.usuario_id && !isReporteCerrado && (
+                        <span role="status" className="text-xs text-muted-foreground">
+                          El autor avisó que se resolvió
+                        </span>
+                      )}
+                      {isReporteCerrado && (
+                        <span className="text-xs text-muted-foreground">
+                          Reparado {votosReparadoCount} · No existe {votosCount}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -609,71 +627,6 @@ export function ReporteDetalleClient({
 
           {/* Barra Lateral */}
           <div className="lg:col-span-4 space-y-4 md:space-y-6">
-
-            {/* Panel de Administrador - Solo visible para admins */}
-            {isAdmin && (
-              <Card className="tone-admin-card border-2">
-                <CardHeader className="pb-3 md:pb-4 lg:pb-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-5 h-5 text-[var(--semantic-admin)] md:w-6 md:h-6" />
-                    <CardTitle className="text-base text-[var(--semantic-admin)] md:text-lg lg:text-xl">
-                      Panel de Administrador
-                    </CardTitle>
-                  </div>
-                  <CardDescription className="text-xs md:text-sm">
-                    Controles exclusivos para gestionar este reporte
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 pt-0">
-                  {/* Cambiar Estado */}
-                  <div className="space-y-2">
-                    <label className="text-xs md:text-sm font-medium text-foreground">
-                      Cambiar Estado
-                    </label>
-                    <Select value={estadoSeleccionado} onValueChange={setEstadoSeleccionado}>
-                      <SelectTrigger className="w-full text-xs md:text-sm">
-                        <SelectValue placeholder="Seleccionar estado..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {estados.map((estado) => (
-                          <SelectItem key={estado.id} value={estado.id.toString()}>
-                            {estado.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Textarea
-                      placeholder="Descripción del cambio (opcional)"
-                      value={comentarioEstado}
-                      onChange={(e) => setComentarioEstado(e.target.value)}
-                      className="min-h-[60px] text-xs md:text-sm resize-none"
-                    />
-                    <Button
-                      onClick={handleAdminChangeEstado}
-                      disabled={!estadoSeleccionado || isChangingEstado}
-                       className="w-full text-xs md:text-sm"
-                      size="sm"
-                    >
-                      <Settings className="w-3 h-3 md:w-4 md:h-4 mr-1.5" />
-                      {isChangingEstado ? "Actualizando..." : "Actualizar Estado"}
-                    </Button>
-                  </div>
-
-                  {/* Eliminar Reporte */}
-                   <div className="border-t border-[var(--semantic-admin-border)] pt-3">
-                    <Button
-                      onClick={handleAdminDeleteReporte}
-                      variant="destructive"
-                      className="w-full text-xs md:text-sm"
-                      size="sm"
-                    >
-                      <Trash2 className="w-3 h-3 md:w-4 md:h-4 mr-1.5" />
-                      Eliminar Reporte (Admin)
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Seguimiento de la cuadrilla (cuadrillas) - solo lectura; la gestión vive en /dashboard/cuadrillas */}
             {gestionOperativa &&
@@ -869,25 +822,7 @@ export function ReporteDetalleClient({
               </span>
               ¿Confirmar voto «No existe»?
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Confirmá que el reporte no existe o fue enviado por error.</p>
-                <div className="rounded-xl border border-border/70 bg-muted/60 p-3">
-                  <p className="font-semibold text-foreground mb-1">{reporte?.titulo}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Votantes actuales: {votosCount} / 1
-                  </p>
-                </div>
-                <div className="tone-danger-soft-inline rounded-xl p-3">
-                  <p className="text-sm">
-                    Con 1 voto, el reporte será <span className="font-bold">rechazado automáticamente</span>.
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Ganarás <span className="font-bold text-primary">{PUNTOS.VOTAR_NO_EXISTE} punto</span> por votar.
-                </p>
-              </div>
-            </AlertDialogDescription>
+            <AlertDialogDescription>Tu voto sumará 1 punto.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isVoting}>Cancelar</AlertDialogCancel>
@@ -922,25 +857,7 @@ export function ReporteDetalleClient({
               </span>
               ¿Confirmar que está reparado?
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Confirmá que este problema ya fue solucionado.</p>
-                <div className="rounded-xl border border-border/70 bg-muted/60 p-3">
-                  <p className="font-semibold text-foreground mb-1">{reporte?.titulo}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Votantes actuales: {votosReparadoCount} / 1
-                  </p>
-                </div>
-                <div className="tone-success-soft-inline rounded-xl p-3">
-                  <p className="text-sm">
-                    Con 1 voto, el reporte se marcará como <span className="font-bold">Reparado</span>.
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Ganarás <span className="font-bold text-primary">{PUNTOS.VOTAR_REPARADO} punto</span> por votar.
-                </p>
-              </div>
-            </AlertDialogDescription>
+            <AlertDialogDescription>Tu voto sumará 1 punto.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isVotingReparado}>Cancelar</AlertDialogCancel>

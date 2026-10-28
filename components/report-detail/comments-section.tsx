@@ -156,6 +156,18 @@ export function CommentsSection({
               )}
             </p>
           )}
+          <div className="space-y-3">
+            {activity.length === 0 && !isClosed ? (
+              <div className="py-8 text-center text-muted-foreground"><MessageCircle className="mx-auto mb-3 size-10 opacity-50" /><p className="text-sm">Aún no hay actividad</p><p className="text-xs">Sé el primero en actualizar</p></div>
+            ) : activity.map((entry) => {
+              if (entry.kind === "status") return <div key={entry.id} className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 sm:p-4"><p className="whitespace-pre-wrap break-words text-sm font-medium">{entry.content}</p>{entry.detail && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{entry.detail}</p>}<p className="mt-2 text-xs text-muted-foreground">{dayjs.utc(entry.createdAt).tz("America/Argentina/Buenos_Aires").format("DD/MM/YYYY HH:mm")}</p></div>
+              const comment = comments.find((item) => `comment-${item.id}` === entry.id)!
+              const canDelete = Boolean(currentUser && (isClosed ? isAdmin : currentUser.id === comment.usuario_id || isAdmin))
+              const adminDelete = Boolean(isClosed || (isAdmin && currentUser?.id !== comment.usuario_id))
+              return <div key={entry.id} className="space-y-2 rounded-md border p-3 transition-colors hover:bg-[var(--surface-subtle)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{entry.username}</p><p className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="size-3 shrink-0" /><span>{dayjs.utc(entry.createdAt).tz("America/Argentina/Buenos_Aires").format("DD/MM/YYYY HH:mm")}</span></p></div>{currentUser && canDelete && (!isClosed || isAdmin) && <Button variant="ghost" size="sm" onClick={() => requestDelete(comment.id, adminDelete)} className="size-9 shrink-0 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive" title={adminDelete ? "Eliminar comentario (Admin)" : "Eliminar comentario"} aria-label={adminDelete ? "Eliminar comentario (Admin)" : "Eliminar comentario"}><Trash2 className="size-4" /></Button>}</div><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{entry.content}</p></div>
+            })}
+          </div>
+
           {!isClosed && currentUser && !currentUser.is_anonymous && (
             <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border/70 bg-muted/30 p-3 sm:p-4">
               <label htmlFor="report-contribution" className="block text-sm font-medium">¿Qué novedad tenés?</label>
@@ -171,18 +183,6 @@ export function CommentsSection({
               </div>
             </form>
           )}
-
-          <div className="space-y-3">
-            {activity.length === 0 && !isClosed ? (
-              <div className="py-8 text-center text-muted-foreground"><MessageCircle className="mx-auto mb-3 size-10 opacity-50" /><p className="text-sm">Aún no hay actividad</p><p className="text-xs">Sé el primero en actualizar</p></div>
-            ) : activity.map((entry) => {
-              if (entry.kind === "status") return <div key={entry.id} className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 sm:p-4"><p className="whitespace-pre-wrap break-words text-sm font-medium">{entry.content}</p>{entry.detail && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{entry.detail}</p>}<p className="mt-2 text-xs text-muted-foreground">{dayjs.utc(entry.createdAt).tz("America/Argentina/Buenos_Aires").format("DD/MM/YYYY HH:mm")}</p></div>
-              const comment = comments.find((item) => `comment-${item.id}` === entry.id)!
-              const canDelete = Boolean(currentUser && (isClosed ? isAdmin : currentUser.id === comment.usuario_id || isAdmin))
-              const adminDelete = Boolean(isClosed || (isAdmin && currentUser?.id !== comment.usuario_id))
-              return <div key={entry.id} className="space-y-2 rounded-md border p-3 transition-colors hover:bg-[var(--surface-subtle)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{entry.username}</p><p className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="size-3 shrink-0" /><span>{dayjs.utc(entry.createdAt).tz("America/Argentina/Buenos_Aires").format("DD/MM/YYYY HH:mm")}</span></p></div>{currentUser && canDelete && (!isClosed || isAdmin) && <Button variant="ghost" size="sm" onClick={() => requestDelete(comment.id, adminDelete)} className="size-9 shrink-0 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive" title={adminDelete ? "Eliminar comentario (Admin)" : "Eliminar comentario"} aria-label={adminDelete ? "Eliminar comentario (Admin)" : "Eliminar comentario"}><Trash2 className="size-4" /></Button>}</div><p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{entry.content}</p></div>
-            })}
-          </div>
         </CardContent>
       </Card>
 

@@ -15,6 +15,45 @@ beforeEach(() => {
 })
 
 describe("report status transition concurrency", () => {
+  it("uses an IS NULL predicate when changing a report with no current state", async () => {
+    let currentState: number | null = null
+    const updateIsFilters: Array<[string, unknown]> = []
+    const historyInsert = vi.fn().mockResolvedValue({ error: null })
+    const updateQuery = {
+      eq: () => updateQuery,
+      is: (column: string, value: unknown) => { updateIsFilters.push([column, value]); return updateQuery },
+      select: () => updateQuery,
+      maybeSingle: async () => {
+        const hasExpectedNullState = updateIsFilters.some(([column, value]) => column === "estado_id" && value === null)
+        if (currentState === null && hasExpectedNullState) {
+          currentState = 2
+          return { data: { id: 4 }, error: null }
+        }
+        return { data: null, error: null }
+      },
+    }
+    const supabase = {
+      from: (table: string) => table === "reportes"
+        ? { update: () => updateQuery }
+        : { insert: historyInsert },
+    } as never
+
+    const result = await applyReportStateChange(supabase, {
+      id: 4,
+      usuario_id: "owner",
+      titulo: "Reporte",
+      estado_id: null,
+      deleted_at: null,
+      reparacion_reportada_at: null,
+      ownerProfile: null,
+    }, 2, "admin")
+
+    expect(result).toMatchObject({ success: true, data: { stateChanged: true, estadoId: 2 } })
+    expect(updateIsFilters).toContainEqual(["estado_id", null])
+    expect(currentState).toBe(2)
+    expect(historyInsert).toHaveBeenCalledTimes(1)
+  })
+
   it("does not overwrite an admin status change made after the workflow read the report", async () => {
     let currentState = 3
     const updateFilters: Array<[string, unknown]> = []
