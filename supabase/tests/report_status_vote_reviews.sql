@@ -8,6 +8,10 @@ begin
   raise exception 'Operación privada permitida';
 exception when insufficient_privilege then return;
 end $$;
+select pg_temp.exigir(not exists (
+  select 1 from information_schema.columns
+  where table_schema='public' and table_name='reportes' and column_name='reparacion_reportada_at'
+), 'El flujo de votos no debe conservar una marca separada de reparación del autor');
 insert into auth.users(id,email) values
  ('10000000-0000-0000-0000-000000000101','review-author@ejemplo.invalid'),
  ('10000000-0000-0000-0000-000000000102','review-voter-1@ejemplo.invalid'),

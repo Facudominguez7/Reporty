@@ -11,7 +11,6 @@ import {
   eliminarReporteAdminWorkflow,
   eliminarReportePropioWorkflow,
   mutationErrorMessage as workflowErrorMessage,
-  marcarReporteReparadoWorkflow,
   votarNoExisteWorkflow,
   votarReparadoWorkflow,
 } from "@/lib/use-cases/reportes"
@@ -69,18 +68,6 @@ export async function votarNoExisteAction(reporteId: number) {
     return await votarNoExisteWorkflow(createAdminClient(), parsedReportId, user.id)
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos registrar tu voto.") }
-  }
-}
-
-export async function marcarReparacionReportadaAction(reporteId: number) {
-  try {
-    const parsedReportId = reportIdSchema.parse(reporteId)
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false as const, error: "Tenés que iniciar sesión para informar una reparación." }
-    return await marcarReporteReparadoWorkflow(createAdminClient(), parsedReportId, user.id)
-  } catch (error) {
-    return { success: false as const, error: mutationErrorMessage(error, "No pudimos registrar el aviso de reparación.") }
   }
 }
 

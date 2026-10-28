@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn() }))
 vi.mock("@/utils/supabase/server", () => ({ createClient: mocks.createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }))
-import { cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, marcarReparacionReportadaAction, votarNoExisteAction, votarReparadoAction } from "./actions"
+import { cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, votarNoExisteAction, votarReparadoAction } from "./actions"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -15,7 +15,6 @@ const cases = [
   ["votarNoExiste", (id: number) => votarNoExisteAction(id), "Tenés que iniciar sesión para votar."],
   ["crearComentario", (id: number) => crearComentarioAction(id, "problema_sigue_igual"), "Tenés que iniciar sesión para comentar."],
   ["votarReparado", (id: number) => votarReparadoAction(id), "Tenés que iniciar sesión para votar."],
-  ["marcarReparacionReportada", (id: number) => marcarReparacionReportadaAction(id), "Tenés que iniciar sesión para informar una reparación."],
   ["eliminarComentarioPropio", (id: number) => eliminarComentarioPropioAction(id), "Tenés que iniciar sesión para eliminar el comentario."],
   ["eliminarComentarioAdmin", (id: number) => eliminarComentarioAdminAction(id), "Tenés que iniciar sesión para eliminar el comentario."],
   ["eliminarReportePropio", (id: number) => eliminarReportePropioAction(id), "Tenés que iniciar sesión para eliminar el reporte."],

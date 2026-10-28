@@ -56,7 +56,6 @@ type ReportContext = {
   estado_id: number | null
   deleted_at: string | null
   ownerProfile: ReportOwnerRelation
-  reparacion_reportada_at?: string | null
 }
 
 type VoteResult = {
@@ -215,7 +214,6 @@ export async function getReportContext(
         titulo,
         estado_id,
         deleted_at,
-        reparacion_reportada_at,
         ownerProfile:profiles!reportes_usuario_id_fkey(username, email)
       `,
     )
@@ -599,42 +597,6 @@ export async function votarReparadoWorkflow(
       needsAdminReview: false,
     },
   }
-}
-
-export async function marcarReporteReparadoWorkflow(
-  supabase: SupabaseClient,
-  reporteId: number,
-  actorUserId: string,
-): Promise<MutationResult<{ reported: true }>> {
-  const reportResult = await getReportContext(supabase, reporteId)
-  if (!reportResult.success) return reportResult
-
-  const report = reportResult.data
-  if (report.deleted_at || report.estado_id !== REPORT_STATE_IDS.PENDIENTE) {
-    return { success: false, error: "El reporte ya no está disponible para informar una reparación." }
-  }
-  if (report.usuario_id !== actorUserId) {
-    return { success: false, error: "Solo quien creó el reporte puede informar que se resolvió." }
-  }
-  if (report.reparacion_reportada_at) return { success: true, data: { reported: true } }
-
-  const { data, error } = await supabase.from("reportes")
-    .update({ reparacion_reportada_at: new Date().toISOString() })
-    .eq("id", reporteId)
-    .eq("usuario_id", actorUserId)
-    .eq("estado_id", REPORT_STATE_IDS.PENDIENTE)
-    .is("deleted_at", null)
-    .is("reparacion_reportada_at", null)
-    .select("id")
-    .maybeSingle()
-
-  if (error) return { success: false, error: "No pudimos registrar el aviso de reparación." }
-  if (data) return { success: true, data: { reported: true } }
-
-  const latest = await getReportContext(supabase, reporteId)
-  return latest.success && latest.data.usuario_id === actorUserId && latest.data.reparacion_reportada_at
-    ? { success: true, data: { reported: true } }
-    : { success: false, error: "El reporte cambió mientras registrábamos el aviso. Actualizá e intentá nuevamente." }
 }
 
 export async function crearComentarioWorkflow(

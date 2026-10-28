@@ -44,7 +44,6 @@ describe("report status transition concurrency", () => {
       titulo: "Reporte",
       estado_id: null,
       deleted_at: null,
-      reparacion_reportada_at: null,
       ownerProfile: null,
     }, 2, "admin")
 
@@ -82,7 +81,6 @@ describe("report status transition concurrency", () => {
               titulo: "Reporte",
               estado_id: currentState,
               deleted_at: null,
-              reparacion_reportada_at: null,
               ownerProfile: null,
             }, error: null }) }) }),
           }
@@ -95,7 +93,6 @@ describe("report status transition concurrency", () => {
       titulo: "Reporte",
       estado_id: 1,
       deleted_at: null,
-      reparacion_reportada_at: null,
       ownerProfile: null,
     }, 2, "voter")
 

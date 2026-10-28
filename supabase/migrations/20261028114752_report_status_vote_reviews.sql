@@ -1,9 +1,3 @@
-alter table public.reportes
-  add column reparacion_reportada_at timestamptz;
-
-comment on column public.reportes.reparacion_reportada_at is
-  'Timestamp when the report author signaled that the issue appears resolved; community votes still decide closure.';
-
 create table public.reportes_revision_rechazo (
   reporte_id bigint primary key references public.reportes(id) on delete cascade,
   estado text not null check (estado in ('pendiente', 'descartada', 'rechazada')),

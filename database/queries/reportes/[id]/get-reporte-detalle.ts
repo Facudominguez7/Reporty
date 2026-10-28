@@ -17,7 +17,6 @@ const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
       created_at,
       usuario_id,
       estado_id,
-      reparacion_reportada_at,
       categorias (nombre),
       prioridades (nombre),
       estados (id, nombre),
@@ -39,7 +38,6 @@ type ReporteDetalleRow = {
   created_at: string
   usuario_id: string
   estado_id: number
-  reparacion_reportada_at: string | null
   categorias: ReportNameRelation
   prioridades: ReportNameRelation
   estados: ReportStateRelation

@@ -399,7 +399,6 @@ export function ReporteDetalleClient({
   const showVoteFooter = Boolean(
     isReporteCerrado ||
     currentUser?.id === reporte.usuario_id ||
-    reporte.reparacion_reportada_at ||
     (!isAdmin && (!currentUser || puedeVotar))
   );
 
@@ -589,11 +588,6 @@ export function ReporteDetalleClient({
                         <Button asChild variant="outline" size="xs" className="min-h-7 px-2.5 text-[11px]">
                           <Link href={`/auth?next=/reportes/${reporte.id}`}>Entrar para votar</Link>
                         </Button>
-                      )}
-                      {reporte.reparacion_reportada_at && currentUser?.id !== reporte.usuario_id && !isReporteCerrado && (
-                        <span role="status" className="text-xs text-muted-foreground">
-                          El autor avisó que se resolvió
-                        </span>
                       )}
                       {isReporteCerrado && (
                         <span className="text-xs text-muted-foreground">

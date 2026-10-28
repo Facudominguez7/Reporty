@@ -13,7 +13,7 @@ vi.mock("@/database/queries/puntos", async (importOriginal) => ({
   actualizarPuntos: effects.actualizarPuntos,
 }))
 
-import { marcarReporteReparadoWorkflow, votarNoExisteWorkflow, votarReparadoWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
+import { votarNoExisteWorkflow, votarReparadoWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
 
 function reportClient({ voteCount, ownerId = "report-owner" }: { voteCount: number; ownerId?: string }) {
   const report = { id: 9, usuario_id: ownerId, titulo: "Bache", estado_id: 1, deleted_at: null, ownerProfile: null }
@@ -78,21 +78,6 @@ describe("community report status votes", () => {
 
     expect(result).toMatchObject({ success: true, data: { count: 5, stateChangedTo: 2 } })
     expect(effects.updateReport).toHaveBeenCalledWith({ estado_id: 2 })
-  })
-
-  it("allows the report author to flag a repair without changing the final status", async () => {
-    const client = reportClient({ voteCount: 0 })
-    const result = await marcarReporteReparadoWorkflow(client, 9, "report-owner")
-
-    expect(result).toMatchObject({ success: true, data: { reported: true } })
-    expect(effects.updateReport).toHaveBeenCalledWith({ reparacion_reportada_at: expect.any(String) })
-  })
-
-  it("prevents a non-author from submitting the creator-only resolution signal", async () => {
-    const result = await marcarReporteReparadoWorkflow(reportClient({ voteCount: 0 }), 9, "voter")
-
-    expect(result).toMatchObject({ success: false })
-    expect(effects.updateReport).not.toHaveBeenCalled()
   })
 
   it("allows the report author to vote repaired", async () => {
