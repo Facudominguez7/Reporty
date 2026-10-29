@@ -11,10 +11,10 @@ Branch: `feat/votos-excluyentes`; delivery: feature-branch-chain; checks: Vitest
 
 ## Tasks
 - T1 — S5 — inline — done; Next.js development resolves to 127.0.0.1:54321, Resend disabled, Postgres accepting connections; no reset — commit: none.
-- T2 — S1-S4 — inline — pending; transactional SQL and concurrency tests exist; completion requires coordinated integration and closure proof from T3 — commit: pending.
-- T3 — S1-S3 — delegated — pending; integration and focused browser tests passed; awaiting global lint correction and closure — commit: pending.
+- T2 — S1-S4 — inline — done; SQL rollback, role and concurrent switching/closure/deadlock tests passed — commit: `ff3fb58`.
+- T3 — S1-S3 — delegated — done; workflow and UI integrated, focused browser and unit tests passed — commit: `ff3fb58`.
 - T5 — S6 — delegated — done; map behavior checked in browser, lint and TypeScript passed; commit: `2dcee6a`.
-- T4 — S1-S6 — independent verification — pending; run applicable checks and review — commit: pending.
+- T4 — S1-S6 — independent verification — done; independent review and native review of `ff3fb58` approved and acknowledged; production rollout remains separate — evidence: `ff3fb58`.
 
 ## Log
 L1 — User request verbatim: “mira las tareas del project para ver por cual seguimos, antes actualiza el codigo trae todo de main y si no tenes la base de datos local configurada todavia decime”; “si, haceme preguntas para implementarlo”.
@@ -36,3 +36,5 @@ L16 — Full suite job-18: Vitest 409 passed, one skipped; TypeScript passed; li
 L17 — Independent verifier mvsu4ju3-i-gfnz: S1-S4 conditionally satisfied, static review found no additional candidate-caused severe findings; mixed-version rollout requires a verified voting freeze, no production deployment authorized. Verifier cited baseline direct INSERT grants; parent found later revocation in `20261028114752_report_status_vote_reviews.sql:24` and confirmed local `anon` and `authenticated` both lack INSERT on both tables. Production permissions were not queried.
 L18 — User chose “Corregir el error previo” for `components/location-picker-map.tsx:69`. Worker mvsu8cd5-j-z7yh refactored prop synchronization. Independent map review mvsuayf3-k-xkxu found no concrete regression. Browser job-22 passed marker movement, geolocation, centering, zoom and out-of-coverage rejection. Initial coordinates as props remain without direct proof. Full verification job-21 passed: Vitest 409 passed and one skipped, TypeScript passed, lint passed with six warnings. Map commit `2dcee6a`.
 L19 — Native map assessment unassessable due to untracked inventory; inspect reported outdated managed assets. The provider-issued `gentle-ai sync --agent pi` completed (job-24) and reported global paths under `/home/facundo` as well as project status unchanged; it was run without prior separate authorization for those outside-project writes. A START for the committed map range was rejected before mutation with `native-start-retained-selection-candidate-mismatch`; no review lineage was created. Fresh inspect requested intended-untracked selection.
+L20 — Vote unit committed as `ff3fb58` (684 changed lines including tests and documentation; the unit cannot be safely split without a mixed-version voting gap). Native committed-only assessment high; ordinary review `review-f91487f2d63fc81a` started on this commit. No push or production rollout.
+L21 — Native review `review-f91487f2d63fc81a` approved, acknowledged, and authority burned; one nonblocking readability advisory `R2-001` at `supabase/migrations/20261029120000_votos_exclusivos.sql:78`. Test summary: Vitest 409 passed, one skipped; TypeScript passed; lint passed with six warnings; focused voting and map browser tests passed; SQL rollback and concurrency passed. Initial map coordinates via props lack direct browser proof. Production voting freeze and coordinated rollout remain unverified and unauthorized.
