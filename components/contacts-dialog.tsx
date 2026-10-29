@@ -1,6 +1,6 @@
 "use client"
 
-import { Mail, Phone, Siren } from "lucide-react"
+import { Mail, MessageCircle, Phone, Siren } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -117,46 +117,49 @@ export function ContactsDialog() {
           <span className="sr-only sm:hidden">Contactos</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl min-w-0 gap-3 overflow-x-hidden p-2.5 sm:p-5">
+      <DialogContent className="max-w-3xl min-w-0 gap-2 overflow-x-hidden p-2.5 sm:gap-3 sm:p-5">
         <DialogHeader className="pr-2">
-          <DialogTitle className="text-lg sm:text-2xl">Contactos</DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">Canales de atención por tipo de reporte y emergencias.</DialogDescription>
+          <DialogTitle className="text-base sm:text-2xl">Contactos</DialogTitle>
+          <DialogDescription className="text-[11px] sm:text-sm">Canales de atención por tipo de reporte y emergencias.</DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="contactos" className="min-w-0">
-          <TabsList className="grid w-full grid-cols-2 gap-0">
-            <TabsTrigger value="contactos" className="min-w-0 px-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground">Contactos</TabsTrigger>
-            <TabsTrigger value="emergencias" className="min-w-0 gap-1 px-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground"><Siren className="size-3.5" /> Emergencias</TabsTrigger>
+          <TabsList className="grid w-full shrink-0 grid-cols-2 gap-0">
+            <TabsTrigger value="contactos" className="min-h-8 min-w-0 px-1 py-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground">Contactos</TabsTrigger>
+            <TabsTrigger value="emergencias" className="min-h-8 min-w-0 gap-1 px-1 py-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground"><Siren className="size-3.5" /> Emergencias</TabsTrigger>
           </TabsList>
-          <TabsContent value="contactos" className="space-y-3">
+          <TabsContent value="contactos" className="space-y-2">
             <Tabs defaultValue="alumbrado" className="min-w-0">
-              <TabsList className="max-w-full justify-start overflow-x-auto [&>[data-slot=tabs-trigger]]:shrink-0 [&>[data-slot=tabs-trigger]]:px-2 [&>[data-slot=tabs-trigger]]:text-xs">
+              <TabsList className="w-full max-w-full justify-between overflow-x-auto [&>[data-slot=tabs-trigger]]:min-h-8 [&>[data-slot=tabs-trigger]]:flex-none [&>[data-slot=tabs-trigger]]:shrink-0 [&>[data-slot=tabs-trigger]]:px-2 [&>[data-slot=tabs-trigger]]:text-xs">
                 {(Object.keys(CONTACT_GROUPS) as Array<keyof typeof CONTACT_GROUPS>).map((group) => (
                   <TabsTrigger key={group} value={group}>{GROUP_LABELS[group]}</TabsTrigger>
                 ))}
               </TabsList>
               {(Object.keys(CONTACT_GROUPS) as Array<keyof typeof CONTACT_GROUPS>).map((group) => (
-                <TabsContent key={group} value={group} className="grid gap-1.5 sm:grid-cols-2">
+                <TabsContent key={group} value={group} className="grid gap-1 sm:grid-cols-2">
                   {CONTACT_GROUPS[group].map((contact, index) => <ContactRow key={`${group}-${index}`} contact={contact} />)}
                 </TabsContent>
               ))}
             </Tabs>
           </TabsContent>
-          <TabsContent value="emergencias" className="grid gap-1.5 sm:grid-cols-2">
+          <TabsContent value="emergencias" className="grid max-h-[40dvh] grid-cols-1 content-start gap-1 overflow-y-auto sm:max-h-none sm:grid-cols-2 sm:overflow-visible">
             {EMERGENCIES.map(([number, description]) => (
-              <div key={number} className="rounded-xl border border-border/70 bg-muted/30 px-2.5 py-2 text-xs sm:px-3 sm:py-2.5 sm:text-sm">
+              <div key={number} className="rounded-xl border border-border/70 bg-muted/30 px-2 py-1.5 text-[11px] leading-4 sm:px-3 sm:py-2.5 sm:text-sm">
                 <a href={`tel:${number}`} className="font-semibold text-primary hover:underline">{number}</a>
-                <p className="mt-1 text-muted-foreground">{description}</p>
+                <p className="mt-0.5 text-muted-foreground sm:mt-1">{description}</p>
               </div>
             ))}
           </TabsContent>
         </Tabs>
-        <DialogFooter className="flex-col">
-          <Button asChild variant="outline" className="h-auto w-full py-2">
-            <a href="tel:+5493764241856" className="flex flex-col items-center gap-0.5">
-              <span className="inline-flex items-center gap-1.5"><Phone className="size-4" aria-hidden="true" />Contactanos</span>
+        <DialogFooter className="flex-col gap-1.5 border-t pt-1 sm:flex-col sm:justify-start">
+          <Button asChild variant="outline" className="h-auto min-h-0 w-full py-1">
+            <a href="https://wa.me/5493764241856" className="flex flex-col items-center gap-0.5">
+              <span className="inline-flex items-center gap-1.5"><MessageCircle className="size-4" aria-hidden="true" />Contactanos</span>
               <span className="text-xs font-normal">+54 9 3764 24-1856</span>
             </a>
           </Button>
+          <p className="w-full text-center text-[10px] leading-none text-muted-foreground">
+            Creado por <a href="https://god.com.ar" className="font-semibold" aria-label="GOD, god.com.ar"><span className="text-black">G</span><span className="text-black">O</span><span className="text-violet-600">D</span></a>
+          </p>
           <DialogClose asChild>
             <Button type="button" size="sm" className="w-full sm:w-auto">Entendido</Button>
           </DialogClose>
