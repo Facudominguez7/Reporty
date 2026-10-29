@@ -12,6 +12,7 @@ import type { AuthError } from "@supabase/supabase-js"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Lock, Mail, Phone, User, UserRound } from "lucide-react"
+import { toast } from "sonner"
 
 import { iniciarSesionOAuth, login, signup, type AuthFormState } from "./actions"
 import { obtenerRutaInternaSegura, RUTA_RECUPERAR_CONTRASENA } from "./rutas-seguras"
@@ -46,6 +47,11 @@ export default function AuthPage() {
   const [guestPending, setGuestPending] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [loginEmail, setLoginEmail] = useState("")
+  const [signupFields, setSignupFields] = useState({ name: "", lastname: "", email: "", phone: "" })
+  const [signupPassword, setSignupPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const passwordsMatch = signupPassword === confirmPassword
   const initialState: AuthFormState = { error: undefined, message: undefined }
   const [loginState, loginAction] = useActionState(login, initialState)
   const [signupState, signupAction] = useActionState(signup, initialState)
@@ -53,6 +59,15 @@ export default function AuthPage() {
   const oauthError = searchParams.get("error") === "oauth"
   const enlaceError = searchParams.get("error") === "enlace"
   const needsGuestCaptcha = TURNSTILE_SITE_KEY !== ""
+
+  useEffect(() => {
+    if (signupState?.error) toast.error(signupState.error)
+    if (signupState?.message) toast.success(signupState.message)
+  }, [signupState])
+
+  useEffect(() => {
+    if (loginState?.error) toast.error(loginState.error)
+  }, [loginState])
 
   useEffect(() => {
     let cancelled = false
@@ -68,6 +83,12 @@ export default function AuthPage() {
     })
     return () => { cancelled = true }
   }, [nextPath])
+
+  const handleSignup = async (formData: FormData) => {
+    await signupAction(formData)
+    setSignupPassword("")
+    setConfirmPassword("")
+  }
 
   const continueAsGuest = async () => {
     if (guestPending || (needsGuestCaptcha && !guestCaptchaToken)) return
@@ -154,6 +175,8 @@ export default function AuthPage() {
                         placeholder="tu@email.com"
                         className="pl-10"
                         autoComplete="email"
+                        value={loginEmail}
+                        onChange={(event) => setLoginEmail(event.target.value)}
                         required
                       />
                   </Field>
@@ -193,12 +216,6 @@ export default function AuthPage() {
               </TabsContent>
 
               <TabsContent value="register" className="space-y-5 pt-2">
-                {signupState?.message && (
-                  <Alert>
-                    <AlertTitle>Verificá tu correo</AlertTitle>
-                    <AlertDescription>{signupState.message}</AlertDescription>
-                  </Alert>
-                )}
                 {signupState?.error && (
                   <Alert variant="destructive">
                     <AlertTitle>No se pudo crear la cuenta</AlertTitle>
@@ -206,7 +223,7 @@ export default function AuthPage() {
                   </Alert>
                 )}
 
-                <form action={signupAction} className="space-y-4">
+                <form action={handleSignup} className="space-y-4">
                   <input type="hidden" name="next" value={nextPath} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Nombre" htmlFor="register-name">
@@ -218,6 +235,8 @@ export default function AuthPage() {
                           placeholder="Juan"
                           className="pl-10"
                           autoComplete="given-name"
+                          value={signupFields.name}
+                          onChange={(event) => setSignupFields({ ...signupFields, name: event.target.value })}
                           required
                         />
                     </Field>
@@ -230,6 +249,8 @@ export default function AuthPage() {
                           placeholder="Pérez"
                           className=""
                           autoComplete="family-name"
+                          value={signupFields.lastname}
+                          onChange={(event) => setSignupFields({ ...signupFields, lastname: event.target.value })}
                           required
                         />
                     </Field>
@@ -244,6 +265,8 @@ export default function AuthPage() {
                         placeholder="tu@email.com"
                         className="pl-10"
                         autoComplete="email"
+                        value={signupFields.email}
+                        onChange={(event) => setSignupFields({ ...signupFields, email: event.target.value })}
                         required
                       />
                   </Field>
@@ -257,6 +280,8 @@ export default function AuthPage() {
                         placeholder="+54 376 123-4567"
                         className="pl-10"
                         autoComplete="tel"
+                        value={signupFields.phone}
+                        onChange={(event) => setSignupFields({ ...signupFields, phone: event.target.value })}
                       />
                   </Field>
 
@@ -269,6 +294,8 @@ export default function AuthPage() {
                       placeholder="••••••••"
                       className="pl-10 pr-10"
                       autoComplete="new-password"
+                      value={signupPassword}
+                      onChange={(event) => setSignupPassword(event.target.value)}
                       required
                     />
                     <Button
@@ -292,6 +319,10 @@ export default function AuthPage() {
                       placeholder="••••••••"
                       className="pl-10 pr-10"
                       autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      aria-invalid={confirmPassword.length > 0 && !passwordsMatch}
+                      aria-describedby="register-password-match"
                       required
                     />
                     <Button
@@ -310,6 +341,12 @@ export default function AuthPage() {
                     </Button>
                   </Field>
 
+                  {confirmPassword.length > 0 && !passwordsMatch && (
+                    <p id="register-password-match" className="text-sm text-destructive" role="status">
+                      Las contraseñas no coinciden.
+                    </p>
+                  )}
+
                   <label className="flex items-start gap-2 rounded-md border border-border bg-background p-4 text-sm text-muted-foreground">
                     <input type="checkbox" className="mt-0.5 size-4 rounded border-border" required />
                     <span>
@@ -319,7 +356,14 @@ export default function AuthPage() {
                     </span>
                   </label>
 
-                  <Button type="submit" className="w-full">
+                  {signupState?.message && (
+                    <Alert>
+                      <AlertTitle>Verificá tu correo</AlertTitle>
+                      <AlertDescription>{signupState.message}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={!passwordsMatch}>
                     Crear cuenta
                   </Button>
                 </form>
