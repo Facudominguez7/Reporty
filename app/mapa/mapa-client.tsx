@@ -10,7 +10,9 @@ import { useSearchParams, useServerInsertedHTML } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
+import { ContactsDialog } from "@/components/contacts-dialog"
 import { FiltrosReportes } from "@/components/filtros-reportes"
+import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
@@ -83,6 +85,12 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
     <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
       <div className="relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
       <OnboardingModal />
+      <div className="fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <ContactsDialog />
+          <HowToUseDialog />
+        </div>
+      </div>
       <div className="absolute inset-0 z-0">
         {error ? (
           <div className="flex h-full items-center justify-center p-5">

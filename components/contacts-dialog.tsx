@@ -124,8 +124,8 @@ export function ContactsDialog() {
         </DialogHeader>
         <Tabs defaultValue="contactos" className="min-w-0">
           <TabsList className="grid w-full grid-cols-2 gap-0">
-            <TabsTrigger value="contactos" className="min-w-0 px-1 text-xs sm:text-sm">Contactos</TabsTrigger>
-            <TabsTrigger value="emergencias" className="min-w-0 gap-1 px-1 text-xs sm:text-sm"><Siren className="size-3.5" /> Emergencias</TabsTrigger>
+            <TabsTrigger value="contactos" className="min-w-0 px-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground">Contactos</TabsTrigger>
+            <TabsTrigger value="emergencias" className="min-w-0 gap-1 px-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground"><Siren className="size-3.5" /> Emergencias</TabsTrigger>
           </TabsList>
           <TabsContent value="contactos" className="space-y-3">
             <Tabs defaultValue="alumbrado" className="min-w-0">
@@ -150,7 +150,13 @@ export function ContactsDialog() {
             ))}
           </TabsContent>
         </Tabs>
-        <DialogFooter>
+        <DialogFooter className="flex-col">
+          <Button asChild variant="outline" className="h-auto w-full py-2">
+            <a href="tel:+5493764241856" className="flex flex-col items-center gap-0.5">
+              <span className="inline-flex items-center gap-1.5"><Phone className="size-4" aria-hidden="true" />Contactanos</span>
+              <span className="text-xs font-normal">+54 9 3764 24-1856</span>
+            </a>
+          </Button>
           <DialogClose asChild>
             <Button type="button" size="sm" className="w-full sm:w-auto">Entendido</Button>
           </DialogClose>
