@@ -296,6 +296,14 @@
       "sessions": 20,
       "memories": 94,
       "prompts": 0
+    },
+    {
+      "id": "b4b5a4c8",
+      "created_by": "octid",
+      "created_at": "2026-10-29T15:18:56Z",
+      "sessions": 80,
+      "memories": 248,
+      "prompts": 55
     }
   ]
 }
