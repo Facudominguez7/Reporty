@@ -55,7 +55,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
   ];
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
-  const showTopHeader = !isAdminRoute && pathname !== "/" && pathname !== "/mapa" && !pathname.startsWith("/auth");
+  const showTopHeader = !isAdminRoute && pathname !== "/" && !pathname.startsWith("/auth");
   const isReportDetail = /^\/reportes\/\d+$/.test(pathname);
 
   const isActive = (href: string) => {
