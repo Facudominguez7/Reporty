@@ -159,6 +159,7 @@ export function ReporteDetalleClient({
   const [votosReparadoCount, setVotosReparadoCount] = useState(reporte?.votos.reparado.count ?? 0);
   const [hasVotedReparado, setHasVotedReparado] = useState(reporte?.votos.reparado.hasVoted ?? false);
   const [isVotingReparado, setIsVotingReparado] = useState(false);
+  const [cerradoPorVoto, setCerradoPorVoto] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [estadoSeleccionado, setEstadoSeleccionado] = useState("");
   const [comentarioEstado, setComentarioEstado] = useState("");
@@ -177,7 +178,7 @@ export function ReporteDetalleClient({
   // IDs de estados según la base de datos: 1 = Pendiente, 2 = Reparado, 3 = Rechazado
   // Verificar si el reporte está cerrado (Reparado o Rechazado) usando IDs
   const isReporteCerrado = reporte && (
-    reporte.estado_id === REPORT_STATE_IDS.REPARADO ||
+    cerradoPorVoto || reporte.estado_id === REPORT_STATE_IDS.REPARADO ||
     reporte.estado_id === REPORT_STATE_IDS.RECHAZADO
   );
 
@@ -198,14 +199,11 @@ export function ReporteDetalleClient({
         return;
       }
 
-      const newVotosCount = result.data.count;
-      setVotosCount(newVotosCount);
+      setVotosCount(result.data.votosNoExiste);
+      setVotosReparadoCount(result.data.votosReparado);
       setHasVoted(true);
-
-      // Mostrar mensaje de puntos ganados
-      toast.success(`¡Voto registrado! +${PUNTOS.VOTAR_NO_EXISTE} punto`, {
-        description: "Tu voto ha sido contabilizado correctamente"
-      });
+      setHasVotedReparado(false);
+      toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_NO_EXISTE} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
 
     } catch (error) {
       console.error("Error:", error);
@@ -235,16 +233,14 @@ export function ReporteDetalleClient({
         return;
       }
 
-      const newVotosReparadoCount = result.data.count;
-      setVotosReparadoCount(newVotosReparadoCount);
+      setVotosCount(result.data.votosNoExiste);
+      setVotosReparadoCount(result.data.votosReparado);
+      setHasVoted(false);
       setHasVotedReparado(true);
-
-      // Mostrar mensaje de puntos ganados
-      toast.success(`¡Voto registrado! +${PUNTOS.VOTAR_REPARADO} punto`, {
-        description: "Gracias por mantener la información actualizada"
-      });
+      toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_REPARADO} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
 
       if (result.data.stateChangedTo) {
+        setCerradoPorVoto(true);
         toast.success("¡Reporte marcado como reparado!");
         setTimeout(() => window.location.reload(), 1500);
       }
@@ -565,10 +561,11 @@ export function ReporteDetalleClient({
                             size="xs"
                             className={`min-h-7 w-full px-2.5 text-[11px] ${currentUser.id === reporte.usuario_id ? "col-span-2" : ""}`}
                             onClick={handleVoteReparado}
-                            disabled={hasVotedReparado || isVotingReparado}
+                            disabled={hasVotedReparado || isVotingReparado || isVoting}
+                            aria-pressed={hasVotedReparado}
                           >
                             <ThumbsUp className="size-3" />
-                            Reparado
+                            Reparado{hasVotedReparado ? " · Tu voto" : ""}
                           </Button>
                           {currentUser.id !== reporte.usuario_id && (
                             <Button
@@ -576,13 +573,19 @@ export function ReporteDetalleClient({
                               size="xs"
                               className="min-h-7 w-full px-2.5 text-[11px]"
                               onClick={handleVoteNoExiste}
-                              disabled={hasVoted || isVoting}
+                              disabled={hasVoted || isVoting || isVotingReparado}
+                              aria-pressed={hasVoted}
                             >
                               <ThumbsDown className="size-3" />
-                              No existe
+                              No existe{hasVoted ? " · Tu voto" : ""}
                             </Button>
                           )}
                         </div>
+                      )}
+                      {currentUser && hasVoted && hasVotedReparado && (
+                        <p role="status" className="text-xs text-muted-foreground">
+                          Tus votos históricos son contradictorios y requieren revisión. No se modificaron.
+                        </p>
                       )}
                       {!currentUser && !isReporteCerrado && (
                         <Button asChild variant="outline" size="xs" className="min-h-7 px-2.5 text-[11px]">
@@ -816,7 +819,7 @@ export function ReporteDetalleClient({
               </span>
               ¿Confirmar voto «No existe»?
             </AlertDialogTitle>
-            <AlertDialogDescription>Tu voto sumará 1 punto.</AlertDialogDescription>
+            <AlertDialogDescription>{hasVotedReparado ? "Cambiar tu voto no suma puntos adicionales." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isVoting}>Cancelar</AlertDialogCancel>
@@ -851,7 +854,7 @@ export function ReporteDetalleClient({
               </span>
               ¿Confirmar que está reparado?
             </AlertDialogTitle>
-            <AlertDialogDescription>Tu voto sumará 1 punto.</AlertDialogDescription>
+            <AlertDialogDescription>{hasVoted ? "Cambiar tu voto no suma puntos adicionales." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isVotingReparado}>Cancelar</AlertDialogCancel>

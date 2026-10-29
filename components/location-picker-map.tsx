@@ -42,6 +42,14 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
   const [position, setPosition] = useState<[number, number] | null>(
     initialLat != null && initialLon != null ? [initialLat, initialLon] : null
   )
+  const [coordenadasAnteriores, setCoordenadasAnteriores] = useState([initialLat, initialLon])
+
+  if (!Object.is(coordenadasAnteriores[0], initialLat) || !Object.is(coordenadasAnteriores[1], initialLon)) {
+    setCoordenadasAnteriores([initialLat, initialLon])
+    if (initialLat != null && initialLon != null) {
+      setPosition([initialLat, initialLon])
+    }
+  }
 
   const map = useMapEvents({
     click(e) {
@@ -66,7 +74,6 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
 
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
-      setPosition([initialLat, initialLon])
       map.setView([initialLat, initialLon], 13)
     }
   }, [initialLat, initialLon, map])

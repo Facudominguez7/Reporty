@@ -61,6 +61,55 @@ test.describe("community", () => {
     expect(formBounds.y).toBeGreaterThan(emptyStateBounds.y + emptyStateBounds.height)
   })
 
+  test("un ciudadano cambia su voto y conserva una sola recompensa", async ({ page, testData }) => {
+    const autor = await testData.createUser()
+    const ciudadano = await testData.createUser()
+    const reporte = await testData.createReport(autor)
+    const supabase = adminClient()
+    /** Consulta el saldo del ciudadano descartable, sin modificarlo. */
+    const puntos = async () => {
+      const { data, error } = await supabase.from("profiles").select("puntos").eq("id", ciudadano.id).single()
+      if (error) throw error
+      return data.puntos ?? 0
+    }
+    const saldoInicial = await puntos()
+    await signIn(page, ciudadano)
+    await page.goto(`/reportes/${reporte.id}`)
+    const controles = page.getByRole("group", { name: "Votar sobre el reporte" })
+    const noExiste = controles.getByRole("button", { name: /^No existe/ })
+    const reparado = controles.getByRole("button", { name: /^Reparado/ })
+
+    await expect(noExiste).toHaveText("No existe")
+    await expect(reparado).toHaveText("Reparado")
+    await expect(noExiste).toHaveAttribute("aria-pressed", "false")
+    await noExiste.click()
+    await page.getByRole("alertdialog").getByRole("button", { name: "Confirmar Voto" }).click()
+    await expect(noExiste).toHaveText("No existe · Tu voto")
+    await expect(noExiste).toHaveAttribute("aria-pressed", "true")
+    await expect(reparado).toHaveText("Reparado")
+    await expect.poll(puntos).toBe(saldoInicial + 1)
+
+    await page.reload()
+    await expect(noExiste).toHaveText("No existe · Tu voto")
+    await expect(noExiste).toHaveAttribute("aria-pressed", "true")
+    await expect(reparado).toBeEnabled()
+    await reparado.click()
+    const dialogo = page.getByRole("alertdialog")
+    await expect(dialogo.getByText("Cambiar tu voto no suma puntos adicionales.")).toBeVisible()
+    await dialogo.getByRole("button", { name: "Confirmar Voto" }).click()
+    await expect(reparado).toHaveText("Reparado · Tu voto")
+    await expect(reparado).toHaveAttribute("aria-pressed", "true")
+    await expect(noExiste).toHaveText("No existe")
+    await expect(noExiste).toBeEnabled()
+    await expect.poll(puntos).toBe(saldoInicial + 1)
+
+    await page.reload()
+    await expect(reparado).toHaveText("Reparado · Tu voto")
+    await expect(reparado).toHaveAttribute("aria-pressed", "true")
+    await expect(noExiste).toHaveText("No existe")
+    expect(await puntos()).toBe(saldoInicial + 1)
+  })
+
   test("the report owner and four citizens vote repaired before the report closes", async ({ browser, page, testData }) => {
     const owner = await testData.createUser()
     const voters = await Promise.all(Array.from({ length: 4 }, () => testData.createUser()))
@@ -72,9 +121,9 @@ test.describe("community", () => {
       await signIn(page, owner)
       await page.goto(`/reportes/${report.id}`)
       const detailsCard = page.locator('[data-slot="card"]').filter({ has: page.getByText(report.titulo, { exact: true }) }).first()
-      const repairedButton = page.getByRole("button", { name: "Reparado", exact: true })
-      await expect(detailsCard.getByRole("button", { name: "Reparado", exact: true })).toHaveCount(1)
-      await expect(detailsCard.getByRole("button", { name: "No existe", exact: true })).toHaveCount(0)
+      const repairedButton = page.getByRole("button", { name: /^Reparado(?: · Tu voto)?$/ })
+      await expect(detailsCard.getByRole("button", { name: /^Reparado(?: · Tu voto)?$/ })).toHaveCount(1)
+      await expect(detailsCard.getByRole("button", { name: /^No existe(?: · Tu voto)?$/ })).toHaveCount(0)
       await expect(detailsCard.getByRole("button", { name: "Avisar resuelto", exact: true })).toHaveCount(0)
       await expect(page.getByText("¿Qué pasó con este reporte?", { exact: true })).toHaveCount(0)
       await expect(detailsCard.locator("hr")).toHaveCount(1)
@@ -96,6 +145,7 @@ test.describe("community", () => {
       await repairedButton.click()
       await page.getByRole("alertdialog").getByRole("button", { name: "Confirmar Voto" }).click()
       await expect(page.getByText("Pendiente", { exact: true })).toBeVisible()
+      await expect(repairedButton).toHaveText("Reparado · Tu voto")
       await expect(repairedButton).toBeDisabled()
 
       for (let voteCount = 2; voteCount <= 5; voteCount++) {
@@ -104,10 +154,10 @@ test.describe("community", () => {
         const voterPage = await context.newPage()
         await signIn(voterPage, voters[voteCount - 2])
         await voterPage.goto(`/reportes/${report.id}`)
-        const repairedVoteButton = voterPage.getByRole("button", { name: "Reparado", exact: true })
-        const notExistsButton = voterPage.getByRole("button", { name: "No existe", exact: true })
-        await expect(repairedVoteButton).toBeVisible()
-        await expect(notExistsButton).toBeVisible()
+        const repairedVoteButton = voterPage.getByRole("button", { name: /^Reparado(?: · Tu voto)?$/ })
+        const notExistsButton = voterPage.getByRole("button", { name: /^No existe(?: · Tu voto)?$/ })
+        await expect(repairedVoteButton).toHaveText("Reparado")
+        await expect(notExistsButton).toHaveText("No existe")
 
         if (voteCount === 2) {
           await expect(notExistsButton).toHaveClass(/bg-destructive/)
@@ -132,6 +182,7 @@ test.describe("community", () => {
 
         if (voteCount < 5) {
           await expect(voterPage.getByText("Pendiente", { exact: true })).toBeVisible()
+          await expect(repairedVoteButton).toHaveText("Reparado · Tu voto")
           await expect(repairedVoteButton).toBeDisabled()
         } else {
           await expect(voterPage.getByText("Reparado", { exact: true })).toBeVisible()
@@ -161,13 +212,13 @@ test.describe("community", () => {
     await signIn(page, voter)
     await page.goto(`/reportes/${report.id}`)
     const detailsCard = page.locator('[data-slot="card"]').filter({ has: page.getByText(report.titulo, { exact: true }) }).first()
-    const repairedButton = detailsCard.getByRole("button", { name: "Reparado", exact: true })
-    const noExistsButton = detailsCard.getByRole("button", { name: "No existe", exact: true })
+    const repairedButton = detailsCard.getByRole("button", { name: /^Reparado(?: · Tu voto)?$/ })
+    const noExistsButton = detailsCard.getByRole("button", { name: /^No existe(?: · Tu voto)?$/ })
 
     await repairedButton.click()
     const repairedDialog = page.getByRole("alertdialog")
     await expect(repairedDialog).toBeVisible()
-    const repairedPointMessage = await repairedDialog.getByText("Tu voto sumará 1 punto.", { exact: true }).count()
+    const repairedPointMessage = await repairedDialog.getByText("Tu primer voto sumará 1 punto.", { exact: true }).count()
     const repairedDescriptionId = await repairedDialog.getAttribute("aria-describedby")
     const repairedDescriptionTargetCount = repairedDescriptionId
       ? await page.locator(`[id="${repairedDescriptionId}"]`).count()
@@ -178,7 +229,7 @@ test.describe("community", () => {
     await noExistsButton.click()
     const noExistsDialog = page.getByRole("alertdialog")
     await expect(noExistsDialog).toBeVisible()
-    const noExistsPointMessage = await noExistsDialog.getByText("Tu voto sumará 1 punto.", { exact: true }).count()
+    const noExistsPointMessage = await noExistsDialog.getByText("Tu primer voto sumará 1 punto.", { exact: true }).count()
     const noExistsDescriptionId = await noExistsDialog.getAttribute("aria-describedby")
     const noExistsDescriptionTargetCount = noExistsDescriptionId
       ? await page.locator(`[id="${noExistsDescriptionId}"]`).count()

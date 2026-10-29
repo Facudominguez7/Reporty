@@ -4,9 +4,11 @@ const effects = vi.hoisted(() => ({
   sumarPuntos: vi.fn(),
   actualizarPuntos: vi.fn(),
   updateReport: vi.fn(),
+  notificar: vi.fn(),
 }))
 
 vi.mock("server-only", () => ({}))
+vi.mock("@/lib/notifications/report-notifications", () => ({ sendStatusNotificationEmail: effects.notificar, sendCommentNotificationEmail: vi.fn() }))
 vi.mock("@/database/queries/puntos", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/database/queries/puntos")>()),
   sumarPuntos: effects.sumarPuntos,
@@ -15,9 +17,14 @@ vi.mock("@/database/queries/puntos", async (importOriginal) => ({
 
 import { votarNoExisteWorkflow, votarReparadoWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
 
-function reportClient({ voteCount, ownerId = "report-owner" }: { voteCount: number; ownerId?: string }) {
-  const report = { id: 9, usuario_id: ownerId, titulo: "Bache", estado_id: 1, deleted_at: null, ownerProfile: null }
+function reportClient({ voteCount, ownerId = "report-owner", email = false, estado = 1 }: { voteCount: number; ownerId?: string; email?: boolean; estado?: number }) {
+  const report = { id: 9, usuario_id: ownerId, titulo: "Bache", estado_id: estado, deleted_at: null, ownerProfile: email ? { email: "autor@example.invalid", username: "Autor" } : null }
   return {
+    rpc: vi.fn(async (_nombre: string, args: { p_tipo: string }) => ({
+      data: { primero: true, cambio: false, estado_cambiado: args.p_tipo === "reparado" && voteCount >= 5,
+        votos_no_existe: args.p_tipo === "no_existe" ? voteCount : 0,
+        votos_reparado: args.p_tipo === "reparado" ? voteCount : 0 }, error: null,
+    })),
     from(table: string) {
       if (table === "reportes") {
         const query = {
@@ -51,6 +58,46 @@ beforeEach(() => {
   effects.actualizarPuntos.mockResolvedValue({ success: true, error: null })
 })
 
+describe("contrato de voto exclusivo", () => {
+  it("explica el conflicto histórico sin pedir reintentar", async () => {
+    const cliente = reportClient({ voteCount: 1 }) as any
+    cliente.rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "PVA01", message: "Votos históricos ambiguos" } })
+    expect(await votarReparadoWorkflow(cliente, 9, "voter")).toEqual({ success: false, error: "Tus votos históricos son contradictorios y requieren revisión. No se modificaron." })
+  })
+  it("notifica solo si la RPC confirmó el cierre y no deshace el voto si falla el correo", async () => {
+    effects.notificar.mockRejectedValueOnce(new Error("correo no disponible"))
+    const resultado = await votarReparadoWorkflow(reportClient({ voteCount: 5, email: true }), 9, "voter")
+    expect(resultado).toMatchObject({ success: true, data: { stateChangedTo: 2 } })
+    expect(effects.notificar).toHaveBeenCalledOnce()
+    effects.notificar.mockClear()
+    await votarReparadoWorkflow(reportClient({ voteCount: 4, email: true }), 9, "voter")
+    expect(effects.notificar).not.toHaveBeenCalled()
+  })
+
+  it("bloquea un reporte cerrado antes de invocar la RPC", async () => {
+    const cliente = reportClient({ voteCount: 5, estado: 2 }) as any
+    expect(await votarReparadoWorkflow(cliente, 9, "voter")).toMatchObject({ success: false })
+    expect(cliente.rpc).not.toHaveBeenCalled()
+  })
+
+  it("informa un error de la RPC sin aplicar efectos posteriores", async () => {
+    const cliente = reportClient({ voteCount: 1 }) as any
+    cliente.rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "falló" } })
+    expect(await votarReparadoWorkflow(cliente, 9, "voter")).toMatchObject({ success: false })
+    expect(effects.sumarPuntos).not.toHaveBeenCalled()
+    expect(effects.updateReport).not.toHaveBeenCalled()
+  })
+
+  it("usa la operación atómica y devuelve ambos contadores sin sumar puntos otra vez", async () => {
+    const cliente = reportClient({ voteCount: 1 }) as any
+    cliente.rpc = vi.fn().mockResolvedValue({ data: { primero: false, cambio: true, votos_no_existe: 0, votos_reparado: 1, estado_cambiado: false }, error: null })
+    const resultado = await votarReparadoWorkflow(cliente, 9, "voter")
+    expect(cliente.rpc).toHaveBeenCalledWith("registrar_voto_exclusivo", { p_reporte_id: 9, p_usuario_id: "voter", p_tipo: "reparado" })
+    expect(resultado).toMatchObject({ success: true, data: { count: 1, votosNoExiste: 0, votosReparado: 1, primero: false, cambio: true } })
+    expect(effects.sumarPuntos).not.toHaveBeenCalled()
+  })
+})
+
 describe("community report status votes", () => {
   it("routes five 'No existe' votes to admin review without rejecting the report", async () => {
     const result = await votarNoExisteWorkflow(reportClient({ voteCount: 5 }), 9, "voter")
@@ -77,14 +124,14 @@ describe("community report status votes", () => {
     const result = await votarReparadoWorkflow(reportClient({ voteCount: 5 }), 9, "voter")
 
     expect(result).toMatchObject({ success: true, data: { count: 5, stateChangedTo: 2 } })
-    expect(effects.updateReport).toHaveBeenCalledWith({ estado_id: 2 })
+    expect(effects.updateReport).not.toHaveBeenCalled()
   })
 
   it("allows the report author to vote repaired", async () => {
     const result = await votarReparadoWorkflow(reportClient({ voteCount: 1 }), 9, "report-owner")
 
     expect(result).toMatchObject({ success: true, data: { count: 1, stateChangedTo: null } })
-    expect(effects.sumarPuntos).toHaveBeenCalled()
+    expect(effects.sumarPuntos).not.toHaveBeenCalled()
   })
 
   it("prevents the report author from voting 'No existe'", async () => {
