@@ -6,12 +6,12 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 1. S1: “Ahora, algo q quiero q hagas, tanto en la base de prod como la local, es agregar una categoria mas de tipo de reporte, viste q tenemos alumbrado, bache, semaforo etc, bueno se sumaria agua, asiq agrega eso, y tambien tene en cuenta q deberias agregar logo y demas tambien, toma como referencia como trabajan las otras categorias”
 
 ## Tasks
-- T1 — S1 — inline — done: Add focused regression tests for Agua category filtering and icon mapping. Commit: pending.
-- T2 — S1 — inline — done: Implement the Agua icon and public category-filter mapping. Commit: pending.
-- T3 — S1 — inline — done: Persist Agua in the local migration, empty seed, and saved/production setup restore path. Commit: pending.
-- T4 — S1 — inline — in progress: Commit the feature slice after deterministic checks. Commit: pending. Note: focused tests and build pass; full suite has an unrelated failure.
-- T5 — S1 — inline — blocked: Add Agua to production and verify the row. Waiting for authenticated Supabase CLI access; the MCP SQL executor is read-only. Commit: pending.
-- T6 — S1 — inline — blocked: Verify the Agua picker, filters, and icon in a visible browser at required desktop/mobile sizes and exercise its error state. Waiting for configured MCP Playwright navigation/interaction tools, which are unavailable in this session. Commit: pending.
+- T1 — S1 — inline — done: Add focused regression tests for Agua category filtering and icon mapping. Commit: 7e68635.
+- T2 — S1 — inline — done: Implement the Agua icon and public category-filter mapping. Commit: 7e68635.
+- T3 — S1 — inline — done: Persist Agua in the local migration, empty seed, and saved/production setup restore path. Commit: 7e68635.
+- T4 — S1 — inline — blocked: Finish verification/close the feature. Waiting for the user’s decision whether to expand scope to address the unrelated full-suite failure in `lib/validation/zod-resource-limit.test.ts` or keep it out of this feature. Source slice commit: 7e68635.
+- T5 — S1 — inline — blocked: Add Agua to production and verify the row. Waiting for authenticated Supabase CLI access; the MCP SQL executor is read-only. Source migration commit: 7e68635.
+- T6 — S1 — inline — blocked: Verify the Agua picker, filters, and icon in a visible browser at required desktop/mobile sizes and exercise its error state. Waiting for configured MCP Playwright navigation/interaction tools, which are unavailable in this session. UI code commit: 7e68635.
 
 ## Log
 - L1: “Ahora, algo q quiero q hagas, tanto en la base de prod como la local, es agregar una categoria mas de tipo de reporte, viste q tenemos alumbrado, bache, semaforo etc, bueno se sumaria agua, asiq agrega eso, y tambien tene en cuenta q deberias agregar logo y demas tambien, toma como referencia como trabajan las otras categorias”
@@ -24,3 +24,5 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 - L8: MCP tool search found no navigable Playwright browser or interaction tool. The project-required visible browser check at 1920×1080, 1280×720, and 390×844 remains pending; no headless or DOM-only substitute was used.
 - L9: The full Vitest suite exited 1: 4 test files were reported failed, 49 passed, and 1 skipped; 1 assertion failed in the untouched `lib/validation/zod-resource-limit.test.ts`, which expected Zod to skip element refinements for an oversized array. Re-running that single test reproduced the failure. The Agua-focused tests remain green; no unrelated test was changed.
 - L10: `npm run build` exited successfully (0) and completed the Next.js production build.
+- L11: Independent verifier reviewed commit `7e68635`: T1–T3 code follows S1; no defect was found. It relied on recorded local test/data evidence and did not rerun tests or access databases. It confirmed production and browser checks remain unverified. It also noticed the task lines still said `Commit: pending`; those entries now reference `7e68635`.
+- L12: Native assessment classified the committed candidate high after the explicit item-5 escalation, with `reviewDue: false` (`under_budget`) and `independentVerifier: true`; the required verifier returned no code findings and a partial S1 verdict because production and browser checks remain unavailable.
