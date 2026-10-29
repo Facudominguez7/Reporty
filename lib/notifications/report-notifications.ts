@@ -1,7 +1,9 @@
 import "server-only";
 
 import { Resend } from "resend";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ROLE_IDS } from "@/lib/authz/catalog";
 import { resolveSiteUrl } from "@/lib/seo/site";
 
 import {
@@ -39,6 +41,14 @@ type CrewAssignedEmailParams = {
   reporteTitulo: string;
   cuadrillaNombre: string | null;
   detalle?: string | null;
+};
+
+type AdminReviewEmailParams = {
+  supabase: SupabaseClient;
+  tipo: "foto" | "reporte";
+  reviewId: string;
+  reporteId: number;
+  reporteTitulo: string;
 };
 
 function getResendClient() {
@@ -188,6 +198,39 @@ export async function sendStatusNotificationEmail({
  * Envía el email de asignación de cuadrilla al propietario del reporte, con la misma
  * plantilla que el resto de los emails de este módulo.
  */
+export async function sendAdminReviewNotificationEmail({ supabase, tipo, reviewId, reporteId, reporteTitulo }: AdminReviewEmailParams) {
+  const { data: admins, error } = await supabase.from("profiles").select("id,email").eq("rol_id", ROLE_IDS.ADMIN);
+  if (error) throw error;
+
+  const destinatarios = (admins ?? []).filter((admin) => typeof admin.email === "string" && admin.email.trim());
+  if (!destinatarios.length) return;
+
+  const resend = getResendClient();
+  const reviewUrl = `${getAppUrl()}/admin/moderacion${tipo === "reporte" ? "?tipo=reportes" : ""}`;
+  const asunto = tipo === "foto" ? "Fotografía pendiente de revisión" : "Reporte pendiente de revisión";
+  const descripcion = tipo === "foto"
+    ? `La fotografía del reporte N.º ${reporteId} necesita una revisión manual.`
+    : `El reporte N.º ${reporteId} alcanzó el umbral de votos “No existe” y necesita una revisión manual.`;
+
+  await Promise.all(destinatarios.map((admin) => {
+    const email = admin.email!.trim();
+    return resend.emails.send({
+      from: SENDER,
+      to: [email],
+      subject: asunto,
+      html: renderEmailLayout({
+        assetBaseUrl: getAppUrl(),
+        title: asunto,
+        kicker: tipo === "foto" ? "Revisión de fotografía" : "Revisión de reporte",
+        preheader: `${asunto}: ${reporteTitulo}.`,
+        heading: asunto,
+        body: [emailParagraph(escapeHtml(descripcion)), emailPanel({ eyebrow: `Reporte N.º ${reporteId}`, title: reporteTitulo }), emailButton("Abrir cola de revisión", reviewUrl)].join("\n"),
+      }),
+      text: plainText([descripcion, `Reporte: ${reporteTitulo}`, `Abrir cola de revisión: ${reviewUrl}`]),
+    }, { idempotencyKey: `admin-review/${tipo}/${reviewId}/${admin.id}` });
+  }));
+}
+
 export async function sendCrewAssignedEmail({
   ownerEmail,
   ownerUsername,

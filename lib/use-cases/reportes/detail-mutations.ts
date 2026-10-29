@@ -11,6 +11,7 @@ import {
   type ReportImageRow,
 } from "@/lib/media/report-images"
 import {
+  sendAdminReviewNotificationEmail,
   sendCommentNotificationEmail,
   sendStatusNotificationEmail,
 } from "@/lib/notifications/report-notifications"
@@ -526,6 +527,19 @@ export async function votarNoExisteWorkflow(
   const voteResult = await createVote(supabase, "no_existe", reporteId, actorUserId)
   if (!voteResult.success) return voteResult
   const voto = voteResult.data
+  if (voto.votos_no_existe === REPORT_STATUS_VOTE_THRESHOLD) {
+    try {
+      await sendAdminReviewNotificationEmail({
+        supabase,
+        tipo: "reporte",
+        reviewId: String(reporteId),
+        reporteId,
+        reporteTitulo: report.titulo,
+      })
+    } catch (error) {
+      console.error("Error al notificar revisión administrativa del reporte:", error)
+    }
+  }
   return {
     success: true,
     data: {

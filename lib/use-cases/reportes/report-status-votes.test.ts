@@ -5,10 +5,11 @@ const effects = vi.hoisted(() => ({
   actualizarPuntos: vi.fn(),
   updateReport: vi.fn(),
   notificar: vi.fn(),
+  notificarRevisionAdmin: vi.fn(),
 }))
 
 vi.mock("server-only", () => ({}))
-vi.mock("@/lib/notifications/report-notifications", () => ({ sendStatusNotificationEmail: effects.notificar, sendCommentNotificationEmail: vi.fn() }))
+vi.mock("@/lib/notifications/report-notifications", () => ({ sendStatusNotificationEmail: effects.notificar, sendCommentNotificationEmail: vi.fn(), sendAdminReviewNotificationEmail: effects.notificarRevisionAdmin }))
 vi.mock("@/database/queries/puntos", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/database/queries/puntos")>()),
   sumarPuntos: effects.sumarPuntos,
@@ -99,11 +100,19 @@ describe("contrato de voto exclusivo", () => {
 })
 
 describe("community report status votes", () => {
-  it("routes five 'No existe' votes to admin review without rejecting the report", async () => {
+  it("notifies admins when the fifth 'No existe' vote opens review without rejecting the report", async () => {
     const result = await votarNoExisteWorkflow(reportClient({ voteCount: 5 }), 9, "voter")
 
     expect(result).toMatchObject({ success: true, data: { count: 5, stateChangedTo: null, needsAdminReview: true } })
+    expect(effects.notificarRevisionAdmin).toHaveBeenCalledOnce()
+    expect(effects.notificarRevisionAdmin).toHaveBeenCalledWith(expect.objectContaining({ tipo: "reporte", reporteId: 9 }))
     expect(effects.updateReport).not.toHaveBeenCalled()
+  })
+
+  it("does not resend the report review alert on later votes", async () => {
+    await votarNoExisteWorkflow(reportClient({ voteCount: 6 }), 9, "voter")
+
+    expect(effects.notificarRevisionAdmin).not.toHaveBeenCalled()
   })
 
   it("does not send four 'No existe' votes to admin review", async () => {

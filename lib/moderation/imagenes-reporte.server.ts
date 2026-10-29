@@ -3,6 +3,7 @@ import "server-only"
 import { createHash, randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { prepararImagenReporte } from "@/lib/media/preparar-imagen-reporte.server"
+import { sendAdminReviewNotificationEmail } from "@/lib/notifications/report-notifications"
 import { moderarImagen } from "./sightengine.server"
 import type { ResultadoModeracion } from "./tipos"
 import { enviarAvisoRetiro } from "./avisos-retiro.server"
@@ -31,6 +32,22 @@ export type EntradaImagenReporte = { reporteId: number; propietarioId: string; i
 
 /** Calcula identidad exacta del contenido sin nombres suministrados por el cliente. */
 function hash(bytes: Uint8Array) { return createHash("sha256").update(bytes).digest("hex") }
+
+/** Email is best-effort: provider failures must not change the report/photo workflow. */
+async function notificarRevisionAdmin(supabase: SupabaseClient, fila: FilaImagen) {
+  if (fila.decision !== "REVIEW" || fila.estado_publicacion !== "pendiente") return
+  try {
+    await sendAdminReviewNotificationEmail({
+      supabase,
+      tipo: "foto",
+      reviewId: fila.id,
+      reporteId: fila.reporte_id,
+      reporteTitulo: `Reporte N.º ${fila.reporte_id}`,
+    })
+  } catch (error) {
+    console.error("Error al notificar revisión administrativa de fotografía:", error)
+  }
+}
 
 /** Devuelve únicamente texto seguro; nunca identificadores o motivos internos del proveedor. */
 function resultado(fila?: FilaImagen | null, advertencias: string[] = []): ResultadoImagenReporte {
@@ -206,11 +223,15 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
     const carga = await supabase.storage.from(BUCKET_PRIVADO).upload(path, imagen.original, { upsert: false, contentType: "image/webp" })
     if (carga.error) {
       await auditar(supabase, fila, "carga_privada_pendiente")
+      await notificarRevisionAdmin(supabase, fila)
       return resultado(null, ["carga_privada_pendiente"])
     }
     privadoGuardado = true
     const reclamo = await supabase.rpc("reclamar_imagen_moderacion", { p_id: id, p_propietario: entrada.propietarioId })
-    if (reclamo.error || !reclamo.data) return resultado(fila, ["revision_pendiente"])
+    if (reclamo.error || !reclamo.data) {
+      await notificarRevisionAdmin(supabase, fila)
+      return resultado(fila, ["revision_pendiente"])
+    }
     const reserva = await supabase.rpc("reservar_operaciones_moderacion", { p_solicitud: id, p_operaciones: 2 })
     let clasificacion: ResultadoModeracion = { decision: "REVIEW", motivos: ["cuota_no_disponible"], operaciones: 0, proveedor: "ninguno" }
     if (!reserva.error && reserva.data === true) {
@@ -233,7 +254,10 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
     const decision = await supabase.rpc("decidir_imagen_moderacion", {
       p_id: id, p_token: reclamo.data, p_decision: clasificacion.decision, p_motivos: clasificacion.motivos,
     })
-    if (decision.error || decision.data !== true) return resultado(fila, ["decision_pendiente"])
+    if (decision.error || decision.data !== true) {
+      await notificarRevisionAdmin(supabase, fila)
+      return resultado(fila, ["decision_pendiente"])
+    }
     // El CAS exitoso ya retiró el reporte. Una lectura posterior fallida no debe ocultarlo.
     if (clasificacion.decision === "REJECTED") {
       fila = { ...fila, decision: "REJECTED", estado_publicacion: "rechazada" }
@@ -242,6 +266,7 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
     }
     fila = await leerFila(supabase, id)
     if (fila.decision === "APPROVED") return publicarImagenModerada(supabase, id)
+    await notificarRevisionAdmin(supabase, fila)
     return resultado(fila, await limpiarImagenModerada(supabase, id))
   } catch {
     // El reporte ya existe: no exponer excepciones ni provocar reenvío de su texto.
@@ -250,6 +275,7 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
       catch { return resultado(null, ["carga_privada_pendiente", "auditoria_pendiente"]) }
       return resultado(null, ["carga_privada_pendiente"])
     }
+    if (fila) await notificarRevisionAdmin(supabase, fila)
     return resultado(fila, ["revision_pendiente"])
   }
 }

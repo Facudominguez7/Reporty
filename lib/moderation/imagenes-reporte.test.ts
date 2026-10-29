@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import sharp from "sharp"
 import type { SupabaseClient } from "@supabase/supabase-js"
-const { moderarImagen, enviarAviso } = vi.hoisted(() => ({ moderarImagen: vi.fn(), enviarAviso: vi.fn() }))
+const { moderarImagen, enviarAviso, notificarRevisionAdmin } = vi.hoisted(() => ({ moderarImagen: vi.fn(), enviarAviso: vi.fn(), notificarRevisionAdmin: vi.fn() }))
+vi.mock("@/lib/notifications/report-notifications", () => ({ sendAdminReviewNotificationEmail: notificarRevisionAdmin }))
 vi.mock("./avisos-retiro.server", () => ({ enviarAvisoRetiro: enviarAviso }))
 vi.mock("./sightengine.server", () => ({ moderarImagen }))
 import { moderarYGuardarImagenReporte, publicarImagenModerada, limpiarImagenModerada } from "./imagenes-reporte.server"
@@ -95,6 +96,7 @@ async function entrada() {
 
 beforeEach(() => {
   enviarAviso.mockReset().mockResolvedValue("pendiente")
+  notificarRevisionAdmin.mockReset().mockResolvedValue(undefined)
   moderarImagen.mockReset().mockResolvedValue({ decision: "APPROVED", motivos: [], operaciones: 2, proveedor: "simulado" })
 })
 describe("orquestación de imágenes", () => {
@@ -120,6 +122,21 @@ describe("orquestación de imágenes", () => {
     expect(r.publicada).toBe(false)
     expect(e.eventos).not.toContain("subir:reportes")
     expect([...e.objetos.keys()].length).toBe(decision === "REVIEW" ? 1 : 0)
+  })
+  it("notifies admins when a photo is retained for manual review", async () => {
+    const e = escenario()
+    moderarImagen.mockResolvedValue({ decision: "REVIEW", motivos: ["contenido"], operaciones: 2 })
+
+    expect(await moderarYGuardarImagenReporte(e.supabase, await entrada())).toMatchObject({ estado: "REVIEW", publicada: false })
+    expect(notificarRevisionAdmin).toHaveBeenCalledOnce()
+    expect(notificarRevisionAdmin).toHaveBeenCalledWith(expect.objectContaining({ supabase: e.supabase, tipo: "foto", reviewId: e.fila().id, reporteId: 7 }))
+  })
+  it("keeps the photo review result if the admin email fails", async () => {
+    const e = escenario()
+    moderarImagen.mockResolvedValue({ decision: "REVIEW", motivos: ["contenido"], operaciones: 2 })
+    notificarRevisionAdmin.mockRejectedValueOnce(new Error("mail unavailable"))
+
+    expect(await moderarYGuardarImagenReporte(e.supabase, await entrada())).toMatchObject({ estado: "REVIEW", publicada: false })
   })
   it("ignora miniatura falsificada sin otra clasificación ni copia de esos bytes", async () => {
     const e = escenario()
