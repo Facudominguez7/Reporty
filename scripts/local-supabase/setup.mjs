@@ -15,6 +15,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSy
 import path from "node:path"
 import process from "node:process"
 import readline from "node:readline"
+import { createClient } from "@supabase/supabase-js"
 import { fileURLToPath } from "node:url"
 
 import {
@@ -237,6 +238,15 @@ async function pullProduction() {
  * Files uploaded before the bucket got its current size limit can be heavier than it. Production
  * keeps them, so the copy lifts the limit while it uploads and puts it back afterwards.
  */
+async function removeMigrationSeededBucket(status) {
+  const supabase = createClient(status.API_URL, status.SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  const { error: emptyError } = await supabase.storage.emptyBucket("reportes-pendientes")
+  if (emptyError) fail(`Could not empty local Storage bucket reportes-pendientes: ${emptyError.message}`)
+
+  const { error: deleteError } = await supabase.storage.deleteBucket("reportes-pendientes")
+  if (deleteError) fail(`Could not remove local Storage bucket reportes-pendientes: ${deleteError.message}`)
+}
+
 async function withoutBucketSizeLimit(run) {
   const limit = localSql(`select coalesce(file_size_limit::text, 'null') from storage.buckets where id = '${BUCKET}';`).trim()
   if (!limit) return run()
@@ -337,6 +347,9 @@ async function main() {
     await loadSqlFile(SEED_FILE)
     console.log("  Catalogs loaded. Sign up in the app to create users; the emails land in Mailpit.")
   } else {
+    // Migrations seed these values; replace them with the authoritative production data.
+    localSql("delete from public.presupuesto_moderacion;")
+    await removeMigrationSeededBucket(status)
     await loadSqlFile(DATA_FILE)
     console.log(`  Production copy from ${statSync(DATA_FILE).mtime.toLocaleString()} loaded.`)
     await withoutBucketSizeLimit(() => syncStorage(status))
