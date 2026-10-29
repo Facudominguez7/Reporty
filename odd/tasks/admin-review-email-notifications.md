@@ -10,9 +10,9 @@ Branch: `main` (per user instruction; no feature branch) · Delivery: ask-on-ris
 
 | ID | Specs | Route | Status | Evidence |
 |----|-------|-------|--------|----------|
-| T1 | S1-S2 | inline | done | RED → GREEN; commit `feat(notifications): alert admins on moderation reviews` |
-| T2 | S1-S2 | inline | done | Focused photo tests pass; commit `feat(notifications): alert admins on moderation reviews` |
-| T3 | S1-S2 | inline | done | Full suite 414 passed/1 skipped; focused 59 passed; lint 0 errors (6 existing warnings); `tsc --noEmit` and `git diff --check` clean; commit `feat(notifications): alert admins on moderation reviews` |
+| T1 | S1-S2 | inline | done | RED → GREEN; `df4377e` (`feat(notifications): alert admins on moderation reviews`) |
+| T2 | S1-S2 | inline | done | Focused photo tests pass; `df4377e` (`feat(notifications): alert admins on moderation reviews`) |
+| T3 | S1-S2 | inline | done | Full suite 414 passed/1 skipped; focused 59 passed; lint 0 errors (6 existing warnings); `tsc --noEmit` and `git diff --check` clean; `df4377e` (`feat(notifications): alert admins on moderation reviews`) |
 
 ## Log
 
@@ -24,4 +24,4 @@ Branch: `main` (per user instruction; no feature branch) · Delivery: ask-on-ris
 - **L6** User correction: "ok, no hace falta rama aparte, no te lo pedi". Returned to `main`; continue without a feature branch. No source changes were committed.
 - **L7** T1 RED observed in `report-status-votes.test.ts` (fifth-vote notification absent); GREEN after implementation. Photo T2 RED observed in `imagenes-reporte.test.ts`; GREEN after implementation. Combined focused tests passed 59 tests including existing email template coverage. Email send failures are caught so user workflows still succeed.
 - **L8** Added `sendAdminReviewNotificationEmail`: queries only `profiles.rol_id = ADMIN`, sends separate emails (one quota unit per recipient) with event/admin-scoped idempotency keys and a link to the relevant moderation queue. Report emails send only when the fifth rejection vote opens review; photo emails send only for persisted pending REVIEW outcomes. Full suite: 52 passed, 1 skipped; 414 passed, 1 skipped. `npm run lint`: exit 0, 6 warnings in unchanged files. `npx tsc --noEmit`: exit 0. `git diff --check`: clean.
-- **L9** User authorized: "bueno, commitea lo q tenemos entonces hasta aca, y pushea a main". Commit will be `feat(notifications): alert admins on moderation reviews`; push remains pending native RDD candidate assessment on that committed work unit.
+- **L9** User authorized: "bueno, commitea lo q tenemos entonces hasta aca, y pushea a main". Commit `df4377e16909286b928122dacdce8ecf40bbb1cd` (`feat(notifications): alert admins on moderation reviews`) was assessed medium risk with `reviewDue=false` (`under_budget`) and pushed to `origin/main`; remote ref and local HEAD both report this exact SHA.
