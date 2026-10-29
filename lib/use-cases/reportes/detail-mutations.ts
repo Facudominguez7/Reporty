@@ -62,6 +62,10 @@ type VoteResult = {
   count: number
   stateChangedTo: number | null
   needsAdminReview: boolean
+  votosNoExiste: number
+  votosReparado: number
+  primero: boolean
+  cambio: boolean
 }
 
 type StatusChangeResult = {
@@ -472,35 +476,27 @@ async function revokeCommentPointsIfNeeded(
   }
 }
 
+/** Registra el voto y el cierre eventual en una única transacción de base de datos. */
 async function createVote(
   supabase: SupabaseClient,
-  table: "votos_no_existe" | "votos_reparado",
+  tipo: "no_existe" | "reparado",
   reportId: number,
   userId: string,
 ) {
-  const { error: insertError } = await supabase.from(table).insert({
-    reporte_id: reportId,
-    usuario_id: userId,
+  const { data, error } = await supabase.rpc("registrar_voto_exclusivo", {
+    p_reporte_id: reportId, p_usuario_id: userId, p_tipo: tipo,
   })
-
-  if (isDuplicateRowError(insertError)) {
-    return { success: false as const, error: "Ya habías votado este reporte." }
+  if (error?.code === "PVA01") {
+    return { success: false as const, error: "Tus votos históricos son contradictorios y requieren revisión. No se modificaron." }
   }
-
-  if (insertError) {
-    return { success: false as const, error: "No pudimos registrar tu voto." }
+  if (error || !data || typeof data.primero !== "boolean" || typeof data.cambio !== "boolean" ||
+      typeof data.estado_cambiado !== "boolean" || typeof data.votos_no_existe !== "number" ||
+      typeof data.votos_reparado !== "number") {
+    return { success: false as const, error: "No pudimos registrar tu voto. Recargá e intentá nuevamente." }
   }
-
-  const { count, error: countError } = await supabase
-    .from(table)
-    .select("*", { count: "exact", head: true })
-    .eq("reporte_id", reportId)
-
-  if (countError) {
-    return { success: false as const, error: "No pudimos actualizar el contador de votos." }
-  }
-
-  return { success: true as const, count: count ?? 0 }
+  return { success: true as const, data: data as {
+    primero: boolean; cambio: boolean; estado_cambiado: boolean; votos_no_existe: number; votos_reparado: number
+  } }
 }
 
 export async function votarNoExisteWorkflow(
@@ -527,19 +523,19 @@ export async function votarNoExisteWorkflow(
     return { success: false, error: "No podés votar 'No Existe' sobre tu propio reporte." }
   }
 
-  const voteResult = await createVote(supabase, "votos_no_existe", reporteId, actorUserId)
-  if (!voteResult.success) {
-    return voteResult
-  }
-
-  await sumarPuntos(supabase, actorUserId, PUNTOS.VOTAR_NO_EXISTE, "Votar 'No Existe' en reporte")
-
+  const voteResult = await createVote(supabase, "no_existe", reporteId, actorUserId)
+  if (!voteResult.success) return voteResult
+  const voto = voteResult.data
   return {
     success: true,
     data: {
-      count: voteResult.count,
+      count: voto.votos_no_existe,
+      votosNoExiste: voto.votos_no_existe,
+      votosReparado: voto.votos_reparado,
+      primero: voto.primero,
+      cambio: voto.cambio,
       stateChangedTo: null,
-      needsAdminReview: voteResult.count >= REPORT_STATUS_VOTE_THRESHOLD,
+      needsAdminReview: voto.votos_no_existe >= REPORT_STATUS_VOTE_THRESHOLD,
     },
   }
 }
@@ -564,36 +560,31 @@ export async function votarReparadoWorkflow(
     return { success: false, error: "No podés votar un reporte que ya está cerrado." }
   }
 
-  const voteResult = await createVote(supabase, "votos_reparado", reporteId, actorUserId)
-  if (!voteResult.success) {
-    return voteResult
-  }
-
-  await sumarPuntos(supabase, actorUserId, PUNTOS.VOTAR_REPARADO, "Votar 'Reparado' en reporte")
-
-  let stateChangedTo: number | null = null
-
-  if (voteResult.count >= REPORT_STATUS_VOTE_THRESHOLD) {
-    const stateResult = await applyReportStateChange(
-      supabase,
-      report,
-      REPORT_STATE_IDS.REPARADO,
-      actorUserId,
-      `Marcado como reparado por ${voteResult.count} votos de usuarios`,
-    )
-
-    if (!stateResult.success) {
-      return stateResult
+  const voteResult = await createVote(supabase, "reparado", reporteId, actorUserId)
+  if (!voteResult.success) return voteResult
+  const voto = voteResult.data
+  const owner = getOwnerProfile(report.ownerProfile)
+  if (voto.estado_cambiado && report.usuario_id && owner?.email) {
+    try {
+      await sendStatusNotificationEmail({
+        ownerEmail: owner.email, ownerUsername: owner.username, reporteId,
+        reporteTitulo: report.titulo, nuevoEstado: "Reparado",
+        comentario: `Marcado como reparado por ${voto.votos_reparado} votos de usuarios`,
+      })
+    } catch (error) {
+      console.error("Error al enviar notificación de estado:", error)
     }
-
-    stateChangedTo = stateResult.data.stateChanged ? stateResult.data.estadoId : null
   }
 
   return {
     success: true,
     data: {
-      count: voteResult.count,
-      stateChangedTo,
+      count: voto.votos_reparado,
+      votosNoExiste: voto.votos_no_existe,
+      votosReparado: voto.votos_reparado,
+      primero: voto.primero,
+      cambio: voto.cambio,
+      stateChangedTo: voto.estado_cambiado ? REPORT_STATE_IDS.REPARADO : null,
       needsAdminReview: false,
     },
   }

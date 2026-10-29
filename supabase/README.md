@@ -15,6 +15,19 @@ This project is adopting tracked Supabase artifacts incrementally.
 - `supabase/access-matrix.md` documents the trusted access model used to phase in RLS and storage tightening.
 - Future schema and policy changes for this change MUST be added as incremental migrations after the baseline file.
 
+## Votos exclusivos: despliegue coordinado
+
+**No es un despliegue sin interrupción.** Las versiones anteriores insertan votos directamente y no saben cambiar un voto; la versión nueva necesita la RPC y su respuesta extendida. No conviene ejecutar ambas durante la transición.
+
+1. Un operador autorizado debe detener todas las escrituras de votos, incluidas acciones server, clientes directos y trabajos, y esperar a que terminen las solicitudes y transacciones en curso. Mantener el bloqueo durante todo el cambio y su verificación.
+2. Verificar respaldo, migraciones previas y pruebas SQL/concurrencia en un entorno local aislado. Aplicar la migración versionada candidata mediante el proceso de migraciones del proyecto; verificar sus triggers, permisos y la versión de la RPC. No reejecutar un archivo ya aplicado: para una base que ya tiene una versión anterior de esta candidata, preparar una migración incremental revisada que sustituya la función.
+3. Desplegar exclusivamente la versión nueva de la aplicación, comprobar que todas las instancias anteriores terminaron y verificar registro, cambio, bloqueo de reportes cerrados y cierre por umbral antes de habilitar nuevamente las escrituras. La notificación por correo es posterior al commit y no garantiza entrega.
+4. Ante fallos, mantener las escrituras detenidas. No volver a una aplicación antigua con las nuevas reglas o con votos cambiados: puede rechazar cambios o duplicar premios y cierre. Un rollback requiere un plan de base de datos y aplicación conjuntamente revisado, que preserve votos, puntos, historial y revisiones; sin ese plan, continuar con las escrituras bloqueadas y corregir hacia adelante.
+
+### Pares históricos ambiguos
+
+La vista `public.votos_exclusivos_ambiguos` solo permite lectura a `service_role`; no publicarla ni conceder acceso a usuarios de la aplicación. Un operador autorizado puede consultar `select reporte_id, usuario_id, fecha_no_existe, fecha_reparado from public.votos_exclusivos_ambiguos;` en un entorno administrativo seguro para elaborar un informe de revisión de acceso restringido. Las fechas no son directamente comparables por su zona horaria: el informe no autoriza elegir un ganador ni modificar filas, puntos o recompensas. No incluir identificadores en canales públicos.
+
 ## Local development
 
 Development runs against a local Supabase stack in Docker, not production. One command sets it up or brings it up to date, on Windows, macOS and Linux:

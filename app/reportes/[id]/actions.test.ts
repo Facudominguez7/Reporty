@@ -49,6 +49,18 @@ it("does not introduce a safe-integer restriction on existing IDs", async () => 
   expect(mocks.createAdminClient).not.toHaveBeenCalled()
 })
 
+it.each([
+  [1, false, false], [4, false, false], [5, false, false], [2, true, false],
+  [2, false, true], [3, false, true], [null, false, true],
+])("controla el rol %s y anonimato %s antes de usar service role", async (rol, anonimo, permitido) => {
+  const consulta = { select: () => consulta, eq: () => consulta, single: async () => ({ data: { rol_id: rol, roles: null }, error: null }) }
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "votante", is_anonymous: anonimo } } }) }, from: () => consulta })
+  mocks.createAdminClient.mockReturnValue({ from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: {} }) }) }) }) })
+  await votarReparadoAction(7)
+  await votarNoExisteAction(7)
+  expect(mocks.createAdminClient).toHaveBeenCalledTimes(permitido ? 2 : 0)
+})
+
 it("preserves invalid contribution feedback before external work", async () => {
   const error = JSON.stringify([{ code: "custom", message: "Elegí una actualización válida.", path: [] }], null, 2)
   expect(await crearComentarioAction(7, "invalid")).toEqual({ success: false, error })
