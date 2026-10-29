@@ -5,6 +5,7 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 ## Specs
 1. S1: “Ahora, algo q quiero q hagas, tanto en la base de prod como la local, es agregar una categoria mas de tipo de reporte, viste q tenemos alumbrado, bache, semaforo etc, bueno se sumaria agua, asiq agrega eso, y tambien tene en cuenta q deberias agregar logo y demas tambien, toma como referencia como trabajan las otras categorias”
 2. S2: “deja de joder con tantos tests, conectate a supabase asi pones en produccion tambien, y tambien al unico reporte cargado q tenemos en prod y en local hay q cambiar la categoriaa q tiene actual q es otros, a por la de agua”
+3. S3: “bien, ordena para que otros quede ultimo, despues del agua, un detalle nomas.. Luego commiteamos y pusheamos a main, no a otra rama aparte”
 
 ## Tasks
 - T1 — S1 — inline — done: Add focused regression tests for Agua category filtering and icon mapping. Commit: 7e68635.
@@ -15,6 +16,8 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 - T6 — S1 — dropped: Visible browser verification not run at the user’s explicit request to stop further tests; UX remains unverified because MCP Playwright navigation/interaction tools are unavailable.
 - T7 — S2 — inline — done: Change local report 76 from Otros (7) to Agua (8) and read the row back. Commit: not applicable (local data).
 - T8 — S2 — inline — done: Change production report 76 from Otros (7) to Agua (8), then read the row back. Leave report 77 (Bache) unchanged. Commit: not applicable (production data).
+- T9 — S3 — inline — in progress: Ensure the remaining admin category option list puts Otros last after Agua; commit the change on main. Preserve unrelated local edits. Commit: pending.
+- T10 — S3 — inline — pending: Push the in-scope commits directly to `origin/main`; do not push a separate feature branch. User authorized the push.
 
 ## Log
 - L1: “Ahora, algo q quiero q hagas, tanto en la base de prod como la local, es agregar una categoria mas de tipo de reporte, viste q tenemos alumbrado, bache, semaforo etc, bueno se sumaria agua, asiq agrega eso, y tambien tene en cuenta q deberias agregar logo y demas tambien, toma como referencia como trabajan las otras categorias”
@@ -31,3 +34,5 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 - L12: User confirmation: “listo ahi ya conecte”. Authenticated CLI read-only query succeeded. Production still had only categories 1–7, report 76 in Otros, and report 77 in Bache. T5 was unblocked; use the targeted category migration and update report 76 only.
 - L13: Applied the exact production migration file through authenticated `supabase db query --linked --project-ref`; a SELECT confirmed Agua at ID 8 and `categorias_id_seq` at 8. `supabase migration repair` marked only `20261029202841` as applied; no broad `db push` or tests were run.
 - L14: Updated production report 76 only where its previous category was ID 7, returning category ID 8. Readback confirmed report 76 is Agua (8) and report 77 remains Bache (1). Local report 76 had already been verified as Agua. No tests were run.
+- L15: User correction S3: “bien, ordena para que otros quede ultimo, despues del agua, un detalle nomas.. Luego commiteamos y pusheamos a main, no a otra rama aparte”.
+- L16: Category query exploration found the public report filter and report-creation query already place Otros last, but the admin report filters still return the raw alphabetical query order. Change only that remaining order path; keep category IDs and report foreign keys unchanged. The active branch was fast-forwarded onto local `main`; unrelated port/moderation work was stashed and restored, still uncommitted.

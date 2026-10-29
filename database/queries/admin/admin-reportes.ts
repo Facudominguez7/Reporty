@@ -106,8 +106,16 @@ export async function getAdminReportFilters(supabase: SupabaseClient, usuarioId:
     supabase.from("estados").select("id, nombre").order("id"),
   ])
 
+  const categoriasOrdenadas = (categorias ?? []).sort((a, b) => {
+    const aIsOther = a.nombre.localeCompare("Otros", "es", { sensitivity: "base" }) === 0
+    const bIsOther = b.nombre.localeCompare("Otros", "es", { sensitivity: "base" }) === 0
+
+    if (aIsOther !== bIsOther) return aIsOther ? 1 : -1
+    return a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })
+  })
+
   return {
-    categorias: categorias ?? [],
+    categorias: categoriasOrdenadas,
     estados: estados ?? [],
     error: categoriasError ?? estadosError ?? null,
   }
