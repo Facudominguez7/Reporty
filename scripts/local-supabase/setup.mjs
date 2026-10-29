@@ -37,6 +37,7 @@ const BUCKET = "reportes"
 const LOCAL_DIR = path.join(ROOT, "supabase", ".local")
 const DATA_FILE = path.join(LOCAL_DIR, "prod-data.sql")
 const SEED_FILE = path.join(ROOT, "supabase", "seed.sql")
+const AGUA_CATEGORY_MIGRATION = path.join(ROOT, "supabase", "migrations", "20261029202841_add_agua_category.sql")
 const BASELINE = path.join("supabase", "migrations", "20261020120050_remote_schema.sql")
 const ENV_FILE = path.join(ROOT, ".env.development.local")
 const SUPABASE_CLI = path.join(ROOT, "node_modules", "supabase", "dist", "supabase.js")
@@ -351,6 +352,8 @@ async function main() {
     localSql("delete from public.presupuesto_moderacion;")
     await removeMigrationSeededBucket(status)
     await loadSqlFile(DATA_FILE)
+    // Re-run this idempotent data migration after import so older saved snapshots gain new catalog rows.
+    localSql(readFileSync(AGUA_CATEGORY_MIGRATION, "utf8"))
     console.log(`  Production copy from ${statSync(DATA_FILE).mtime.toLocaleString()} loaded.`)
     await withoutBucketSizeLimit(() => syncStorage(status))
   }

@@ -77,6 +77,12 @@ describe("getReportMapData", () => {
     expect(mocks.calls.some(([, column]) => column === "estado_id")).toBe(false)
   })
 
+  it("filters Agua by category ID 8", async () => {
+    await getReportMapData({ categoria: "Agua" })
+
+    expect(mocks.calls).toContainEqual(["eq", "categoria_id", 8])
+  })
+
   it("skips the crew status lookup while crews are turned off", async () => {
     vi.stubEnv("CUADRILLAS_ENABLED", undefined)
     mocks.rows.push(pendingRow)

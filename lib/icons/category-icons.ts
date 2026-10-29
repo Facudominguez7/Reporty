@@ -42,6 +42,9 @@ export const categoryIconNodes: Record<string, CategoryIconNode> = {
     ["path", { d: "M12 8v4" }],
     ["path", { d: "M12 16h.01" }],
   ],
+  Agua: [
+    ["path", { d: "M12 22a7 7 0 0 0 7-7c0-5-7-13-7-13S5 10 5 15a7 7 0 0 0 7 7Z" }],
+  ],
   default: [
     ["circle", { cx: "12", cy: "12", r: "1" }],
     ["circle", { cx: "19", cy: "12", r: "1" }],

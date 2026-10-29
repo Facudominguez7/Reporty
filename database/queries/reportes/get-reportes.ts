@@ -98,6 +98,7 @@ const CATEGORY_FILTER_IDS = {
   residuos: 5,
   seguridad: 6,
   otros: 7,
+  agua: 8,
 } as const
 
 const PRIORITY_FILTER_IDS = {
