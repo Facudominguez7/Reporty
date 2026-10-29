@@ -17,7 +17,7 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 - T7 — S2 — inline — done: Change local report 76 from Otros (7) to Agua (8) and read the row back. Commit: not applicable (local data).
 - T8 — S2 — inline — done: Change production report 76 from Otros (7) to Agua (8), then read the row back. Leave report 77 (Bache) unchanged. Commit: not applicable (production data).
 - T9 — S3 — inline — done: Ensure the remaining admin category option list puts Otros last after Agua; commit: 81b0b0a on main. Preserve unrelated local edits.
-- T10 — S3 — inline — in progress: Push the in-scope commits directly to `origin/main`; do not push a separate feature branch. User authorized the push. No force push.
+- T10 — S3 — inline — done: Push the in-scope commits directly to `origin/main`; no separate feature branch and no force push. The push completed at `8c6e944`.
 
 ## Log
 - L1: “Ahora, algo q quiero q hagas, tanto en la base de prod como la local, es agregar una categoria mas de tipo de reporte, viste q tenemos alumbrado, bache, semaforo etc, bueno se sumaria agua, asiq agrega eso, y tambien tene en cuenta q deberias agregar logo y demas tambien, toma como referencia como trabajan las otras categorias”
@@ -37,3 +37,4 @@ Risk: item 5 (production Supabase catalog write and local data-restore behavior)
 - L15: User correction S3: “bien, ordena para que otros quede ultimo, despues del agua, un detalle nomas.. Luego commiteamos y pusheamos a main, no a otra rama aparte”.
 - L16: Category query exploration found the public report filter and report-creation query already place Otros last, but the admin report filters still return the raw alphabetical query order. Change only that remaining order path; keep category IDs and report foreign keys unchanged. The active branch was fast-forwarded onto local `main`; unrelated port/moderation work was stashed and restored, still uncommitted.
 - L17: Commit `81b0b0a` applies the same Otros-last comparator to admin category filters. Independent verifier passed S3 and confirmed IDs/foreign keys and report filtering are unchanged. No tests ran per user instruction; browser rendering remains unverified as recorded in T6.
+- L18: `git push origin main` exited 0 and advanced remote main from `a1b44ed` to `8c6e944`. GitHub reported that the repository moved from `JackeMate` to `Reporty`; local `origin` now uses `https://github.com/Facudominguez7/Reporty.git`. No force push; the five unrelated port/moderation edits remain uncommitted.
