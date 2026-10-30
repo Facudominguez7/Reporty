@@ -43,7 +43,7 @@ import { crearReporteAction } from "./actions"
 import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { TURNSTILE_SITE_KEY, TurnstileWidget } from "@/components/turnstile-widget"
-import { ReportContactActions } from "./report-contact-actions"
+import { ReportContactActions } from "@/components/report-contact-actions"
 import { canShowReportContacts } from "@/lib/report-contacts/eligibility"
 
 /** Maps Supabase Auth errors from the guest sign-in to user-facing messages. */
@@ -538,9 +538,11 @@ export default function NuevoReportePage() {
                 <Link href={`/reportes/${createdReport.reportId}`}>Ver el reporte</Link>
               </Button>}
             </div>
-            <Button type="button" variant="ghost-bordered" className="w-full" onClick={startNewReport}>
-              Crear otro reporte
-            </Button>
+            {(!createdReport.imageApproved || createdReport.withdrawn) && (
+              <Button type="button" variant="ghost-bordered" className="w-full" onClick={startNewReport}>
+                Crear otro reporte
+              </Button>
+            )}
           </div>
           </DialogContent>
         </Dialog>

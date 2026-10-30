@@ -4,7 +4,7 @@ import { canShowReportContacts, contactHref, createContactDraft, getReportContac
 
 describe("report contact actions", () => {
   it("uses shorter cards and buttons and only announces scrolling when the list overflows", () => {
-    const actions = readFileSync(new URL("./report-contact-actions.tsx", import.meta.url), "utf8")
+    const actions = readFileSync(new URL("../../../components/report-contact-actions.tsx", import.meta.url), "utf8")
     expect(actions).toContain('size="xs"')
     expect(actions).toContain('bg-card px-2 py-1 text-[0.8rem]')
     expect(actions).toContain('scrollHeight > list.clientHeight')
@@ -15,7 +15,7 @@ describe("report contact actions", () => {
   })
 
   it("presents compact contact actions without an editable draft or extra contact text", () => {
-    const actions = readFileSync(new URL("./report-contact-actions.tsx", import.meta.url), "utf8")
+    const actions = readFileSync(new URL("../../../components/report-contact-actions.tsx", import.meta.url), "utf8")
     const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
     expect(actions).not.toContain("<Textarea")
     expect(actions).not.toContain("Mensaje editable")
@@ -32,7 +32,8 @@ describe("report contact actions", () => {
     expect(actions).toContain('className="shrink-0 whitespace-nowrap"')
     expect(actions).toContain("contact.organization")
     expect(actions).toContain('variant="default"')
-    expect(actions).not.toContain('variant="outline"')
+    expect(actions).toContain('variant="outline" className="w-full"')
+    expect(actions).toContain('<ReportContactActions {...props} reportUrl={reportUrl} showHeading={false} />')
     expect(actions).not.toContain('variant="secondary"')
     expect(actions).toContain('rounded-lg border border-border')
     expect(actions).toContain('aria-label={`${action}: ${contact.organization}`}')
@@ -64,6 +65,7 @@ describe("report contact actions", () => {
     expect(page).toMatch(/const handleResultDialogOpenChange = \(open: boolean\) => \{\s*setShowResultDialog\(open\)\s*if \(!open\) router\.push\("\/mapa"\)\s*\}/)
     expect(page.match(/router\.push\("\/mapa"\)/g)).toHaveLength(1)
     expect(result).toContain('onClick={startNewReport}')
+    expect(result).toContain('{(!createdReport.imageApproved || createdReport.withdrawn) && (')
     expect(result).toContain('<Link href="/mis-reportes">')
     expect(result).toContain('<Link href={`/reportes/${createdReport.reportId}`}>')
     expect(page).toMatch(/const startNewReport = \(\) => \{[\s\S]*?setCreatedReport\(null\)\s*\}/)
@@ -78,7 +80,7 @@ describe("report contact actions", () => {
 
   it("identifies registration in Reporty and passes the public report link to the draft", () => {
     const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
-    const actions = readFileSync(new URL("./report-contact-actions.tsx", import.meta.url), "utf8")
+    const actions = readFileSync(new URL("../../../components/report-contact-actions.tsx", import.meta.url), "utf8")
     expect(page).toContain('"Reporte registrado en Reporty"')
     expect(page).not.toContain('"¡Reporte enviado!"')
     expect(page).toContain('reportUrl={`${window.location.origin}/reportes/${createdReport.reportId}`}')

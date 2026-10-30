@@ -17,6 +17,11 @@ S12. "achica un poco mas a 0.8rem el texto de cada card de contacto ahi en ese m
 S13. "Tene en cuenta q por default cuando entras, debe mostrar mas q nada posadas, no otra cosa, despues si el usuario quiere moverse y bueno, revisa eso porque ahora cuando entras se ve otra cosa"
 S14. "no me gusta q salga como municipalidad de garupa dos veces. De ultima, abajo de eso bien en chiquito, tamanio 0.65, agregale esa distintincion. En todos hace eso, en todos los municipios, el boton de accion seguira siempre a la derecha"
 S15. "Haceme un cuadro por favor, en un documento de todo lo q tengas, por jurisdiccion, y por tipo de problema q se le muestra al usuario digamos, tipo depende q elija el usuario q contactos va a ver"
+S16. "este texto Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta., tambien achicalo a 0,7rem por favor"
+S17. "y bueno tambien agrega el boton q te dije de contactar organismos, q ocupe todo el width"
+S18. "el desplazate para ver mas organismos ponelo en negrita. y el boton de contactar organismos, separalo levemente del contenido de arriba"
+S19. "el boton de crear otro reporte, ahi en ese modal q te sale cuando esta todo ok, sacalo a la mierda"
+S20. "Bien, bueno, la idea es commitear esto tambien, pushear, y tambien q apliques en produccion lo q hicimos, osea lo de los contactos y eso, porque tengo entendido q solo esta en bd local por ahora. asique vamos a ello"
 
 S11. "bueno agreguemoslos, mi idea es que siempre tengan algun numero o correo para quejarse, sea el municipio q sea con la categoria q sea se entiende?"
 
@@ -27,10 +32,15 @@ S11. "bueno agreguemoslos, mi idea es que siempre tengan algun numero o correo p
 - T4 [S5] Inventory and validate backup and recovery; inline; validated
 - T5 [S5] Rename local Supabase and dependent scripts while preserving data; parent; references updated in 9161d20; Vector logging remains blocked
 - T6 [S6] Compact contact actions and button variants; inline; commit 268d1e4; browser verification pending
-- T7 [S6,S7,S8,S9,S10,S12,S14] Compact confirmation modal and contact cards; inline; 0.65rem channel details and right-aligned actions; commit 268d1e4; browser verification pending
+- T7 [S6,S7,S8,S9,S10,S12,S14,S16,S19] Compact confirmation modal and contact cards; inline; channel detail and explanatory text use 0.65rem and 0.7rem respectively; actions right-aligned; hide “Crear otro reporte” only when the image is approved and the report is not withdrawn, retaining it for other outcomes; visual verification pending
 - T8 [S11] Add Garupá general phone contacts for all covered categories; worker; local migration and isolated SQL passed; commit a6380a9; number validity/competence and independent review remain incomplete
 - T9 [S13] Keep map initial view centered on Posadas while retaining east pan to Candelaria; inline; commit f9e434e; no tests run per user request
 - T10 [S15] Document visible contacts for every municipality/category; inline; completed in docs/contactos-mostrados-por-jurisdiccion.md; commit 1b92fe2
+- T11 [S17,S18] Add and refine the full-width contact button above votes on public report details; inline; implemented for all viewers in `app/reportes/[id]/reporte-detalle-client.tsx` using the shared `components/report-contact-actions.tsx` dialog. The server gate exposes only a boolean for explicitly APPROVED images; `getReporteDetalle` excludes deleted reports. The scroll hint is bold and the button has slight top spacing. Test sources/mocks updated but not run per user instruction; browser verification remains pending under T3.
+- T12 [S20] Commit the reviewed contact-detail and confirmation changes as a focused Conventional Commit; exclude unrelated `components/report-detail/comments-section.tsx` changes; inline; pending.
+- T13 [S20] Push the authorized feature branch after T12; inline; pending.
+- T14 [S20] Identify the exact production Supabase project, obtain a validated backup/recovery path, and inspect remote migration status before changing production; inline; pending.
+- T15 [S20] Apply only the missing contact-directory migrations to the confirmed production project and verify the public contact read path; inline; pending.
 
 Delivery note: local work-unit commits only; no push or pull request was requested or authorized. Commits a6380a9 (directory data), 268d1e4 (report-contact UI), 9161d20 (Reporty local references), f9e434e (map viewport), and 1b92fe2 (contact matrix) are separate reviewable boundaries. Unrelated working-tree changes are intentionally excluded.
 
@@ -65,3 +75,12 @@ L27. Added a small channel-type/value line under each organization in all munici
 L28. Created docs/contactos-mostrados-por-jurisdiccion.md with the contact list shown for every municipality and category, channel values and action labels, ordering and provisional-status caveats. No tests requested or run.
 L29. Bien, hace commit hasta aca. Luego quiero que hagamos lo siguiente. Nose si solo lo veria el creador o cualquier usuario q entra al detalle de un reporte. Pero mi idea es agregar un boton que sea por ejemplo contactar con la insitucion o algo asi, estaria justo arriba de los botones de votos. Mostraria tambien ese modal de contactos se entiende? Q pensas? osea si entramos a ver detalle de un reporte de bache, en posadas, y presionamos ese boton, nos abriria ese modal q dice los contactos con sus boton de accion correspondientes. q pensas
 L30. Commits created as authorized, preserving unrelated working-tree modifications; new report-detail contact button remains only an idea for discussion, not implemented.
+L31. Explanatory copy in the contact section now uses 0.7rem; source readback confirmed. No tests run per user request.
+L32. y bueno tambien agrega el boton q te dije de contactar organismos, q ocupe todo el width
+L33. Source/call-site review confirmed the detail button sits above the vote footer, requires the server's boolean for an explicitly APPROVED image, and uses `getReporteDetalle`'s existing `deleted_at IS NULL` filter. `git diff --check` passed; tests were not run per user instruction. Native assess returned risk medium and `nativeRisk: unassessable` because untracked files require explicit declaration; it omitted `reviewDue`, so no inspect or review was started. Browser verification remains pending under T3.
+L34. el desplazate para ver mas organismos ponelo en negrita. y el boton de contactar organismos, separalo levemente del contenido de arriba
+L35. Added `font-semibold` to the scroll hint and `mt-2` to the detail button wrapper. Source readback and `git diff --check` passed; tests and browser were not run per user instruction. Git reported only the existing LF-to-CRLF normalization warning for the task document.
+L36. el boton de crear otro reporte, ahi en ese modal q te sale cuando esta todo ok, sacalo a la mierda
+L37. Lo sacaste para todos los casos o solo para cuando alguien crea un reporte exitoso?
+L38. The result modal is shared across outcomes. Kept “Crear otro reporte” for pending, failed, or withdrawn outcomes, and hid it only when `imageApproved` is true and the report is not withdrawn; restored its reset handler and updated the source assertion. Source readback and `git diff --check` passed; no tests or browser verification run.
+L39. Bien, bueno, la idea es commitear esto tambien, pushear, y tambien q apliques en produccion lo q hicimos, osea lo de los contactos y eso, porque tengo entendido q solo esta en bd local por ahora. asique vamos a ello

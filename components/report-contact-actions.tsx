@@ -3,12 +3,41 @@
 import { useEffect, useRef, useState } from "react"
 import { Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { contactHref, createContactDraft, getReportContacts, type ReportContact } from "@/lib/report-contacts/contact-actions"
 import { createClient } from "@/utils/supabase/client"
 
-type Props = { category: string; description: string; latitude: number; longitude: number; date: string; reportUrl: string }
+type Props = { category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string; showHeading?: boolean }
+type DialogProps = Omit<Props, "reportUrl" | "showHeading"> & { reportId: number }
+const CONTACT_DISCLAIMER = "Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta."
 
-export function ReportContactActions(props: Props) {
+export function ReportContactDialog({ reportId, ...props }: DialogProps) {
+  const [open, setOpen] = useState(false)
+  const [reportUrl, setReportUrl] = useState("")
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (nextOpen) setReportUrl(new URL(`/reportes/${reportId}`, window.location.origin).toString())
+      setOpen(nextOpen)
+    }}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" className="w-full">
+          <Building2 aria-hidden="true" className="size-4" />
+          Contactar organismos
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="gap-3">
+        <DialogHeader>
+          <DialogTitle>Contactar a organismos</DialogTitle>
+          <DialogDescription className="text-[0.7rem]">{CONTACT_DISCLAIMER}</DialogDescription>
+        </DialogHeader>
+        <ReportContactActions {...props} reportUrl={reportUrl} showHeading={false} />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function ReportContactActions({ showHeading = true, ...props }: Props) {
   const draft = createContactDraft(props)
   const [contacts, setContacts] = useState<ReportContact[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -36,14 +65,16 @@ export function ReportContactActions(props: Props) {
   }, [contacts, failed])
 
   return (
-    <section className="space-y-2" aria-labelledby="contact-heading">
-      <h2 id="contact-heading" className="flex items-center gap-2 font-semibold"><Building2 aria-hidden="true" className="size-4 shrink-0" />Contactar a organismos</h2>
-      <p className="text-sm text-muted-foreground">Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta.</p>
+    <section className="space-y-2" aria-labelledby={showHeading ? "contact-heading" : undefined} aria-label={showHeading ? undefined : "Lista de organismos"}>
+      {showHeading && <>
+        <h2 id="contact-heading" className="flex items-center gap-2 font-semibold"><Building2 aria-hidden="true" className="size-4 shrink-0" />Contactar a organismos</h2>
+        <p className="text-[0.7rem] text-muted-foreground">{CONTACT_DISCLAIMER}</p>
+      </>}
       {failed ? <p role="status">No pudimos cargar los contactos. Intentá nuevamente más tarde.</p>
         : contacts === null ? <p role="status">Cargando contactos…</p>
         : contacts.length === 0 ? <p role="status">No hay contactos disponibles para esta ubicación y categoría.</p>
         : <>
-        {hasOverflow && <p id="contact-scroll-hint" className="text-xs text-muted-foreground">Desplazate para ver más organismos</p>}
+        {hasOverflow && <p id="contact-scroll-hint" className="text-xs font-semibold text-muted-foreground">Desplazate para ver más organismos</p>}
         <ul ref={listRef} aria-label="Lista de organismos" aria-describedby={hasOverflow ? "contact-scroll-hint" : undefined} tabIndex={0} className="max-h-40 space-y-2 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {contacts.map((contact) => {
             const href = contactHref(contact.channel_type, contact.channel_value, draft)

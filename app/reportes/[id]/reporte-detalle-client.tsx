@@ -70,6 +70,7 @@ import { getNameFromRelation, getUserInitials, getUsernameFromRelation } from "@
 import { ChipEstadoOperativo } from "@/components/cuadrillas/chip-estado-operativo";
 import { LineaTiempoOperativa } from "@/components/cuadrillas/linea-tiempo-operativa";
 import { CommentsSection } from "@/components/report-detail/comments-section";
+import { ReportContactDialog } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
 import {
   cambiarEstadoAdminAction,
@@ -117,6 +118,7 @@ function formatRepairDuration(createdAt: string, repairedAt: string) {
 export type ReporteDetalleInicial = {
   reporte: ReporteDetalle | null;
   fotografiaPendiente?: boolean;
+  puedeContactar: boolean;
   currentUser: UsuarioActual | null;
   isAdmin: boolean;
   estados: Estado[];
@@ -144,6 +146,7 @@ export type ReporteDetalleInicial = {
 export function ReporteDetalleClient({
   reporte,
   fotografiaPendiente = false,
+  puedeContactar,
   currentUser,
   isAdmin,
   estados,
@@ -548,6 +551,18 @@ export function ReporteDetalleClient({
                         </span>
                       )}
                     </span>
+                  </div>
+                )}
+                {puedeContactar && reporte.lat !== null && reporte.lon !== null && (
+                  <div className="mt-2 mb-3">
+                    <ReportContactDialog
+                      category={getNameFromRelation(reporte.categorias)}
+                      description={reporte.descripcion ?? ""}
+                      latitude={reporte.lat}
+                      longitude={reporte.lon}
+                      date={parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", { timeZone: ZONA_HORARIA })}
+                      reportId={reporte.id}
+                    />
                   </div>
                 )}
                 {showVoteFooter && (
