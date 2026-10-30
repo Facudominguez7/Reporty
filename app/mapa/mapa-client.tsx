@@ -16,7 +16,7 @@ import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
-import { getInitialMapTilePreloadScript, getMapBounds } from "@/lib/map/initial-view"
+import { getInitialMapTilePreloadScript } from "@/lib/map/initial-view"
 
 const loadMapContainer = () => import("@/components/map-container").then((m) => m.MapContainer)
 
@@ -53,7 +53,7 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
   useServerInsertedHTML(() => {
     if (error || tilePreloadInsertedRef.current) return null
     tilePreloadInsertedRef.current = true
-    const script = getInitialMapTilePreloadScript(getMapBounds(reportes.map((r) => r.coordinates)), MAP_MIN_HEIGHT_PX)
+    const script = getInitialMapTilePreloadScript(null, MAP_MIN_HEIGHT_PX)
     return <script dangerouslySetInnerHTML={{ __html: script }} />
   })
 
