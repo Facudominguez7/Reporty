@@ -52,7 +52,7 @@ async function fillReportForm(page: Page, titulo: string) {
 async function submitReport(page: Page) {
   await page.getByRole("button", { name: "Enviar Reporte" }).click()
   await page.getByRole("alertdialog").getByRole("button", { name: "Confirmar y Enviar" }).click()
-  await expect(page.getByText("¡Reporte enviado!")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText("Reporte registrado en Reporty")).toBeVisible({ timeout: 15_000 })
 }
 
 test.describe("reports", () => {
@@ -89,13 +89,14 @@ test.describe("reports", () => {
   test("a visitor without an account reports as a guest and finds it in Mis reportes", async ({ page, testData }) => {
     const titulo = `Bache de invitado ${uniqueTag()}`
 
-    // Without a session, creating a report asks to sign in or go on as a guest.
+    // The guest choice precedes the anonymous session, which is created on submit.
     await page.goto("/reportes/nuevo")
     await expect(page).toHaveURL(/\/auth/)
     await page.getByRole("link", { name: "Continuar como invitado" }).click()
     await expect(page).toHaveURL(/\/reportes\/nuevo\?modo=invitado$/)
-
     await fillReportForm(page, titulo)
+    await page.locator("#images").setInputFiles(await heavyPhoto(page))
+    await expect(page.getByAltText("Preview 1")).toBeVisible({ timeout: 30_000 })
     await submitReport(page)
 
     await expect(page.getByText("Reportaste como invitado.", { exact: false })).toBeVisible()
