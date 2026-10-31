@@ -25,14 +25,14 @@ type MutationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-export type AdminReportEditInput = {
+export type AdminReportEditInput = Partial<{
   titulo: string
   descripcion: string
   categoriaId: number
   prioridadId: number
   lat: number | null
   lon: number | null
-}
+}>
 
 type CommentProfileRelation =
   | {
@@ -271,22 +271,44 @@ export async function actualizarDatosReporteAdminWorkflow(
   const adminResult = await ensureAdmin(supabase, actorUserId)
   if (!adminResult.success) return adminResult
 
+  const changes: {
+    titulo?: string
+    descripcion?: string
+    categoria_id?: number
+    prioridad_id?: number
+    lat?: number | null
+    lon?: number | null
+  } = {}
+  if (input.titulo !== undefined) changes.titulo = input.titulo
+  if (input.descripcion !== undefined) changes.descripcion = input.descripcion
+  if (input.categoriaId !== undefined) changes.categoria_id = input.categoriaId
+  if (input.prioridadId !== undefined) changes.prioridad_id = input.prioridadId
+
+  const updatesLocation = input.lat !== undefined || input.lon !== undefined
+  const location = input.lat === undefined || input.lon === undefined
+    ? null
+    : { lat: input.lat, lon: input.lon }
+  if (updatesLocation && (!location || (location.lat === null) !== (location.lon === null))) {
+    return { success: false, error: "La latitud y longitud deben indicarse juntas." }
+  }
+  if (Object.keys(changes).length === 0 && !updatesLocation) {
+    return { success: false, error: "No hay campos editables para actualizar." }
+  }
+
   const reportResult = await getReportContext(supabase, reporteId)
   if (!reportResult.success) return reportResult
   if (reportResult.data.deleted_at) return { success: false, error: "El reporte ya no está disponible." }
-  const locationChanged = reportResult.data.lat !== input.lat || reportResult.data.lon !== input.lon
-  if (locationChanged && input.lat !== null && input.lon !== null && !isWithinReportCoverage(input.lat, input.lon)) {
-    return { success: false, error: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria." }
-  }
 
-  const { data, error } = await supabase.from("reportes").update({
-    titulo: input.titulo,
-    descripcion: input.descripcion,
-    categoria_id: input.categoriaId,
-    prioridad_id: input.prioridadId,
-    lat: input.lat,
-    lon: input.lon,
-  }).eq("id", reporteId).is("deleted_at", null).select("id").maybeSingle()
+  if (location) {
+    const locationChanged = reportResult.data.lat !== location.lat || reportResult.data.lon !== location.lon
+    if (locationChanged && location.lat !== null && location.lon !== null && !isWithinReportCoverage(location.lat, location.lon)) {
+      return { success: false, error: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria." }
+    }
+    changes.lat = location.lat
+    changes.lon = location.lon
+  }
+  const { data, error } = await supabase.from("reportes").update(changes)
+    .eq("id", reporteId).is("deleted_at", null).select("id").maybeSingle()
 
   if (error || !data) return { success: false, error: "No pudimos editar el reporte." }
   return { success: true, data: true }

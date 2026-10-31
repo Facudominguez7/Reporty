@@ -61,6 +61,32 @@ describe("admin report edits", () => {
     expect(updateQuery.is).toHaveBeenCalledWith("deleted_at", null)
   })
 
+  it("updates only the requested field without rewriting the rest of the report", async () => {
+    const update = vi.fn()
+    const updateQuery = {
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 4 }, error: null }),
+    }
+    const reportQuery = {
+      eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, lat: -34.6, lon: -58.4, deleted_at: null, ownerProfile: null }, error: null }) }),
+    }
+    const supabase = { from: () => ({ select: () => reportQuery, update: (values: unknown) => { update(values); return updateQuery } }) } as never
+
+    const result = await actualizarDatosReporteAdminWorkflow(supabase, 4, "admin", { titulo: "New title" })
+
+    expect(result).toEqual({ success: true, data: true })
+    expect(update).toHaveBeenCalledWith({ titulo: "New title" })
+  })
+
+  it("rejects incomplete coordinate patches before querying or writing", async () => {
+    const from = vi.fn()
+    const result = await actualizarDatosReporteAdminWorkflow({ from } as never, 4, "admin", { lat: -27.36 })
+    expect(result).toEqual({ success: false, error: "La latitud y longitud deben indicarse juntas." })
+    expect(from).not.toHaveBeenCalled()
+  })
+
   it("rejects changed coordinates outside the service area", async () => {
     const reportQuery = { eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, lat: -27.36, lon: -55.9, deleted_at: null, ownerProfile: null }, error: null }) }) }
     const update = vi.fn()

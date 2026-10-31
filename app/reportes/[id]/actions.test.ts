@@ -86,6 +86,39 @@ it("validates report edit fields before the admin workflow", async () => {
   expect(mocks.actualizarDatosReporte).not.toHaveBeenCalled()
 })
 
+it("accepts a valid single-field edit and forwards only that whitelisted field", async () => {
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
+  mocks.createAdminClient.mockReturnValue({})
+  mocks.actualizarDatosReporte.mockResolvedValue({ success: true, data: true })
+
+  const result = await actualizarReporteAdminAction(7, { titulo: "Nuevo título" } as Parameters<typeof actualizarReporteAdminAction>[1])
+
+  expect(result).toEqual({ success: true, data: true })
+  expect(mocks.actualizarDatosReporte).toHaveBeenCalledWith({}, 7, "admin-1", { titulo: "Nuevo título" })
+  expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
+})
+
+it("rejects empty and non-editable report patches", async () => {
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
+  mocks.createAdminClient.mockReturnValue({})
+  mocks.actualizarDatosReporte.mockResolvedValue({ success: true, data: true })
+  const empty = {} as Parameters<typeof actualizarReporteAdminAction>[1]
+  const immutable = {
+    titulo: "Título válido", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1, lat: null, lon: null, usuario_id: "owner",
+  } as unknown as Parameters<typeof actualizarReporteAdminAction>[1]
+
+  expect((await actualizarReporteAdminAction(7, empty)).success).toBe(false)
+  expect((await actualizarReporteAdminAction(7, immutable)).success).toBe(false)
+  expect(mocks.actualizarDatosReporte).not.toHaveBeenCalled()
+})
+
+it("requires location patches to include both coordinates", async () => {
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
+  const result = await actualizarReporteAdminAction(7, { lat: -27.36 } as Parameters<typeof actualizarReporteAdminAction>[1])
+  expect(result).toMatchObject({ success: false, error: expect.stringContaining("La latitud y longitud deben indicarse juntas.") })
+  expect(mocks.actualizarDatosReporte).not.toHaveBeenCalled()
+})
+
 it("does not introduce a safe-integer restriction on existing IDs", async () => {
   expect(await votarNoExisteAction(9007199254740992)).toEqual({ success: false, error: "Tenés que iniciar sesión para votar." })
   expect(mocks.createClient).toHaveBeenCalledTimes(1)

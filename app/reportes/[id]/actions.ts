@@ -36,9 +36,17 @@ const reportEditSchema = z.object({
   prioridadId: z.number().int().positive(),
   lat: z.number().min(-90).max(90).nullable(),
   lon: z.number().min(-180).max(180).nullable(),
-}).refine((value) => (value.lat === null) === (value.lon === null), {
-  message: "La latitud y longitud deben indicarse juntas.",
-})
+}).strict().partial()
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "Tenés que indicar al menos un campo editable.",
+  })
+  .refine((value) => {
+    const updatesLocation = value.lat !== undefined || value.lon !== undefined
+    return !updatesLocation || (
+      value.lat !== undefined && value.lon !== undefined &&
+      (value.lat === null) === (value.lon === null)
+    )
+  }, { message: "La latitud y longitud deben indicarse juntas." })
 type ReportEditInput = z.infer<typeof reportEditSchema>
 
 /** Preserve the scalar validation errors already returned by these public actions. */
