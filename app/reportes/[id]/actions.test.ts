@@ -1,9 +1,14 @@
 import { beforeEach, expect, it, vi } from "vitest"
 
-const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn() }))
+const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn(), actualizarDatosReporte: vi.fn() }))
 vi.mock("@/utils/supabase/server", () => ({ createClient: mocks.createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }))
-import { cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, votarNoExisteAction, votarReparadoAction } from "./actions"
+vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/use-cases/reportes")>()),
+  actualizarDatosReporteAdminWorkflow: mocks.actualizarDatosReporte,
+}))
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
+import { actualizarReporteAdminAction, cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, votarNoExisteAction, votarReparadoAction } from "./actions"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -21,6 +26,14 @@ const cases = [
   ["eliminarReporteAdmin", (id: number) => eliminarReporteAdminAction(id), "Tenés que iniciar sesión para eliminar el reporte."],
   ["cambiarEstado", (id: number) => cambiarEstadoAdminAction(id, 2), "Tenés que iniciar sesión para cambiar el estado."],
 ] as const
+
+it("requires a signed-in user before attempting an admin report update", async () => {
+  expect(await actualizarReporteAdminAction(7, { titulo: "Nuevo título", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1, lat: null, lon: null })).toEqual({
+    success: false,
+    error: "Tenés que iniciar sesión para editar el reporte.",
+  })
+  expect(mocks.createAdminClient).not.toHaveBeenCalled()
+})
 
 it.each(cases)("preserves %s authentication for valid coerced IDs", async (_name, action, error) => {
   expect(await action("7" as unknown as number)).toEqual({ success: false, error })
@@ -41,6 +54,13 @@ it.each([
   expect(await votarNoExisteAction(id as number)).toEqual({ success: false, error })
   expect(mocks.createClient).not.toHaveBeenCalled()
   expect(mocks.createAdminClient).not.toHaveBeenCalled()
+})
+
+it("validates report edit fields before the admin workflow", async () => {
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
+  const result = await actualizarReporteAdminAction(7, { titulo: "x", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1, lat: null, lon: null })
+  expect(result.success).toBe(false)
+  expect(mocks.actualizarDatosReporte).not.toHaveBeenCalled()
 })
 
 it("does not introduce a safe-integer restriction on existing IDs", async () => {

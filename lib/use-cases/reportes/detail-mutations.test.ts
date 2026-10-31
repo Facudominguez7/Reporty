@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { APORTES_COMUNITARIOS, mergeReportActivity, parseAporteKey } from "@/lib/reportes/aportes"
-import { applyReportStateChange, crearComentarioWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
+import { actualizarDatosReporteAdminWorkflow, applyReportStateChange, crearComentarioWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
 
-const mocks = vi.hoisted(() => ({ sumarPuntos: vi.fn() }))
+const mocks = vi.hoisted(() => ({ sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), isAdminRole: vi.fn() }))
 vi.mock("server-only", () => ({}))
+vi.mock("@/lib/authz/roles", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/authz/roles")>()),
+  getUserRoleContext: mocks.getUserRoleContext,
+  isAdminRole: mocks.isAdminRole,
+}))
 vi.mock("@/database/queries/puntos", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/database/queries/puntos")>()),
   sumarPuntos: mocks.sumarPuntos,
@@ -12,6 +17,48 @@ vi.mock("@/database/queries/puntos", async (importOriginal) => ({
 
 beforeEach(() => {
   mocks.sumarPuntos.mockReset().mockResolvedValue({ success: true, error: null })
+  mocks.getUserRoleContext.mockReset().mockResolvedValue({ data: { roleId: 2 }, error: null })
+  mocks.isAdminRole.mockReset().mockReturnValue(true)
+})
+
+describe("admin report edits", () => {
+  it("updates only editable report fields after verifying admin access", async () => {
+    const update = vi.fn()
+    const updateQuery = {
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 4 }, error: null }),
+    }
+    const reportQuery = {
+      eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, deleted_at: null, ownerProfile: null }, error: null }) }),
+    }
+    const supabase = {
+      from: (table: string) => table === "reportes" ? {
+        select: () => reportQuery,
+        update: (values: unknown) => { update(values); return updateQuery },
+      } : {},
+    } as never
+
+    const input = { titulo: "New title", descripcion: "Valid description", categoriaId: 3, prioridadId: 2, lat: -34.6, lon: -58.4 }
+    const result = await actualizarDatosReporteAdminWorkflow(supabase, 4, "admin", input)
+
+    expect(result).toEqual({ success: true, data: true })
+    expect(mocks.getUserRoleContext).toHaveBeenCalledWith(supabase, "admin")
+    expect(update).toHaveBeenCalledWith({ titulo: "New title", descripcion: "Valid description", categoria_id: 3, prioridad_id: 2, lat: -34.6, lon: -58.4 })
+    expect(updateQuery.eq).toHaveBeenCalledWith("id", 4)
+    expect(updateQuery.is).toHaveBeenCalledWith("deleted_at", null)
+  })
+
+  it("rejects non-admin edits without writing", async () => {
+    mocks.isAdminRole.mockReturnValue(false)
+    const from = vi.fn()
+    const result = await actualizarDatosReporteAdminWorkflow({ from } as never, 4, "user", {
+      titulo: "New title", descripcion: "Valid description", categoriaId: 3, prioridadId: 2, lat: null, lon: null,
+    })
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining("permisos") })
+    expect(from).not.toHaveBeenCalled()
+  })
 })
 
 describe("report status transition concurrency", () => {

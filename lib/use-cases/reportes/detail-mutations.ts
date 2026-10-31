@@ -21,6 +21,15 @@ type MutationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
+export type AdminReportEditInput = {
+  titulo: string
+  descripcion: string
+  categoriaId: number
+  prioridadId: number
+  lat: number | null
+  lon: number | null
+}
+
 type CommentProfileRelation =
   | {
       username: string
@@ -242,6 +251,32 @@ async function ensureAdmin(supabase: SupabaseClient, userId: string): Promise<Mu
     return { success: false, error: "No tenés permisos de administrador para esta acción." }
   }
 
+  return { success: true, data: true }
+}
+
+export async function actualizarDatosReporteAdminWorkflow(
+  supabase: SupabaseClient,
+  reporteId: number,
+  actorUserId: string,
+  input: AdminReportEditInput,
+): Promise<MutationResult<true>> {
+  const adminResult = await ensureAdmin(supabase, actorUserId)
+  if (!adminResult.success) return adminResult
+
+  const reportResult = await getReportContext(supabase, reporteId)
+  if (!reportResult.success) return reportResult
+  if (reportResult.data.deleted_at) return { success: false, error: "El reporte ya no está disponible." }
+
+  const { data, error } = await supabase.from("reportes").update({
+    titulo: input.titulo,
+    descripcion: input.descripcion,
+    categoria_id: input.categoriaId,
+    prioridad_id: input.prioridadId,
+    lat: input.lat,
+    lon: input.lon,
+  }).eq("id", reporteId).is("deleted_at", null).select("id").maybeSingle()
+
+  if (error || !data) return { success: false, error: "No pudimos editar el reporte." }
   return { success: true, data: true }
 }
 

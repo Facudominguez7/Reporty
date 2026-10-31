@@ -1,9 +1,11 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { parseAporteKey } from "@/lib/reportes/aportes"
 
 import {
+  actualizarDatosReporteAdminWorkflow,
   cambiarEstadoAdminWorkflow,
   crearComentarioWorkflow,
   eliminarComentarioAdminWorkflow,
@@ -19,10 +21,21 @@ import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
 // Keep the existing integer policy: Zod 4's .int() additionally enforces safe integers.
-const reportIdSchema = z.coerce.number().refine(Number.isInteger, "Expected integer, received float").positive()
+const reportIdSchema = z.coerce.number().positive().refine(Number.isInteger, "Expected integer, received float")
 const commentIdSchema = reportIdSchema
 const contributionSchema = z.string().refine((value) => parseAporteKey(value) !== null, "Elegí una actualización válida.")
 const stateIdSchema = reportIdSchema
+const reportEditSchema = z.object({
+  titulo: z.string().trim().min(3).max(120),
+  descripcion: z.string().trim().min(10).max(5000),
+  categoriaId: z.number().int().positive(),
+  prioridadId: z.number().int().positive(),
+  lat: z.number().min(-90).max(90).nullable(),
+  lon: z.number().min(-180).max(180).nullable(),
+}).refine((value) => (value.lat === null) === (value.lon === null), {
+  message: "La latitud y longitud deben indicarse juntas.",
+})
+type ReportEditInput = z.infer<typeof reportEditSchema>
 
 /** Preserve the scalar validation errors already returned by these public actions. */
 function mutationErrorMessage(error: unknown, fallback: string) {
@@ -192,6 +205,27 @@ export async function eliminarReporteAdminAction(reporteId: number) {
     return await eliminarReporteAdminWorkflow(createAdminClient(), parsedReportId, user.id)
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos eliminar el reporte.") }
+  }
+}
+
+export async function actualizarReporteAdminAction(reporteId: number, input: ReportEditInput) {
+  try {
+    const parsedReportId = reportIdSchema.parse(reporteId)
+    const parsedInput = reportEditSchema.parse(input)
+    const session = await createClient()
+    const { data: { user } } = await session.auth.getUser()
+
+    if (!user || user.is_anonymous) {
+      return { success: false as const, error: "Tenés que iniciar sesión para editar el reporte." }
+    }
+
+    const result = await actualizarDatosReporteAdminWorkflow(
+      createAdminClient(), parsedReportId, user.id, parsedInput,
+    )
+    if (result.success) revalidatePath(`/reportes/${parsedReportId}`)
+    return result
+  } catch (error) {
+    return { success: false as const, error: mutationErrorMessage(error, "No pudimos editar el reporte.") }
   }
 }
 
