@@ -194,6 +194,7 @@ export function ReporteDetalleClient({
   const [adminBase, setAdminBase] = useState<AdminReportDraft | null>(null);
   const [adminPhotoDrafts, setAdminPhotoDrafts] = useState<Record<number, AdminReportPhotoDraft>>({});
   const [isAdminSaving, setIsAdminSaving] = useState(false);
+  const [adminSaveError, setAdminSaveError] = useState<string | null>(null);
   const [votosCount, setVotosCount] = useState(reporte?.votos.noExiste.count ?? 0);
   const [hasVoted, setHasVoted] = useState(reporte?.votos.noExiste.hasVoted ?? false);
   const [isVoting, setIsVoting] = useState(false);
@@ -214,6 +215,7 @@ export function ReporteDetalleClient({
     setAdminDraft(initialDraft);
     setAdminBase(initialDraft);
     setAdminPhotoDrafts({});
+    setAdminSaveError(null);
     setIsAdminEditing(true);
   };
 
@@ -223,13 +225,16 @@ export function ReporteDetalleClient({
     setAdminDraft(null);
     setAdminBase(null);
     setAdminPhotoDrafts({});
+    setAdminSaveError(null);
   };
 
   const updateAdminDraft = <Key extends keyof AdminReportDraft,>(key: Key, value: AdminReportDraft[Key]) => {
+    setAdminSaveError(null);
     setAdminDraft((current) => current ? { ...current, [key]: value } : current);
   };
 
   const updateAdminPhotoDraft = (fotoId: number, draft: AdminReportPhotoDraft) => {
+    setAdminSaveError(null);
     setAdminPhotoDrafts((current) => ({ ...current, [fotoId]: draft }));
   };
 
@@ -369,6 +374,7 @@ export function ReporteDetalleClient({
     if (!isAdmin || !currentUser || !reporte || !adminDraft || !adminBase || isAdminSaving) return;
 
     setIsAdminSaving(true);
+    setAdminSaveError(null);
     const failures: string[] = [];
     const saved: string[] = [];
     const warnings: string[] = [];
@@ -382,10 +388,13 @@ export function ReporteDetalleClient({
     if (adminDraft.categoriaId !== adminBase.categoriaId && adminDraft.categoriaId !== null) { patch.categoriaId = adminDraft.categoriaId; savedFields.categoriaId = adminDraft.categoriaId; }
     if (adminDraft.prioridadId !== adminBase.prioridadId && adminDraft.prioridadId !== null) { patch.prioridadId = adminDraft.prioridadId; savedFields.prioridadId = adminDraft.prioridadId; }
     if (adminDraft.lat !== adminBase.lat || adminDraft.lon !== adminBase.lon) {
-      patch.lat = adminDraft.lat;
-      patch.lon = adminDraft.lon;
-      savedFields.lat = adminDraft.lat;
-      savedFields.lon = adminDraft.lon;
+      if (adminDraft.lat === null || adminDraft.lon === null) failures.push("La ubicación es obligatoria.");
+      else {
+        patch.lat = adminDraft.lat;
+        patch.lon = adminDraft.lon;
+        savedFields.lat = adminDraft.lat;
+        savedFields.lon = adminDraft.lon;
+      }
     }
 
     try {
@@ -480,6 +489,9 @@ export function ReporteDetalleClient({
       ].filter(Boolean).join(" ");
 
       if (failures.length) {
+        setAdminSaveError(completed
+          ? "Algunos cambios no se pudieron guardar. Revisá los datos e intentá de nuevo."
+          : "No se pudieron guardar los cambios. Revisá los datos e intentá de nuevo.");
         toast.error(completed ? "Guardado parcial" : "No se pudieron guardar los cambios", { description: details });
         return;
       }
@@ -934,7 +946,6 @@ export function ReporteDetalleClient({
                           heightClassName="h-48"
                           onLocationSelect={(lat, lon) => onChange({ lat, lon })}
                         />
-                        <Button type="button" variant="outline" className="min-h-10 w-full" disabled={isAdminSaving} onClick={() => onChange({ lat: null, lon: null })}>Quitar ubicación</Button>
                       </div>
                     )}
                   />
@@ -986,6 +997,7 @@ export function ReporteDetalleClient({
             {isAdmin && isAdminEditing && (
               <AdminReportEditActions
                 saving={isAdminSaving}
+                errorMessage={adminSaveError}
                 onSave={() => void saveAdminChanges()}
                 onCancel={cancelAdminEditing}
               />

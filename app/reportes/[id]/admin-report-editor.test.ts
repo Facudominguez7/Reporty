@@ -42,6 +42,18 @@ it("provides exactly one global Save and Cancel pair", () => {
   expect(markup.match(/Cancelar/g)).toHaveLength(1)
 })
 
+it("shows save failures inline with an accessible alert", () => {
+  const markup = renderToStaticMarkup(createElement(AdminReportEditActions, {
+    saving: false,
+    errorMessage: "No se pudieron guardar los cambios. Revisá los datos e intentá de nuevo.",
+    onSave: () => {},
+    onCancel: () => {},
+  }))
+
+  expect(markup).toContain('role="alert"')
+  expect(markup).toContain("No se pudieron guardar los cambios. Revisá los datos e intentá de nuevo.")
+})
+
 it("stages photo replacement and removal without per-photo Save/Cancel controls", () => {
   const markup = renderToStaticMarkup(createElement(AdminReportPhotoControls, {
     fotoId: 7,

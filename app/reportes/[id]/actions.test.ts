@@ -51,7 +51,7 @@ it("passes authenticated photo replacement to the guarded workflow", async () =>
 })
 
 it("requires a signed-in user before attempting an admin report update", async () => {
-  expect(await actualizarReporteAdminAction(7, { titulo: "Nuevo título", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1, lat: null, lon: null })).toEqual({
+  expect(await actualizarReporteAdminAction(7, { titulo: "Nuevo título" })).toEqual({
     success: false,
     error: "Tenés que iniciar sesión para editar el reporte.",
   })
@@ -81,7 +81,19 @@ it.each([
 
 it("validates report edit fields before the admin workflow", async () => {
   mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
-  const result = await actualizarReporteAdminAction(7, { titulo: "x", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1, lat: null, lon: null })
+  const result = await actualizarReporteAdminAction(7, { titulo: "x", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1 })
+  expect(result.success).toBe(false)
+  expect(mocks.actualizarDatosReporte).not.toHaveBeenCalled()
+})
+
+it("rejects clearing the required report location before the admin workflow", async () => {
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
+  mocks.createAdminClient.mockReturnValue({})
+  mocks.actualizarDatosReporte.mockResolvedValue({ success: true, data: true })
+
+  const invalidPatch = { lat: null, lon: null } as unknown as Parameters<typeof actualizarReporteAdminAction>[1]
+  const result = await actualizarReporteAdminAction(7, invalidPatch)
+
   expect(result.success).toBe(false)
   expect(mocks.actualizarDatosReporte).not.toHaveBeenCalled()
 })

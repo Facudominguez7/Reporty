@@ -37,11 +37,13 @@ type AdminReportEditActionsProps = {
   saving: boolean
   onSave: () => void
   onCancel: () => void
+  errorMessage?: string | null
 }
 
-export function AdminReportEditActions({ saving, onSave, onCancel }: AdminReportEditActionsProps) {
+export function AdminReportEditActions({ saving, onSave, onCancel, errorMessage }: AdminReportEditActionsProps) {
   return (
     <div role="group" aria-label="Acciones de edición del reporte" className="flex flex-wrap justify-end gap-2 rounded-xl border border-border/70 bg-card p-3">
+      {errorMessage && <p role="alert" className="w-full rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{errorMessage}</p>}
       <Button type="button" onClick={onSave} disabled={saving} className="min-h-10">
         <Save className="size-4" />
         {saving ? "Guardando…" : "Guardar cambios"}
