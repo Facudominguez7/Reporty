@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { APORTES_COMUNITARIOS, mergeReportActivity, parseAporteKey } from "@/lib/reportes/aportes"
-import { actualizarDatosReporteAdminWorkflow, applyReportStateChange, crearComentarioWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
+import { actualizarDatosReporteAdminWorkflow, applyReportStateChange, crearComentarioWorkflow, quitarFotoReporteAdminWorkflow, reemplazarFotoReporteAdminWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
 
-const mocks = vi.hoisted(() => ({ sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), isAdminRole: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), isAdminRole: vi.fn(),
+  reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), validarImagen: vi.fn(),
+}))
 vi.mock("server-only", () => ({}))
+vi.mock("@/lib/moderation/imagenes-reporte.server", () => ({
+  moderarYGuardarImagenReporte: mocks.reemplazarFoto,
+  eliminarFotoReportePublicada: mocks.quitarFoto,
+}))
+vi.mock("@/lib/media/report-image-validation.server", () => ({ validateUploadedReportImage: mocks.validarImagen }))
 vi.mock("@/lib/authz/roles", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/authz/roles")>()),
   getUserRoleContext: mocks.getUserRoleContext,
@@ -19,6 +27,9 @@ beforeEach(() => {
   mocks.sumarPuntos.mockReset().mockResolvedValue({ success: true, error: null })
   mocks.getUserRoleContext.mockReset().mockResolvedValue({ data: { roleId: 2 }, error: null })
   mocks.isAdminRole.mockReset().mockReturnValue(true)
+  mocks.reemplazarFoto.mockReset().mockResolvedValue({ estado: "REVIEW", publicada: false, motivos: [], advertencias: [] })
+  mocks.quitarFoto.mockReset().mockResolvedValue({ success: true, cleanupPending: false })
+  mocks.validarImagen.mockReset().mockResolvedValue(undefined)
 })
 
 describe("admin report edits", () => {
@@ -58,6 +69,42 @@ describe("admin report edits", () => {
     })
     expect(result).toMatchObject({ success: false, error: expect.stringContaining("permisos") })
     expect(from).not.toHaveBeenCalled()
+  })
+})
+
+describe("admin report photo edits", () => {
+  it("moderates a replacement under the report owner's identity and target photo", async () => {
+    const reportQuery = { eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Report", estado_id: 1, deleted_at: null, ownerProfile: null }, error: null }) }) }
+    const photoQuery = { eq: () => photoQuery, maybeSingle: async () => ({ data: { id: 22 }, error: null }) }
+    const activeReplacementQuery = { eq: () => activeReplacementQuery, in: () => activeReplacementQuery, maybeSingle: async () => ({ data: null, error: null }) }
+    const supabase = { from: (table: string) => table === "reportes" ? { select: () => reportQuery } : table === "fotos_reporte" ? { select: () => photoQuery } : { select: () => activeReplacementQuery } } as never
+    const image = new File(["image"], "report.png", { type: "image/png" })
+
+    const result = await reemplazarFotoReporteAdminWorkflow(supabase, 4, 22, "admin", image)
+
+    expect(result).toMatchObject({ success: true, data: { estado: "REVIEW", publicada: false } })
+    expect(mocks.reemplazarFoto).toHaveBeenCalledWith(supabase, { reporteId: 4, propietarioId: "owner", image, reemplazaFotoId: 22 })
+    expect(mocks.validarImagen).toHaveBeenCalledWith(image)
+  })
+
+  it("blocks a second replacement while the selected photo has an active review", async () => {
+    const reportQuery = { eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Report", estado_id: 1, deleted_at: null, ownerProfile: null }, error: null }) }) }
+    const photoQuery = { eq: () => photoQuery, maybeSingle: async () => ({ data: { id: 22 }, error: null }) }
+    const activeQuery = { eq: () => activeQuery, in: () => activeQuery, maybeSingle: async () => ({ data: { id: "pending" }, error: null }) }
+    const supabase = { from: (table: string) => table === "reportes" ? { select: () => reportQuery } : table === "fotos_reporte" ? { select: () => photoQuery } : { select: () => activeQuery } } as never
+    const image = new File(["image"], "report.png", { type: "image/png" })
+
+    expect(await reemplazarFotoReporteAdminWorkflow(supabase, 4, 22, "admin", image)).toMatchObject({ success: false, error: expect.stringContaining("pendiente de revisión") })
+    expect(mocks.reemplazarFoto).not.toHaveBeenCalled()
+    expect(mocks.validarImagen).not.toHaveBeenCalled()
+  })
+
+  it("removes only a photo after admin authorization", async () => {
+    const reportQuery = { eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Report", estado_id: 1, deleted_at: null, ownerProfile: null }, error: null }) }) }
+    const supabase = { from: () => ({ select: () => reportQuery }) } as never
+
+    expect(await quitarFotoReporteAdminWorkflow(supabase, 4, 22, "admin")).toEqual({ success: true, data: { cleanupPending: false } })
+    expect(mocks.quitarFoto).toHaveBeenCalledWith(supabase, 4, 22)
   })
 })
 

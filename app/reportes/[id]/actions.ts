@@ -7,6 +7,8 @@ import { parseAporteKey } from "@/lib/reportes/aportes"
 import {
   actualizarDatosReporteAdminWorkflow,
   cambiarEstadoAdminWorkflow,
+  quitarFotoReporteAdminWorkflow,
+  reemplazarFotoReporteAdminWorkflow,
   crearComentarioWorkflow,
   eliminarComentarioAdminWorkflow,
   eliminarComentarioPropioWorkflow,
@@ -25,6 +27,8 @@ const reportIdSchema = z.coerce.number().positive().refine(Number.isInteger, "Ex
 const commentIdSchema = reportIdSchema
 const contributionSchema = z.string().refine((value) => parseAporteKey(value) !== null, "Elegí una actualización válida.")
 const stateIdSchema = reportIdSchema
+const photoIdSchema = reportIdSchema
+const reportPhotoSchema = z.instanceof(File)
 const reportEditSchema = z.object({
   titulo: z.string().trim().min(3).max(120),
   descripcion: z.string().trim().min(10).max(5000),
@@ -226,6 +230,39 @@ export async function actualizarReporteAdminAction(reporteId: number, input: Rep
     return result
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos editar el reporte.") }
+  }
+}
+
+export async function reemplazarFotoReporteAdminAction(reporteId: number, fotoId: number, image: File) {
+  try {
+    const parsedReportId = reportIdSchema.parse(reporteId)
+    const parsedPhotoId = photoIdSchema.parse(fotoId)
+    const parsedImage = reportPhotoSchema.parse(image)
+    const session = await createClient()
+    const { data: { user } } = await session.auth.getUser()
+    if (!user || user.is_anonymous) return { success: false as const, error: "Tenés que iniciar sesión para editar la foto." }
+
+    const result = await reemplazarFotoReporteAdminWorkflow(createAdminClient(), parsedReportId, parsedPhotoId, user.id, parsedImage)
+    if (result.success) revalidatePath(`/reportes/${parsedReportId}`)
+    return result
+  } catch (error) {
+    return { success: false as const, error: mutationErrorMessage(error, "No pudimos reemplazar la foto.") }
+  }
+}
+
+export async function quitarFotoReporteAdminAction(reporteId: number, fotoId: number) {
+  try {
+    const parsedReportId = reportIdSchema.parse(reporteId)
+    const parsedPhotoId = photoIdSchema.parse(fotoId)
+    const session = await createClient()
+    const { data: { user } } = await session.auth.getUser()
+    if (!user || user.is_anonymous) return { success: false as const, error: "Tenés que iniciar sesión para editar la foto." }
+
+    const result = await quitarFotoReporteAdminWorkflow(createAdminClient(), parsedReportId, parsedPhotoId, user.id)
+    if (result.success) revalidatePath(`/reportes/${parsedReportId}`)
+    return result
+  } catch (error) {
+    return { success: false as const, error: mutationErrorMessage(error, "No pudimos quitar la foto.") }
   }
 }
 

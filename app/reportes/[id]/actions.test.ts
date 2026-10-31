@@ -1,14 +1,19 @@
 import { beforeEach, expect, it, vi } from "vitest"
 
-const mocks = vi.hoisted(() => ({ createClient: vi.fn(), createAdminClient: vi.fn(), actualizarDatosReporte: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(), createAdminClient: vi.fn(), actualizarDatosReporte: vi.fn(),
+  reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), revalidatePath: vi.fn(),
+}))
 vi.mock("@/utils/supabase/server", () => ({ createClient: mocks.createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }))
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/use-cases/reportes")>()),
   actualizarDatosReporteAdminWorkflow: mocks.actualizarDatosReporte,
+  reemplazarFotoReporteAdminWorkflow: mocks.reemplazarFoto,
+  quitarFotoReporteAdminWorkflow: mocks.quitarFoto,
 }))
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
-import { actualizarReporteAdminAction, cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, votarNoExisteAction, votarReparadoAction } from "./actions"
+import { actualizarReporteAdminAction, cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, quitarFotoReporteAdminAction, reemplazarFotoReporteAdminAction, votarNoExisteAction, votarReparadoAction } from "./actions"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -26,6 +31,24 @@ const cases = [
   ["eliminarReporteAdmin", (id: number) => eliminarReporteAdminAction(id), "Tenés que iniciar sesión para eliminar el reporte."],
   ["cambiarEstado", (id: number) => cambiarEstadoAdminAction(id, 2), "Tenés que iniciar sesión para cambiar el estado."],
 ] as const
+
+it("requires a signed-in user before photo replacement or removal", async () => {
+  const image = new File(["image"], "photo.png", { type: "image/png" })
+  expect(await reemplazarFotoReporteAdminAction(7, 22, image)).toEqual({ success: false, error: "Tenés que iniciar sesión para editar la foto." })
+  expect(await quitarFotoReporteAdminAction(7, 22)).toEqual({ success: false, error: "Tenés que iniciar sesión para editar la foto." })
+  expect(mocks.reemplazarFoto).not.toHaveBeenCalled()
+  expect(mocks.quitarFoto).not.toHaveBeenCalled()
+})
+
+it("passes authenticated photo replacement to the guarded workflow", async () => {
+  const image = new File(["image"], "photo.png", { type: "image/png" })
+  mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-1" } } }) } })
+  mocks.createAdminClient.mockReturnValue({})
+  mocks.reemplazarFoto.mockResolvedValue({ success: true, data: { estado: "REVIEW", publicada: false, motivos: [], advertencias: [] } })
+  expect(await reemplazarFotoReporteAdminAction(7, 22, image)).toMatchObject({ success: true })
+  expect(mocks.reemplazarFoto).toHaveBeenCalledWith(expect.anything(), 7, 22, "admin-1", image)
+  expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
+})
 
 it("requires a signed-in user before attempting an admin report update", async () => {
   expect(await actualizarReporteAdminAction(7, { titulo: "Nuevo título", descripcion: "Descripción válida", categoriaId: 1, prioridadId: 1, lat: null, lon: null })).toEqual({

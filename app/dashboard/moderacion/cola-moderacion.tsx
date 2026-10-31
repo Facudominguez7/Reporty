@@ -35,7 +35,7 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
 
   return <Card>
     <CardHeader>
-      <CardTitle>{imagen.decision === "REJECTED" ? `Reporte #${imagen.reporteId} · retirado` : <Link href={`/reportes/${imagen.reporteId}`}>Reporte #{imagen.reporteId}</Link>}</CardTitle>
+      <CardTitle>{imagen.esReemplazo || imagen.decision !== "REJECTED" ? <Link href={`/reportes/${imagen.reporteId}`}>Reporte #{imagen.reporteId}{imagen.esReemplazo && imagen.decision === "REJECTED" ? " · reemplazo rechazado" : ""}</Link> : `Reporte #${imagen.reporteId} · retirado`}</CardTitle>
       <CardDescription><time dateTime={imagen.fecha}>{imagen.fecha}</time></CardDescription>
       <Badge variant="secondary">{etiquetas[imagen.estado] ?? "Requiere atención"}</Badge>
     </CardHeader>
@@ -44,7 +44,7 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
       {imagenAusente || imagen.cargaPendiente ? <p role="status">Imagen no disponible o carga no confirmada. Solo se puede aprobar si el servidor verifica los bytes privados; si faltan, rechazá la solicitud.</p> : null}
       <ul className="list-disc pl-5 text-sm text-muted-foreground">{imagen.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
       {reclamada ? <p className="text-sm">Una clasificación pudo interrumpirse. Recuperar invalida su token y devuelve la foto a revisión humana; no vuelve a consumir proveedor. No recuperes trabajo activo.</p> : null}
-      {terminal ? <p className="text-sm">La decisión y su auditoría se conservan. El borrado privado puede reintentarse si falló.</p> : null}
+      {terminal ? <p className="text-sm">{imagen.esReemplazo ? "El reemplazo fue rechazado; el reporte y las fotos actuales se conservan." : "La decisión y su auditoría se conservan. El borrado privado puede reintentarse si falló."}</p> : null}
       {imagen.aviso ? <p className="text-sm">Advertencia al autor: {imagen.aviso.conciliacion ? "aceptación incierta; requiere conciliación, sin reenvío" : imagen.aviso.estado}. Intentos: {imagen.aviso.intentos}. No se muestra el destinatario.</p> : null}
       <p role="status" aria-live="polite" aria-atomic="true">{pendiente ? "Procesando decisión…" : mensaje}</p>
     </CardContent>

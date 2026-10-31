@@ -37,9 +37,19 @@ function escenario() {
     }
     return { data: null, error: null }
   })
+  let fotoAnteriorEliminada = false
   const from = vi.fn((tabla: string) => {
     let accion = "leer"
     let datos: Record<string, unknown> = {}
+    if (tabla === "fotos_reporte") {
+      const foto = { id: 22, reporte_id: 7, url: "https://sintetico.test/reportes/anterior", bucket: "reportes", path: "anterior/original", thumbnail_url: "https://sintetico.test/reportes/anterior-mini", thumbnail_bucket: "reportes", thumbnail_path: "anterior/mini" }
+      const query = {
+        select: vi.fn(() => query), eq: vi.fn(() => query),
+        delete: vi.fn(() => { fotoAnteriorEliminada = true; return query }),
+        maybeSingle: vi.fn(async () => ({ data: fotoAnteriorEliminada ? { id: 22 } : foto, error: null })),
+      }
+      return query
+    }
     const consulta = {
       select: vi.fn(() => consulta), eq: vi.fn(() => consulta), is: vi.fn(() => consulta),
       insert: vi.fn((d: Record<string, unknown>) => { accion = "insertar"; datos = d; return consulta }),
@@ -85,13 +95,13 @@ function escenario() {
     }),
     getPublicUrl: (path: string) => ({ data: { publicUrl: `https://sintetico.test/${bucket}/${path}` } }),
   })) }
-  return { errorDescarga: (error: unknown) => { errorDescarga = error }, supabase: { from, rpc, storage } as unknown as SupabaseClient, eventos, objetos, fallos, rpc, fila: () => fila! }
+  return { errorDescarga: (error: unknown) => { errorDescarga = error }, supabase: { from, rpc, storage } as unknown as SupabaseClient, eventos, objetos, fallos, rpc, fila: () => fila!, fotoAnteriorEliminada: () => fotoAnteriorEliminada }
 }
 
 /** Crea evidencia inocua real, no una cabecera simulada. */
-async function entrada() {
+async function entrada(reemplazaFotoId?: number) {
   const bytes = await sharp({ create: { width: 24, height: 24, channels: 3, background: "blue" } }).png().toBuffer()
-  return { reporteId: 7, propietarioId: "persona", image: new File([new Uint8Array(bytes)], "foto.png", { type: "image/png" }) }
+  return { reporteId: 7, propietarioId: "persona", image: new File([new Uint8Array(bytes)], "foto.png", { type: "image/png" }), ...(reemplazaFotoId ? { reemplazaFotoId } : {}) }
 }
 
 beforeEach(() => {
@@ -100,6 +110,33 @@ beforeEach(() => {
   moderarImagen.mockReset().mockResolvedValue({ decision: "APPROVED", motivos: [], operaciones: 2, proveedor: "simulado" })
 })
 describe("orquestación de imágenes", () => {
+  it("removes the replaced photo only after the new photo is published", async () => {
+    const e = escenario()
+    expect((await moderarYGuardarImagenReporte(e.supabase, await entrada(22))).publicada).toBe(true)
+    expect(e.fila().reemplaza_foto_id).toBe(22)
+    expect(e.fotoAnteriorEliminada()).toBe(true)
+    expect(e.eventos.indexOf("confirmar_publicacion_moderacion")).toBeLessThan(e.eventos.lastIndexOf("borrar:reportes"))
+  })
+
+  it("keeps the old photo while a replacement awaits review", async () => {
+    const e = escenario()
+    moderarImagen.mockResolvedValue({ decision: "REVIEW", motivos: ["contenido"], operaciones: 2 })
+    expect((await moderarYGuardarImagenReporte(e.supabase, await entrada(22))).publicada).toBe(false)
+    expect(e.fila().reemplaza_foto_id).toBe(22)
+    expect(e.fotoAnteriorEliminada()).toBe(false)
+  })
+
+  it("does not retire the report or remove the old photo when a replacement is rejected", async () => {
+    const e = escenario()
+    moderarImagen.mockResolvedValue({ decision: "REJECTED", motivos: ["contenido"], operaciones: 2 })
+    const result = await moderarYGuardarImagenReporte(e.supabase, await entrada(22))
+    expect(result.estado).toBe("REJECTED")
+    expect(result.motivos).toEqual(["La foto nueva fue rechazada; el reporte y la foto anterior se conservan."])
+    expect(e.fila().reemplaza_foto_id).toBe(22)
+    expect(enviarAviso).not.toHaveBeenCalled()
+    expect(e.fotoAnteriorEliminada()).toBe(false)
+  })
+
   it("persiste antes del proveedor y publica solo después de decidir", async () => {
     const e = escenario()
     moderarImagen.mockImplementationOnce(async () => {

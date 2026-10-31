@@ -16,6 +16,9 @@ import {
   sendStatusNotificationEmail,
 } from "@/lib/notifications/report-notifications"
 import { APORTES_COMUNITARIOS, type AporteKey } from "@/lib/reportes/aportes"
+import { eliminarFotoReportePublicada, moderarYGuardarImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
+import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
+import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -278,6 +281,62 @@ export async function actualizarDatosReporteAdminWorkflow(
 
   if (error || !data) return { success: false, error: "No pudimos editar el reporte." }
   return { success: true, data: true }
+}
+
+export async function reemplazarFotoReporteAdminWorkflow(
+  supabase: SupabaseClient,
+  reporteId: number,
+  fotoId: number,
+  actorUserId: string,
+  image: File,
+): Promise<MutationResult<Awaited<ReturnType<typeof moderarYGuardarImagenReporte>>>> {
+  const adminResult = await ensureAdmin(supabase, actorUserId)
+  if (!adminResult.success) return adminResult
+
+  const reportResult = await getReportContext(supabase, reporteId)
+  if (!reportResult.success) return reportResult
+  if (reportResult.data.deleted_at || !reportResult.data.usuario_id) {
+    return { success: false, error: "El reporte ya no está disponible." }
+  }
+  const { data: photo, error: photoError } = await supabase.from("fotos_reporte")
+    .select("id").eq("id", fotoId).eq("reporte_id", reporteId).maybeSingle()
+  if (photoError || !photo) return { success: false, error: "La foto ya no está disponible." }
+  const { data: replacementInProgress, error: replacementError } = await supabase.from("moderacion_imagenes")
+    .select("id").eq("reemplaza_foto_id", fotoId).in("estado_publicacion", ["pendiente", "reclamada", "publicando"]).maybeSingle()
+  if (replacementError) return { success: false, error: "No pudimos verificar si la foto ya está siendo reemplazada." }
+  if (replacementInProgress) return { success: false, error: "Ya hay un reemplazo de esta foto pendiente de revisión." }
+
+  if (!isAcceptedReportImageType(image.type)) return { success: false, error: "La imagen debe estar en formato JPG, PNG o WebP." }
+  if (image.size > REPORT_IMAGE_MAX_BYTES) return { success: false, error: `La imagen optimizada no puede superar los ${REPORT_IMAGE_MAX_BYTES_LABEL}.` }
+  await validateUploadedReportImage(image)
+
+  return {
+    success: true,
+    data: await moderarYGuardarImagenReporte(supabase, {
+      reporteId,
+      propietarioId: reportResult.data.usuario_id,
+      image,
+      reemplazaFotoId: fotoId,
+    }),
+  }
+}
+
+export async function quitarFotoReporteAdminWorkflow(
+  supabase: SupabaseClient,
+  reporteId: number,
+  fotoId: number,
+  actorUserId: string,
+): Promise<MutationResult<{ cleanupPending: boolean }>> {
+  const adminResult = await ensureAdmin(supabase, actorUserId)
+  if (!adminResult.success) return adminResult
+
+  const reportResult = await getReportContext(supabase, reporteId)
+  if (!reportResult.success) return reportResult
+  if (reportResult.data.deleted_at) return { success: false, error: "El reporte ya no está disponible." }
+
+  const result = await eliminarFotoReportePublicada(supabase, reporteId, fotoId)
+  if (!result.success) return { success: false, error: "No pudimos quitar la foto del reporte." }
+  return { success: true, data: { cleanupPending: result.cleanupPending } }
 }
 
 export async function applyReportStateChange(

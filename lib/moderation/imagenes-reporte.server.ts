@@ -7,6 +7,7 @@ import { sendAdminReviewNotificationEmail } from "@/lib/notifications/report-not
 import { moderarImagen } from "./sightengine.server"
 import type { ResultadoModeracion } from "./tipos"
 import { enviarAvisoRetiro } from "./avisos-retiro.server"
+import { getReportImageStorageRefs, isMissingReportImageColumnsError, type ReportImageRow } from "@/lib/media/report-images"
 
 const BUCKET_PRIVADO = "reportes-pendientes"
 const BUCKET_PUBLICO = "reportes"
@@ -21,6 +22,7 @@ type FilaImagen = {
   motivos: string[]
   estado_publicacion: "pendiente" | "reclamada" | "publicando" | "publicada" | "rechazada"
   token: string | null
+  reemplaza_foto_id?: number | null
 }
 export type ResultadoImagenReporte = {
   estado: Decision | "ERROR_PRIVADO"
@@ -28,7 +30,7 @@ export type ResultadoImagenReporte = {
   motivos: string[]
   advertencias: string[]
 }
-export type EntradaImagenReporte = { reporteId: number; propietarioId: string; image: File }
+export type EntradaImagenReporte = { reporteId: number; propietarioId: string; image: File; reemplazaFotoId?: number }
 
 /** Calcula identidad exacta del contenido sin nombres suministrados por el cliente. */
 function hash(bytes: Uint8Array) { return createHash("sha256").update(bytes).digest("hex") }
@@ -56,9 +58,13 @@ function resultado(fila?: FilaImagen | null, advertencias: string[] = []): Resul
   return {
     estado,
     publicada: fila?.estado_publicacion === "publicada",
-    motivos: estado === "REJECTED" ? ["Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material"]
-      : estado === "REVIEW" ? ["La fotografía quedó privada y pendiente de revisión. No necesitás reenviar el reporte."]
-      : estado === "ERROR_PRIVADO" ? ["No pudimos guardar la fotografía. Tu reporte fue creado sin imagen."] : [],
+    motivos: estado === "REJECTED" ? [fila?.reemplaza_foto_id
+      ? "La foto nueva fue rechazada; el reporte y la foto anterior se conservan."
+      : "Tu reporte fue retirado porque la fotografía adjunta incumple nuestras normas de contenido. Evitá volver a publicar este tipo de material"]
+      : estado === "REVIEW" ? [fila?.reemplaza_foto_id
+        ? "El reemplazo quedó pendiente de revisión; la foto actual sigue visible."
+        : "La fotografía quedó privada y pendiente de revisión. No necesitás reenviar el reporte."]
+      : estado === "ERROR_PRIVADO" ? ["No pudimos guardar la fotografía."] : [],
     advertencias,
   }
 }
@@ -161,13 +167,22 @@ async function limpiarHuerfanos(supabase: SupabaseClient, id: string, token: str
   return []
 }
 
+async function completarPublicacion(supabase: SupabaseClient, fila: FilaImagen) {
+  const advertencias = await limpiarImagenModerada(supabase, fila.id)
+  if (fila.reemplaza_foto_id) {
+    const retirada = await eliminarFotoReportePublicada(supabase, fila.reporte_id, fila.reemplaza_foto_id)
+    if (!retirada.success || retirada.cleanupPending) advertencias.push("limpieza_reemplazo_pendiente")
+  }
+  return advertencias
+}
+
 /** Publica exclusivamente APPROVED/publicando; reintentos conservan token y no consumen proveedor/cuota. */
 export async function publicarImagenModerada(supabase: SupabaseClient, id: string): Promise<ResultadoImagenReporte> {
   let fila: FilaImagen | undefined
   let paths: string[] = []
   try {
     fila = await leerFila(supabase, id)
-    if (fila.estado_publicacion === "publicada") return resultado(fila, await limpiarImagenModerada(supabase, id))
+    if (fila.estado_publicacion === "publicada") return resultado(fila, await completarPublicacion(supabase, fila))
     if (fila.decision !== "APPROVED" || fila.estado_publicacion !== "publicando" || !fila.token) return resultado(fila)
     paths = [`${fila.id}/${fila.token}`, `${fila.id}/${fila.token}-miniatura`]
     const privado = await supabase.storage.from(BUCKET_PRIVADO).download(fila.path_privado)
@@ -185,7 +200,7 @@ export async function publicarImagenModerada(supabase: SupabaseClient, id: strin
     })
     const actual = await leerFila(supabase, id)
     // Un confirmador concurrente puede ganar incluso si nuestra RPC falla o devuelve false.
-    if (actual.estado_publicacion === "publicada") return resultado(actual, await limpiarImagenModerada(supabase, id))
+    if (actual.estado_publicacion === "publicada") return resultado(actual, await completarPublicacion(supabase, actual))
     if (error || data !== true) throw new Error("confirmacion_pendiente")
     throw new Error("confirmacion_no_verificable")
   } catch {
@@ -196,6 +211,41 @@ export async function publicarImagenModerada(supabase: SupabaseClient, id: strin
     }
     return resultado(fila, advertencias)
   }
+}
+
+/** Removes only the selected report-photo row and its referenced public originals/thumbnails. */
+export async function eliminarFotoReportePublicada(supabase: SupabaseClient, reporteId: number, fotoId: number) {
+  let { data, error } = await supabase.from("fotos_reporte")
+    .select("id,reporte_id,url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path")
+    .eq("id", fotoId).eq("reporte_id", reporteId).maybeSingle()
+
+  if (error && isMissingReportImageColumnsError(error)) {
+    ;({ data, error } = await supabase.from("fotos_reporte")
+      .select("id,reporte_id,url,bucket,path").eq("id", fotoId).eq("reporte_id", reporteId).maybeSingle())
+  }
+  if (error && isMissingReportImageColumnsError(error)) {
+    ;({ data, error } = await supabase.from("fotos_reporte")
+      .select("id,reporte_id,url").eq("id", fotoId).eq("reporte_id", reporteId).maybeSingle())
+  }
+  if (error || !data) return { success: false, cleanupPending: false }
+
+  const { data: deleted, error: deleteError } = await supabase.from("fotos_reporte").delete()
+    .eq("id", fotoId).eq("reporte_id", reporteId).select("id").maybeSingle()
+  if (deleteError || !deleted) return { success: false, cleanupPending: false }
+
+  let cleanupPending = false
+  const byBucket = getReportImageStorageRefs([data as ReportImageRow]).reduce<Record<string, string[]>>((paths, ref) => {
+    paths[ref.bucket] = [...(paths[ref.bucket] ?? []), ref.path]
+    return paths
+  }, {})
+  for (const [bucket, paths] of Object.entries(byBucket)) {
+    const { error: storageError } = await supabase.storage.from(bucket).remove(paths)
+    if (storageError) {
+      cleanupPending = true
+      console.error("No pudimos limpiar Storage al quitar una foto del reporte:", { reporteId, bucket, pathCount: paths.length, message: storageError.message })
+    }
+  }
+  return { success: true, cleanupPending }
 }
 
 /** Autoriza propietario DB, deduplica evidencia canónica y clasifica una sola vez tras reservar cuota. */
@@ -212,6 +262,7 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
     const insercion = await supabase.from("moderacion_imagenes").insert({
       id, reporte_id: entrada.reporteId, propietario_id: entrada.propietarioId,
       hash_sha256: identidad, path_privado: path, decision: "REVIEW", motivos: [],
+      ...(entrada.reemplazaFotoId ? { reemplaza_foto_id: entrada.reemplazaFotoId } : {}),
     }).select("*").single()
     if (insercion.error?.code === "23505") {
       const existente = await supabase.from("moderacion_imagenes").select("*").eq("reporte_id", entrada.reporteId).eq("hash_sha256", identidad).single()
@@ -261,7 +312,7 @@ export async function moderarYGuardarImagenReporte(supabase: SupabaseClient, ent
     // El CAS exitoso ya retiró el reporte. Una lectura posterior fallida no debe ocultarlo.
     if (clasificacion.decision === "REJECTED") {
       fila = { ...fila, decision: "REJECTED", estado_publicacion: "rechazada" }
-      await enviarAvisoRetiro(supabase, fila.reporte_id)
+      if (!fila.reemplaza_foto_id) await enviarAvisoRetiro(supabase, fila.reporte_id)
       return resultado(fila, await limpiarImagenModerada(supabase, id))
     }
     fila = await leerFila(supabase, id)

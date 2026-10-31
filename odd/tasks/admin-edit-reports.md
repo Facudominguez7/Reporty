@@ -10,8 +10,8 @@ The accepted scope is report content and operational fields; author identity and
 4. **S4 — User experience verification.** The updated `AGENTS.md` requires a visible Playwright browser check for UX/UI changes, but the user specified: “Todo esto que vas a leer aca abajo, lo vas a hacer solo si yo te doy permiso, osea luego de hacer algo medianamente grande me preguntas y ahi recien te digo si o no y lo haces, sino no hagas nada porque si(”. Ask for permission after implementation before running the browser verification; if not granted, leave that check pending and report it.
 
 ## Tasks
-- T1 — Implement and test admin-only metadata/operational-field editing (S1); route: inline; status: done; commit: pending.
-- T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; commit: pending.
+- T1 — Implement and test admin-only metadata/operational-field editing (S1); route: inline; status: done; commit: db6fff6.
+- T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: pending.
 - T3 — Add the admin-only detail-page edit UI and verify the flow (S1, S4); route: inline; commit: pending.
 
 ## Log
@@ -21,3 +21,5 @@ The accepted scope is report content and operational fields; author identity and
 - L4 — User declined a separate audit trail: “no hace falta lo de la auditoria en este caso creo”.
 - L5 — User clarified photo operations apply individually: “Cada foto por separado”.
 - L6 — T1 metadata/operational update action and workflow pass focused tests and lint; the existing report-action Zod schema order was fixed because module loading failed before tests could run.
+- L7 — Schema inspection confirmed photo rows have stable IDs, moderation publication is the approval/linkage point, and database/Storage removal cannot be atomic; replacement cleanup must happen only after publication, while cleanup failures follow the repository's existing logged best-effort behavior.
+- L8 — T2 passes 115 focused tests and targeted ESLint; both migrations applied to local Supabase, `db lint --local --fail-on error` found no errors (two pre-existing warnings). `npx tsc --noEmit` remains blocked by existing type errors in `app/reportes/[id]/actions.ts`'s Zod error adapter and `app/reportes/nuevo/actions.ts`.

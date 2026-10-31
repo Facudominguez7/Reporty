@@ -17,7 +17,7 @@ let rpc: ReturnType<typeof vi.fn>
 let descarga: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
-  fila = { id, reporte_id: 7, decision: "REVIEW", estado_publicacion: "pendiente", motivos: [], token: "token-original", path_privado: "privado", hash_sha256: createHash("sha256").update(bytes).digest("hex") }
+  fila = { id, reporte_id: 7, decision: "REVIEW", estado_publicacion: "pendiente", motivos: [], token: "token-original", path_privado: "privado", hash_sha256: createHash("sha256").update(bytes).digest("hex"), reemplaza_foto_id: null }
   consulta = Object.fromEntries(["select", "eq", "in", "order", "range"].map((clave) => [clave, vi.fn()]))
   for (const metodo of Object.values(consulta)) metodo.mockReturnValue(consulta)
   consulta.single = vi.fn(async () => ({ data: fila, error: null }))
@@ -89,6 +89,18 @@ describe("frontera administrativa", () => {
     await ejecutarRevision(id, operacion)
     expect(rpc).toHaveBeenCalledWith("decidir_imagen_moderacion", expect.objectContaining({ p_administrador: "admin-verificado", p_decision: operacion === "aprobar" ? "APPROVED" : "REJECTED" }))
     expect(operacion === "aprobar" ? dobles.publicar : dobles.limpiar).toHaveBeenCalled()
+  })
+  it("rechazar un reemplazo conserva el reporte y no genera aviso de retiro", async () => {
+    fila.reemplaza_foto_id = 22
+    expect(await ejecutarRevision(id, "rechazar")).toMatchObject({ exito: true, mensaje: expect.stringContaining("reporte y sus fotos actuales se conservan") })
+    expect(dobles.avisar).not.toHaveBeenCalled()
+    expect(dobles.limpiar).toHaveBeenCalledWith(dobles.servicio.mock.results[0].value, id)
+  })
+  it("rejects report-retirement actions for a rejected replacement", async () => {
+    fila.reemplaza_foto_id = 22
+    fila.decision = "REJECTED"; fila.estado_publicacion = "rechazada"
+    expect(await ejecutarRevision(id, "avisar")).toMatchObject({ exito: false })
+    expect(dobles.avisar).not.toHaveBeenCalled()
   })
   it("rechazo comunica retiro aunque el aviso quede pendiente", async () => {
     expect(await ejecutarRevision(id, "rechazar")).toMatchObject({ exito: true, reporteId: 7, mensaje: expect.stringContaining("Reporte retirado") })
