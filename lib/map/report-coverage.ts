@@ -66,6 +66,20 @@ export function isWithinReportCoverage(latitude: number, longitude: number) {
   )
 }
 
+export function resolveReportMunicipality(latitude: number, longitude: number): string | null {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null
+
+  let municipality: string | null = null
+  for (const { geometry, properties } of REPORT_COVERAGE.features) {
+    if (geometry.coordinates.some((ring) => locateInRing(longitude, latitude, ring) === "boundary")) return null
+    if (locateInPolygon(longitude, latitude, geometry.coordinates)) {
+      if (municipality !== null) return null
+      municipality = properties.Municipio
+    }
+  }
+  return municipality
+}
+
 const positions = REPORT_COVERAGE.features.flatMap(({ geometry }) => geometry.coordinates.flat())
 
 export const REPORT_COVERAGE_BOUNDS: [[number, number], [number, number]] = [

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prueba carreras con registros dedicados; no borra ni modifica datos existentes.
 set -euo pipefail
-contenedor="${SUPABASE_DB_CONTAINER:-supabase_db_JackeMate}"
+contenedor="${SUPABASE_DB_CONTAINER:-supabase_db_Reporty}"
 psql_local() { docker exec "$contenedor" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
 if [[ "$(psql_local -Atc "select to_regprocedure('public.registrar_voto_exclusivo(bigint,uuid,text)') is not null")" != t ]]; then
   echo 'Falta aplicar la migración local de votos exclusivos.' >&2

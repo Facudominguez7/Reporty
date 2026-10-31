@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest"
 
-import { isWithinReportCoverage } from "./report-coverage"
+import { isWithinReportCoverage, REPORT_COVERAGE, resolveReportMunicipality } from "./report-coverage"
+
+describe("resolveReportMunicipality", () => {
+  it("resolves interior locations only", () => {
+    expect(resolveReportMunicipality(-27.3676, -55.8961)).toBe("Posadas")
+    expect(resolveReportMunicipality(-27.48, -55.82)).toBe("Garupá")
+    expect(resolveReportMunicipality(-27.5062, -55.6351)).toBe("Candelaria")
+    expect(resolveReportMunicipality(-27.5591, -55.9696)).toBeNull()
+    expect(resolveReportMunicipality(-26, -54)).toBeNull()
+    expect(resolveReportMunicipality(NaN, -54)).toBeNull()
+  })
+
+  it("does not resolve overlapping municipalities", () => {
+    const posadas = REPORT_COVERAGE.features.find((feature) => feature.properties.Municipio === "Posadas")!
+    REPORT_COVERAGE.features.push({ ...posadas, properties: { Municipio: "Otro" } })
+    try {
+      expect(resolveReportMunicipality(-27.3676, -55.8961)).toBeNull()
+    } finally {
+      REPORT_COVERAGE.features.pop()
+    }
+  })
+})
 
 describe("isWithinReportCoverage", () => {
   it("allows near-river Candelaria land inside the municipal polygon", () => {

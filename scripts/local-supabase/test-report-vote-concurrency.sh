@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-container="${SUPABASE_DB_CONTAINER:-supabase_db_JackeMate}"
+container="${SUPABASE_DB_CONTAINER:-supabase_db_Reporty}"
 if ! docker ps --format '{{.Names}}' | grep -Fxq "$container"; then
   echo "Local Supabase database container '$container' is not running." >&2
   exit 1

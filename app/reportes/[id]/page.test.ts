@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getCategorias: vi.fn(),
   getPrioridades: vi.fn(),
   tieneFotografiaPendiente: vi.fn(),
+  tieneFotografiaAprobada: vi.fn(),
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
   obtenerGestionOperativaDetalle: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./reporte-detalle-client", () => ({ ReporteDetalleClient: () => null }))
 vi.mock("@/lib/moderation/estado-publico.server", () => ({
   tieneFotografiaPendiente: mocks.tieneFotografiaPendiente,
+  tieneFotografiaAprobada: mocks.tieneFotografiaAprobada,
 }))
 vi.mock("@/utils/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: mocks.getUser } }),
@@ -64,6 +66,7 @@ describe("ReporteDetallePage", () => {
     mocks.getCategorias.mockReset().mockResolvedValue([{ id: 1, nombre: "Otros" }])
     mocks.getPrioridades.mockReset().mockResolvedValue([{ id: 2, nombre: "Alta" }])
     mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
+    mocks.tieneFotografiaAprobada.mockReset().mockResolvedValue(false)
     mocks.obtenerGestionOperativaDetalle.mockReset().mockResolvedValue({
       puedeOperar: false,
       estadoOperativo: null,
@@ -103,9 +106,19 @@ describe("ReporteDetallePage", () => {
     expect(mocks.getPrioridades).not.toHaveBeenCalled()
   })
 
-  it("does not show the notice without a pending photo", async () => {
+  it("does not show the notice or contact action without matching moderation status", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
-    expect((await renderPage()).props.fotografiaPendiente).toBe(false)
+    const page = await renderPage()
+    expect(page.props.fotografiaPendiente).toBe(false)
+    expect(page.props.puedeContactar).toBe(false)
+  })
+
+  it("allows contact actions only when an image was explicitly approved", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.tieneFotografiaAprobada.mockResolvedValue(true)
+    const page = await renderPage()
+    expect(page.props.puedeContactar).toBe(true)
+    expect(mocks.tieneFotografiaAprobada).toHaveBeenCalledWith(5)
   })
 
   it("lets a citizen vote while crews are turned off", async () => {

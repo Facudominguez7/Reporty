@@ -109,12 +109,14 @@ Además compara stdout exacto del CAS REVIEW/APPROVED y confirmación/publicaci�
 contra el validador anterior copiado de la migración20261025144223 dentro de una
 transacción revertida. No consulta git ni deja funciones base persistidas.
 
-Comandos exactos (Docker local mapeado a127.0.0.1:54322; conexión loopback dentro
-del contenedor al mismo Postgres, sin credenciales impresas):
+Comandos exactos (Docker local mapeado a 127.0.0.1:54322; conexión loopback dentro
+del contenedor al mismo Postgres, sin credenciales impresas). El nombre Reporty
+requiere completar primero el traslado y comprobar la recuperación de datos;
+cambiar `project_id` no traslada volúmenes ni garantiza su conservación:
 
 ```sh
-docker exec -i supabase_db_JackeMate psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -w -v ON_ERROR_STOP=1 < supabase/tests/moderacion_retiro_reporte.sql
-docker exec -i supabase_db_JackeMate psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -w -v ON_ERROR_STOP=1 < supabase/tests/moderacion_imagenes.sql
+docker exec -i supabase_db_Reporty psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -w -v ON_ERROR_STOP=1 < supabase/tests/moderacion_retiro_reporte.sql
+docker exec -i supabase_db_Reporty psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -w -v ON_ERROR_STOP=1 < supabase/tests/moderacion_imagenes.sql
 node scripts/moderacion/verificar-retiro.mjs
 git diff --check
 ```

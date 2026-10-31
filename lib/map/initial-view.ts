@@ -30,12 +30,8 @@ export type InitialMapView = {
 
 export const MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
-/**
- * Municipality of Posadas, Misiones: its OpenStreetMap bounding box (-27.5824, -56.0586,
- * -27.3243, -55.8395) rounded outward. Maps and new reports stay inside it. The previous
- * approximate box left out western neighborhoods such as Itaembé Guazú.
- */
-export const POSADAS_BOUNDS: MapBounds = [-27.59, -56.06, -27.32, -55.83]
+/** Panning bounds for the reports map, extended east to include Candelaria. */
+export const POSADAS_BOUNDS: MapBounds = [-27.59, -56.06, -27.32, -55.6]
 
 /** Lowest zoom of the Posadas maps: zooming further out would only show the region around the city. */
 export const POSADAS_MIN_ZOOM = 13

@@ -27,6 +27,8 @@ const buttonVariants = cva(
           "rounded-md bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 focus-visible:ring-primary focus-visible:ring-offset-background",
         ghost:
           "text-secondary",
+        "ghost-bordered":
+          "border border-secondary bg-transparent text-secondary",
         muted:
           "text-muted-foreground hover:bg-muted hover:text-foreground",
       },

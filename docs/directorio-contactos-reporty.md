@@ -51,9 +51,11 @@ Candelaria es un municipio independiente. No reutilizar automáticamente los con
 
 ### Garupá
 
-Garupá es un municipio independiente. Priorizar sus canales municipales específicos, aún pendientes de completar y verificar.
+Garupá es un municipio independiente. Los siguientes teléfonos generales se ofrecen provisionalmente para las ocho categorías, con vigencia y competencia por categoría pendientes de confirmar; no son canales específicos ni se asume que tengan WhatsApp:
 
-- SAMSA declara cobertura de agua potable y cloacas en Garupá; confirmar canal y alcance aplicable al caso.
+- 376 438-1434: difundido para reclamos por [La Voz de Garupá](https://www.lavozdegarupa.com.ar/inicio/noticia/6551/Municipalidad-de-Garup-Nuevo-Nmero-para-reclamos-3764-381434.html).
+- 376 430-0019: contacto general publicado en [GaruApp](https://garuapp.sgmgarupa.com/index.php).
+- Para agua y cloacas se mantiene SAMSA como primera opción; declara cobertura en Garupá, pero deben confirmarse el canal y el alcance aplicable al caso. Los teléfonos municipales son alternativas generales.
 - No usar los contactos municipales de Posadas como sustituto automático.
 
 ## Mensajes predeterminados

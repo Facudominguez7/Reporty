@@ -4,7 +4,7 @@ import { randomUUID, randomInt } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
-const container = 'supabase_db_JackeMate';
+const container = 'supabase_db_Reporty';
 const ports = execFileSync('docker', ['port', container, '5432/tcp'], { encoding: 'utf8' });
 assert.match(ports, /:54322\b/, 'Refusing a database not mapped to local port 54322');
 const args = ['exec', '-i', container, 'psql', '-X', '-qAt', '-h', '127.0.0.1',

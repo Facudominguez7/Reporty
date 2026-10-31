@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest"
+import { readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 
 import {
   EXCLUDED_TABLES,
@@ -91,6 +93,32 @@ describe("readProjectId", () => {
 
   it("fails when it is missing", () => {
     expect(() => readProjectId("[api]\n")).toThrow("project_id not found in supabase/config.toml")
+  })
+})
+
+describe("local database container names", () => {
+  it("uses the Reporty project id", () => {
+    expect(readProjectId(readFileSync("supabase/config.toml", "utf8"))).toBe("Reporty")
+  })
+
+  it.each([
+    ["scripts/local-supabase/test-report-vote-exclusivo.sh", "contenedor"],
+    ["scripts/local-supabase/test-report-vote-races.sh", "contenedor"],
+    ["scripts/local-supabase/test-report-vote-concurrency.sh", "container"],
+  ])("defaults and honors the existing override in %s", (path, variable) => {
+    const source = readFileSync(path, "utf8")
+    const assignment = source.split(/\r?\n/).find(line => line.startsWith(`${variable}=`))
+    expect(assignment).toBeDefined()
+    expect(source).toContain(`"$${variable}"`)
+    const resolve = (override: string) => execFileSync("bash", ["-c", `${assignment}\nprintf '%s' "$${variable}"`], {
+      encoding: "utf8", env: { NODE_ENV: "test", SUPABASE_DB_CONTAINER: override },
+    })
+    expect(resolve("")).toBe("supabase_db_Reporty")
+    expect(resolve("custom_container")).toBe("custom_container")
+  })
+
+  it("uses the Reporty container in the moderation runner", () => {
+    expect(readFileSync("scripts/moderacion/verificar-retiro.mjs", "utf8")).toContain("const container = 'supabase_db_Reporty';")
   })
 })
 

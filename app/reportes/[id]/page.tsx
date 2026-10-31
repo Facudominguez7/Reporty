@@ -14,12 +14,13 @@ import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
 import { getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
-import { tieneFotografiaPendiente } from "@/lib/moderation/estado-publico.server";
+import { tieneFotografiaAprobada, tieneFotografiaPendiente } from "@/lib/moderation/estado-publico.server";
 import { obtenerGestionOperativaDetalle } from "@/lib/use-cases/cuadrillas/detalle-operativo";
 import { ReporteDetalleClient, type ReporteDetalleInicial } from "./reporte-detalle-client";
 
 const SIN_REPORTE: ReporteDetalleInicial = {
   reporte: null,
+  puedeContactar: false,
   currentUser: null,
   isAdmin: false,
   estados: [],
@@ -121,9 +122,17 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
         )
       : undefined;
 
+    const [fotografiaPendiente, fotografiaAprobada] = encontrado
+      ? await Promise.all([
+          tieneFotografiaPendiente(encontrado.id),
+          tieneFotografiaAprobada(encontrado.id),
+        ])
+      : [false, false]
+
     return {
       reporte: encontrado,
-      fotografiaPendiente: encontrado ? await tieneFotografiaPendiente(encontrado.id) : false,
+      fotografiaPendiente,
+      puedeContactar: Boolean(encontrado && fotografiaAprobada),
       currentUser: user ? { id: user.id, is_anonymous: user.is_anonymous } : null,
       isAdmin: adminResult?.isAdmin ?? false,
       estados: adminResult?.isAdmin ? adminResult.estados : [],

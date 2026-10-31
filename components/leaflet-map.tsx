@@ -15,8 +15,6 @@ import { getCategoryColor, getPriorityColor, getStatusColor } from "@/components
 import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/catalog"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
 import {
-  computeInitialMapView,
-  getMapBounds,
   INITIAL_MAP_VIEW_CONFIG,
   MAP_MAX_ZOOM,
   MAP_TILE_URL,
@@ -327,8 +325,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
 
     // No center yet: Leaflet adds layers and requests tiles only once the first view is set,
     // so the effect below requests the tiles of the final view and nothing else.
-    // Reports only exist in Posadas, so panning and zooming out stop at the city, as in the
-    // location picker of new reports.
+    // Limit panning to the reports map's regional bounds.
     const [south, west, north, east] = POSADAS_BOUNDS
     const map = L.map(container, {
       scrollWheelZoom: true,
@@ -427,12 +424,9 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
     }
 
     if (!hasInitialViewRef.current) {
-      // Same computation as the tile preload script of /mapa, so the preloaded tile is the
-      // first one Leaflet requests.
-      const size = map.getSize()
-      const bounds = getMapBounds(reports.map((report) => report.coordinates))
-      const { center, zoom } = computeInitialMapView(bounds, size.x, size.y, INITIAL_MAP_VIEW_CONFIG)
-      map.setView(center, zoom)
+      // Start over Posadas regardless of where current reports are located; users can pan
+      // east to Candelaria within the regional max bounds.
+      map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
       hasInitialViewRef.current = true
       return
     }
