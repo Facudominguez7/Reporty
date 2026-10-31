@@ -707,76 +707,86 @@ export function ReporteDetalleClient({
         </div>
       </div>
 
+      {/* Share one modal root so switching views cannot stack competing backdrops. */}
       {isAdmin && (
-        <Dialog open={showAdminPanelDialog} onOpenChange={setShowAdminPanelDialog}>
-          <DialogContent>
-            <DialogHeader className="pr-8">
-              <DialogTitle className="flex items-center gap-2 text-[var(--semantic-admin)]">
-                <Shield className="size-5" />
-                Panel de Administrador
-              </DialogTitle>
-              <DialogDescription>
-                Controles exclusivos para gestionar este reporte
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 rounded-xl border border-border p-4">
-              <Button type="button" variant="outline" className="w-full text-sm" size="sm" onClick={() => { setShowAdminPanelDialog(false); setShowAdminEditDialog(true); }}>
-                Editar contenido y fotos
-              </Button>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Cambiar Estado</label>
-                <Select value={estadoSeleccionado} onValueChange={setEstadoSeleccionado}>
-                  <SelectTrigger className="w-full text-sm">
-                    <SelectValue placeholder="Seleccionar estado..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estados.map((estado) => (
-                      <SelectItem key={estado.id} value={estado.id.toString()}>
-                        {estado.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Textarea
-                  placeholder="Descripción del cambio (opcional)"
-                  value={comentarioEstado}
-                  onChange={(e) => setComentarioEstado(e.target.value)}
-                  className="min-h-[60px] resize-none text-sm"
-                />
-                <Button
-                  onClick={handleAdminChangeEstado}
-                  disabled={!estadoSeleccionado || isChangingEstado}
-                  className="w-full text-sm"
-                  size="sm"
-                >
-                  <Settings className="size-4" />
-                  {isChangingEstado ? "Actualizando..." : "Actualizar Estado"}
+        <Dialog
+          open={showAdminPanelDialog || showAdminEditDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowAdminPanelDialog(false);
+              setShowAdminEditDialog(false);
+            }
+          }}
+        >
+          {showAdminPanelDialog && (
+            <DialogContent>
+              <DialogHeader className="pr-8">
+                <DialogTitle className="flex items-center gap-2 text-[var(--semantic-admin)]">
+                  <Shield className="size-5" />
+                  Panel de Administrador
+                </DialogTitle>
+                <DialogDescription>
+                  Controles exclusivos para gestionar este reporte
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 rounded-xl border border-border p-4">
+                <Button type="button" variant="outline" className="w-full text-sm" size="sm" onClick={() => { setShowAdminPanelDialog(false); setShowAdminEditDialog(true); }}>
+                  Editar contenido y fotos
                 </Button>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Cambiar Estado</label>
+                  <Select value={estadoSeleccionado} onValueChange={setEstadoSeleccionado}>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Seleccionar estado..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {estados.map((estado) => (
+                        <SelectItem key={estado.id} value={estado.id.toString()}>
+                          {estado.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    placeholder="Descripción del cambio (opcional)"
+                    value={comentarioEstado}
+                    onChange={(e) => setComentarioEstado(e.target.value)}
+                    className="min-h-[60px] resize-none text-sm"
+                  />
+                  <Button
+                    onClick={handleAdminChangeEstado}
+                    disabled={!estadoSeleccionado || isChangingEstado}
+                    className="w-full text-sm"
+                    size="sm"
+                  >
+                    <Settings className="size-4" />
+                    {isChangingEstado ? "Actualizando..." : "Actualizar Estado"}
+                  </Button>
+                </div>
+                <div className="border-t border-border pt-3">
+                  <Button
+                    onClick={handleAdminDeleteReporte}
+                    variant="destructive"
+                    className="w-full text-sm"
+                    size="sm"
+                  >
+                    <Trash2 className="size-4" />
+                    Eliminar Reporte (Admin)
+                  </Button>
+                </div>
               </div>
-              <div className="border-t border-border pt-3">
-                <Button
-                  onClick={handleAdminDeleteReporte}
-                  variant="destructive"
-                  className="w-full text-sm"
-                  size="sm"
-                >
-                  <Trash2 className="size-4" />
-                  Eliminar Reporte (Admin)
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
+            </DialogContent>
+          )}
+          {showAdminEditDialog && reporte && (
+            <AdminReportEditor
+              onOpenChange={setShowAdminEditDialog}
+              reporte={reporte}
+              categorias={categoriasDisponibles}
+              prioridades={prioridadesDisponibles}
+            />
+          )}
         </Dialog>
       )}
-
-      {isAdmin && reporte && <AdminReportEditor
-        key={showAdminEditDialog ? "open" : "closed"}
-        open={showAdminEditDialog}
-        onOpenChange={setShowAdminEditDialog}
-        reporte={reporte}
-        categorias={categoriasDisponibles}
-        prioridades={prioridadesDisponibles}
-      />}
 
       {/* AlertDialog - Eliminar Reporte */}
       <AlertDialog open={showDeleteReporteDialog} onOpenChange={setShowDeleteReporteDialog}>
