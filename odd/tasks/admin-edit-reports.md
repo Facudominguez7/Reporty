@@ -12,7 +12,7 @@ The accepted scope is report content and operational fields; author identity and
 ## Tasks
 - T1 — Implement and test admin-only metadata/operational-field editing (S1); route: inline; status: done; commit: db6fff6.
 - T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: 9a6efa9, c4ca918.
-- T3 — Add and refine the admin-only detail-page editor for report fields and per-photo actions (S1); route: inline; status: in_progress; commits: 49c0718, 2648c51, 818167c, e54cdef, mobile text-size follow-up pending; waiting for visual verification.
+- T3 — Add and refine the admin-only detail-page editor for report fields and per-photo actions (S1); route: inline; status: in_progress; commits: 49c0718, 2648c51, 818167c, e54cdef, ec46dda; waiting for visual verification.
 - T4 — Verify the editor in a visible browser at required desktop/mobile sizes (S4); route: inline; status: blocked; commit: n/a; user authorized, waiting for MCP Playwright availability.
 
 ## Log
@@ -50,3 +50,4 @@ The accepted scope is report content and operational fields; author identity and
 - L32 — Removed the editor's separate Radix Dialog root and rendered its content under the report detail's existing admin Dialog root, avoiding a close/open handoff between two modal portals. Compacted mobile labels/menu text to 12px, reduced gaps/padding, shortened the description field, and changed photo cards to a 64px thumbnail beside controls; actions/selects remain about 40–44px and the map remains 192px. The focused dialog/map/page tests pass (13); targeted ESLint has zero errors and four warnings. TypeScript still reports only the pre-existing Zod errors. Playwright remains unavailable, so the user's reported blur/click behavior is not yet visually confirmed.
 - L33 — Shared admin Dialog root and compact mobile layout committed as `e54cdef` (154 insertions/145 deletions), a separate UI slice. The focused dialog/map/page tests pass (13); targeted ESLint has zero errors and four warnings; TypeScript remains blocked only by existing Zod diagnostics. No Playwright/browser visual proof was available, so T3 remains in progress and T4 remains blocked; do not treat the modal fix as confirmed.
 - L34 — Reduced mobile title and description input typography to 12px while retaining 40–44px control targets; 13 focused tests pass and targeted ESLint has zero errors (four warnings). This is a separate, narrow mobile typography follow-up; visual behavior still needs browser verification.
+- L35 — Mobile input typography follow-up committed as `ec46dda`. T3 remains in progress because the reported blur/click behavior and mobile usability have not yet been confirmed in a browser.
