@@ -12,7 +12,7 @@ The accepted scope is report content and operational fields; author identity and
 ## Tasks
 - T1 — Implement and test admin-only metadata/operational-field editing (S1); route: inline; status: done; commit: db6fff6.
 - T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: 9a6efa9, c4ca918.
-- T3 — Add and refine the admin-only detail-page editor for report fields and per-photo actions (S1); route: inline; status: in_progress; commits: 49c0718, 2648c51, screenshot stacking correction pending.
+- T3 — Add and refine the admin-only detail-page editor for report fields and per-photo actions (S1); route: inline; status: done; commits: 49c0718, 2648c51, 818167c.
 - T4 — Verify the editor in a visible browser at required desktop/mobile sizes (S4); route: inline; status: blocked; commit: n/a; user authorized, waiting for MCP Playwright availability.
 
 ## Log
@@ -45,3 +45,4 @@ The accepted scope is report content and operational fields; author identity and
 - L27 — Native ASSESS for `c4ca918` returned `nativeRisk: unassessable` because untracked files require an explicit declaration; no candidate or native review was produced. The independent read-only follow-up reviewed the committed retry change and confirmed the primary Storage-failure path. T4 remains blocked because no MCP Playwright tool/server is available despite user authorization.
 - L28 — User reported a blurry, non-interactive modal and supplied a screenshot: “fijate q se ve borroso el modal, no se porque, no me deja apretar nada tampoco”. The editor content and scrim currently share `z-[70]`; raise only the editor content above its scrim, keep both above the fixed nav, and reopen T3.
 - L29 — Raised editor content to `z-[80]` while its scrim remains `z-[70]`, leaving both above the fixed navigation. The dialog/map/page focused tests pass (13 tests); targeted ESLint has no errors and retains the existing `no-img-element` warning. This is a separate, narrow UI stacking slice. The visible browser check remains unavailable, so screenshot behavior is not yet confirmed in Playwright.
+- L30 — T3 stacking fix committed as `818167c`. The test confirms dialog content can layer above its scrim; visual confirmation still requires the authorized Playwright check, which remains blocked by missing MCP tools.
