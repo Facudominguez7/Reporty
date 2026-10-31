@@ -168,5 +168,5 @@ export default async function ReporteDetallePage({
   const { id } = await params;
   const detalle = await cargarDetalle(id);
 
-  return <ReporteDetalleClient key={id} {...detalle} />;
+  return <ReporteDetalleClient key={`${id}-${detalle.isAdmin ? "admin" : "viewer"}`} {...detalle} />;
 }
