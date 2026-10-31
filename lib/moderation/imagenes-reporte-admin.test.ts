@@ -42,15 +42,20 @@ it("removes only the selected photo row and its exact original/thumbnail objects
   expect(state.actions).toEqual(["delete"])
 })
 
-it("reports pending Storage cleanup after removing the selected photo row", async () => {
+it("keeps the selected photo row when Storage cleanup fails so removal can be retried", async () => {
   const state = client({ id: 22, reporte_id: 7, url: "https://example.test/original", bucket: "reportes", path: "image/original" })
   mocks.remove.mockResolvedValue({ error: { message: "storage unavailable" } })
   const log = vi.spyOn(console, "error").mockImplementation(() => {})
 
-  expect(await eliminarFotoReportePublicada(state.supabase, 7, 22)).toEqual({ success: true, cleanupPending: true })
-  expect(state.actions).toEqual(["delete"])
+  expect(await eliminarFotoReportePublicada(state.supabase, 7, 22)).toEqual({ success: false, cleanupPending: true })
+  expect(state.actions).toEqual([])
   expect(log).toHaveBeenCalledOnce()
   log.mockRestore()
+
+  mocks.remove.mockResolvedValue({ error: null })
+  expect(await eliminarFotoReportePublicada(state.supabase, 7, 22)).toEqual({ success: true, cleanupPending: false })
+  expect(state.actions).toEqual(["delete"])
+  expect(mocks.remove).toHaveBeenCalledTimes(2)
 })
 
 it("does not delete a photo that belongs to another report", async () => {

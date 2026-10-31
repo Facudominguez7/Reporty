@@ -229,15 +229,11 @@ export async function eliminarFotoReportePublicada(supabase: SupabaseClient, rep
   }
   if (error || !data) return { success: false, cleanupPending: false }
 
-  const { data: deleted, error: deleteError } = await supabase.from("fotos_reporte").delete()
-    .eq("id", fotoId).eq("reporte_id", reporteId).select("id").maybeSingle()
-  if (deleteError || !deleted) return { success: false, cleanupPending: false }
-
-  let cleanupPending = false
   const byBucket = getReportImageStorageRefs([data as ReportImageRow]).reduce<Record<string, string[]>>((paths, ref) => {
     paths[ref.bucket] = [...(paths[ref.bucket] ?? []), ref.path]
     return paths
   }, {})
+  let cleanupPending = false
   for (const [bucket, paths] of Object.entries(byBucket)) {
     const { error: storageError } = await supabase.storage.from(bucket).remove(paths)
     if (storageError) {
@@ -245,7 +241,12 @@ export async function eliminarFotoReportePublicada(supabase: SupabaseClient, rep
       console.error("No pudimos limpiar Storage al quitar una foto del reporte:", { reporteId, bucket, pathCount: paths.length, message: storageError.message })
     }
   }
-  return { success: true, cleanupPending }
+  if (cleanupPending) return { success: false, cleanupPending: true }
+
+  const { data: deleted, error: deleteError } = await supabase.from("fotos_reporte").delete()
+    .eq("id", fotoId).eq("reporte_id", reporteId).select("id").maybeSingle()
+  if (deleteError || !deleted) return { success: false, cleanupPending: false }
+  return { success: true, cleanupPending: false }
 }
 
 /** Autoriza propietario DB, deduplica evidencia canónica y clasifica una sola vez tras reservar cuota. */
