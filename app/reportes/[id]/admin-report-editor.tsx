@@ -125,11 +125,11 @@ export function AdminReportEditor({ onOpenChange, reporte, categorias, prioridad
             <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
               <div className="col-span-2 min-w-0 space-y-1 sm:space-y-2">
                 <Label htmlFor="admin-report-title" className="text-xs sm:text-sm">Nombre</Label>
-                <Input id="admin-report-title" value={titulo} onChange={(event) => setTitulo(event.target.value)} maxLength={120} required />
+                <Input id="admin-report-title" value={titulo} onChange={(event) => setTitulo(event.target.value)} className="text-xs sm:text-sm" maxLength={120} required />
               </div>
               <div className="col-span-2 min-w-0 space-y-1 sm:space-y-2">
                 <Label htmlFor="admin-report-description" className="text-xs sm:text-sm">Descripción</Label>
-                <Textarea id="admin-report-description" value={descripcion} onChange={(event) => setDescripcion(event.target.value)} rows={2} className="min-h-16 resize-none text-sm sm:min-h-20" maxLength={5000} required />
+                <Textarea id="admin-report-description" value={descripcion} onChange={(event) => setDescripcion(event.target.value)} rows={2} className="min-h-16 resize-none text-xs sm:min-h-20 sm:text-sm" maxLength={5000} required />
               </div>
               <div className="min-w-0 space-y-1 sm:space-y-2">
                 <Label htmlFor="admin-report-category" className="text-xs sm:text-sm">Categoría</Label>
