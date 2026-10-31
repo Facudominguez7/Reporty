@@ -5,6 +5,8 @@ import { crearComentarioAction } from "./actions"
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
+  getCategorias: vi.fn(),
+  getPrioridades: vi.fn(),
   tieneFotografiaPendiente: vi.fn(),
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
@@ -28,6 +30,10 @@ vi.mock("@/database/queries/reportes/[id]/index", () => ({
   getReporteDetalle: async () => ({ data: { id: 5, estado_id: 1 }, error: null }),
   getComentariosReporte: async () => ({ data: [] }),
   getHistorialEstados: async () => ({ data: [] }),
+}))
+vi.mock("@/database/queries/reportes/nuevo", () => ({
+  getCategorias: mocks.getCategorias,
+  getPrioridades: mocks.getPrioridades,
 }))
 vi.mock("@/database/queries/admin/index", () => ({
   verificarEsAdmin: mocks.verificarEsAdmin,
@@ -55,6 +61,8 @@ describe("ReporteDetallePage", () => {
   beforeEach(() => {
     vi.stubEnv("CUADRILLAS_ENABLED", undefined)
     mocks.crearComentarioWorkflow.mockReset().mockResolvedValue({ success: true, data: {} })
+    mocks.getCategorias.mockReset().mockResolvedValue([{ id: 1, nombre: "Otros" }])
+    mocks.getPrioridades.mockReset().mockResolvedValue([{ id: 2, nombre: "Alta" }])
     mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
     mocks.obtenerGestionOperativaDetalle.mockReset().mockResolvedValue({
       puedeOperar: false,
@@ -75,6 +83,24 @@ describe("ReporteDetallePage", () => {
     expect(page.props.fotografiaPendiente).toBe(true)
     expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
     expect(page.props.reporte).toEqual({ id: 5, estado_id: 1 })
+  })
+
+  it("loads edit lookup options only for admins", async () => {
+    signInAs(ROLE.ADMIN)
+    const page = await renderPage()
+    expect(page.props.categoriasDisponibles).toEqual([{ id: 1, nombre: "Otros" }])
+    expect(page.props.prioridadesDisponibles).toEqual([{ id: 2, nombre: "Alta" }])
+    expect(mocks.getCategorias).toHaveBeenCalledWith(expect.anything())
+    expect(mocks.getPrioridades).toHaveBeenCalledWith(expect.anything())
+
+    mocks.getCategorias.mockClear()
+    mocks.getPrioridades.mockClear()
+    signInAs(ROLE.CIUDADANO)
+    const publicPage = await renderPage()
+    expect(publicPage.props.categoriasDisponibles).toEqual([])
+    expect(publicPage.props.prioridadesDisponibles).toEqual([])
+    expect(mocks.getCategorias).not.toHaveBeenCalled()
+    expect(mocks.getPrioridades).not.toHaveBeenCalled()
   })
 
   it("does not show the notice without a pending photo", async () => {

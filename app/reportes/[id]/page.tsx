@@ -9,7 +9,8 @@ import {
   getComentariosReporte,
   getHistorialEstados,
 } from "@/database/queries/reportes/[id]/index";
-import { verificarEsAdmin, getEstados } from "@/database/queries/admin/index";
+import { verificarEsAdmin, getEstados } from "@/database/queries/admin/index"
+import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo";
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
 import { getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
@@ -22,6 +23,8 @@ const SIN_REPORTE: ReporteDetalleInicial = {
   currentUser: null,
   isAdmin: false,
   estados: [],
+  categoriasDisponibles: [],
+  prioridadesDisponibles: [],
   comentarios: [],
   historialEstados: [],
   fechaCambioEstado: null,
@@ -83,10 +86,13 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
 
     // The admin check and the report detail both need the user, but not each other.
     const adminPromise = user
-      ? verificarEsAdmin(supabase, user.id).then(async ({ isAdmin }) => ({
-          isAdmin,
-          estados: isAdmin ? (await getEstados(supabase)).data : [],
-        }))
+      ? verificarEsAdmin(supabase, user.id).then(async ({ isAdmin }) => {
+          if (!isAdmin) return { isAdmin, estados: [], categoriasDisponibles: [], prioridadesDisponibles: [] }
+          const [estados, categoriasDisponibles, prioridadesDisponibles] = await Promise.all([
+            getEstados(supabase), getCategorias(supabase), getPrioridades(supabase),
+          ])
+          return { isAdmin, estados: estados.data, categoriasDisponibles, prioridadesDisponibles }
+        })
       : null;
 
     const [
@@ -121,6 +127,8 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
       currentUser: user ? { id: user.id, is_anonymous: user.is_anonymous } : null,
       isAdmin: adminResult?.isAdmin ?? false,
       estados: adminResult?.isAdmin ? adminResult.estados : [],
+      categoriasDisponibles: adminResult?.isAdmin ? adminResult.categoriasDisponibles : [],
+      prioridadesDisponibles: adminResult?.isAdmin ? adminResult.prioridadesDisponibles : [],
       comentarios,
       historialEstados: historial ?? [],
       fechaCambioEstado: cambio?.created_at ?? null,

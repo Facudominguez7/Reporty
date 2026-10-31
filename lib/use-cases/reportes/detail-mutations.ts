@@ -19,6 +19,7 @@ import { APORTES_COMUNITARIOS, type AporteKey } from "@/lib/reportes/aportes"
 import { eliminarFotoReportePublicada, moderarYGuardarImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
+import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -67,6 +68,8 @@ type ReportContext = {
   usuario_id: string | null
   titulo: string
   estado_id: number | null
+  lat: number | null
+  lon: number | null
   deleted_at: string | null
   ownerProfile: ReportOwnerRelation
 }
@@ -230,6 +233,8 @@ export async function getReportContext(
         usuario_id,
         titulo,
         estado_id,
+        lat,
+        lon,
         deleted_at,
         ownerProfile:profiles!reportes_usuario_id_fkey(username, email)
       `,
@@ -269,6 +274,10 @@ export async function actualizarDatosReporteAdminWorkflow(
   const reportResult = await getReportContext(supabase, reporteId)
   if (!reportResult.success) return reportResult
   if (reportResult.data.deleted_at) return { success: false, error: "El reporte ya no está disponible." }
+  const locationChanged = reportResult.data.lat !== input.lat || reportResult.data.lon !== input.lon
+  if (locationChanged && input.lat !== null && input.lon !== null && !isWithinReportCoverage(input.lat, input.lon)) {
+    return { success: false, error: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria." }
+  }
 
   const { data, error } = await supabase.from("reportes").update({
     titulo: input.titulo,

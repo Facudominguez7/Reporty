@@ -42,7 +42,7 @@ describe("admin report edits", () => {
       maybeSingle: vi.fn().mockResolvedValue({ data: { id: 4 }, error: null }),
     }
     const reportQuery = {
-      eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, deleted_at: null, ownerProfile: null }, error: null }) }),
+      eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, lat: -34.6, lon: -58.4, deleted_at: null, ownerProfile: null }, error: null }) }),
     }
     const supabase = {
       from: (table: string) => table === "reportes" ? {
@@ -59,6 +59,20 @@ describe("admin report edits", () => {
     expect(update).toHaveBeenCalledWith({ titulo: "New title", descripcion: "Valid description", categoria_id: 3, prioridad_id: 2, lat: -34.6, lon: -58.4 })
     expect(updateQuery.eq).toHaveBeenCalledWith("id", 4)
     expect(updateQuery.is).toHaveBeenCalledWith("deleted_at", null)
+  })
+
+  it("rejects changed coordinates outside the service area", async () => {
+    const reportQuery = { eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, lat: -27.36, lon: -55.9, deleted_at: null, ownerProfile: null }, error: null }) }) }
+    const update = vi.fn()
+    const supabase = { from: () => ({
+      select: () => reportQuery,
+      update: () => { update(); return {} },
+    }) } as never
+    const result = await actualizarDatosReporteAdminWorkflow(supabase, 4, "admin", {
+      titulo: "New title", descripcion: "Valid description", categoriaId: 3, prioridadId: 2, lat: 0, lon: 0,
+    })
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining("dentro de Posadas") })
+    expect(update).not.toHaveBeenCalled()
   })
 
   it("rejects non-admin edits without writing", async () => {
@@ -137,6 +151,8 @@ describe("report status transition concurrency", () => {
       usuario_id: "owner",
       titulo: "Reporte",
       estado_id: null,
+      lat: null,
+      lon: null,
       deleted_at: null,
       ownerProfile: null,
     }, 2, "admin")
@@ -186,6 +202,8 @@ describe("report status transition concurrency", () => {
       usuario_id: "owner",
       titulo: "Reporte",
       estado_id: 1,
+      lat: null,
+      lon: null,
       deleted_at: null,
       ownerProfile: null,
     }, 2, "voter")

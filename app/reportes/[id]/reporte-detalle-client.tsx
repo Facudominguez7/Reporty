@@ -70,6 +70,7 @@ import { getNameFromRelation, getUserInitials, getUsernameFromRelation } from "@
 import { ChipEstadoOperativo } from "@/components/cuadrillas/chip-estado-operativo";
 import { LineaTiempoOperativa } from "@/components/cuadrillas/linea-tiempo-operativa";
 import { CommentsSection } from "@/components/report-detail/comments-section";
+import { AdminReportEditor } from "./admin-report-editor";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
 import {
   cambiarEstadoAdminAction,
@@ -120,6 +121,8 @@ export type ReporteDetalleInicial = {
   currentUser: UsuarioActual | null;
   isAdmin: boolean;
   estados: Estado[];
+  categoriasDisponibles: Array<{ id: number; nombre: string }>;
+  prioridadesDisponibles: Array<{ id: number; nombre: string }>;
   comentarios: Comentario[];
   historialEstados: Array<{
     id: number;
@@ -147,6 +150,8 @@ export function ReporteDetalleClient({
   currentUser,
   isAdmin,
   estados,
+  categoriasDisponibles,
+  prioridadesDisponibles,
   comentarios,
   historialEstados,
   fechaCambioEstado,
@@ -174,6 +179,7 @@ export function ReporteDetalleClient({
   const [showAdminChangeEstadoDialog, setShowAdminChangeEstadoDialog] = useState(false);
   const [showAdminDeleteReporteDialog, setShowAdminDeleteReporteDialog] = useState(false);
   const [showAdminPanelDialog, setShowAdminPanelDialog] = useState(false);
+  const [showAdminEditDialog, setShowAdminEditDialog] = useState(false);
 
   // IDs de estados según la base de datos: 1 = Pendiente, 2 = Reparado, 3 = Rechazado
   // Verificar si el reporte está cerrado (Reparado o Rechazado) usando IDs
@@ -714,6 +720,9 @@ export function ReporteDetalleClient({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 rounded-xl border border-border p-4">
+              <Button type="button" variant="outline" className="w-full text-sm" size="sm" onClick={() => { setShowAdminPanelDialog(false); setShowAdminEditDialog(true); }}>
+                Editar contenido y fotos
+              </Button>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Cambiar Estado</label>
                 <Select value={estadoSeleccionado} onValueChange={setEstadoSeleccionado}>
@@ -759,6 +768,15 @@ export function ReporteDetalleClient({
           </DialogContent>
         </Dialog>
       )}
+
+      {isAdmin && reporte && <AdminReportEditor
+        key={showAdminEditDialog ? "open" : "closed"}
+        open={showAdminEditDialog}
+        onOpenChange={setShowAdminEditDialog}
+        reporte={reporte}
+        categorias={categoriasDisponibles}
+        prioridades={prioridadesDisponibles}
+      />}
 
       {/* AlertDialog - Eliminar Reporte */}
       <AlertDialog open={showDeleteReporteDialog} onOpenChange={setShowDeleteReporteDialog}>

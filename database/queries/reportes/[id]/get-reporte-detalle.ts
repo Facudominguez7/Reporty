@@ -17,10 +17,12 @@ const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
       created_at,
       usuario_id,
       estado_id,
+      categoria_id,
+      prioridad_id,
       categorias (nombre),
       prioridades (nombre),
       estados (id, nombre),
-      fotos_reporte (${includeCanonicalImageFields ? "url, bucket, path" : "url"})
+      fotos_reporte (${includeCanonicalImageFields ? "id, url, bucket, path, thumbnail_url, thumbnail_bucket, thumbnail_path" : "id, url"})
     `
 
 export type ReportNameRelation = { nombre: string | null } | { nombre: string | null }[] | null
@@ -38,15 +40,17 @@ type ReporteDetalleRow = {
   created_at: string
   usuario_id: string
   estado_id: number
+  categoria_id: number | null
+  prioridad_id: number | null
   categorias: ReportNameRelation
   prioridades: ReportNameRelation
   estados: ReportStateRelation
-  fotos_reporte: ReportImageRow[] | null
+  fotos_reporte: Array<ReportImageRow & { id: number }> | null
   profiles?: ReportUsernameRelation
 }
 
 type ReporteDetalleView = Omit<ReporteDetalleRow, "fotos_reporte"> & {
-  fotos_reporte: ResolvedReportImageRow[]
+  fotos_reporte: ResolvedReportImageRow<ReportImageRow & { id: number }>[]
   votos: ReporteVoteSummary
 }
 

@@ -11,8 +11,9 @@ The accepted scope is report content and operational fields; author identity and
 
 ## Tasks
 - T1 — Implement and test admin-only metadata/operational-field editing (S1); route: inline; status: done; commit: db6fff6.
-- T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: pending.
-- T3 — Add the admin-only detail-page edit UI and verify the flow (S1, S4); route: inline; commit: pending.
+- T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: 9a6efa9.
+- T3 — Add the admin-only detail-page editor for report fields and per-photo actions (S1); route: inline; status: done; commit: pending.
+- T4 — Verify the editor in a visible browser at required desktop/mobile sizes (S4); route: inline; status: blocked; commit: n/a.
 
 ## Log
 - L1 — User request: “Quiero hacer una nueva feature: La idea es que el rod admim, desde panel de admin, pueda editar todo lo que sea de algun reporte, osea nombre foto, descripcion etc, actualmente puede el estado me parece y borrarlo, asi que la idea es esa, editar todo el reporte. O no se si es necesario que sea desde el panel de admin, sino tambien podria ser mismo desde la vista del reporte en si. Fijate que es lo mas rapido y mejor. Primero lee agents.md ya q lo actualice.”
@@ -23,3 +24,6 @@ The accepted scope is report content and operational fields; author identity and
 - L6 — T1 metadata/operational update action and workflow pass focused tests and lint; the existing report-action Zod schema order was fixed because module loading failed before tests could run.
 - L7 — Schema inspection confirmed photo rows have stable IDs, moderation publication is the approval/linkage point, and database/Storage removal cannot be atomic; replacement cleanup must happen only after publication, while cleanup failures follow the repository's existing logged best-effort behavior.
 - L8 — T2 passes 115 focused tests and targeted ESLint; both migrations applied to local Supabase, `db lint --local --fail-on error` found no errors (two pre-existing warnings). `npx tsc --noEmit` remains blocked by existing type errors in `app/reportes/[id]/actions.ts`'s Zod error adapter and `app/reportes/nuevo/actions.ts`.
+- L9 — T2 is a committed high-risk photo-storage slice (`9a6efa9`); keep the UI/editor as a separate work unit.
+- L10 — User deferred visible-browser verification: “No, dejar pendiente”.
+- L11 — T3 passes 125 focused tests; targeted ESLint has no errors (existing `no-img-element`/navigation warnings remain). `npx tsc --noEmit` reports only the pre-existing Zod typing errors in `app/reportes/[id]/actions.ts` and `app/reportes/nuevo/actions.ts`; no new editor/detail-loader type errors.
