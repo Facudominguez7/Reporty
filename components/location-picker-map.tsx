@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css"
 import { toast } from "sonner"
 import { useMounted } from "@/hooks/use-mounted"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
+import { cn } from "@/lib/utils"
 import { REPORT_COVERAGE_BOUNDS, REPORT_COVERAGE_SOURCE, isWithinReportCoverage } from "@/lib/map/report-coverage"
 import { MAP_MAX_ZOOM } from "@/lib/map/initial-view"
 
@@ -26,6 +27,7 @@ interface LocationPickerMapProps {
   onLocationSelect: (lat: number, lon: number) => void
   initialLat?: number | null
   initialLon?: number | null
+  heightClassName?: string
 }
 
 /**
@@ -90,14 +92,15 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
  * @param onLocationSelect - Callback que recibe `(lat, lon)` cuando el usuario selecciona una ubicación válida
  * @param initialLat - Latitud inicial opcional para centrar el mapa y posicionar el marcador
  * @param initialLon - Longitud inicial opcional para centrar el mapa y posicionar el marcador
+ * @param heightClassName - Altura opcional; por defecto conserva los 400px existentes
  * @returns El elemento React que renderiza el mapa y su interfaz de selección de ubicación
  */
-export function LocationPickerMap({ onLocationSelect, initialLat, initialLon }: LocationPickerMapProps) {
+export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, heightClassName = "h-[400px]" }: LocationPickerMapProps) {
   const mounted = useMounted()
 
   if (!mounted) {
     return (
-      <div className="h-[400px] w-full">
+      <div className={cn("w-full", heightClassName)}>
         <MapLoadingSkeleton />
       </div>
     )
@@ -109,7 +112,7 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon }: 
     : [-27.3671, -55.8961]
 
   return (
-    <div className="w-full h-[400px] rounded-lg overflow-hidden border-2 border-muted relative z-0">
+    <div className={cn("w-full rounded-lg overflow-hidden border-2 border-muted relative z-0", heightClassName)}>
       <MapContainer
         center={defaultCenter}
         zoom={13}
