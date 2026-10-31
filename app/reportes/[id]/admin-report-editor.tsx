@@ -115,7 +115,7 @@ export function AdminReportEditor({ open, onOpenChange, reporte, categorias, pri
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="z-[70]"
-        className="z-[70] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] gap-3 overflow-y-auto p-3 sm:max-w-6xl sm:p-4"
+        className="z-[80] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] gap-3 overflow-y-auto p-3 sm:max-w-6xl sm:p-4"
       >
         <form onSubmit={save} className="space-y-3">
           <DialogHeader className="pr-8">

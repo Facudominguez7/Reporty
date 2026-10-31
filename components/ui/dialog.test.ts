@@ -19,11 +19,11 @@ vi.mock("@radix-ui/react-dialog", () => ({
 
 import { Dialog, DialogContent } from "./dialog"
 
-function renderDialog(overlayClassName?: string) {
+function renderDialog(overlayClassName?: string, contentClassName = overlayClassName) {
   return renderToStaticMarkup(createElement(
     Dialog,
     { open: true },
-    createElement(DialogContent, { overlayClassName, className: overlayClassName, showClose: false }, "Content"),
+    createElement(DialogContent, { overlayClassName, className: contentClassName, showClose: false }, "Content"),
   ))
 }
 
@@ -38,12 +38,12 @@ describe("DialogContent layering", () => {
     expect(elementWithTestId(html, "dialog-content")).toContain("z-50")
   })
 
-  it("can layer both dialog and scrim above fixed navigation", () => {
-    const html = renderDialog("z-[70]")
+  it("layers content above its scrim and both above fixed navigation", () => {
+    const html = renderDialog("z-[70]", "z-[80]")
     const overlay = elementWithTestId(html, "dialog-overlay")
     const content = elementWithTestId(html, "dialog-content")
     expect(overlay).toContain("z-[70]")
-    expect(content).toContain("z-[70]")
+    expect(content).toContain("z-[80]")
     expect(overlay).not.toContain("z-50")
     expect(content).not.toContain("z-50")
   })
