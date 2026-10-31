@@ -11,7 +11,7 @@ The accepted scope is report content and operational fields; author identity and
 
 ## Tasks
 - T1 — Implement and test admin-only metadata/operational-field editing (S1); route: inline; status: done; commit: db6fff6.
-- T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: 9a6efa9, cleanup-order correction pending.
+- T2 — Implement and test safe moderated photo replacement and authorized photo removal (S2); route: inline; status: done; commit: 9a6efa9, c4ca918.
 - T3 — Add and refine the admin-only detail-page editor for report fields and per-photo actions (S1); route: inline; status: done; commit: 49c0718, 2648c51.
 - T4 — Verify the editor in a visible browser at required desktop/mobile sizes (S4); route: inline; status: blocked; commit: n/a; user authorized, waiting for MCP Playwright availability.
 
@@ -41,3 +41,5 @@ The accepted scope is report content and operational fields; author identity and
 - L23 — User authorized visible-browser verification: “Sí, autorizo la prueba”. The MCP gateway reports 0/7 servers connected and no Playwright tools (`mcp` search for “playwright” returned none), so no browser was opened and T4 remains blocked pending an available MCP Playwright server.
 - L24 — Independent `gentle-ai-verify` found that photo removal deletes the database row before Storage; a Storage failure then leaves no durable reference for retry. Reopened T2 to retain the row if Storage cleanup fails and permit a safe retry. The independent verifier also confirmed the admin role guard, selected-photo scoping, old-photo preservation through moderation, and active-replacement guard; no browser verification was performed.
 - L25 — Observed RED for Storage failure deleting the row; changed order so Storage removal must succeed before deleting the database row. The failed cleanup test now verifies the row/path remains and a retry succeeds. Follow-up independent review confirmed both the failure and success paths; 88 focused tests and targeted ESLint pass. Residual cross-store partial case: if Storage deletion succeeds but DB deletion fails, the row remains pointing to missing file(s) until a retry; no durable background retry queue was added.
+- L26 — Retryable cleanup correction committed as `c4ca918`, separate from the prior high-risk slices. The independent follow-up confirmed the cleanup path; one residual is that a DB-delete failure after Storage success leaves a visible row pointing to missing file(s) until the user retries removal.
+- L27 — Native ASSESS for `c4ca918` returned `nativeRisk: unassessable` because untracked files require an explicit declaration; no candidate or native review was produced. The independent read-only follow-up reviewed the committed retry change and confirmed the primary Storage-failure path. T4 remains blocked because no MCP Playwright tool/server is available despite user authorization.
