@@ -19,6 +19,17 @@ async function notification(to: string, subject: string): Promise<CapturedEmail>
 }
 
 test.describe("community", () => {
+  test("visitors are directed to sign in from either vote", async ({ page, testData }) => {
+    const owner = await testData.createUser()
+    const report = await testData.createReport(owner)
+    for (const name of ["Reparado", "No existe"]) {
+      await page.goto(`/reportes/${report.id}`)
+      const controls = page.getByRole("group", { name: "Votar sobre el reporte" })
+      await controls.getByRole("button", { name, exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(`/auth\\?next=(?:%2F|/)reportes(?:%2F|/)${report.id}`))
+    }
+  })
+
   test("a citizen comments and the report owner receives the notification", async ({ page, testData }) => {
     const owner = await testData.createUser()
     const citizen = await testData.createUser()

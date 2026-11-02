@@ -21,7 +21,7 @@ export function ReportContactDialog({ reportId, ...props }: DialogProps) {
       setOpen(nextOpen)
     }}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" className="w-full">
+        <Button type="button" variant="secondary" className="w-full">
           <Building2 aria-hidden="true" className="size-4" />
           Contactar organismos
         </Button>

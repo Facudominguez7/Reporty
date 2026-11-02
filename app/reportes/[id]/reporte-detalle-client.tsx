@@ -206,6 +206,7 @@ export function ReporteDetalleClient({
 
   // Estados para controlar los AlertDialogs
   const [showDeleteReporteDialog, setShowDeleteReporteDialog] = useState(false);
+  const [showVoteLoginDialog, setShowVoteLoginDialog] = useState(false);
   const [showVoteNoExisteDialog, setShowVoteNoExisteDialog] = useState(false);
   const [showVoteReparadoDialog, setShowVoteReparadoDialog] = useState(false);
 
@@ -249,7 +250,15 @@ export function ReporteDetalleClient({
   );
 
   const handleVoteNoExiste = async () => {
-    if (!currentUser || !reporte) return;
+    if (!reporte) return;
+    if (currentUser?.is_anonymous) {
+      setShowVoteLoginDialog(true);
+      return;
+    }
+    if (!currentUser) {
+      router.push(`/auth?next=/reportes/${reporte.id}`);
+      return;
+    }
     setShowVoteNoExisteDialog(true);
   };
 
@@ -283,7 +292,15 @@ export function ReporteDetalleClient({
   };
 
   const handleVoteReparado = async () => {
-    if (!currentUser || !reporte) return;
+    if (!reporte) return;
+    if (currentUser?.is_anonymous) {
+      setShowVoteLoginDialog(true);
+      return;
+    }
+    if (!currentUser) {
+      router.push(`/auth?next=/reportes/${reporte.id}`);
+      return;
+    }
     setShowVoteReparadoDialog(true);
   };
 
@@ -563,7 +580,7 @@ export function ReporteDetalleClient({
   const showVoteFooter = Boolean(
     isReporteCerrado ||
     currentUser?.id === reporte.usuario_id ||
-    (!isAdmin && (!currentUser || puedeVotar))
+    (!isAdmin && (!currentUser || currentUser.is_anonymous || puedeVotar))
   );
 
   return (
@@ -806,12 +823,12 @@ export function ReporteDetalleClient({
                   <div className="mt-3">
                     <hr className="mb-2 border-border" />
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {currentUser && puedeVotar && !isReporteCerrado && (
+                      {(!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado && (
                         <div role="group" aria-label="Votar sobre el reporte" className="grid w-full grid-cols-2 gap-2">
                           <Button
                             variant="default"
                             size="xs"
-                            className={`min-h-7 w-full px-2.5 text-[11px] ${currentUser.id === reporte.usuario_id ? "col-span-2" : ""}`}
+                            className={`min-h-7 w-full px-2.5 text-[11px] ${currentUser && !currentUser.is_anonymous && currentUser.id === reporte.usuario_id ? "col-span-2" : ""}`}
                             onClick={handleVoteReparado}
                             disabled={hasVotedReparado || isVotingReparado || isVoting}
                             aria-pressed={hasVotedReparado}
@@ -819,7 +836,7 @@ export function ReporteDetalleClient({
                             <ThumbsUp className="size-3" />
                             Reparado{hasVotedReparado ? " · Tu voto" : ""}
                           </Button>
-                          {currentUser.id !== reporte.usuario_id && (
+                          {(!currentUser || currentUser.is_anonymous || currentUser.id !== reporte.usuario_id) && (
                             <Button
                               variant="destructive"
                               size="xs"
@@ -839,11 +856,6 @@ export function ReporteDetalleClient({
                           Tus votos históricos son contradictorios y requieren revisión. No se modificaron.
                         </p>
                       )}
-                      {!currentUser && !isReporteCerrado && (
-                        <Button asChild variant="outline" size="xs" className="min-h-7 px-2.5 text-[11px]">
-                          <Link href={`/auth?next=/reportes/${reporte.id}`}>Entrar para votar</Link>
-                        </Button>
-                      )}
                       {isReporteCerrado && (
                         <span className="text-xs text-muted-foreground">
                           Reparado {votosReparadoCount} · No existe {votosCount}
@@ -855,6 +867,31 @@ export function ReporteDetalleClient({
               </CardContent>
             </Card>
 
+            <CommentsSection
+              comments={comentarios}
+              statusHistory={historialEstados}
+              currentUser={currentUser}
+              reportOwnerId={reporte.usuario_id}
+              isAdmin={isAdmin}
+              isClosed={Boolean(isReporteCerrado)}
+              onSubmitComment={(content) => crearComentarioAction(reporte.id, content)}
+              onDeleteComment={async (commentId) => {
+                const result = await eliminarComentarioPropioAction(commentId)
+                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
+              }}
+              onAdminDeleteComment={async (commentId) => {
+                const result = await eliminarComentarioAdminAction(commentId)
+                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
+              }}
+            />
+            {isAdmin && isAdminEditing && (
+              <AdminReportEditActions
+                saving={isAdminSaving}
+                errorMessage={adminSaveError}
+                onSave={() => void saveAdminChanges()}
+                onCancel={cancelAdminEditing}
+              />
+            )}
           </div>
 
           {/* Barra Lateral */}
@@ -975,35 +1012,6 @@ export function ReporteDetalleClient({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-12">
-          <div className="space-y-4 lg:col-span-8">
-            <CommentsSection
-              comments={comentarios}
-              statusHistory={historialEstados}
-              currentUser={currentUser}
-              reportOwnerId={reporte.usuario_id}
-              isAdmin={isAdmin}
-              isClosed={Boolean(isReporteCerrado)}
-              onSubmitComment={(content) => crearComentarioAction(reporte.id, content)}
-              onDeleteComment={async (commentId) => {
-                const result = await eliminarComentarioPropioAction(commentId)
-                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
-              }}
-              onAdminDeleteComment={async (commentId) => {
-                const result = await eliminarComentarioAdminAction(commentId)
-                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
-              }}
-            />
-            {isAdmin && isAdminEditing && (
-              <AdminReportEditActions
-                saving={isAdminSaving}
-                errorMessage={adminSaveError}
-                onSave={() => void saveAdminChanges()}
-                onCancel={cancelAdminEditing}
-              />
-            )}
-          </div>
-        </div>
       </div>
 
       {/* AlertDialog - Eliminar Reporte */}
@@ -1051,6 +1059,18 @@ export function ReporteDetalleClient({
                 </>
               )}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showVoteLoginDialog} onOpenChange={setShowVoteLoginDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Iniciá sesión para votar</AlertDialogTitle>
+            <AlertDialogDescription>Para votar necesitás iniciar sesión con una cuenta.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Entendido</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

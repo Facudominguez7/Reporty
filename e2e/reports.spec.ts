@@ -106,6 +106,14 @@ test.describe("reports", () => {
     await expect(page).toHaveURL(/\/mis-reportes$/)
     await expect(page.getByText(titulo).first()).toBeVisible()
     expect(reporte.usuario_id).toBeTruthy()
+
+    for (const name of ["Reparado", "No existe"]) {
+      await page.goto(`/reportes/${reporte.id}`)
+      await page.getByRole("group", { name: "Votar sobre el reporte" }).getByRole("button", { name, exact: true }).click()
+      const dialog = page.getByRole("alertdialog")
+      await expect(dialog.getByText("Para votar necesitás iniciar sesión con una cuenta.")).toBeVisible()
+      await dialog.getByRole("button", { name: "Entendido" }).click()
+    }
   })
 
   test("the owner can delete their report", async ({ page, testData }) => {
