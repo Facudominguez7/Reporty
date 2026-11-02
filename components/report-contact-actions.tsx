@@ -23,7 +23,7 @@ export function ReportContactDialog({ reportId, ...props }: DialogProps) {
       <DialogTrigger asChild>
         <Button type="button" variant="secondary" className="w-full">
           <Building2 aria-hidden="true" className="size-4" />
-          Contactar organismos
+          Avisar a un organismo
         </Button>
       </DialogTrigger>
       <DialogContent className="gap-3">

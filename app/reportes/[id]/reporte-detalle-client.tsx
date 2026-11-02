@@ -577,6 +577,7 @@ export function ReporteDetalleClient({
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
     ? formatRepairDuration(reporte.created_at, fechaCambioEstado)
     : null;
+  const showVoteButtons = (!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado;
   const showVoteFooter = Boolean(
     isReporteCerrado ||
     currentUser?.id === reporte.usuario_id ||
@@ -685,9 +686,11 @@ export function ReporteDetalleClient({
                     <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{reporte.titulo}</CardTitle>
                   )}
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <Button variant="outline" size="icon" className="size-10" onClick={handleShareReport} aria-label="Compartir reporte" title="Compartir reporte">
-                      <Share2 className="size-4" />
-                    </Button>
+                    {!showVoteButtons && (
+                      <Button variant="outline" size="icon" className="size-10" onClick={handleShareReport} aria-label="Compartir reporte" title="Compartir reporte">
+                        <Share2 className="size-4" />
+                      </Button>
+                    )}
                     {isAdmin && !isAdminEditing && (
                       <Button
                         type="button"
@@ -823,29 +826,39 @@ export function ReporteDetalleClient({
                   <div className="mt-3">
                     <hr className="mb-2 border-border" />
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {(!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado && (
-                        <div role="group" aria-label="Votar sobre el reporte" className="grid w-full grid-cols-2 gap-2">
+                      {showVoteButtons && (
+                        <div role="group" aria-label="Votar sobre el reporte" className="mx-auto grid w-full max-w-72 grid-cols-3 justify-items-center gap-4">
                           <Button
-                            variant="default"
+                            variant="ghost"
                             size="xs"
-                            className={`min-h-7 w-full px-2.5 text-[11px] ${currentUser && !currentUser.is_anonymous && currentUser.id === reporte.usuario_id ? "col-span-2" : ""}`}
+                            className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-primary hover:bg-primary/10"
                             onClick={handleVoteReparado}
                             disabled={hasVotedReparado || isVotingReparado || isVoting}
                             aria-pressed={hasVotedReparado}
                           >
-                            <ThumbsUp className="size-3" />
+                            <ThumbsUp className="size-4" />
                             Reparado{hasVotedReparado ? " · Tu voto" : ""}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-muted-foreground hover:bg-muted"
+                            onClick={handleShareReport}
+                            aria-label="Compartir reporte"
+                          >
+                            <Share2 className="size-4" />
+                            Compartir
                           </Button>
                           {(!currentUser || currentUser.is_anonymous || currentUser.id !== reporte.usuario_id) && (
                             <Button
-                              variant="destructive"
+                              variant="ghost"
                               size="xs"
-                              className="min-h-7 w-full px-2.5 text-[11px]"
+                              className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-destructive hover:bg-destructive/10"
                               onClick={handleVoteNoExiste}
                               disabled={hasVoted || isVoting || isVotingReparado}
                               aria-pressed={hasVoted}
                             >
-                              <ThumbsDown className="size-3" />
+                              <ThumbsDown className="size-4" />
                               No existe{hasVoted ? " · Tu voto" : ""}
                             </Button>
                           )}

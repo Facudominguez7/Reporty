@@ -221,7 +221,7 @@ export function CommentsSection({
           )}
           <div className="space-y-3">
             {activity.length === 0 && !isClosed ? (
-              <div className="py-8 text-center text-muted-foreground">
+              <div className="text-center text-muted-foreground md:py-8">
                 <MessageCircle className="mx-auto mb-3 size-10 opacity-50" />
                 <p className="text-sm">Aún no hay actividad</p>
                 <p className="text-xs">Sé el primero en actualizar</p>
