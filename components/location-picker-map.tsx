@@ -28,6 +28,7 @@ interface LocationPickerMapProps {
   initialLat?: number | null
   initialLon?: number | null
   heightClassName?: string
+  preserveZoomOnSelection?: boolean
 }
 
 /**
@@ -40,7 +41,7 @@ interface LocationPickerMapProps {
  * @param initialLon - Longitud inicial del marcador; se usa junto con `initialLat` para posicionar el marcador inicial
  * @returns El componente `Marker` posicionado en las coordenadas seleccionadas, o `null` si no hay posición definida
  */
-function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPickerMapProps) {
+function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoomOnSelection }: LocationPickerMapProps) {
   const [position, setPosition] = useState<[number, number] | null>(
     initialLat != null && initialLon != null ? [initialLat, initialLon] : null
   )
@@ -76,9 +77,9 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
 
   useEffect(() => {
     if (initialLat != null && initialLon != null) {
-      map.setView([initialLat, initialLon], 13)
+      map.setView([initialLat, initialLon], preserveZoomOnSelection ? map.getZoom() : 13)
     }
-  }, [initialLat, initialLon, map])
+  }, [initialLat, initialLon, map, preserveZoomOnSelection])
 
   return position ? <Marker position={position} icon={markerIcon} /> : null
 }
@@ -95,7 +96,7 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon }: LocationPi
  * @param heightClassName - Altura opcional; por defecto conserva los 400px existentes
  * @returns El elemento React que renderiza el mapa y su interfaz de selección de ubicación
  */
-export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, heightClassName = "h-[400px]" }: LocationPickerMapProps) {
+export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, heightClassName = "h-[400px]", preserveZoomOnSelection = false }: LocationPickerMapProps) {
   const mounted = useMounted()
 
   if (!mounted) {
@@ -132,6 +133,7 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, he
           onLocationSelect={onLocationSelect}
           initialLat={initialLat}
           initialLon={initialLon}
+          preserveZoomOnSelection={preserveZoomOnSelection}
         />
       </MapContainer>
     </div>

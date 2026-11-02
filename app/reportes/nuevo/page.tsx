@@ -704,6 +704,7 @@ export default function NuevoReportePage() {
                     onLocationSelect={handleLocationSelect}
                     initialLat={formData.lat}
                     initialLon={formData.lon}
+                    preserveZoomOnSelection
                   />
                   {formData.lat !== null && formData.lon !== null ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">

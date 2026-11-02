@@ -572,6 +572,13 @@ export function ReporteDetalleClient({
     );
   }
 
+  const diasDesdeCreacion = Math.max(
+    0,
+    dayjs().tz(ZONA_HORARIA).startOf("day").diff(
+      dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA).startOf("day"),
+      "day"
+    )
+  );
   const adminDraftForRender = adminDraft ?? createAdminReportDraft(reporte);
   const adminBaseForRender = adminBase ?? adminDraftForRender;
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
@@ -611,6 +618,9 @@ export function ReporteDetalleClient({
                       day: "numeric",
                       timeZone: ZONA_HORARIA,
                     })}
+                    {" "}<span className="font-bold">
+                       (hace {diasDesdeCreacion} {diasDesdeCreacion === 1 ? "día" : "días"})
+                    </span>
                   </span>
                 </div>
                 <div className="flex w-full flex-wrap items-center gap-1.5">
