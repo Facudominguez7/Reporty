@@ -92,6 +92,11 @@
     "typescript": "^5",
     "vitest": "^5.0.5"
   },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    }
+  },
   "allowScripts": {
     "@tailwindcss/oxide@4.1.12": true,
     "unrs-resolver@1.11.1": true
