@@ -601,6 +601,18 @@ export function ReporteDetalleClient({
             {/* Encabezado del Reporte */}
             <Card className="gap-0">
               <CardHeader className="pb-3">
+                <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Calendar className="size-3.5 shrink-0" />
+                  <span className="whitespace-nowrap">
+                    Creado el día{" "}
+                    {parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      timeZone: ZONA_HORARIA,
+                    })}
+                  </span>
+                </div>
                 <div className="flex w-full flex-wrap items-center gap-1.5">
                   {isAdmin ? (
                     <AdminInlineField
@@ -727,11 +739,11 @@ export function ReporteDetalleClient({
                     onChange={(value) => updateAdminDraft("descripcion", value)}
                     disabled={isAdminSaving}
                     className="mb-4 w-full"
-                    display={(value) => <p className="text-sm leading-relaxed text-foreground md:text-base">{value}</p>}
+                    display={(value) => <p className="text-xs leading-relaxed text-foreground">{value}</p>}
                     editor={(value, onChange) => <Textarea aria-label="Descripción del reporte" value={value} maxLength={5000} disabled={isAdminSaving} onChange={(event) => onChange(event.target.value)} className="min-h-28 resize-y text-sm md:text-base" />}
                   />
                 ) : (
-                  <p className="mb-4 text-sm leading-relaxed text-foreground md:text-base">{reporte.descripcion}</p>
+                  <p className="mb-4 text-xs leading-relaxed text-foreground">{reporte.descripcion}</p>
                 )}
 
                 {fotografiaPendiente && (
@@ -767,27 +779,14 @@ export function ReporteDetalleClient({
                 )}
 
                 {/* Autor y Fecha */}
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="size-6">
-                      <AvatarFallback className="text-[10px]">
-                        {getUserInitials(getUsernameFromRelation(reporte.profiles))}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">Reportado por {getUsernameFromRelation(reporte.profiles)}</span>
-                  </div>
-                 <div className="flex items-center gap-1.5">
-                    <Calendar className="size-3.5 shrink-0" />
-                    <span className="whitespace-nowrap">
-                      {parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        timeZone: ZONA_HORARIA,
-                     })}
-                   </span>
-                 </div>
-               </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Avatar className="size-6">
+                    <AvatarFallback className="text-[10px]">
+                      {getUserInitials(getUsernameFromRelation(reporte.profiles))}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">Reportado por {getUsernameFromRelation(reporte.profiles)}</span>
+                </div>
                 {fechaCambioEstado && isReporteCerrado && (
                   <div className={`mt-3 inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium ${getNameFromRelation(reporte.estados).toLowerCase() === 'reparado'
                     ? 'tone-success-inline'
@@ -821,6 +820,16 @@ export function ReporteDetalleClient({
                       reportId={reporte.id}
                     />
                   </div>
+                )}
+                {reporte.lat !== null && reporte.lon !== null && (
+                  <button
+                    type="button"
+                    className="mx-auto mt-1 flex w-fit items-center justify-center gap-1 bg-transparent p-0 text-center text-xs font-semibold text-foreground underline md:hidden"
+                    onClick={() => document.getElementById("reporte-ubicacion-map")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    <MapPin className="size-3" aria-hidden="true" />
+                    Ver ubicación
+                  </button>
                 )}
                 {showVoteFooter && (
                   <div className="mt-3">
@@ -952,7 +961,7 @@ export function ReporteDetalleClient({
               )}
 
             {/* Marcador de Posición del Mapa */}
-            <Card>
+            <Card id="reporte-ubicacion-map" className="scroll-mt-4">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base md:text-lg">Ubicación</CardTitle>
               </CardHeader>
