@@ -7,7 +7,6 @@ import { createPublicClient } from "@/utils/supabase/public"
 
 type VisibleReport = {
   usuario_id: string | null
-  estado_id: number | null
 }
 
 export type CommunityContributor = {
@@ -66,7 +65,7 @@ const loadComunidadPageData = unstable_cache(
     ] = await Promise.all([
       supabase
         .from("reportes")
-        .select("usuario_id, estado_id")
+        .select("usuario_id")
         .is("deleted_at", null)
         .returns<VisibleReport[]>(),
       getPublicProfilesCount(supabase),

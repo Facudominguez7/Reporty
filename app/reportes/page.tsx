@@ -54,7 +54,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
       prioridad,
       limite: 12,
       offset: 0,
-    }),
+    }, { includeAuthors: false }),
     getCategorias(),
     getEstados(),
     getPrioridades(),

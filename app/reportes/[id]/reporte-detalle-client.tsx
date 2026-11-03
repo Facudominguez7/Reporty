@@ -771,6 +771,7 @@ export function ReporteDetalleClient({
                           <img
                             src={foto.publicUrl || foto.url || "/placeholder.svg"}
                             alt={`Imagen ${index + 1} del reporte`}
+                            loading={index === 0 ? undefined : "lazy"}
                             className="h-full w-full object-contain"
                           />
                         </div>

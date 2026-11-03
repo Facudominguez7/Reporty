@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getReportMapData } from "./get-reportes"
+import { getReportCardData, getReportMapData } from "./get-reportes"
 
 const mocks = vi.hoisted(() => {
   const calls: unknown[][] = []
@@ -20,15 +20,15 @@ const mocks = vi.hoisted(() => {
       },
     },
   )
-  return { calls, rows, builder, obtenerEstadoOperativo: vi.fn() }
+  return { calls, rows, builder, obtenerEstadoOperativo: vi.fn(), getPublicProfiles: vi.fn() }
 })
 
 vi.mock("next/cache", () => ({ unstable_cache: (load: unknown) => load }))
 vi.mock("@/utils/supabase/server", () => ({ createClient: async () => ({ from: () => mocks.builder }) }))
 vi.mock("@/utils/supabase/public", () => ({ createPublicClient: vi.fn() }))
 vi.mock("@/database/queries/profiles", () => ({
-  getPublicProfilesByIds: async () => ({ data: [] }),
-  indexPublicProfilesById: () => new Map(),
+  getPublicProfilesByIds: mocks.getPublicProfiles,
+  indexPublicProfilesById: (profiles: Array<{ id: string; username: string }> | null) => new Map((profiles ?? []).map((profile) => [profile.id, profile])),
 }))
 vi.mock("@/database/queries/cuadrillas", () => ({
   obtenerEstadoOperativoPublicoPorReporte: mocks.obtenerEstadoOperativo,
@@ -55,10 +55,31 @@ describe("getReportMapData", () => {
     mocks.calls.length = 0
     mocks.rows.length = 0
     mocks.obtenerEstadoOperativo.mockReset().mockResolvedValue(new Map())
+    mocks.getPublicProfiles.mockReset().mockResolvedValue({ data: [{ id: "user-1", username: "Author" }] })
   })
 
   afterEach(() => {
     vi.unstubAllEnvs()
+  })
+
+  it("skips author profiles only when compact cards explicitly opt out", async () => {
+    mocks.rows.push({ ...pendingRow, usuario_id: "user-1" })
+
+    const result = await getReportCardData({}, { includeAuthors: false })
+
+    expect(mocks.getPublicProfiles).not.toHaveBeenCalled()
+    expect(result.data).toMatchObject([{ id: 7, title: "Bache" }])
+  })
+
+  it("keeps authors for the existing card and map callers", async () => {
+    mocks.rows.push({ ...pendingRow, usuario_id: "user-1" })
+
+    const cards = await getReportCardData()
+    const map = await getReportMapData()
+
+    expect(mocks.getPublicProfiles).toHaveBeenCalledTimes(2)
+    expect(cards.data[0].author).toBe("Author")
+    expect(map.data[0].author).toBe("Author")
   })
 
   it("keeps only pending reports in the query when asked to", async () => {

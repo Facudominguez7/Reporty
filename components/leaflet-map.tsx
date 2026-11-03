@@ -402,6 +402,13 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
       return
     }
 
+    const isInitialView = !hasInitialViewRef.current
+    if (isInitialView) {
+      // Start tile requests while the initial markers are being prepared.
+      map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
+      hasInitialViewRef.current = true
+    }
+
     clusterGroup.clearLayers()
 
     for (const report of reports) {
@@ -423,11 +430,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
       clusterGroup.addLayer(marker)
     }
 
-    if (!hasInitialViewRef.current) {
-      // Start over Posadas regardless of where current reports are located; users can pan
-      // east to Candelaria within the regional max bounds.
-      map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
-      hasInitialViewRef.current = true
+    if (isInitialView) {
       return
     }
 

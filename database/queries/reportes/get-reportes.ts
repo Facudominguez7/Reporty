@@ -314,7 +314,7 @@ async function fetchReportes(
  *   - `limite`: número máximo de resultados (por defecto 12)
  * @returns Objeto con `data` — lista de reportes (`ReporteDB[]`) o `null`, y `error` — el error devuelto por Supabase o `null`.
  */
-export async function getReportes(filtros: FiltrosReportes = {}) {
+export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthors = true } = {}) {
   const supabase = await createClient()
   const {
     search,
@@ -355,10 +355,12 @@ export async function getReportes(filtros: FiltrosReportes = {}) {
 
   // Both lookups only need the ids of this page, so they run at the same time.
   const [{ data: publicProfiles }, estadosOperativos] = await Promise.all([
-    getPublicProfilesByIds(
-      supabase,
-      pageRows.map((report) => report.usuario_id ?? ""),
-    ),
+    includeAuthors
+      ? getPublicProfilesByIds(
+          supabase,
+          pageRows.map((report) => report.usuario_id ?? ""),
+        )
+      : Promise.resolve({ data: [] }),
     // Without crews there is no operational state to show, so the lookup is skipped.
     cuadrillasHabilitadas()
       ? obtenerEstadoOperativoPublicoPorReporte(
@@ -445,8 +447,8 @@ export async function getReportStatusCounts(
   }
 }
 
-export async function getReportCardData(filtros: FiltrosReportes = {}) {
-  const { data, error, hasMore, estadosOperativos } = await getReportes(filtros)
+export async function getReportCardData(filtros: FiltrosReportes = {}, options: { includeAuthors?: boolean } = {}) {
+  const { data, error, hasMore, estadosOperativos } = await getReportes(filtros, options)
 
   return {
     data: adjuntarEstadoOperativo(data.map(mapReportToCardData), estadosOperativos),
