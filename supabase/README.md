@@ -86,6 +86,7 @@ The production copy holds real user data:
 
 ### Migrations
 
+- `20261103145429_automatic_usernames.sql` assigns a unique public username to new non-anonymous profiles from Google's name or the email local part. Existing registered profiles are unchanged; a guest converting to a registered account receives a username only if missing. Run `bash scripts/local-supabase/test-automatic-usernames.sh` against the running local stack; it rolls back its integration test and uses a disposable database for the concurrency test. It does not apply the migration to production.
 - `20261020120050_remote_schema.sql` is a `supabase db dump` of production taken on 2026-10-21 (`npm run db:setup -- --schema` regenerates it).
 - `20261020120060_match_production_grants.sql` and `20261020120070_auth_and_storage_objects.sql` restore what the dump leaves out: the revoked client privileges, plus the trigger and the policies production keeps in the `auth` and `storage` schemas.
 - These three files describe what production already has. Production's migration history lists exactly these three versions, so the CLI never applies them there.
