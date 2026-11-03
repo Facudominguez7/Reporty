@@ -6,7 +6,7 @@
 
 import type React from "react"
 
-import { useActionState, useEffect, useState } from "react"
+import { useActionState, useEffect, useRef, useState } from "react"
 import { useFormStatus } from "react-dom"
 import type { AuthError } from "@supabase/supabase-js"
 import Link from "next/link"
@@ -17,7 +17,13 @@ import { toast } from "sonner"
 import { iniciarSesionOAuth, login, signup, type AuthFormState } from "./actions"
 import { obtenerRutaInternaSegura, RUTA_RECUPERAR_CONTRASENA } from "./rutas-seguras"
 import { createClient } from "@/utils/supabase/client"
-import { TURNSTILE_SITE_KEY, TurnstileWidget } from "@/components/turnstile-widget"
+import {
+  MENSAJE_CAPTCHA_NO_DISPONIBLE,
+  TURNSTILE_CONFIGURADO,
+  TURNSTILE_NO_DISPONIBLE,
+  TurnstileWidget,
+  valoresTrasIntentoFallido,
+} from "@/components/turnstile-widget"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +38,9 @@ function guestSessionErrorMessage(error: AuthError) {
   return "No pudimos preparar tu sesión de invitado. Intentá nuevamente."
 }
 
+/** Passwords the signup form holds once it has nothing left to protect. */
+const CONTRASENAS_VACIAS = { password: "", confirmPassword: "" }
+
 /**
  * Renderiza la experiencia principal de ingreso y registro de usuarios.
  *
@@ -43,6 +52,10 @@ export default function AuthPage() {
   const [checkingSession, setCheckingSession] = useState(true)
   const [guestCaptchaToken, setGuestCaptchaToken] = useState<string | null>(null)
   const [guestCaptchaReset, setGuestCaptchaReset] = useState(0)
+  const [loginCaptchaToken, setLoginCaptchaToken] = useState<string | null>(null)
+  const [loginCaptchaReset, setLoginCaptchaReset] = useState(0)
+  const [signupCaptchaToken, setSignupCaptchaToken] = useState<string | null>(null)
+  const [signupCaptchaReset, setSignupCaptchaReset] = useState(0)
   const [guestError, setGuestError] = useState<string | null>(null)
   const [guestPending, setGuestPending] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -58,15 +71,39 @@ export default function AuthPage() {
   const nextPath = obtenerRutaInternaSegura(searchParams.get("next"))
   const oauthError = searchParams.get("error") === "oauth"
   const enlaceError = searchParams.get("error") === "enlace"
-  const needsGuestCaptcha = TURNSTILE_SITE_KEY !== ""
+  const needsCaptcha = TURNSTILE_CONFIGURADO
+  // Production without a site key cannot challenge anybody: the forms fail closed instead
+  // of submitting an unprotected request that the provider may accept.
+  const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE
+  const lastLoginState = useRef(loginState)
+  const lastSignupState = useRef(signupState)
 
   useEffect(() => {
     if (signupState?.error) toast.error(signupState.error)
     if (signupState?.message) toast.success(signupState.message)
-  }, [signupState])
+    // Supabase consumed the submitted token, so the form keeps its values and asks for a
+    // fresh challenge instead of reusing it.
+    if (signupState === lastSignupState.current) return
+    lastSignupState.current = signupState
+    // Keep what was typed after any failure (a rejected CAPTCHA included); only a created
+    // account clears the passwords.
+    const contrasenas = valoresTrasIntentoFallido(
+      signupState,
+      { password: signupPassword, confirmPassword },
+      CONTRASENAS_VACIAS,
+    )
+    setSignupPassword(contrasenas.password)
+    setConfirmPassword(contrasenas.confirmPassword)
+    setSignupCaptchaToken(null)
+    setSignupCaptchaReset((signal) => signal + 1)
+  }, [confirmPassword, signupPassword, signupState])
 
   useEffect(() => {
     if (loginState?.error) toast.error(loginState.error)
+    if (loginState === lastLoginState.current) return
+    lastLoginState.current = loginState
+    setLoginCaptchaToken(null)
+    setLoginCaptchaReset((signal) => signal + 1)
   }, [loginState])
 
   useEffect(() => {
@@ -84,14 +121,15 @@ export default function AuthPage() {
     return () => { cancelled = true }
   }, [nextPath])
 
-  const handleSignup = async (formData: FormData) => {
-    await signupAction(formData)
-    setSignupPassword("")
-    setConfirmPassword("")
-  }
-
   const continueAsGuest = async () => {
-    if (guestPending || (needsGuestCaptcha && !guestCaptchaToken)) return
+    if (guestPending) return
+
+    if (captchaNoDisponible) {
+      setGuestError(MENSAJE_CAPTCHA_NO_DISPONIBLE)
+      return
+    }
+
+    if (needsCaptcha && !guestCaptchaToken) return
 
     setGuestPending(true)
     setGuestError(null)
@@ -123,6 +161,12 @@ export default function AuthPage() {
             <CardDescription>Ingresá o registrate para comentar, votar y sumar puntos. Para reportar también podés continuar como invitado.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            {captchaNoDisponible && (
+              <Alert variant="destructive">
+                <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
+                <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
+              </Alert>
+            )}
             {oauthError && (
               <Alert variant="destructive">
                 <AlertTitle>No se pudo iniciar sesión</AlertTitle>
@@ -166,6 +210,8 @@ export default function AuthPage() {
 
                 <form action={loginAction} className="space-y-4">
                   <input type="hidden" name="next" value={nextPath} />
+                  {/* Consumed by Supabase as `captchaToken`; empty until the challenge passes. */}
+                  <input type="hidden" name="captcha_token" value={loginCaptchaToken ?? ""} />
                   <Field label="Correo electrónico" htmlFor="login-email">
                     <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -210,7 +256,15 @@ export default function AuthPage() {
                     </Link>
                   </div>
 
-                  <SubmitButton label="Ingresar" pendingLabel="Ingresando..." />
+                  {needsCaptcha && (
+                    <TurnstileWidget onTokenChange={setLoginCaptchaToken} resetSignal={loginCaptchaReset} />
+                  )}
+
+                  <SubmitButton
+                    label="Ingresar"
+                    pendingLabel="Ingresando..."
+                    disabled={captchaNoDisponible || (needsCaptcha && !loginCaptchaToken)}
+                  />
                 </form>
 
               </TabsContent>
@@ -223,8 +277,10 @@ export default function AuthPage() {
                   </Alert>
                 )}
 
-                <form action={handleSignup} className="space-y-4">
+                <form action={signupAction} className="space-y-4">
                   <input type="hidden" name="next" value={nextPath} />
+                  {/* Consumed by Supabase as `captchaToken`; empty until the challenge passes. */}
+                  <input type="hidden" name="captcha_token" value={signupCaptchaToken ?? ""} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Nombre" htmlFor="register-name">
                       <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -356,6 +412,10 @@ export default function AuthPage() {
                     </span>
                   </label>
 
+                  {needsCaptcha && (
+                    <TurnstileWidget onTokenChange={setSignupCaptchaToken} resetSignal={signupCaptchaReset} />
+                  )}
+
                   {signupState?.message && (
                     <Alert>
                       <AlertTitle>Verificá tu correo</AlertTitle>
@@ -363,7 +423,11 @@ export default function AuthPage() {
                     </Alert>
                   )}
 
-                  <Button type="submit" className="w-full" disabled={!passwordsMatch}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={!passwordsMatch || captchaNoDisponible || (needsCaptcha && !signupCaptchaToken)}
+                  >
                     Crear cuenta
                   </Button>
                 </form>
@@ -375,9 +439,9 @@ export default function AuthPage() {
                 <p className="text-sm font-medium">¿Querés continuar como invitado?</p>
                 <p className="text-xs text-muted-foreground">Podés crear y seguir reportes, pero no comentar ni votar.</p>
               </div>
-              {needsGuestCaptcha && <TurnstileWidget onTokenChange={setGuestCaptchaToken} resetSignal={guestCaptchaReset} />}
+              {needsCaptcha && <TurnstileWidget onTokenChange={setGuestCaptchaToken} resetSignal={guestCaptchaReset} />}
               {guestError && <Alert variant="destructive"><AlertDescription>{guestError}</AlertDescription></Alert>}
-              <Button type="button" variant="outline" className="w-full" onClick={continueAsGuest} disabled={guestPending || (needsGuestCaptcha && !guestCaptchaToken)}>
+              <Button type="button" variant="outline" className="w-full" onClick={continueAsGuest} disabled={guestPending || captchaNoDisponible || (needsCaptcha && !guestCaptchaToken)}>
                 <UserRound className="size-4" aria-hidden="true" />
                 {guestPending ? "Preparando sesión..." : "Continuar como invitado"}
               </Button>
@@ -415,13 +479,21 @@ function Field({
 /**
  * Botón de envío que refleja el estado pendiente del formulario actual.
  *
- * @param props - Textos a mostrar según el estado de envío.
- * @returns Botón deshabilitado durante el envío del formulario.
+ * @param props - Textos según el estado de envío y si el formulario todavía no es válido.
+ * @returns Botón deshabilitado durante el envío o mientras falta una verificación.
  */
-function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+function SubmitButton({
+  label,
+  pendingLabel,
+  disabled = false,
+}: {
+  label: string
+  pendingLabel: string
+  disabled?: boolean
+}) {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
+    <Button type="submit" className="w-full" disabled={pending || disabled}>
       {pending ? pendingLabel : label}
     </Button>
   )
