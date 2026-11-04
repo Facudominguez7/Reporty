@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures"
 import { signIn } from "./support/auth"
+import { rejectNextVerification, resetSiteverify } from "./support/siteverify"
 import { uniqueTag } from "./support/test-data"
 
 const MAX_STORED_BYTES = 100 * 1024
@@ -56,6 +57,11 @@ async function submitReport(page: Page) {
 }
 
 test.describe("reports", () => {
+  test.afterEach(async () => {
+    // A pending rejection or a changed action would make the next report creation fail.
+    await resetSiteverify()
+  })
+
   test("a citizen reports a problem with a heavy photo, stored optimized", async ({ page, testData }) => {
     const user = await testData.createUser()
     const titulo = `Bache con foto ${uniqueTag()}`
@@ -89,11 +95,11 @@ test.describe("reports", () => {
   test("a visitor without an account reports as a guest and finds it in Mis reportes", async ({ page, testData }) => {
     const titulo = `Bache de invitado ${uniqueTag()}`
 
-    // The guest choice precedes the anonymous session, which is created on submit.
+    // The guest choice precedes the anonymous session, which is created on click.
     await page.goto("/reportes/nuevo")
     await expect(page).toHaveURL(/\/auth/)
-    await page.getByRole("link", { name: "Continuar como invitado" }).click()
-    await expect(page).toHaveURL(/\/reportes\/nuevo\?modo=invitado$/)
+    await page.getByRole("button", { name: "Continuar como invitado" }).click()
+    await expect(page).toHaveURL(/\/reportes\/nuevo$/)
     await fillReportForm(page, titulo)
     await page.locator("#images").setInputFiles(await heavyPhoto(page))
     await expect(page.getByAltText("Preview 1")).toBeVisible({ timeout: 30_000 })
@@ -114,6 +120,34 @@ test.describe("reports", () => {
       await expect(dialog.getByText("Para votar necesitás iniciar sesión con una cuenta.")).toBeVisible()
       await dialog.getByRole("button", { name: "Entendido" }).click()
     }
+  })
+
+  test("a rejected verification keeps the form data and the retry publishes the report", async ({ page, testData }) => {
+    const user = await testData.createUser()
+    const titulo = `Bache reintentado ${uniqueTag()}`
+    await signIn(page, user)
+
+    await page.goto("/reportes/nuevo")
+    await fillReportForm(page, titulo)
+    await page.locator("#images").setInputFiles(await heavyPhoto(page))
+    await expect(page.getByAltText("Preview 1")).toBeVisible({ timeout: 30_000 })
+
+    // The fake answer fails like an expired or already consumed token.
+    await rejectNextVerification()
+    await page.getByRole("button", { name: "Enviar Reporte" }).click()
+    await page.getByRole("alertdialog").getByRole("button", { name: "Confirmar y Enviar" }).click()
+
+    await expect(page.getByText("Error al crear el reporte")).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText("La verificación falló o venció.", { exact: false })).toBeVisible()
+    // A rejected challenge never discards what was already typed or attached.
+    await expect(page.getByLabel("Título del Reporte *")).toHaveValue(titulo)
+    await expect(page.getByLabel("Descripción Detallada *")).toHaveValue("Pozo grande que ocupa medio carril.")
+    await expect(page.getByAltText("Preview 1")).toBeVisible()
+
+    // The form solved a new challenge, so the same submission now succeeds.
+    await submitReport(page)
+    const reporte = await testData.trackReportByTitle(titulo)
+    expect(reporte.usuario_id).toBe(user.id)
   })
 
   test("the owner can delete their report", async ({ page, testData }) => {
