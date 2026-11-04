@@ -19,7 +19,7 @@ test.describe("public browsing, without an account", () => {
           const style = getComputedStyle(element)
           return { position: style.position, height: style.height, background: style.backgroundColor, pointerEvents: style.pointerEvents }
         })
-        expect(edge).toEqual({ position: "fixed", height: "76px", background: "rgba(0, 0, 0, 0)", pointerEvents: "none" })
+        expect(edge).toEqual({ position: "fixed", height: "1px", background: "rgb(149, 210, 254)", pointerEvents: "none" })
       }
     }
   })
