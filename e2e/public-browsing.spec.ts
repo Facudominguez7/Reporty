@@ -15,8 +15,8 @@ test.describe("public browsing, without an account", () => {
       expect(background.position).toBe("fixed")
       expect(background.image).toContain("mapaMobile.webp")
       if (path !== "/mapa") {
-        const edge = await page.evaluate(() => {
-          const style = getComputedStyle(document.body, "::before")
+        const edge = await page.locator(".mobile-top-edge").evaluate((element) => {
+          const style = getComputedStyle(element)
           return { position: style.position, height: style.height, background: style.backgroundColor, pointerEvents: style.pointerEvents }
         })
         expect(edge).toEqual({ position: "fixed", height: "76px", background: "rgba(0, 0, 0, 0)", pointerEvents: "none" })

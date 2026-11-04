@@ -161,11 +161,6 @@ body:not(:has(.admin-workspace)),
     background: transparent;
   }
 
-  body:has(.welcome-screen)::before,
-  body:has(.auth-shell)::before {
-    height: 4.75rem;
-  }
-
   body:not(:has(.admin-workspace)),
   .auth-shell {
     background-size: cover, max(110%, 61.875vh) auto;
