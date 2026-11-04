@@ -346,12 +346,46 @@ describe("startTurnstileChallenge", () => {
 })
 
 describe("carga compartida del script de Turnstile", () => {
-  it("marca el script como listo también en onLoad, que es lo único que recibe un segundo widget de la página", async () => {
+  it("resuelve en seguida cuando la API de Cloudflare ya está cargada", async () => {
+    const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const api = fakeTurnstile().api
+
+    await expect(esperarApiTurnstile(() => api)).resolves.toBe(api)
+  })
+
+  it("espera a la API cuando el script todavía está cargando", async () => {
+    vi.useFakeTimers()
+    const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const api = fakeTurnstile().api
+    let cargada: typeof api | undefined
+    const espera = esperarApiTurnstile(() => cargada)
+
+    await vi.advanceTimersByTimeAsync(500)
+    cargada = api
+    await vi.advanceTimersByTimeAsync(100)
+
+    await expect(espera).resolves.toBe(api)
+    vi.useRealTimers()
+  })
+
+  it("devuelve null si la API nunca llega para mostrar el estado no disponible", async () => {
+    vi.useFakeTimers()
+    const { esperarApiTurnstile, TURNSTILE_SCRIPT_TIMEOUT_MS } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const espera = esperarApiTurnstile(() => undefined)
+
+    await vi.advanceTimersByTimeAsync(TURNSTILE_SCRIPT_TIMEOUT_MS + 100)
+
+    await expect(espera).resolves.toBeNull()
+    vi.useRealTimers()
+  })
+
+  it("no confía en los callbacks de next/script, que avisan antes de tiempo a un widget montado durante la carga", async () => {
     const { readFileSync } = await import("node:fs")
     const codigo = readFileSync(new URL("../../components/turnstile-widget.tsx", import.meta.url), "utf8")
     const script = codigo.slice(codigo.indexOf("<Script"), codigo.indexOf("/>", codigo.indexOf("<Script")))
 
-    expect(script).toContain("onLoad={() => setScriptReady(true)}")
-    expect(script).toContain("onReady={() => setScriptReady(true)}")
+    expect(script).not.toContain("onReady")
+    expect(script).not.toContain("onLoad")
+    expect(codigo).toContain("esperarApiTurnstile()")
   })
 })

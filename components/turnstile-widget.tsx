@@ -315,6 +315,41 @@ export function createTurnstileTokenFeed(): TurnstileTokenFeed {
   }
 }
 
+/** How long a widget waits for the Cloudflare script before reporting it unavailable. */
+export const TURNSTILE_SCRIPT_TIMEOUT_MS = 20_000
+
+/** Interval between checks while the shared script is still loading. */
+const TURNSTILE_SCRIPT_POLL_MS = 50
+
+/**
+ * Resolves once the Cloudflare API exists. `next/script` cannot tell this reliably: it marks
+ * a shared src as loaded as soon as a second instance starts waiting, so a widget mounted
+ * later during the load (a tab switch) would be told it is ready while the API is still
+ * missing. Every widget checks the API itself instead.
+ *
+ * @param obtenerApi - Reads the API; defaults to `window.turnstile`.
+ * @param limiteMs - Maximum wait before giving up.
+ * @returns The API, or `null` when it never arrived (blocked or offline).
+ */
+export function esperarApiTurnstile(
+  obtenerApi: () => TurnstileApi | undefined = () => window.turnstile,
+  limiteMs = TURNSTILE_SCRIPT_TIMEOUT_MS,
+): Promise<TurnstileApi | null> {
+  const disponible = obtenerApi()
+  if (disponible) return Promise.resolve(disponible)
+
+  return new Promise((resolve) => {
+    const inicio = Date.now()
+    const intervalo = setInterval(() => {
+      const api = obtenerApi()
+      if (api || Date.now() - inicio >= limiteMs) {
+        clearInterval(intervalo)
+        resolve(api ?? null)
+      }
+    }, TURNSTILE_SCRIPT_POLL_MS)
+  })
+}
+
 type TurnstileStatus = "idle" | "verified" | "error" | "unavailable"
 
 const statusCopy: Record<TurnstileStatus, string> = {
@@ -383,6 +418,20 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
   useEffect(() => {
     onTokenChangeRef.current = onTokenChange
   }, [onTokenChange])
+
+  // The challenge mounts only once the API really exists, however the shared script loads.
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY || scriptReady) return
+    let cancelado = false
+    esperarApiTurnstile().then((api) => {
+      if (cancelado) return
+      if (api) setScriptReady(true)
+      else setStatus("unavailable")
+    })
+    return () => {
+      cancelado = true
+    }
+  }, [scriptReady])
 
   useEffect(() => {
     const container = containerRef.current
@@ -455,10 +504,6 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
       <Script
         src={TURNSTILE_SCRIPT_SRC}
         strategy="afterInteractive"
-        // `next/script` loads a shared src once: only the first widget gets `onReady`, while
-        // every other widget mounted during that load is notified through `onLoad`.
-        onLoad={() => setScriptReady(true)}
-        onReady={() => setScriptReady(true)}
         onError={() => setStatus("unavailable")}
       />
       <div className="space-y-2">
