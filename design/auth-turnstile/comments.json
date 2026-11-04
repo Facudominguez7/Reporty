@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "shp4j404",
+      "file": "03-grupo-verificacion-envio.html",
+      "selector": "body",
+      "excerpt": "DIRECCIÓN 03 · REPORTY · /AUTH Grupo verificación + envío Sin párrafo y sin etiqueta. El widget y Ingresar pasan a compartir una superficie apenas más oscura que la tarjeta, así el botón deshabilitado se explica solo: pertenece al desafío que está arriba. El resto de la tarjeta no cambia. TRADEOFF E",
+      "comment": "mostrame el de registro tambien",
+      "createdAt": "2026-11-04T17:56:22.632Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T17:56:22.661Z",
+      "resolvedAt": "2026-11-04T17:57:18.565Z"
+    },
+    {
+      "id": "pvh2p484",
+      "file": "03-grupo-verificacion-envio.html",
+      "selector": "body",
+      "excerpt": "DIRECCIÓN 03 · REPORTY · /AUTH Grupo verificación + envío Sin párrafo y sin etiqueta. El widget y Ingresar pasan a compartir una superficie apenas más oscura que la tarjeta, así el botón deshabilitado se explica solo: pertenece al desafío que está arriba. El resto de la tarjeta no cambia. TRADEOFF E",
+      "comment": "quedo muy estirado el login, como se podria achicar ademas para entrar como invitado es re feo porque tenes que scrollear para ir bien abajo",
+      "createdAt": "2026-11-04T17:58:13.907Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T17:58:13.937Z",
+      "resolvedAt": "2026-11-04T17:59:21.749Z"
+    },
+    {
+      "id": "3pks89tn",
+      "file": "03-grupo-verificacion-envio.html",
+      "selector": "body > section:nth-of-type(2) > article > div:nth-of-type(2) > button",
+      "excerpt": "Continuar con Google",
+      "comment": "te falto el logo",
+      "createdAt": "2026-11-04T18:00:55.127Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T18:01:04.084Z",
+      "resolvedAt": "2026-11-04T18:01:29.834Z"
+    },
+    {
+      "id": "4px16up2",
+      "file": "03-grupo-verificacion-envio.html",
+      "selector": "body > section:nth-of-type(3) > article > div:nth-of-type(2) > button",
+      "excerpt": "Continuar con Google",
+      "comment": "te falto el logo",
+      "createdAt": "2026-11-04T18:01:02.616Z",
+      "status": "resolved",
+      "sentAt": "2026-11-04T18:01:04.084Z",
+      "resolvedAt": "2026-11-04T18:01:29.834Z"
+    }
+  ]
+}

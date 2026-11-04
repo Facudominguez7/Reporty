@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema de diseño · Reporty</title>
+<style>
+  /* ============================================================
+     Tokens capturados de app/globals.css (sin valores inventados).
+     Ningún recurso externo: fuentes del sistema y SVG en línea.
+     ============================================================ */
+  :root{
+    --background:oklch(94.463% 0.00213 14.416);
+    --foreground:oklch(0.19 0.01 95);
+    --card:oklch(1 0 0);
+    --card-foreground:oklch(0.19 0.01 95);
+    --popover:oklch(1 0 0);
+    --popover-foreground:oklch(0.19 0.01 95);
+    --primary:oklch(0.57 0.12 157);
+    --primary-foreground:oklch(0.985 0 0);
+    --secondary:#000000;
+    --secondary-foreground:#ffffff;
+    --muted:oklch(96.115% 0.00011 271.152);
+    --muted-foreground:oklch(0.45 0.028 157);
+    --accent:oklch(0.93 0.03 157);
+    --accent-foreground:oklch(0.3 0.05 157);
+    --destructive:oklch(0.57 0.18 25);
+    --destructive-foreground:oklch(0.985 0 0);
+    --border:oklch(78.892% 0.00009 271.152);
+    --input:oklch(96.416% 0.00011 271.152);
+    --ring:oklch(0.62 0.08 230);
+    --radius:0.75rem;
+    --radius-sm:var(--radius);
+    --radius-md:var(--radius);
+    --radius-lg:var(--radius);
+    --radius-xl:var(--radius);
+    --radius-pill:999px;
+    --surface-subtle:oklch(94.007% 0.00011 271.152);
+    --semantic-info:oklch(0.56 0.11 240);
+    --semantic-success:oklch(0.57 0.12 157);
+    --semantic-warning:oklch(0.72 0.13 85);
+    --semantic-danger:oklch(0.57 0.18 25);
+    --semantic-admin:oklch(0.5 0.1 285);
+    --ranking-first:oklch(0.76 0.14 84);
+    --ranking-second:oklch(0.66 0.01 250);
+    --ranking-third:oklch(0.61 0.09 50);
+    --elevation-soft:0 10px 30px color-mix(in oklab, var(--foreground) 12%, transparent);
+    --card-shadow:7px 7px 12px color-mix(in oklab, var(--foreground) 20%, transparent);
+    --bottom-nav-space:calc(4rem + env(safe-area-inset-bottom));
+    --fuente:"Geist","Geist Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:48px 56px 64px;background:var(--background);color:var(--foreground);
+    font-family:var(--fuente);font-feature-settings:"cv02","cv03","cv04","cv11";
+    -webkit-font-smoothing:antialiased;min-width:1440px;
+  }
+  h1{font-size:2rem;line-height:1.15;letter-spacing:-.02em;margin:0 0 6px;font-weight:600}
+  h2{font-size:1.0625rem;line-height:1.3;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground);margin:44px 0 16px;font-weight:600}
+  h3{font-size:.8125rem;margin:0 0 10px;font-weight:600;letter-spacing:.02em}
+  p{margin:0}
+  .intro{max-width:760px;color:var(--muted-foreground);font-size:.9375rem;line-height:1.6}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);padding:5px 12px;font-size:.75rem;color:var(--muted-foreground)}
+  .chip b{color:var(--foreground);font-weight:600}
+
+  .grid-swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+  .swatch{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);overflow:hidden;box-shadow:var(--card-shadow)}
+  .swatch .chip-color{height:64px;border-bottom:1px solid var(--border)}
+  .swatch .datos{padding:9px 11px 11px}
+  .swatch .nombre{font-size:.75rem;font-weight:600;letter-spacing:-.01em}
+  .swatch .valor{font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;font-size:.6875rem;color:var(--muted-foreground);margin-top:3px;overflow-wrap:anywhere}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);padding:22px 24px}
+  .columnas{display:grid;grid-template-columns:1.05fr 1fr;gap:18px}
+  .muestra-tipo{display:flex;align-items:baseline;justify-content:space-between;gap:18px;padding:11px 0;border-bottom:1px solid color-mix(in oklab,var(--border) 55%,transparent)}
+  .muestra-tipo:last-child{border-bottom:0;padding-bottom:0}
+  .muestra-tipo .clase{font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;font-size:.6875rem;color:var(--muted-foreground);white-space:nowrap}
+  .fila-token{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid color-mix(in oklab,var(--border) 55%,transparent);font-size:.8125rem}
+  .fila-token:last-child{border-bottom:0;padding-bottom:0}
+  .fila-token code{font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;font-size:.75rem;color:var(--muted-foreground)}
+  .muestra-radio{width:72px;height:44px;border:1px solid var(--border);background:var(--input);display:flex;align-items:center;justify-content:center;font-size:.625rem;color:var(--muted-foreground)}
+  .muestra-sombra{width:132px;height:60px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:.625rem;color:var(--muted-foreground)}
+
+  /* Componentes reales del proyecto */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--radius-pill);font-size:.875rem;font-weight:500;border:1px solid transparent;padding:0 16px;min-height:40px;white-space:nowrap;cursor:default}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--background),0 0 0 4px var(--ring)}
+  .btn-primario{background:var(--primary);color:var(--primary-foreground)}
+  .btn-outline{background:var(--background);border-color:var(--border);color:var(--foreground)}
+  .btn-negro{background:var(--secondary);color:var(--secondary-foreground)}
+  .btn-muted{background:transparent;color:var(--muted-foreground);min-height:32px;padding:0 10px;border:0}
+  .btn-deshabilitado{opacity:.5}
+  .btn-sm{min-height:36px;font-size:.75rem;padding:0 14px}
+  .fila-botones{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .campo{display:flex;flex-direction:column;gap:8px;max-width:340px}
+  .etiqueta{font-size:.875rem;font-weight:500;line-height:1}
+  .input-wrap{position:relative}
+  .input{min-height:40px;width:100%;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--input);padding:8px 12px 8px 40px;font-size:.875rem;font-family:inherit;color:var(--foreground)}
+  .input::placeholder{color:var(--muted-foreground)}
+  .input:focus-visible{outline:none;border-color:var(--foreground);box-shadow:0 0 0 2px var(--background),0 0 0 4px var(--ring)}
+  .input-invalido{border-color:var(--destructive);box-shadow:0 0 0 2px color-mix(in oklab,var(--destructive) 20%,transparent)}
+  .icono-campo{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted-foreground);display:flex}
+  .tabs-lista{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--input);padding:4px;box-shadow:var(--card-shadow)}
+  .tab{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 12px;border-radius:var(--radius-pill);border:1px solid transparent;font-size:.875rem;font-weight:500;color:var(--foreground)}
+  .tab[aria-selected="true"]{background:var(--secondary);color:var(--secondary-foreground);border-color:var(--secondary)}
+  .alerta{display:grid;grid-template-columns:1fr;gap:2px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:12px 16px;font-size:.875rem;max-width:520px}
+  .alerta-destructiva{color:var(--destructive)}
+  .alerta-titulo{font-weight:500;letter-spacing:-.01em}
+  .alerta-desc{color:color-mix(in oklab,var(--destructive) 90%,var(--card))}
+  .separador-texto{display:flex;align-items:center;gap:12px;font-size:.75rem;text-transform:uppercase;letter-spacing:.2em;color:var(--muted-foreground)}
+  .separador-texto span{height:1px;flex:1;background:var(--border)}
+
+  /* Representación estática del widget de Cloudflare (no es seguridad real) */
+  .turnstile{display:flex;align-items:center;gap:12px;width:300px;height:65px;padding:0 12px;border:1px solid #d6d6d6;border-radius:4px;background:#fdfdfd;font-family:var(--fuente)}
+  .turnstile .caja{width:24px;height:24px;border:2px solid #6b7280;border-radius:3px;background:#fff;flex:0 0 auto}
+  .turnstile .marca{flex:1;min-width:0}
+  .turnstile .marca strong{display:block;font-size:13px;font-weight:500;color:#1f2937;line-height:1.25}
+  .turnstile .marca small{display:block;font-size:9px;color:#6b7280;margin-top:3px}
+  .turnstile .logo{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+  .turnstile .logo span{font-size:8px;color:#6b7280;letter-spacing:.02em}
+  .estado-widget{font-size:.75rem;color:var(--muted-foreground);margin-top:8px}
+  .leyenda-nota{font-size:.75rem;color:var(--muted-foreground);margin-top:14px;max-width:760px;line-height:1.55}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Sistema de diseño · Reporty</h1>
+    <p class="intro">
+      Captura de los tokens reales del proyecto: color, tipografía, radio, elevación y reglas de los
+      componentes que hoy usa la pantalla de acceso. Todo se leyó de <code>app/globals.css</code>,
+      <code>app/layout.tsx</code> y <code>components/ui/*</code>.
+    </p>
+    <div class="meta">
+      <span class="chip"><b>39</b> tokens de color</span>
+      <span class="chip"><b>1</b> familia tipográfica (Geist Sans)</span>
+      <span class="chip"><b>6</b> radios</span>
+      <span class="chip"><b>2</b> sombras</span>
+      <span class="chip"><b>7</b> reglas de componente</span>
+      <span class="chip">shadcn/ui · new-york · Lucide</span>
+    </div>
+  </header>
+
+  <h2>1 · Color base y superficies</h2>
+  <div class="grid-swatches">
+    <div class="swatch"><div class="chip-color" style="background:var(--background)"></div><div class="datos"><div class="nombre">background</div><div class="valor">oklch(94.463% 0.00213 14.416)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--foreground)"></div><div class="datos"><div class="nombre">foreground</div><div class="valor">oklch(0.19 0.01 95)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--card)"></div><div class="datos"><div class="nombre">card</div><div class="valor">oklch(1 0 0)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--popover)"></div><div class="datos"><div class="nombre">popover</div><div class="valor">oklch(1 0 0)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--primary)"></div><div class="datos"><div class="nombre">primary</div><div class="valor">oklch(0.57 0.12 157)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--primary-foreground)"></div><div class="datos"><div class="nombre">primary-foreground</div><div class="valor">oklch(0.985 0 0)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--secondary)"></div><div class="datos"><div class="nombre">secondary</div><div class="valor">#000000</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--secondary-foreground)"></div><div class="datos"><div class="nombre">secondary-foreground</div><div class="valor">#ffffff</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--muted)"></div><div class="datos"><div class="nombre">muted</div><div class="valor">oklch(96.115% 0.00011 271.152)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--muted-foreground)"></div><div class="datos"><div class="nombre">muted-foreground</div><div class="valor">oklch(0.45 0.028 157)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--accent)"></div><div class="datos"><div class="nombre">accent</div><div class="valor">oklch(0.93 0.03 157)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--accent-foreground)"></div><div class="datos"><div class="nombre">accent-foreground</div><div class="valor">oklch(0.3 0.05 157)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--destructive)"></div><div class="datos"><div class="nombre">destructive</div><div class="valor">oklch(0.57 0.18 25)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--destructive-foreground)"></div><div class="datos"><div class="nombre">destructive-foreground</div><div class="valor">oklch(0.985 0 0)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--border)"></div><div class="datos"><div class="nombre">border</div><div class="valor">oklch(78.892% 0.00009 271.152)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--input)"></div><div class="datos"><div class="nombre">input</div><div class="valor">oklch(96.416% 0.00011 271.152)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--ring)"></div><div class="datos"><div class="nombre">ring</div><div class="valor">oklch(0.62 0.08 230)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--surface-subtle)"></div><div class="datos"><div class="nombre">surface-subtle</div><div class="valor">oklch(94.007% 0.00011 271.152)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--semantic-info)"></div><div class="datos"><div class="nombre">semantic-info</div><div class="valor">oklch(0.56 0.11 240)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--semantic-success)"></div><div class="datos"><div class="nombre">semantic-success</div><div class="valor">oklch(0.57 0.12 157)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--semantic-warning)"></div><div class="datos"><div class="nombre">semantic-warning</div><div class="valor">oklch(0.72 0.13 85)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--semantic-danger)"></div><div class="datos"><div class="nombre">semantic-danger</div><div class="valor">oklch(0.57 0.18 25)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--semantic-admin)"></div><div class="datos"><div class="nombre">semantic-admin</div><div class="valor">oklch(0.5 0.1 285)</div></div></div>
+    <div class="swatch"><div class="chip-color" style="background:var(--ranking-first)"></div><div class="datos"><div class="nombre">ranking-first</div><div class="valor">oklch(0.76 0.14 84)</div></div></div>
+  </div>
+
+  <h2>2 · Tipografía</h2>
+  <div class="columnas">
+    <div class="panel">
+      <h3>Escala observada</h3>
+      <div class="muestra-tipo"><strong style="font-size:2rem;letter-spacing:-.02em;line-height:1.15;font-weight:600">Tu cuenta Reporty</strong><span class="clase">text-3xl / .section-title</span></div>
+      <div class="muestra-tipo"><strong style="font-size:1.25rem;letter-spacing:-.01em;line-height:1.1;font-weight:600">Tu cuenta Reporty</strong><span class="clase">text-xl / CardTitle</span></div>
+      <div class="muestra-tipo"><span style="font-size:1rem;line-height:1.5">Ingresá o registrate para comentar y votar.</span><span class="clase">text-base</span></div>
+      <div class="muestra-tipo"><span style="font-size:.875rem;line-height:1.5;color:var(--muted-foreground)">Podés crear y seguir reportes, pero no comentar ni votar.</span><span class="clase">text-sm · CardDescription</span></div>
+      <div class="muestra-tipo"><span style="font-size:.75rem;color:var(--muted-foreground)">Verificación de seguridad completada.</span><span class="clase">text-xs · estado</span></div>
+      <div class="muestra-tipo"><span style="font-size:.75rem;text-transform:uppercase;letter-spacing:.2em;color:var(--muted-foreground)">o continuá con email</span><span class="clase">tracking-[0.2em]</span></div>
+      <div class="muestra-tipo"><span style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.18em;color:var(--primary)">Reportes recientes</span><span class="clase">.section-eyebrow</span></div>
+      <div class="muestra-tipo"><span style="font-size:.6875rem;text-transform:uppercase;letter-spacing:.14em;font-weight:600;color:var(--muted-foreground)">Filtros</span><span class="clase">.page-meta-label</span></div>
+    </div>
+    <div class="panel">
+      <h3>Familia y pesos</h3>
+      <div class="fila-token"><span>Familia</span><code>Geist Sans · geist/font/sans</code></div>
+      <div class="fila-token"><span>Token CSS</span><code>--font-sans: var(--font-geist-sans)</code></div>
+      <div class="fila-token"><span>Pesos en uso</span><code>font-medium · font-semibold</code></div>
+      <div class="fila-token"><span>Interletrado</span><code>tracking-tight · 0.14em · 0.18em · 0.2em</code></div>
+      <div class="fila-token"><span>Interlínea</span><code>leading-tight · leading-6</code></div>
+      <div class="fila-token"><span>Suavizado</span><code>antialiased · cv02 cv03 cv04 cv11</code></div>
+      <p class="leyenda-nota">
+        Esta artboard usa la pila del sistema como sustituto visual de Geist, porque la skill de
+        diseño prohíbe recursos externos. El ancho y el peso son los que declara el proyecto.
+      </p>
+    </div>
+  </div>
+
+  <h2>3 · Radio y elevación</h2>
+  <div class="columnas">
+    <div class="panel">
+      <h3>Radios</h3>
+      <div class="fila-token"><span><code>--radius</code> · base</span><span class="muestra-radio" style="border-radius:12px">12px</span></div>
+      <div class="fila-token"><span><code>--radius-sm/md/lg/xl</code></span><span class="muestra-radio" style="border-radius:12px">= radius</span></div>
+      <div class="fila-token"><span><code>--radius-pill</code></span><span class="muestra-radio" style="border-radius:999px">999px</span></div>
+      <div class="fila-token"><span><code>.page-container</code></span><span class="muestra-radio" style="border-radius:36px">36px</span></div>
+    </div>
+    <div class="panel">
+      <h3>Sombras</h3>
+      <div class="fila-token"><span><code>--card-shadow</code> · 7px 7px 12px</span><span class="muestra-sombra" style="box-shadow:var(--card-shadow)">card</span></div>
+      <div class="fila-token"><span><code>--elevation-soft</code> · 0 10px 30px</span><span class="muestra-sombra" style="box-shadow:var(--elevation-soft)">soft</span></div>
+      <div class="fila-token"><span>Navegación inferior</span><code>calc(4rem + env(safe-area-inset-bottom))</code></div>
+      <div class="fila-token"><span>Espaciado de formulario</span><code>space-y-2 · space-y-4 · space-y-5</code></div>
+    </div>
+  </div>
+
+  <h2>4 · Componentes</h2>
+  <div class="columnas">
+    <div class="panel">
+      <h3>Botones</h3>
+      <div class="fila-botones" style="margin-bottom:14px">
+        <button class="btn btn-primario">Ingresar</button>
+        <button class="btn btn-outline">Continuar con Google</button>
+        <button class="btn btn-negro">Registrarme</button>
+        <button class="btn btn-primario btn-deshabilitado" disabled>Ingresando…</button>
+      </div>
+      <div class="fila-botones" style="margin-bottom:16px">
+        <button class="btn btn-outline btn-sm">Reintentar la verificación</button>
+        <button class="btn btn-muted" aria-label="Mostrar contraseña">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <h3>Campos</h3>
+      <div class="campo" style="margin-bottom:14px">
+        <label class="etiqueta" for="demo-email">Correo electrónico</label>
+        <div class="input-wrap">
+          <span class="icono-campo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg></span>
+          <input class="input" id="demo-email" type="email" placeholder="tu@email.com" value="vecino@reporty.app">
+        </div>
+      </div>
+      <div class="campo">
+        <label class="etiqueta" for="demo-error">Confirmar contraseña</label>
+        <div class="input-wrap">
+          <span class="icono-campo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+          <input class="input input-invalido" id="demo-error" type="password" value="••••••••" aria-invalid="true" aria-describedby="demo-match">
+        </div>
+        <p id="demo-match" style="font-size:.875rem;color:var(--destructive)">Las contraseñas no coinciden.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Pestañas</h3>
+      <div class="tabs-lista" role="tablist" aria-label="Ingreso o registro" style="margin-bottom:20px">
+        <button class="tab" role="tab" aria-selected="true">Ingresar</button>
+        <button class="tab" role="tab" aria-selected="false">Registrarme</button>
+      </div>
+      <h3>Separador</h3>
+      <div class="separador-texto" style="margin-bottom:20px"><span></span>o continuá con email<span></span></div>
+      <h3>Aviso</h3>
+      <div class="alerta alerta-destructiva" style="margin-bottom:18px" role="alert">
+        <div class="alerta-titulo">Verificación de seguridad no disponible</div>
+        <div class="alerta-desc">Por seguridad no podemos procesar el formulario.</div>
+      </div>
+      <h3>Verificación (representación estática)</h3>
+      <div class="turnstile" aria-hidden="true">
+        <span class="caja"></span>
+        <span class="marca"><strong>Verifica que eres humano</strong><small>Cloudflare Turnstile</small></span>
+        <span class="logo">
+          <svg width="26" height="13" viewBox="0 0 26 13" fill="none" aria-hidden="true"><path d="M18.6 10.4H5.3a2.6 2.6 0 0 1-.3-5.2 3.6 3.6 0 0 1 6.6-1.4 2.9 2.9 0 0 1 4.4 1.1 2.4 2.4 0 0 1 2.6 5.5Z" fill="#f6821f"/><path d="M21.4 10.4h-2.6a2.1 2.1 0 0 0-.4-3.9 3 3 0 0 0-1-1.4 2.6 2.6 0 0 1 4 5.3Z" fill="#fbad41"/></svg>
+          <span>Cloudflare</span>
+        </span>
+      </div>
+      <p class="estado-widget">Verificación de seguridad</p>
+      <p class="leyenda-nota">
+        El widget azul claro de Cloudflare no se puede reproducir con exactitud: esta es una
+        representación editable con los mismos textos y medidas (300×65 px) que reserva
+        <code>components/turnstile-widget.tsx</code>. No es seguridad real.
+      </p>
+    </div>
+  </div>
+
+  <h2>5 · Reglas que la pantalla de acceso ya respeta</h2>
+  <div class="panel">
+    <div class="fila-token"><span>Foco visible</span><code>ring-2 ring-ring ring-offset-2 ring-offset-background</code></div>
+    <div class="fila-token"><span>Botón deshabilitado</span><code>opacity-50 · pointer-events-none · la etiqueta no cambia</code></div>
+    <div class="fila-token"><span>Ancho de tarjeta</span><code>max-w-md = 28rem = 448px</code></div>
+    <div class="fila-token"><span>Cáscara</span><code>.auth-shell · centrada, overflow-y:auto, fondo de mapa con velo blanco 0.3→0.55</code></div>
+    <div class="fila-token"><span>Estado del desafío</span><code>role="status" · aria-live="polite" · text-xs</code></div>
+    <div class="fila-token"><span>Token de un solo uso</span><code>resetSignal → nuevo desafío tras cada intento</code></div>
+  </div>
+</body>
+</html>
