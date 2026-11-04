@@ -23,6 +23,44 @@ export type AuthFormState = {
 type ProveedorOAuth = "google"
 
 const emailSchema = z.string().trim().toLowerCase().email().max(254)
+const MENSAJE_CAPTCHA = "Completá la verificación de seguridad e intentá nuevamente."
+
+/**
+ * Same copy as `MENSAJE_CAPTCHA_NO_DISPONIBLE` in `components/turnstile-widget.tsx`;
+ * `app/auth/signup-login.test.ts` asserts both are identical so they cannot drift.
+ */
+const MENSAJE_CAPTCHA_NO_DISPONIBLE =
+  "La verificación de seguridad no está disponible en este momento. Por seguridad no podemos procesar el formulario; si el problema continúa, contactá a la administración de Reporty."
+
+function obtenerCaptcha(formData: FormData): string | undefined {
+  const token = formData.get("captcha_token")
+  return typeof token === "string" && token.length > 0 && token.length <= 2048 ? token : undefined
+}
+
+/** Turnstile's public site key, read per request instead of trusting the submitted form. */
+const obtenerSitioTurnstile = () => process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
+
+/** Production must never submit a protected auth operation with the challenge silently off. */
+const esProduccion = () => process.env.NODE_ENV === "production"
+
+/**
+ * Fails closed in production when Turnstile is not configured. The provider cannot be
+ * trusted to reject the request: its CAPTCHA check may be disabled or misconfigured, so a
+ * direct call to the server action would sign in with no challenge at all.
+ *
+ * @returns Controlled error to return, or `null` when the action may continue.
+ */
+function bloqueoPorCaptchaSinConfigurar(): AuthFormState | null {
+  if (!esProduccion() || obtenerSitioTurnstile().length > 0) {
+    return null
+  }
+
+  console.error(
+    "Turnstile no está configurado: falta NEXT_PUBLIC_TURNSTILE_SITE_KEY y las operaciones de autenticación quedaron bloqueadas.",
+  )
+
+  return { error: MENSAJE_CAPTCHA_NO_DISPONIBLE }
+}
 
 /** Internal destination after a guest verifies the email linked to their account. */
 const RUTA_CUENTA_VINCULADA = "/mis-reportes?cuenta=vinculada"
@@ -53,6 +91,8 @@ const obtenerSiguienteRutaSegura = (formData: FormData) => obtenerRutaInternaSeg
  * technical, so they are never shown as is.
  */
 function mensajeErrorLogin(error: AuthError) {
+  if (error.code === "captcha_failed" || error.code === "captcha") return MENSAJE_CAPTCHA
+
   if (error.code === "user_banned") {
     return "Tu usuario está bloqueado. Contactá a la administración para recuperar el acceso."
   }
@@ -117,6 +157,8 @@ function mensajeContrasenaDebil(error: AuthError) {
 
 /** Translates a sign-up error into Spanish copy, logging the unexpected ones server-side. */
 function mensajeErrorRegistro(error: AuthError) {
+  if (error.code === "captcha_failed" || error.code === "captcha") return MENSAJE_CAPTCHA
+
   if (error.code === "user_already_exists" || error.code === "email_exists") {
     return "Ya existe una cuenta con ese correo. Iniciá sesión o recuperá tu contraseña."
   }
@@ -160,6 +202,12 @@ const obtenerProveedorOAuth = (proveedor: FormDataEntryValue | null): ProveedorO
  * @returns Estado con error controlado o redirección al destino seguro.
  */
 export async function login(_prevState: AuthFormState | void, formData: FormData): Promise<AuthFormState> {
+  const bloqueoCaptcha = bloqueoPorCaptchaSinConfigurar()
+
+  if (bloqueoCaptcha) {
+    return bloqueoCaptcha
+  }
+
   const supabase = await createClient()
 
   const data = {
@@ -167,7 +215,11 @@ export async function login(_prevState: AuthFormState | void, formData: FormData
     password: formData.get('password') as string,
   }
 
-  const { error } = await supabase.auth.signInWithPassword(data)
+  const captchaToken = obtenerCaptcha(formData)
+  const { error } = await supabase.auth.signInWithPassword({
+    ...data,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
+  })
 
   if (error) {
     return { error: mensajeErrorLogin(error) }
@@ -223,6 +275,12 @@ export async function iniciarSesionOAuth(formData: FormData): Promise<void> {
  * Además, si el registro crea una sesión activa, la función revalida la caché del layout raíz y redirige a `/`.
  */
 export async function signup(_prevState: AuthFormState | void, formData: FormData): Promise<AuthFormState> {
+  const bloqueoCaptcha = bloqueoPorCaptchaSinConfigurar()
+
+  if (bloqueoCaptcha) {
+    return bloqueoCaptcha
+  }
+
   const supabase = await createClient()
 
   const name = formData.get('name') as string
@@ -236,12 +294,16 @@ export async function signup(_prevState: AuthFormState | void, formData: FormDat
     return { error: 'Las contraseñas no coinciden' }
   }
 
+  // Read once: the token is single use and must reach exactly one Supabase call.
+  const captchaToken = obtenerCaptcha(formData)
+
   const data = {
     email: formData.get('email') as string,
     password,
     options: {
       // Without it the confirmation link lands on the Site URL root and the session is never exchanged.
       emailRedirectTo: await obtenerRedireccionCallback(obtenerSiguienteRutaSegura(formData)),
+      ...(captchaToken ? { captchaToken } : {}),
       data: {
         display_name: displayName,
         name: name,
@@ -319,6 +381,12 @@ export async function signout(): Promise<SignOutResult> {
  *
  * `signUp()` is intentionally not used: it would create a different identity.
  * If the email already belongs to an account nothing is merged or reassigned.
+ *
+ * CAPTCHA: `updateUser` in @supabase/supabase-js 2.56 (auth-js 2.71) only exposes
+ * `emailRedirectTo`, so this request cannot carry a `captchaToken`. Supabase Auth therefore
+ * never applies its CAPTCHA check to guest email linking; the flow keeps relying on the
+ * anonymous sign-in challenge that created the guest session plus the email verification
+ * link. Do not forward a Turnstile token here: the SDK would silently drop it.
  *
  * @param _prevState - Previous form state.
  * @param formData - FormData with `email`.
@@ -454,10 +522,23 @@ export async function solicitarRecuperacionContrasena(
     return { error: "Ingresá un correo electrónico válido." }
   }
 
+  const bloqueoCaptcha = bloqueoPorCaptchaSinConfigurar()
+
+  if (bloqueoCaptcha) {
+    return bloqueoCaptcha
+  }
+
   const supabase = await createClient()
+  // Read once: the token is single use and must reach exactly one Supabase call.
+  const captchaToken = obtenerCaptcha(formData)
   const { error } = await supabase.auth.resetPasswordForEmail(email.data, {
     redirectTo: await obtenerRedireccionCallback(RUTA_NUEVA_CONTRASENA),
+    ...(captchaToken ? { captchaToken } : {}),
   })
+
+  if (error?.code === "captcha_failed" || error?.code === "captcha") {
+    return { error: MENSAJE_CAPTCHA }
+  }
 
   if (error?.status === 429) {
     return { error: "Enviamos demasiados correos. Probá de nuevo en unos minutos." }
