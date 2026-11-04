@@ -70,9 +70,6 @@ export function HeaderClient({ user }: HeaderClientProps) {
 
   return (
     <>
-      {(pathname === "/" || pathname === "/auth" || pathname.startsWith("/auth/")) && (
-        <div aria-hidden="true" className="mobile-top-edge pointer-events-none fixed inset-x-0 top-0 z-40 h-px bg-[#95d2fe] md:hidden" />
-      )}
       {showTopHeader && <div className="h-[calc(3.75rem+env(safe-area-inset-top))] shrink-0 sm:h-[calc(4.75rem+env(safe-area-inset-top))]" aria-hidden="true" />}
       {showTopHeader && (
         <header className="app-header fixed inset-x-0 top-0 z-40 flex min-h-[3.75rem] items-center justify-center bg-transparent px-4 pt-[env(safe-area-inset-top)] sm:min-h-[4.75rem] sm:px-6">

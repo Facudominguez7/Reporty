@@ -83,7 +83,7 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
 
   return (
     <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
-      <div className="map-screen relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
+      <div className="relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
       <OnboardingModal />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
         <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">

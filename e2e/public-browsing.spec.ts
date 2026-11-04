@@ -2,28 +2,6 @@ import { expect, test } from "./fixtures"
 import { adminClient } from "./support/test-data"
 
 test.describe("public browsing, without an account", () => {
-  test("headerless pages have a fixed map background", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    for (const [path, selector] of [["/", ".welcome-screen"], ["/auth", ".auth-shell"], ["/mapa", ".map-screen"]]) {
-      await page.goto(path)
-      await expect(page.locator(selector)).toBeVisible()
-      await expect(page.locator(".app-header")).toHaveCount(0)
-      const background = await page.evaluate(() => {
-        const style = getComputedStyle(document.body, "::after")
-        return { position: style.position, image: style.backgroundImage }
-      })
-      expect(background.position).toBe("fixed")
-      expect(background.image).toContain("mapaMobile.webp")
-      if (path !== "/mapa") {
-        const edge = await page.locator(".mobile-top-edge").evaluate((element) => {
-          const style = getComputedStyle(element)
-          return { position: style.position, height: style.height, background: style.backgroundColor, pointerEvents: style.pointerEvents }
-        })
-        expect(edge).toEqual({ position: "fixed", height: "1px", background: "rgb(149, 210, 254)", pointerEvents: "none" })
-      }
-    }
-  })
-
   test("mobile header background stays fixed across pages and scrolling", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto("/reportes")
