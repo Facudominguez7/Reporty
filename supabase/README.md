@@ -103,7 +103,7 @@ Settings that cannot be changed through SQL/MCP and must be reviewed in the Supa
 
 1. **Authentication → Sign In / Providers → Anonymous sign-ins**: must be enabled (verified enabled on 2026-10-19 via `GET /auth/v1/settings`).
 2. **Authentication → Sign In / Providers → Allow manual linking**: enable it so guests can link an email (`updateUser({ email })`) or OAuth identity.
-3. **Authentication → Attack Protection → CAPTCHA**: enable Cloudflare Turnstile and paste the Turnstile **secret key**. Then set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in the app. Enable both together: with CAPTCHA on and no site key, guest sign-ins fail.
+3. **Authentication → Attack Protection → CAPTCHA**: enable Cloudflare Turnstile and paste the Turnstile **secret key**. It protects sign-in, sign-up, guest sign-in and password recovery at once. Deploy the app with the Turnstile variables first, then enable it (order and checks: `docs/turnstile.md`).
 4. **Authentication → Rate Limits → Anonymous sign-ins**: default 30/hour per IP; adjust if needed.
 5. **Authentication → URL Configuration → Redirect URLs**: must include `<site>/auth/callback` (the email-linking confirmation and the password recovery link land there).
 6. **Authentication → Emails → Change email address / Reset password** templates: the default `{{ .ConfirmationURL }}` works with `/auth/callback`; custom `token_hash` templates work with `/auth/confirm`.
@@ -113,7 +113,10 @@ Environment variables (no secrets in the repo):
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional | Public Turnstile site key. When unset, the widget is hidden and no `captchaToken` is sent. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Production | Public Turnstile site key, baked into the build. Outside production, unset hides the widget; in production the protected forms fail closed without it. |
+| `TURNSTILE_SECRET_KEY` | Production | Server-only Turnstile secret for report and comment verification. Production rejects Cloudflare's dummy secrets. |
+| `TURNSTILE_ALLOWED_HOSTNAMES` | Production | Comma-separated hostnames accepted from Siteverify (`reporty.com.ar`). |
+| `TURNSTILE_SITEVERIFY_URL` | E2E only | Loopback fake Siteverify; any non-loopback value fails every verification. |
 | `REPORT_RATE_LIMIT_SALT` | Recommended | Server-only salt used to hash client IPs for report rate limiting. |
 
 Anonymous users are never cleaned up automatically. If needed, an operator can delete stale guests manually (this keeps their reports, setting `reportes.usuario_id` to null):
