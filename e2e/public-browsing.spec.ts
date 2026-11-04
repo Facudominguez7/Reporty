@@ -2,6 +2,17 @@ import { expect, test } from "./fixtures"
 import { adminClient } from "./support/test-data"
 
 test.describe("public browsing, without an account", () => {
+  test("welcome and authentication reveal their background in the top safe area", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    for (const path of ["/", "/auth"]) {
+      await page.goto(path)
+      await expect.poll(() => page.evaluate(() => getComputedStyle(document.body, "::before").backgroundColor))
+        .toBe("rgba(0, 0, 0, 0)")
+    }
+    await page.goto("/mapa")
+    expect(await page.evaluate(() => getComputedStyle(document.body, "::before").backgroundColor)).toBe("rgb(0, 0, 0)")
+  })
+
   test("mobile header background stays fixed across pages and scrolling", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto("/reportes")
