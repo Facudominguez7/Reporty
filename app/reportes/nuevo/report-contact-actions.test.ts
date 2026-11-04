@@ -37,7 +37,7 @@ describe("report contact actions", () => {
     expect(actions).not.toContain('variant="secondary"')
     expect(actions).toContain('rounded-lg border border-border')
     expect(actions).toContain('aria-label={`${action}: ${contact.organization}`}')
-    expect(actions).toContain("contactHref(contact.channel_type, contact.channel_value, draft)")
+    expect(actions).toContain("contactHref(contact.channel_type, contact.channel_value, draft, props.title)")
     expect(actions).toContain("Reporty no envía el mensaje")
     expect(actions).toContain("Cargando contactos")
     expect(actions).toContain("No pudimos cargar los contactos")
@@ -117,15 +117,31 @@ describe("report contact actions", () => {
     await expect(getReportContacts(client as never, -27.3676, -55.8961, "Bache")).rejects.toThrow("offline")
   })
 
+  it("includes the report title in both message bodies and the email subject", () => {
+    const title = "Bache & semáforo"
+    const draft = createContactDraft({ title, category: "Bache", description: "Roto", latitude: -27, longitude: -55, date: "2026-01-02" })
+    expect(draft).toContain(`Título: ${title}`)
+    const email = contactHref("email", "a@example.com", draft, title)!
+    expect(new URLSearchParams(email.split("?")[1]).get("subject")).toBe(title)
+    expect(new URLSearchParams(email.split("?")[1]).get("body")).toBe(draft)
+    expect(new URL(contactHref("whatsapp", "3764680021", draft, title)!).searchParams.get("text")).toBe(draft)
+    const creation = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
+    const detail = readFileSync(new URL("../[id]/reporte-detalle-client.tsx", import.meta.url), "utf8")
+    expect(creation).toMatch(/<ReportContactActions\s+title=\{formData.title\}/)
+    expect(detail).toMatch(/<ReportContactDialog\s+[\s\S]*?title=\{reporte.titulo\}/)
+  })
+
   it("constructs editable messages and encoded links without assuming publication", () => {
-    const draft = createContactDraft({ category: "Bache", description: "Roto & peligroso", latitude: -27, longitude: -55, date: "2026-01-02" })
+    const draft = createContactDraft({ title: "Bache roto", category: "Bache", description: "Roto & peligroso", latitude: -27, longitude: -55, date: "2026-01-02" })
+    expect(draft).toBe("Hola, cargué un reporte en Reporty y quisiera informarles sobre el siguiente problema para que puedan revisarlo:\n\nTítulo: Bache roto\nCategoría: Bache\nDescripción: Roto & peligroso\nUbicación: -27, -55\nFecha: 2026-01-02\n\nMuchas gracias.")
     expect(draft).toContain("Bache")
     expect(draft).toContain("Roto & peligroso")
     expect(draft).toContain("-27, -55")
     expect(draft).toContain("2026-01-02")
     expect(draft).not.toContain("http")
-    expect(createContactDraft({ category: "Bache", description: "x", latitude: -27, longitude: -55, date: "2026-01-02", reportUrl: "https://example.org/reportes/1" })).toContain("https://example.org/reportes/1")
-    const fullDraft = createContactDraft({ category: "Bache", description: "Roto & peligroso", latitude: -27, longitude: -55, date: "2026-01-02", reportUrl: "https://example.org/reportes/1" })
+    expect(createContactDraft({ title: "Bache roto", category: "Bache", description: "x", latitude: -27, longitude: -55, date: "2026-01-02", reportUrl: "https://example.org/reportes/1" })).toContain("https://example.org/reportes/1")
+    const fullDraft = createContactDraft({ title: "Bache roto", category: "Bache", description: "Roto & peligroso", latitude: -27, longitude: -55, date: "2026-01-02", reportUrl: "https://example.org/reportes/1" })
+    expect(fullDraft).toContain("Podés consultar la información completa del reporte acá: https://example.org/reportes/1")
     for (const type of ["email", "whatsapp"] as const) {
       const href = contactHref(type, type === "email" ? "a@example.com" : "3764680021", fullDraft)!
       expect(decodeURIComponent(href)).toContain(fullDraft)

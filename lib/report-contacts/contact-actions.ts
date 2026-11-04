@@ -23,13 +23,18 @@ export async function getReportContacts(client: SupabaseClient, latitude: number
   return (data ?? []) as ReportContact[]
 }
 
-export function createContactDraft(input: { category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string }) {
-  return [`Categoría: ${input.category}`, `Descripción: ${input.description}`, `Ubicación: ${input.latitude}, ${input.longitude}`, `Fecha: ${input.date}`, ...(input.reportUrl ? [`Reporte: ${input.reportUrl}`] : [])].join("\n")
+export function createContactDraft(input: { title: string; category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string }) {
+  return [
+    "Hola, cargué un reporte en Reporty y quisiera informarles sobre el siguiente problema para que puedan revisarlo:",
+    [`Título: ${input.title}`, `Categoría: ${input.category}`, `Descripción: ${input.description}`, `Ubicación: ${input.latitude}, ${input.longitude}`, `Fecha: ${input.date}`].join("\n"),
+    ...(input.reportUrl ? [`Podés consultar la información completa del reporte acá: ${input.reportUrl}`] : []),
+    "Muchas gracias.",
+  ].join("\n\n")
 }
 
-export function contactHref(type: ReportContact["channel_type"], value: string, draft: string) {
+export function contactHref(type: ReportContact["channel_type"], value: string, draft: string, title = "Reporte ciudadano") {
   if (type === "phone") return `tel:${value.replace(/[^+\d]/g, "")}`
-  if (type === "email") return `mailto:${encodeURIComponent(value)}?subject=${encodeURIComponent("Reporte ciudadano")}&body=${encodeURIComponent(draft)}`
+  if (type === "email") return `mailto:${encodeURIComponent(value)}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(draft)}`
   if (type === "whatsapp") {
     const digits = value.replace(/\D/g, "")
     const number = digits.length === 10 ? `549${digits}`

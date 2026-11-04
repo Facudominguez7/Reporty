@@ -572,13 +572,7 @@ export function ReporteDetalleClient({
     );
   }
 
-  const diasDesdeCreacion = Math.max(
-    0,
-    dayjs().tz(ZONA_HORARIA).startOf("day").diff(
-      dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA).startOf("day"),
-      "day"
-    )
-  );
+  const diasDesdeCreacion = Math.max(0, dayjs().tz(ZONA_HORARIA).startOf("day").diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA).startOf("day"), "day"));
   const adminDraftForRender = adminDraft ?? createAdminReportDraft(reporte);
   const adminBaseForRender = adminBase ?? adminDraftForRender;
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
@@ -619,7 +613,7 @@ export function ReporteDetalleClient({
                       timeZone: ZONA_HORARIA,
                     })}
                     {" "}<span className="font-bold">
-                       (hace {diasDesdeCreacion} {diasDesdeCreacion === 1 ? "día" : "días"})
+                      (hace {diasDesdeCreacion} {diasDesdeCreacion === 1 ? "día" : "días"})
                     </span>
                   </span>
                 </div>
@@ -823,6 +817,7 @@ export function ReporteDetalleClient({
                 {puedeContactar && reporte.lat !== null && reporte.lon !== null && (
                   <div className="mt-2 mb-3">
                     <ReportContactDialog
+                      title={reporte.titulo}
                       category={getNameFromRelation(reporte.categorias)}
                       description={reporte.descripcion ?? ""}
                       latitude={reporte.lat}

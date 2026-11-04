@@ -520,6 +520,7 @@ export default function NuevoReportePage() {
             )}
             {createdReport.imageApproved && !createdReport.withdrawn && formData.lat !== null && formData.lon !== null && (
               <ReportContactActions
+                title={formData.title}
                 category={categorias.find((category) => String(category.id) === formData.category)?.nombre ?? ""}
                 description={formData.description}
                 latitude={formData.lat}

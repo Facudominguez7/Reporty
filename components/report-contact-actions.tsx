@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { contactHref, createContactDraft, getReportContacts, type ReportContact } from "@/lib/report-contacts/contact-actions"
 import { createClient } from "@/utils/supabase/client"
 
-type Props = { category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string; showHeading?: boolean }
+type Props = { title: string; category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string; showHeading?: boolean }
 type DialogProps = Omit<Props, "reportUrl" | "showHeading"> & { reportId: number }
 const CONTACT_DISCLAIMER = "Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta."
 
@@ -77,7 +77,7 @@ export function ReportContactActions({ showHeading = true, ...props }: Props) {
         {hasOverflow && <p id="contact-scroll-hint" className="text-xs font-semibold text-muted-foreground">Desplazate para ver más organismos</p>}
         <ul ref={listRef} aria-label="Lista de organismos" aria-describedby={hasOverflow ? "contact-scroll-hint" : undefined} tabIndex={0} className="max-h-40 space-y-2 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {contacts.map((contact) => {
-            const href = contactHref(contact.channel_type, contact.channel_value, draft)
+            const href = contactHref(contact.channel_type, contact.channel_value, draft, props.title)
             const action = contact.channel_type === "phone" ? "Llamar" : contact.channel_type === "whatsapp" ? "Abrir WhatsApp" : "Redactar correo"
             const channelLabel = contact.channel_type === "phone" ? "Teléfono" : contact.channel_type === "whatsapp" ? "WhatsApp" : contact.channel_type === "email" ? "Correo" : "Formulario"
             return <li key={contact.id} className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-border bg-card px-2 py-1 text-[0.8rem]">
