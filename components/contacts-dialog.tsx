@@ -1,6 +1,6 @@
 "use client"
 
-import { Mail, MessageCircle, Phone, Siren } from "lucide-react"
+import { Mail, Phone, Siren } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -143,7 +143,7 @@ export function ContactsDialog() {
           </TabsContent>
           <TabsContent value="emergencias" className="grid max-h-[40dvh] grid-cols-1 content-start gap-1 overflow-y-auto sm:max-h-none sm:grid-cols-2 sm:overflow-visible">
             {EMERGENCIES.map(([number, description]) => (
-              <div key={number} className="rounded-xl border border-border/70 bg-muted/30 px-2 py-1.5 text-[11px] leading-4 sm:px-3 sm:py-2.5 sm:text-sm">
+              <div key={number} className="rounded-xl border border-border/70 bg-muted/30 px-2 py-1.5 text-xs leading-4 sm:px-3 sm:py-2.5 sm:text-sm">
                 <a href={`tel:${number}`} className="font-semibold text-primary hover:underline">{number}</a>
                 <p className="mt-0.5 text-muted-foreground sm:mt-1">{description}</p>
               </div>
@@ -151,14 +151,11 @@ export function ContactsDialog() {
           </TabsContent>
         </Tabs>
         <DialogFooter className="flex-col gap-1.5 border-t pt-1 sm:flex-col sm:justify-start">
-          <Button asChild variant="outline" className="h-auto min-h-0 w-full py-1">
-            <a href="https://wa.me/5493764241856" className="flex flex-col items-center gap-0.5">
-              <span className="inline-flex items-center gap-1.5"><MessageCircle className="size-4" aria-hidden="true" />Contactanos</span>
-              <span className="text-xs font-normal">+54 9 3764 24-1856</span>
+          <p className="flex w-full items-center justify-center gap-2 text-[10px] text-muted-foreground">
+            <span>Creado por <a href="https://god.com.ar" className="font-semibold" aria-label="GOD, god.com.ar"><span className="text-black">G</span><span className="text-black">O</span><span className="text-violet-600">D</span></a></span>
+            <a href="https://wa.me/5493764241856" className="inline-flex min-h-11 items-center gap-1 text-primary hover:underline" aria-label="Contactar por WhatsApp al +54 9 3764 24-1856">
+              Contactar
             </a>
-          </Button>
-          <p className="w-full text-center text-[10px] leading-none text-muted-foreground">
-            Creado por <a href="https://god.com.ar" className="font-semibold" aria-label="GOD, god.com.ar"><span className="text-black">G</span><span className="text-black">O</span><span className="text-violet-600">D</span></a>
           </p>
           <DialogClose asChild>
             <Button type="button" size="sm" className="w-full sm:w-auto">Entendido</Button>

@@ -74,7 +74,7 @@ export default async function ComunidadPage() {
                               <RankIcon className="!size-5" aria-hidden="true" />
                               <span>{rank}</span>
                             </Badge>
-                            <p className="w-full break-words text-sm font-semibold leading-5">{contributor.username}</p>
+                            <p className="w-full break-words text-xs font-semibold leading-5">{contributor.username}</p>
                             <p className="ranking-points text-xs font-semibold">{contributor.points} puntos</p>
                           </div>
                         )
@@ -99,7 +99,7 @@ export default async function ComunidadPage() {
                             <AvatarFallback>{getUserInitials(contributor.username)}</AvatarFallback>
                           </Avatar>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate font-semibold">{contributor.username}</p>
+                            <p className="truncate text-xs font-semibold">{contributor.username}</p>
                           </div>
                           <div className="text-right">
                             <p className="ranking-points font-semibold">{contributor.points}</p>

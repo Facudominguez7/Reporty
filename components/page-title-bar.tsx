@@ -26,8 +26,8 @@ export function PageTitleBar({ leading, icon, title, description, actions }: Pag
           </div>
         )}
         <div className="min-w-0 space-y-1">
-          <h1 className="line-clamp-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">{title}</h1>
-          {description && <p className="line-clamp-2 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>}
+          <h1 className="line-clamp-2 text-lg font-semibold tracking-tight text-foreground md:text-2xl">{title}</h1>
+          {description && <p className="line-clamp-2 max-w-2xl text-xs leading-5 text-muted-foreground md:text-sm">{description}</p>}
         </div>
       </div>
       {actions && <div className="flex min-w-0 shrink-0 items-center gap-2">{actions}</div>}
