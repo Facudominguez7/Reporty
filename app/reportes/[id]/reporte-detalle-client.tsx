@@ -602,7 +602,7 @@ export function ReporteDetalleClient({
             {/* Encabezado del Reporte */}
             <Card className="gap-0">
               <CardHeader className="pb-3">
-                <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="col-span-full mb-1 flex items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
                   <Calendar className="size-3.5 shrink-0" />
                   <span className="whitespace-nowrap">
                     Creado el día{" "}
@@ -617,7 +617,7 @@ export function ReporteDetalleClient({
                     </span>
                   </span>
                 </div>
-                <div className="flex w-full flex-wrap items-center gap-1.5">
+                <div className="flex w-full flex-wrap items-center gap-1">
                   {isAdmin ? (
                     <AdminInlineField
                       key={`priority-${isAdminEditing ? "editing" : "display"}`}
@@ -627,7 +627,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("prioridadId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex items-center gap-1 text-xs">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</Badge>}
+                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Prioridad del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir prioridad" /></SelectTrigger>
@@ -636,7 +636,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex items-center gap-1 text-xs">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</Badge>
+                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -647,7 +647,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => setAdminDraft((current) => current ? { ...current, estadoId: value.estadoId, comentarioEstado: value.comentario } : current)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex items-center gap-1 text-xs">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</Badge>}
+                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>}
                       editor={(draft, onChange) => (
                         <div className="min-w-0 space-y-2">
                           <Select value={draft.estadoId.toString()} disabled={isAdminSaving} onValueChange={(id) => {
@@ -662,7 +662,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex items-center gap-1 text-xs">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</Badge>
+                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -673,7 +673,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("categoriaId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant="category" className="flex items-center gap-1 text-xs">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</Badge>}
+                      display={() => <Badge variant="category" className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Categoría del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir categoría" /></SelectTrigger>
@@ -682,7 +682,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant="category" className="flex items-center gap-1 text-xs">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</Badge>
+                    <Badge variant="category" className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>
                   )}
                 </div>
                 <div className="flex min-w-0 items-start gap-3">
