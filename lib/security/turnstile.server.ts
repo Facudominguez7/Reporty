@@ -7,6 +7,13 @@ import "server-only"
  */
 const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
+/**
+ * Hosts a stand-in Siteverify may use. `TURNSTILE_SITEVERIFY_URL` only exists so E2E can
+ * point the server at a fake in loopback; production never sets it and never accepts a
+ * remote replacement for the official endpoint.
+ */
+const HOSTS_LOOPBACK = new Set(["127.0.0.1", "localhost", "::1"])
+
 /** Turnstile tokens are at most 2048 characters long. */
 const TOKEN_MAX_LENGTH = 2048
 
@@ -64,6 +71,35 @@ function leerConfiguracion(): ConfiguracionTurnstile {
     .filter(hostname => hostname.length > 0)
 
   return { secreto, hostnames }
+}
+
+/**
+ * Resolves the Siteverify endpoint for this request. With the variable unset (or empty) the
+ * official endpoint is used, exactly as before. A configured value replaces it only when it
+ * is an http(s) URL on loopback; anything else is refused instead of silently falling back.
+ *
+ * @returns Endpoint to call, or `null` when the configured value is not acceptable.
+ */
+function resolverUrlSiteverify(): string | null {
+  const configurada = process.env.TURNSTILE_SITEVERIFY_URL?.trim() ?? ""
+  if (configurada.length === 0) {
+    return SITEVERIFY_URL
+  }
+
+  let url: URL
+  try {
+    url = new URL(configurada)
+  } catch {
+    return null
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return null
+  }
+
+  // IPv6 hosts keep their brackets in `hostname` (`[::1]`); compare without them.
+  const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  return HOSTS_LOOPBACK.has(hostname) ? url.toString() : null
 }
 
 /** Validates token shape locally: presence, maximum length, no whitespace or control chars. */
@@ -126,6 +162,13 @@ export async function verificarTurnstile(input: { token: string | null | undefin
     }
   }
 
+  // A stand-in endpoint that is not loopback is a configuration error: the request is
+  // never sent anywhere, not even to the official endpoint.
+  const urlSiteverify = resolverUrlSiteverify()
+  if (!urlSiteverify) {
+    return { ok: false, motivo: "configuracion_faltante", mensaje: MENSAJES.configuracion_faltante }
+  }
+
   const token = typeof input.token === "string" ? input.token : ""
   if (!tokenValido(token)) {
     return { ok: false, motivo: "token_invalido", mensaje: MENSAJES.token_invalido }
@@ -150,7 +193,7 @@ export async function verificarTurnstile(input: { token: string | null | undefin
     try {
       const resultado = await Promise.race([
         (async () => {
-          const respuesta = await fetch(SITEVERIFY_URL, {
+          const respuesta = await fetch(urlSiteverify, {
             method: "POST",
             headers: { "content-type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ secret: secreto, response: token }),

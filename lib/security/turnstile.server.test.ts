@@ -311,6 +311,58 @@ describe("verificarTurnstile", () => {
     await asercion
   })
 
+  it("TURNSTILE_SITEVERIFY_URL vacío sigue usando el endpoint oficial", async () => {
+    configurar()
+    vi.stubEnv("TURNSTILE_SITEVERIFY_URL", "")
+    const llamada = espiaFetch()
+    expect(await verificarTurnstile({ token: "tok" })).toEqual({ ok: true })
+    expect(llamada.mock.calls[0][0]).toBe(SITEVERIFY_URL)
+  })
+
+  it("usa el Siteverify falso de loopback configurado en lugar del endpoint oficial", async () => {
+    configurar()
+    const falso = "http://127.0.0.1:3198/siteverify"
+    vi.stubEnv("TURNSTILE_SITEVERIFY_URL", falso)
+    const llamada = espiaFetch()
+
+    expect(await verificarTurnstile({ token: "tok-loopback" })).toEqual({ ok: true })
+    expect(llamada).toHaveBeenCalledTimes(1)
+    expect(llamada.mock.calls[0][0]).toBe(falso)
+    expect(llamada.mock.calls[0][1].body.get("response")).toBe("tok-loopback")
+  })
+
+  it.each([
+    "http://127.0.0.1:3198/siteverify",
+    "http://localhost:3198/siteverify",
+    "http://[::1]:3198/siteverify",
+    "https://LOCALHOST/siteverify",
+  ])("acepta el host de loopback %s", async url => {
+    configurar()
+    vi.stubEnv("TURNSTILE_SITEVERIFY_URL", url)
+    const llamada = espiaFetch()
+
+    expect(await verificarTurnstile({ token: "tok" })).toEqual({ ok: true })
+    expect(llamada.mock.calls[0][0]).toBe(new URL(url).toString())
+  })
+
+  it.each([
+    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+    "http://127.0.0.1.evil.example/siteverify",
+    "http://127.0.0.1@evil.example/siteverify",
+    "http://[::2]:3198/siteverify",
+    "ftp://127.0.0.1/siteverify",
+    "no es una url",
+  ])("falla cerrada sin llamar a Siteverify con un Siteverify no loopback (%s)", async url => {
+    configurar()
+    vi.stubEnv("TURNSTILE_SITEVERIFY_URL", url)
+    const llamada = espiaFetch()
+
+    const resultado = await verificarTurnstile({ token: "tok" })
+
+    expect(resultado).toMatchObject({ ok: false, motivo: "configuracion_faltante" })
+    expect(llamada).not.toHaveBeenCalled()
+  })
+
   it("no registra el token ni el secreto en logs ni en el resultado", async () => {
     configurar()
     const token = "tok-super-secreto-abc123"
