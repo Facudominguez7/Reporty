@@ -149,6 +149,18 @@
   }
 }
 
+body:not(:has(.admin-workspace)),
+.auth-shell {
+  background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.55)), var(--map-background);
+}
+
+@media (max-width: 767px) {
+  body:not(:has(.admin-workspace)),
+  .auth-shell {
+    background-size: cover, max(110%, 61.875vh) auto;
+  }
+}
+
 @media (min-width: 768px) {
   :root {
     --map-background: url("/mapas/mapaDesktop.webp");
@@ -208,8 +220,6 @@
     background-image: var(--map-background);
     background-position: center;
     background-size: cover;
-    background-color: rgb(255 255 255 / 0.45);
-    background-blend-mode: screen;
   }
 
   .page-container {
