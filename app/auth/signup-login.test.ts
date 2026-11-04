@@ -508,3 +508,17 @@ describe("signup form values after a failed attempt", () => {
     ).toEqual({ password: "", confirmPassword: "" })
   })
 })
+
+describe("signup feedback toasts", () => {
+  it("announces each attempt once instead of repeating it while the passwords are edited", async () => {
+    const { readFileSync } = await import("node:fs")
+    const codigo = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
+    const fin = codigo.indexOf("}, [confirmPassword, signupPassword, signupState])")
+    const efecto = codigo.slice(codigo.lastIndexOf("useEffect(() => {", fin), fin)
+    const guard = efecto.indexOf("if (signupState === lastSignupState.current) return")
+
+    expect(guard).toBeGreaterThan(-1)
+    expect(efecto.indexOf("toast.error(signupState.error)")).toBeGreaterThan(guard)
+    expect(efecto.indexOf("toast.success(signupState.message)")).toBeGreaterThan(guard)
+  })
+})

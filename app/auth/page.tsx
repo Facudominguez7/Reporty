@@ -79,12 +79,13 @@ export default function AuthPage() {
   const lastSignupState = useRef(signupState)
 
   useEffect(() => {
+    // The effect also runs while the passwords are edited: only a new attempt is announced.
+    if (signupState === lastSignupState.current) return
+    lastSignupState.current = signupState
     if (signupState?.error) toast.error(signupState.error)
     if (signupState?.message) toast.success(signupState.message)
     // Supabase consumed the submitted token, so the form keeps its values and asks for a
     // fresh challenge instead of reusing it.
-    if (signupState === lastSignupState.current) return
-    lastSignupState.current = signupState
     // Keep what was typed after any failure (a rejected CAPTCHA included); only a created
     // account clears the passwords.
     const contrasenas = valoresTrasIntentoFallido(
