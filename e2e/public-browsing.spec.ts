@@ -2,6 +2,34 @@ import { expect, test } from "./fixtures"
 import { adminClient } from "./support/test-data"
 
 test.describe("public browsing, without an account", () => {
+  test("mobile header background stays fixed across pages and scrolling", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto("/reportes")
+
+    const background = () => page.evaluate(() => {
+      const style = getComputedStyle(document.body, "::after")
+      return { position: style.position, image: style.backgroundImage, size: style.backgroundSize }
+    })
+    const initial = await background()
+    expect(initial.position).toBe("fixed")
+    expect(initial.image).toContain("mapaMobile.webp")
+    const headerBackground = () => page.screenshot({ clip: { x: 0, y: 0, width: 390, height: 8 }, animations: "disabled" })
+    await page.evaluate(() => document.fonts.ready)
+    const header = await headerBackground()
+
+    await page.goto("/comunidad")
+    await page.evaluate(() => document.fonts.ready)
+    expect(await background()).toEqual(initial)
+    expect(await headerBackground()).toEqual(header)
+    await page.evaluate(() => {
+      document.body.style.minHeight = "200vh"
+      document.documentElement.style.scrollBehavior = "auto"
+      window.scrollTo(0, document.body.scrollHeight)
+    })
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+    expect(await background()).toEqual(initial)
+  })
+
   test("the map loads with report markers", async ({ page, testData }) => {
     const owner = await testData.createUser()
     await testData.createReport(owner)
