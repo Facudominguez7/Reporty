@@ -15,7 +15,7 @@ import {
   releaseReportSubmission,
   reportSubmissionClaimMessage,
 } from "@/lib/security/report-submission-guard.server"
-import { verificarTurnstile } from "@/lib/security/turnstile.server"
+import { verificarCaptchaDeAccion } from "@/lib/security/turnstile-guard.server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
@@ -67,13 +67,11 @@ const ACCION_CAPTCHA_CREACION = "crear_reporte"
 const MENSAJE_CAPTCHA_NO_DISPONIBLE =
   "La verificación de seguridad no está disponible en este momento. Por seguridad no podemos procesar el formulario; si el problema continúa, contactá a la administración de Reporty."
 
-/** Production must never accept a report submission with the challenge silently off. */
+/**
+ * Producción nunca acepta un envío con el challenge apagado en silencio. La política vive en
+ * el guard; acá solo decide qué tan grave es la falta de configuración al registrar el error.
+ */
 const esProduccion = () => process.env.NODE_ENV === "production"
-
-/** Mirrors the browser: the widget only renders a challenge when this public key exists. */
-const captchaConfigurado = () => (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "").trim().length > 0
-
-const secretoConfigurado = () => (process.env.TURNSTILE_SECRET_KEY ?? "").trim().length > 0
 
 /** Reads the single-use token the form attached to this submission. */
 function obtenerCaptcha(formData: FormData): string | undefined {
@@ -88,31 +86,30 @@ function obtenerCaptcha(formData: FormData): string | undefined {
  * challenge. Both registered and guest identities go through it, and the token consumed
  * by the guest `signInAnonymously()` call can never be reused here.
  *
+ * La política vive en `lib/security/turnstile-guard.server.ts` junto con el resto de las
+ * operaciones protegidas; acá solo se traduce el resultado al texto que ve la persona.
+ *
  * @param formData - Submission carrying the single-use `captcha_token`.
  * @returns Error copy to return, or `null` when the creation may continue.
  */
 async function verificarCaptchaDeCreacion(formData: FormData): Promise<string | null> {
-  if (!esProduccion() && !captchaConfigurado()) {
-    // Without a site key the form cannot render a challenge at all (development and
-    // tests). Production never reaches this branch: it fails closed below.
-    return null
-  }
-
-  if (!captchaConfigurado() || !secretoConfigurado()) {
-    // Never degrade silently: the private key stays server-side, so an incomplete setup
-    // blocks the protected operation instead of trusting the client token.
-    console.error(
-      "Turnstile no está configurado: la creación de reportes quedó bloqueada hasta completar NEXT_PUBLIC_TURNSTILE_SITE_KEY y TURNSTILE_SECRET_KEY.",
-    )
-    return MENSAJE_CAPTCHA_NO_DISPONIBLE
-  }
-
-  const verificacion = await verificarTurnstile({
+  const resultado = await verificarCaptchaDeAccion({
     token: obtenerCaptcha(formData),
     expectedAction: ACCION_CAPTCHA_CREACION,
   })
 
-  return verificacion.ok ? null : verificacion.mensaje
+  if (resultado.ok) return null
+  if (resultado.tipo === "rechazada") return resultado.mensaje
+
+  // Nunca se degrada en silencio: el secreto vive solo en el servidor, así que una
+  // configuración incompleta bloquea la operación en vez de confiar en el token del cliente.
+  // En producción es una caída del servicio; fuera de ella, una configuración a medio terminar.
+  console.error(
+    esProduccion()
+      ? "Turnstile no está configurado en producción: la creación de reportes quedó bloqueada hasta completar NEXT_PUBLIC_TURNSTILE_SITE_KEY y TURNSTILE_SECRET_KEY."
+      : "Turnstile no está configurado: la creación de reportes quedó bloqueada hasta completar NEXT_PUBLIC_TURNSTILE_SITE_KEY y TURNSTILE_SECRET_KEY.",
+  )
+  return MENSAJE_CAPTCHA_NO_DISPONIBLE
 }
 
 /** Extrae el archivo sin leer bytes; toda validación costosa ocurre después de autorizar el rol. */

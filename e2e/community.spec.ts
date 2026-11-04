@@ -1,6 +1,7 @@
 import { expect, test } from "./fixtures"
 import type { BrowserContext } from "@playwright/test"
 import { signIn } from "./support/auth"
+import { resetSiteverify, setVerificationAction } from "./support/siteverify"
 import { adminClient, uniqueTag } from "./support/test-data"
 
 type CapturedEmail = { to: string[]; subject: string; text: string; html: string }
@@ -19,6 +20,11 @@ async function notification(to: string, subject: string): Promise<CapturedEmail>
 }
 
 test.describe("community", () => {
+  test.afterEach(async () => {
+    // Una action cambiada rompería la próxima creación de reporte de otra prueba.
+    await resetSiteverify()
+  })
+
   test("visitors are directed to sign in from either vote", async ({ page, testData }) => {
     const owner = await testData.createUser()
     const report = await testData.createReport(owner)
@@ -34,17 +40,22 @@ test.describe("community", () => {
     const owner = await testData.createUser()
     const citizen = await testData.createUser()
     const report = await testData.createReport(owner)
-    const comment = `Actualización ${uniqueTag()}`
+    const comment = "El problema sigue igual"
     await signIn(page, citizen)
     await page.goto(`/reportes/${report.id}`)
-    await page.getByRole("textbox").fill(comment)
+    // El challenge del aporte se emite para la action que el servidor verifica con Siteverify.
+    await setVerificationAction("comentar_reporte")
+    const contribution = page.getByLabel("¿Qué novedad tenés?")
+    await contribution.selectOption("problema_sigue_igual")
     await page.getByRole("button", { name: "Publicar", exact: true }).click()
-    await page.getByRole("alertdialog").getByRole("button", { name: "Publicar Comentario" }).click()
+    await page.getByRole("alertdialog").getByRole("button", { name: "Publicar actualización" }).click()
     await expect(page.getByRole("alertdialog")).toBeHidden()
-    await expect(page.getByRole("textbox")).toHaveValue("")
-    await expect(page.getByText(comment, { exact: true })).toBeVisible()
+    await expect(contribution).toHaveValue("")
+    // El aporte aparece como texto propio; el texto del combo no cuenta como publicación.
+    const published = page.getByRole("paragraph").filter({ hasText: comment })
+    await expect(published).toHaveCount(1)
     await page.reload()
-    await expect(page.getByText(comment, { exact: true })).toBeVisible()
+    await expect(published).toHaveCount(1)
 
     const email = await notification(owner.email, `Nuevo comentario en tu reporte: ${report.titulo}`)
     expect(email.to).toEqual([owner.email])
