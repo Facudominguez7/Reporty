@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -36,6 +37,7 @@ import {
   Share2,
   Users,
   FileSearch2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -203,6 +205,7 @@ export function ReporteDetalleClient({
   const [isVotingReparado, setIsVotingReparado] = useState(false);
   const [cerradoPorVoto, setCerradoPorVoto] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ src: string; alt: string } | null>(null);
 
   // Estados para controlar los AlertDialogs
   const [showDeleteReporteDialog, setShowDeleteReporteDialog] = useState(false);
@@ -761,14 +764,19 @@ export function ReporteDetalleClient({
                   <div className="mb-4 flex flex-col items-center gap-3 md:mb-6 lg:mb-8">
                     {reporte.fotos_reporte.map((foto, index) => (
                       <div key={foto.id} className="relative w-full max-w-2xl">
-                        <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-md bg-[var(--surface-subtle)] md:rounded-lg lg:rounded-xl">
+                        <button
+                          type="button"
+                          aria-label={`Ver imagen ${index + 1} del reporte en grande`}
+                          onClick={() => setSelectedPhoto({ src: foto.publicUrl || foto.url || "/placeholder.svg", alt: `Imagen ${index + 1} del reporte` })}
+                          className="flex aspect-video w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-md bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:rounded-lg lg:rounded-xl"
+                        >
                           <img
                             src={foto.publicUrl || foto.url || "/placeholder.svg"}
                             alt={`Imagen ${index + 1} del reporte`}
                             loading={index === 0 ? undefined : "lazy"}
                             className="h-full w-full object-contain"
                           />
-                        </div>
+                        </button>
                         {isAdmin && isAdminEditing && (
                           <AdminReportPhotoControls
                             fotoId={foto.id}
@@ -780,6 +788,18 @@ export function ReporteDetalleClient({
                         )}
                       </div>
                     ))}
+                    <Dialog open={selectedPhoto !== null} onOpenChange={(open) => { if (!open) setSelectedPhoto(null) }}>
+                      <DialogContent showClose={false} className="w-auto max-w-[95vw] gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:p-0">
+                        <DialogClose asChild>
+                          <Button variant="outline" size="icon" aria-label="Cerrar imagen ampliada" className="absolute right-2 top-2 z-10 size-10 rounded-full border-white bg-white text-black shadow-lg hover:bg-white/90">
+                            <X className="size-5" aria-hidden="true" />
+                          </Button>
+                        </DialogClose>
+                        <DialogTitle className="sr-only">Imagen ampliada del reporte</DialogTitle>
+                        <DialogDescription className="sr-only">{selectedPhoto?.alt}</DialogDescription>
+                        {selectedPhoto && <img src={selectedPhoto.src} alt={selectedPhoto.alt} className="max-h-[90dvh] max-w-[95vw] object-contain" />}
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
 
