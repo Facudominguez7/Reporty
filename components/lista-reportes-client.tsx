@@ -112,7 +112,7 @@ export function ListaReportesClient({
     return (
         <>
             {reports.length > 0 && (
-                <div className={variant === "compact" ? "incident-list incident-list--reportes" : "grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2"}>
+                <div className={variant === "compact" ? "incident-list grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3" : "grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2"}>
                     {reports.map((report) => (
                         variant === "compact" ? (
                              <ReportCompactCard

@@ -27,9 +27,9 @@ export function HowToUseDialog() {
       <DialogTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="gap-1.5 rounded-full bg-background/70 text-foreground shadow-sm hover:bg-background"
+          className="size-9 p-0 gap-1.5 rounded-full shadow-sm sm:size-auto sm:px-3.5"
         >
           <CircleHelp className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Cómo usar</span>

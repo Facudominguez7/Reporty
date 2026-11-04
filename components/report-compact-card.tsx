@@ -87,19 +87,19 @@ export function ReportCompactCard({
             <div className="flex min-w-0 flex-col items-end gap-1.5">
               <Badge
                 variant={getStatusVariant(status)}
-                className="max-w-[7.5rem] gap-1 px-2 py-1 text-[9px] leading-3 sm:text-[10px]"
+                className="max-w-24 gap-0.5 px-1 py-0.5 text-[8px] leading-3 sm:max-w-[7.5rem] sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px]"
                 title={status}
               >
-                {getStatusIcon(status)}
+                {getStatusIcon(status, "size-2.5 sm:size-3")}
                 <span className="truncate">{status}</span>
               </Badge>
               {category && (
                 <Badge
                   variant="category"
-                  className="max-w-[7.5rem] gap-1 px-2 py-1 text-[9px] leading-3 sm:text-[10px]"
+                  className="max-w-24 gap-0.5 px-1 py-0.5 text-[8px] leading-3 sm:max-w-[7.5rem] sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px]"
                   title={category}
                 >
-                  {getCategoryIcon(category, "size-3")}
+                  {getCategoryIcon(category, "size-2.5 sm:size-3")}
                   <span className="truncate">{category}</span>
                 </Badge>
               )}

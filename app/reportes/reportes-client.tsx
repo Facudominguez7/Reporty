@@ -49,14 +49,15 @@ export function ReportesClientWrapper({ categorias, estados, prioridades }: Repo
             type="button"
             variant="secondary"
             size="xs"
+            className="size-9 p-0 sm:size-auto sm:px-2.5"
             aria-label={showFilters ? "Cerrar filtros" : `Abrir filtros${activeFilters > 0 ? `, ${activeFilters} activos` : ""}`}
             aria-expanded={showFilters}
           >
             {showFilters ? <X className="size-4" aria-hidden="true" /> : <SlidersHorizontal className="size-4" aria-hidden="true" />}
-            <span>{showFilters ? "Cerrar" : activeFiltersLabel}</span>
+            <span className="hidden sm:inline">{showFilters ? "Cerrar" : activeFiltersLabel}</span>
           </Button>
         </DrawerTrigger>
-        <DrawerContent className="max-h-[85dvh] bg-card md:inset-x-[15%]">
+        <DrawerContent className="max-h-[85dvh] bg-card md:inset-x-[10%]">
           <div className="flex-1 min-h-0 overflow-y-auto">
             <FiltrosReportes
               categorias={categorias}
