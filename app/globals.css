@@ -156,7 +156,8 @@ body:not(:has(.admin-workspace)),
 
 @media (max-width: 767px) {
   body:has(.welcome-screen)::before,
-  body:has(.auth-shell)::before {
+  body:has(.auth-shell)::before,
+  body:has(.map-screen)::before {
     background: transparent;
   }
 
@@ -165,12 +166,18 @@ body:not(:has(.admin-workspace)),
     background-size: cover, max(110%, 61.875vh) auto;
   }
 
-  body:has(.app-header) {
+  body:has(.app-header),
+  body:has(.welcome-screen),
+  body:has(.auth-shell),
+  body:has(.map-screen) {
     isolation: isolate;
     background-image: none;
   }
 
-  body:has(.app-header)::after {
+  body:has(.app-header)::after,
+  body:has(.welcome-screen)::after,
+  body:has(.auth-shell)::after,
+  body:has(.map-screen)::after {
     content: "";
     position: fixed;
     inset: 0;
@@ -178,7 +185,15 @@ body:not(:has(.admin-workspace)),
     pointer-events: none;
     background-image: linear-gradient(to bottom, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.55)), var(--map-background);
     background-position: center;
+    background-size: cover, max(110%, 61.875vh) auto;
+  }
+
+  body:has(.app-header)::after {
     background-size: cover, max(115.5%, 64.96875vh) auto;
+  }
+
+  .auth-shell {
+    background-image: none;
   }
 }
 
