@@ -15,6 +15,10 @@ export type ReportContact = {
 export async function getReportContacts(client: SupabaseClient, latitude: number, longitude: number, category: string) {
   const municipality = resolveReportMunicipality(latitude, longitude)
   if (!municipality) return []
+  return getMunicipalityContacts(client, municipality, category)
+}
+
+export async function getMunicipalityContacts(client: SupabaseClient, municipality: string, category: string) {
   const { data, error } = await client.from("report_contact_directory")
     .select("id, organization, purpose, channel_type, channel_value, verification_status")
     .eq("municipality", municipality).eq("category", category)

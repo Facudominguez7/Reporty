@@ -1,78 +1,24 @@
 "use client"
 
-import { Mail, Phone, Siren } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Phone, Siren } from "lucide-react"
+import { contactHref, getMunicipalityContacts, type ReportContact } from "@/lib/report-contacts/contact-actions"
+import { createClient } from "@/utils/supabase/client"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const CONTACT_GROUPS = {
-  alumbrado: [
-    ["EMSA", "3764242513", "phone"],
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-  ],
-  baches: [
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-    ["Movilidad Urbana", "3764188865 (llamada)", "phone"],
-    ["Movilidad Urbana", "movilidadurbana@posadas.gov.ar", "email"],
-  ],
-  arboles: [
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-  ],
-  residuos: [
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-  ],
-  seguridad: [
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-  ],
-  semaforo: [
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-    ["Movilidad Urbana", "3764188865 (llamada)", "phone"],
-    ["Movilidad Urbana", "movilidadurbana@posadas.gov.ar", "email"],
-  ],
-  agua: [
-    ["EPRAC", "3765046100", "phone"],
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-  ],
-  otros: [
-    ["Atención al Vecino", "3764140677", "phone"],
-    ["Defensoría del pueblo", "3764125611", "phone"],
-    ["Planificación estratégica", "3764449087 (llamada)", "phone"],
-    ["Planificación estratégica", "sec_planificacion@posadas.gov.ar", "email"],
-  ],
+const GROUP_LABELS = {
+  Alumbrado: "Alumbrado",
+  Bache: "Baches",
+  "Arbol caido": "Árboles caídos",
+  Residuos: "Residuos",
+  Seguridad: "Seguridad",
+  Semaforo: "Semáforo",
+  Agua: "Agua",
+  Otros: "Otros",
 } as const
-
-const GROUP_LABELS: Record<keyof typeof CONTACT_GROUPS, string> = {
-  alumbrado: "Alumbrado",
-  baches: "Baches",
-  arboles: "Árboles caídos",
-  residuos: "Residuos",
-  seguridad: "Seguridad",
-  semaforo: "Semáforo",
-  agua: "Agua",
-  otros: "Otros",
-}
 
 const EMERGENCIES = [
   ["911", "Emergencias generales: policía y solicitud de asistencia urgente."],
@@ -91,25 +37,38 @@ const EMERGENCIES = [
   ["145", "Denuncias por trata de personas."],
 ] as const
 
-type Contact = (typeof CONTACT_GROUPS)[keyof typeof CONTACT_GROUPS][number]
-
-function ContactRow({ contact }: { contact: Contact }) {
-  const [label, value, type] = contact
-  const href = type === "email" ? `mailto:${value}` : `tel:${value.replace(/\D/g, "")}`
+export function ContactRow({ contact }: { contact: ReportContact }) {
+  const href = contactHref(contact.channel_type, contact.channel_value, "")
+  const channel = contact.channel_type === "phone" ? "Teléfono" : contact.channel_type === "whatsapp" ? "WhatsApp" : contact.channel_type === "email" ? "Correo" : "Formulario"
+  const action = contact.channel_type === "phone" ? "Llamar" : contact.channel_type === "whatsapp" ? "Abrir WhatsApp" : "Redactar correo"
   return (
-    <div className="flex min-w-0 items-start justify-between gap-2 rounded-xl border border-border/70 bg-muted/30 px-2.5 py-2 text-xs sm:px-3 sm:py-2.5 sm:text-sm">
-      <span className="min-w-0 text-muted-foreground">{label}</span>
-      <a href={href} className="inline-flex min-w-0 shrink break-all items-center justify-end gap-1 text-right font-medium text-primary hover:underline">
-        {type === "email" ? <Mail className="size-3.5" aria-hidden="true" /> : <Phone className="size-3.5" aria-hidden="true" />}
-        {value}
-      </a>
+    <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/30 px-2.5 py-2 text-xs sm:text-sm">
+      <span className="min-w-0 break-all"><span className="font-medium">{contact.organization}</span><br /><span className="text-muted-foreground">{channel}{contact.channel_type === "form" ? "" : ` · ${contact.channel_value}`}</span></span>
+      {href && <a href={href} aria-label={`${action}: ${contact.organization}`} className="shrink-0 font-medium text-primary hover:underline">{action}</a>}
     </div>
   )
 }
 
 export function ContactsDialog() {
+  const [open, setOpen] = useState(false)
+  const [municipality, setMunicipality] = useState("Posadas")
+  const [category, setCategory] = useState<keyof typeof GROUP_LABELS>("Alumbrado")
+  const [result, setResult] = useState<{ key: string; contacts?: ReportContact[]; failed?: boolean } | null>(null)
+  const key = `${municipality}:${category}`
+
+  useEffect(() => {
+    if (!open) return
+    let active = true
+    getMunicipalityContacts(createClient(), municipality, category).then(
+      (contacts) => { if (active) setResult({ key, contacts }) },
+      () => { if (active) setResult({ key, failed: true }) },
+    )
+    return () => { active = false }
+  }, [open, municipality, category, key])
+
+  const current = result?.key === key ? result : null
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={(nextOpen) => { setResult(null); setOpen(nextOpen) }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-1.5 rounded-full bg-background/70 text-foreground shadow-sm hover:bg-background">
           <Phone className="size-4" aria-hidden="true" />
@@ -122,24 +81,30 @@ export function ContactsDialog() {
           <DialogTitle className="text-base sm:text-2xl">Contactos</DialogTitle>
           <DialogDescription className="text-[11px] sm:text-sm">Canales de atención por tipo de reporte y emergencias.</DialogDescription>
         </DialogHeader>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="min-w-0 space-y-1 text-xs font-medium">Ciudad
+            <select aria-label="Ciudad" value={municipality} onChange={(event) => { setResult(null); setMunicipality(event.target.value) }} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-normal">
+              <option>Posadas</option><option>Candelaria</option><option>Garupá</option>
+            </select>
+          </label>
+          <label className="min-w-0 space-y-1 text-xs font-medium">Tipo de reporte
+            <select aria-label="Tipo de reporte" value={category} onChange={(event) => { setResult(null); setCategory(event.target.value as keyof typeof GROUP_LABELS) }} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-normal">
+              {(Object.keys(GROUP_LABELS) as Array<keyof typeof GROUP_LABELS>).map((group) => <option key={group} value={group}>{GROUP_LABELS[group]}</option>)}
+            </select>
+          </label>
+        </div>
         <Tabs defaultValue="contactos" className="min-w-0">
           <TabsList className="grid w-full shrink-0 grid-cols-2 gap-0">
             <TabsTrigger value="contactos" className="min-h-8 min-w-0 px-1 py-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground">Contactos</TabsTrigger>
             <TabsTrigger value="emergencias" className="min-h-8 min-w-0 gap-1 px-1 py-1 text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground"><Siren className="size-3.5" /> Emergencias</TabsTrigger>
           </TabsList>
           <TabsContent value="contactos" className="space-y-2">
-            <Tabs defaultValue="alumbrado" className="min-w-0">
-              <TabsList className="w-full max-w-full justify-between overflow-x-auto [&>[data-slot=tabs-trigger]]:min-h-8 [&>[data-slot=tabs-trigger]]:flex-none [&>[data-slot=tabs-trigger]]:shrink-0 [&>[data-slot=tabs-trigger]]:px-2 [&>[data-slot=tabs-trigger]]:text-xs">
-                {(Object.keys(CONTACT_GROUPS) as Array<keyof typeof CONTACT_GROUPS>).map((group) => (
-                  <TabsTrigger key={group} value={group}>{GROUP_LABELS[group]}</TabsTrigger>
-                ))}
-              </TabsList>
-              {(Object.keys(CONTACT_GROUPS) as Array<keyof typeof CONTACT_GROUPS>).map((group) => (
-                <TabsContent key={group} value={group} className="grid gap-1 sm:grid-cols-2">
-                  {CONTACT_GROUPS[group].map((contact, index) => <ContactRow key={`${group}-${index}`} contact={contact} />)}
-                </TabsContent>
-              ))}
-            </Tabs>
+            <div aria-live="polite" className="max-h-[40dvh] overflow-y-auto">
+                {!current ? <p role="status">Cargando contactos…</p>
+                  : current.failed ? <p role="status">No pudimos cargar los contactos. Intentá nuevamente más tarde.</p>
+                  : current.contacts?.length === 0 ? <p role="status">No hay contactos disponibles para esta ciudad y categoría.</p>
+                  : <div className="grid gap-1 sm:grid-cols-2">{current.contacts?.map((contact) => <ContactRow key={contact.id} contact={contact} />)}</div>}
+            </div>
           </TabsContent>
           <TabsContent value="emergencias" className="grid max-h-[40dvh] grid-cols-1 content-start gap-1 overflow-y-auto sm:max-h-none sm:grid-cols-2 sm:overflow-visible">
             {EMERGENCIES.map(([number, description]) => (
@@ -151,9 +116,9 @@ export function ContactsDialog() {
           </TabsContent>
         </Tabs>
         <DialogFooter className="flex-col gap-1.5 border-t pt-1 sm:flex-col sm:justify-start">
-          <p className="flex w-full items-center justify-center gap-2 text-[10px] text-muted-foreground">
+          <p className="flex w-full items-center justify-center gap-2 text-[10px] leading-none text-muted-foreground">
             <span>Creado por <a href="https://god.com.ar" className="font-semibold" aria-label="GOD, god.com.ar"><span className="text-black">G</span><span className="text-black">O</span><span className="text-violet-600">D</span></a></span>
-            <a href="https://wa.me/5493764241856" className="inline-flex min-h-11 items-center gap-1 text-primary hover:underline" aria-label="Contactar por WhatsApp al +54 9 3764 24-1856">
+            <a href="https://wa.me/5493764241856" className="inline-flex min-h-0 items-center py-1 text-primary hover:underline sm:min-h-11 sm:py-0" aria-label="Contactar por WhatsApp al +54 9 3764 24-1856">
               Contactar
             </a>
           </p>

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it, vi } from "vitest"
-import { canShowReportContacts, contactHref, createContactDraft, getReportContacts } from "../../../lib/report-contacts/contact-actions"
+import { canShowReportContacts, contactHref, createContactDraft, getReportContacts, getMunicipalityContacts } from "../../../lib/report-contacts/contact-actions"
 
 describe("report contact actions", () => {
   it("uses shorter cards and buttons and only announces scrolling when the list overflows", () => {
@@ -87,6 +87,16 @@ describe("report contact actions", () => {
     expect(actions).toContain("createContactDraft(props)")
   })
 
+  it("queries the selected municipality through the same directory lookup", async () => {
+    const order = vi.fn().mockReturnThis()
+    order.mockReturnValueOnce({ order }).mockResolvedValueOnce({ data: [], error: null })
+    const eq = vi.fn().mockReturnThis()
+    const from = vi.fn().mockReturnValue({ select: () => ({ eq, order }) })
+    await getMunicipalityContacts({ from } as never, "Garupá", "Alumbrado")
+    expect(eq.mock.calls).toEqual([["municipality", "Garupá"], ["category", "Alumbrado"]])
+    expect(order.mock.calls).toEqual([["priority", { ascending: true }], ["id", { ascending: true }]])
+  })
+
   it("queries only the resolved municipality and exact category in priority order", async () => {
     const order = vi.fn().mockReturnThis()
     const eq = vi.fn().mockReturnThis()
@@ -115,6 +125,8 @@ describe("report contact actions", () => {
     const eq = vi.fn().mockReturnThis()
     const client = { from: () => ({ select: () => ({ eq, order }) }) }
     await expect(getReportContacts(client as never, -27.3676, -55.8961, "Bache")).rejects.toThrow("offline")
+    order.mockReturnValueOnce({ order }).mockResolvedValueOnce({ data: null, error: new Error("offline") })
+    await expect(getMunicipalityContacts(client as never, "Candelaria", "Agua")).rejects.toThrow("offline")
   })
 
   it("includes the report title in both message bodies and the email subject", () => {
