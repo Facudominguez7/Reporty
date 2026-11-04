@@ -455,6 +455,9 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
       <Script
         src={TURNSTILE_SCRIPT_SRC}
         strategy="afterInteractive"
+        // `next/script` loads a shared src once: only the first widget gets `onReady`, while
+        // every other widget mounted during that load is notified through `onLoad`.
+        onLoad={() => setScriptReady(true)}
         onReady={() => setScriptReady(true)}
         onError={() => setStatus("unavailable")}
       />

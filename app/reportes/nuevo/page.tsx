@@ -152,7 +152,7 @@ export default function NuevoReportePage() {
   const [isLocatingLocation, setIsLocatingLocation] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // Only true once the challenge is verified and the server started the costly upload.
+  // True once the form holds its challenge token and the report is sent to the server.
   const [isPublishing, setIsPublishing] = useState(false)
   const [isOptimizingImage, setIsOptimizingImage] = useState(false)
   // Idempotency key for this form submission; the server rejects duplicates.
@@ -345,7 +345,7 @@ export default function NuevoReportePage() {
     !needsCaptcha || captchaToken !== null ? null : "verificación de seguridad",
   ].filter(Boolean) as string[]
 
-  // Nothing is being processed until the challenge is verified and the server starts the upload.
+  // Until the report is sent, the only pending step is the challenge token.
   const estadoDeEnvio = isPublishing
     ? (formData.images.length > 0 ? "Procesando fotografía..." : "Enviando...")
     : "Verificando seguridad..."
@@ -463,7 +463,7 @@ export default function NuevoReportePage() {
         payload.set("image", formData.images[0])
       }
 
-      // La verificación ya pasó: desde acá el envío puede tardar en analizar la fotografía.
+      // El token ya está listo: desde acá el servidor lo verifica y puede tardar en analizar la fotografía.
       setIsPublishing(true)
       const result = await crearReporteAction(payload)
 
@@ -476,6 +476,9 @@ export default function NuevoReportePage() {
         })
         return
       }
+
+      // The report consumed this token: another report from this form needs a new challenge.
+      requestNewCaptcha()
 
       const imageFailed = formData.images.length > 0 && !result.data.imageUploaded
       const withdrawn = result.data.imageModeration?.estado === "REJECTED"

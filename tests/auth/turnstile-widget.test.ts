@@ -344,3 +344,14 @@ describe("startTurnstileChallenge", () => {
     expect(onError).not.toHaveBeenCalled()
   })
 })
+
+describe("carga compartida del script de Turnstile", () => {
+  it("marca el script como listo también en onLoad, que es lo único que recibe un segundo widget de la página", async () => {
+    const { readFileSync } = await import("node:fs")
+    const codigo = readFileSync(new URL("../../components/turnstile-widget.tsx", import.meta.url), "utf8")
+    const script = codigo.slice(codigo.indexOf("<Script"), codigo.indexOf("/>", codigo.indexOf("<Script")))
+
+    expect(script).toContain("onLoad={() => setScriptReady(true)}")
+    expect(script).toContain("onReady={() => setScriptReady(true)}")
+  })
+})

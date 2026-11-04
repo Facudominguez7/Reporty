@@ -48,6 +48,7 @@ interface RespuestaSiteverify {
   "error-codes"?: unknown
   hostname?: unknown
   action?: unknown
+  metadata?: { result_with_testing_key?: unknown }
 }
 
 interface ConfiguracionTurnstile {
@@ -86,6 +87,23 @@ function codigosDeError(respuesta: RespuestaSiteverify): string[] {
     return []
   }
   return respuesta["error-codes"].filter((codigo): codigo is string => typeof codigo === "string")
+}
+
+/**
+ * Official dummy keys always answer with a fixed token that carries no action, so the
+ * action can only be checked against real keys. Only the server secret decides this, never
+ * the client, and production rejects dummy secrets before calling Siteverify.
+ *
+ * @param secreto - Configured server secret.
+ * @param respuesta - Parsed Siteverify body.
+ * @returns `true` for a dummy-key answer outside production.
+ */
+function esRespuestaDePrueba(secreto: string, respuesta: RespuestaSiteverify) {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    SECRETO_DE_PRUEBA.test(secreto) &&
+    respuesta.metadata?.result_with_testing_key === true
+  )
 }
 
 /**
@@ -164,7 +182,7 @@ export async function verificarTurnstile(input: { token: string | null | undefin
     return falla("hostname_no_autorizado")
   }
 
-  if (input.expectedAction) {
+  if (input.expectedAction && !esRespuestaDePrueba(secreto, cuerpo)) {
     if (cuerpo.action !== input.expectedAction) {
       return falla("action_incorrecta")
     }

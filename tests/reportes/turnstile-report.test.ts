@@ -238,4 +238,13 @@ describe("contrato del envío final con Turnstile", () => {
     expect(fallo).toContain("return")
     expect(fallo).not.toContain("setFormData")
   })
+
+  it("pide un challenge nuevo después de un envío exitoso para que otro reporte no reuse el token", () => {
+    const codigo = pageSource()
+    const inicioExito = codigo.indexOf("if (!result.success) {")
+    const exito = codigo.slice(inicioExito, codigo.indexOf("setShowResultDialog(true)", inicioExito))
+    const despuesDelFallo = exito.slice(exito.indexOf("return\n      }"))
+
+    expect(despuesDelFallo).toContain("requestNewCaptcha()")
+  })
 })

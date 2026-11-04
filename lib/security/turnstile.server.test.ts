@@ -138,6 +138,34 @@ describe("verificarTurnstile", () => {
     if (!resultado.ok) expect(resultado.motivo).toBe("action_incorrecta")
   })
 
+  it("7 — fuera de producción acepta sin action la respuesta de una clave de prueba oficial", async () => {
+    configurar()
+    vi.stubEnv("TURNSTILE_ALLOWED_HOSTNAMES", "example.com")
+    espiaFetch(respuestaExito({ hostname: "example.com", metadata: { result_with_testing_key: true } }))
+
+    const resultado = await verificarTurnstile({ token: "XXXX.DUMMY.TOKEN.XXXX", expectedAction: "crear_reporte" })
+
+    expect(resultado).toEqual({ ok: true })
+  })
+
+  it("7 — con un secreto real exige la action aunque la respuesta se marque como de prueba", async () => {
+    configurar("0x4AAAAAAAsecretoReal")
+    espiaFetch(respuestaExito({ metadata: { result_with_testing_key: true } }))
+
+    const resultado = await verificarTurnstile({ token: "tok-valido-1234", expectedAction: "crear_reporte" })
+
+    expect(resultado).toMatchObject({ ok: false, motivo: "action_incorrecta" })
+  })
+
+  it("7 — la respuesta de prueba sigue exigiendo un hostname permitido", async () => {
+    configurar()
+    espiaFetch(respuestaExito({ hostname: "example.com", metadata: { result_with_testing_key: true } }))
+
+    const resultado = await verificarTurnstile({ token: "XXXX.DUMMY.TOKEN.XXXX", expectedAction: "crear_reporte" })
+
+    expect(resultado).toMatchObject({ ok: false, motivo: "hostname_no_autorizado" })
+  })
+
   it("7 — no exige action cuando no se configura una esperada", async () => {
     configurar()
     espiaFetch(respuestaExito({ action: "lo_que_sea" }))
