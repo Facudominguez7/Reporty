@@ -1,12 +1,17 @@
 # Propuesta: mascotas perdidas en Reporty
 
-Agregar publicaciones de mascotas perdidas al mapa de Reporty reutilizando la experiencia y la infraestructura existente, pero sin hacerlas pasar por incidencias urbanas. La primera versión prioriza publicar, encontrar y compartir; no incorpora chat ni un flujo de avistamientos.
+Agregar publicaciones de mascotas perdidas a Reporty reutilizando la experiencia y la infraestructura existente, pero sin mezclarlas con los incidentes urbanos. La primera versión permite explorarlas en mapa y listado, publicarlas, marcarlas encontradas y compartirlas; no incorpora chat ni un flujo de avistamientos.
+
+## Navegación y creación
+
+- En el encabezado, **Crear** abre una elección: **Reportar un incidente** lleva a `/reportes/nuevo`; **Reportar una mascota perdida** lleva al formulario propio de mascotas.
+- En `/mapa`, el selector **Reportes / Mascotas** cambia la capa visible. El botón de creación se adapta a la pestaña activa y abre el formulario correspondiente.
+- En el listado de `/reportes`, sumar pestañas **Incidentes / Mascotas**. Incidentes conserva su listado y filtros actuales; Mascotas muestra publicaciones de mascotas con su consulta y filtros propios. No combinar ambos tipos en una misma lista.
+- Las cards compactas de mascotas reutilizan casi el diseño de las cards actuales: foto, encabezado corto, fecha de publicación, descripción resumida y tags de tipo de animal y estado. El encabezado se genera con tipo y estado —por ejemplo, **Perro perdido**—; no se pide el nombre de la mascota. No mostrar categoría ni prioridad de incidente.
 
 ## Experiencia en el mapa
 
-- Junto al botón de filtros, sumar un selector **Reportes / Mascotas**.
-- En **Reportes**, conservar el mapa actual sin cambios de comportamiento.
-- En **Mascotas**, mostrar marcadores de mascotas **Perdidas** y **Encontradas**. Las encontradas permanecen visibles.
+- En la pestaña **Mascotas**, mostrar marcadores **Perdida** y **Encontrada**. Las encontradas permanecen visibles.
 - Al tocar un marcador, abrir una ficha breve con foto, especie, descripción, estado, fecha de publicación y teléfono de contacto.
 - Incluir **Compartir** y un enlace estable que vuelva a abrir la ficha de esa mascota.
 - Reutilizar el mapa, los marcadores donde encajen, el selector existente de ubicación, botones, alertas y confirmaciones. Adaptar textos y datos para no presentar una mascota como reporte urbano.
@@ -16,7 +21,7 @@ Agregar publicaciones de mascotas perdidas al mapa de Reporty reutilizando la ex
 | Campo | Regla propuesta |
 |---|---|
 | Foto | Requerida; reutilizar el procesamiento y la moderación de imágenes si pueden desacoplarse del flujo urbano. |
-| Tipo de animal | Requerido: perro, gato u otro. |
+| Tipo de animal | Requerido: perro, gato u otro; se usa también para generar el encabezado de la card junto con el estado. |
 | Descripción | Requerida; permite incluir color, tamaño, collar y señas particulares. |
 | Última ubicación conocida | Requerida; seleccionar el punto con el selector de mapa existente. |
 | Teléfono de contacto | Requerido y público; explicar antes de publicar que cualquier visitante podrá verlo y llamar o escribir. |
@@ -27,7 +32,7 @@ No pedir nombre de la mascota ni una fecha separada de pérdida.
 
 ## Gestión y permisos
 
-- Mantener mascotas en datos propios, separados de `reportes`, prioridades, votos y cuadrillas.
+- Mantener mascotas en datos propios, separados de `reportes`, prioridades, votos y cuadrillas. La pestaña de mascotas del listado tiene filtros propios —tipo de animal y estado— y no altera los filtros de incidentes.
 - La publicación es pública mientras no se retire. El teléfono también es público por decisión de quien publica.
 - Quien publicó puede cambiar el estado de **Perdida** a **Encontrada**; administración puede editar la publicación completa, cambiar el estado o retirarla, igual que gestiona los reportes.
 - No permitir que cualquier visitante cambie el estado. No reutilizar **Reparado** ni el voto **No existe**.
