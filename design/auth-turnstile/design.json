@@ -1,0 +1,27 @@
+{
+  "title": "Acceso con una sola verificación de seguridad",
+  "brief": "Quitar el párrafo que explica que la verificación es una sola y que cada intento pide una nueva, dejando un único widget de Cloudflare inmediatamente arriba de Ingresar, sin romper el modal ni perder ingreso, registro, invitado y OAuth.",
+  "artboards": [
+    {
+      "file": "01-widget-desnudo.html",
+      "title": "Widget desnudo",
+      "tradeoff": "Máxima limpieza y menos scroll en móvil, pero nada explica por qué Ingresar está deshabilitado antes de resolver el desafío.",
+      "width": 1440,
+      "height": 1900
+    },
+    {
+      "file": "02-desafio-como-campo.html",
+      "title": "Desafío como campo",
+      "tradeoff": "Una etiqueta de tres palabras mantiene la orientación sin volver al párrafo, pero exige un cambio pequeño en turnstile-widget.tsx para aceptar etiqueta visible y no duplicar el estado.",
+      "width": 1440,
+      "height": 1940
+    },
+    {
+      "file": "03-grupo-verificacion-envio.html",
+      "title": "Grupo verificación + envío",
+      "tradeoff": "El agrupamiento comunica la dependencia sin palabras, pero suma una caja dentro de la tarjeta, la alarga ~28 px y compite con el borde que separa al invitado.",
+      "width": 1440,
+      "height": 2050
+    }
+  ]
+}

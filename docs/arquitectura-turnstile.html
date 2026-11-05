@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Arquitectura Turnstile · Reporty</title>
+  <style>
+    :root{color-scheme:dark;--fondo:#0a101b;--panel:#121d2d;--borde:#2b3b50;--texto:#eaf1f8;--suave:#aabbd0;--verde:#75e4bc;--azul:#8fc7ff;--ambar:#ffd187}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% 0,#193249 0,transparent 36%),var(--fondo);color:var(--texto);font:16px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:48px 24px 80px}h1,h2,h3{line-height:1.2}h1{font-size:clamp(2.1rem,5vw,3.8rem);letter-spacing:-.04em;margin:12px 0}h2{font-size:1.65rem;margin:0 0 18px}h3{font-size:1.05rem;margin:0 0 8px}p{margin:0 0 12px}a{color:var(--azul)}code{font-size:.88em;overflow-wrap:anywhere;color:#d0e8ff}section{margin-top:56px}.eyebrow{color:var(--verde);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:.75rem}.lead{font-size:1.12rem;max-width:780px;color:var(--suave)}.nav{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}.nav a,.badge{border:1px solid var(--borde);border-radius:999px;padding:5px 12px;text-decoration:none;font-size:.8rem}.badge{display:inline-block;color:var(--verde);padding:3px 10px}.warning{border-left:3px solid var(--ambar);background:#2d2419;padding:16px 20px;border-radius:4px 12px 12px 4px;margin:24px 0;color:#ffdfae}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card,.step,.flow{background:var(--panel);border:1px solid var(--borde);border-radius:16px;padding:20px}.card p,.step p,.flow p{color:var(--suave);font-size:.92rem}.flow{margin-top:14px}.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}.step{position:relative;background:#182639;padding:16px}.step strong{display:block;color:var(--azul);font-size:.78rem;margin-bottom:7px}.step p{margin:0}.tag{font-size:.72rem;color:var(--verde);text-transform:uppercase;font-weight:700;letter-spacing:.08em}.note{color:var(--suave);font-size:.9rem}.table-wrap{overflow-x:auto;border:1px solid var(--borde);border-radius:14px}table{width:100%;border-collapse:collapse;text-align:left;min-width:600px}th,td{padding:13px 16px;border-bottom:1px solid var(--borde);vertical-align:top}th{color:var(--suave);font-size:.8rem;text-transform:uppercase}tr:last-child td{border-bottom:0}ul{padding-left:20px}li{margin:8px 0}li::marker{color:var(--verde)}.pending{color:var(--ambar);font-weight:700}.ok{color:var(--verde);font-weight:700}.paths{font-size:.85rem}.footer{border-top:1px solid var(--borde);padding-top:20px;color:var(--suave);font-size:.85rem;margin-top:60px}@media(max-width:760px){main{padding:32px 16px 60px}.grid{grid-template-columns:1fr}.steps{grid-template-columns:1fr 1fr}section{margin-top:42px}}@media(max-width:430px){.steps{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Reporty · mapa técnico</div>
+    <h1>Arquitectura de<br>Cloudflare Turnstile</h1>
+    <p class="lead">Dos caminos de verificación, un principio: el token del navegador nunca reemplaza la autenticación ni la autorización del servidor.</p>
+    <span class="badge">Implementación preparada · entrega pendiente</span>
+    <nav class="nav" aria-label="Secciones"><a href="#panorama">Panorama</a><a href="#flujos">Flujos</a><a href="#seguridad">Seguridad</a><a href="#pendientes">Qué falta</a><a href="#archivos">Archivos</a></nav>
+    <div class="warning"><strong>Estado de esta vista:</strong> describe el árbol completo preparado en <code>feat/turnstile-reporty-07-docs</code>. El servidor actual corre sobre <code>04-reports</code>: todavía no incluye el slice de comentarios ni los posteriores.</div>
+  </header>
+  <section id="panorama">
+    <h2>Una integración, dos verificadores</h2>
+    <div class="grid">
+      <article class="card"><span class="tag">01 · Navegador</span><h3>Widget compartido</h3><p>Cloudflare emite un token de un solo uso. El componente controla carga, errores, vencimiento, limpieza y renovación.</p><code>components/turnstile-widget.tsx</code></article>
+      <article class="card"><span class="tag">02 · Identidad</span><h3>Supabase Auth</h3><p>Login, registro, invitado y recuperación envían <code>captchaToken</code> a Supabase. Su protección depende de activar CAPTCHA en Supabase Auth.</p></article>
+      <article class="card"><span class="tag">03 · Contenido</span><h3>Servidor de Reporty</h3><p>Las server actions verifican reportes y comentarios mediante Siteverify antes del workflow de escritura.</p></article>
+    </div>
+  </section>
+  <section id="flujos">
+    <h2>Cómo viaja cada solicitud</h2>
+    <article class="flow"><span class="tag">Camino A · autenticación</span><h3>Ingreso, registro y recuperación</h3><div class="steps">
+      <div class="step"><strong>01 / PERSONA</strong><p>Completa el formulario y recibe un token del widget.</p></div><div class="step"><strong>02 / APP</strong><p>La operación envía el token en <code>captchaToken</code>.</p></div><div class="step"><strong>03 / SUPABASE AUTH</strong><p>Supabase verifica el CAPTCHA cuando está habilitado.</p></div><div class="step"><strong>04 / RESULTADO</strong><p>Se renueva el token consumido; el error permite reintentar.</p></div></div>
+    </article>
+    <article class="flow"><span class="tag">Camino B · publicación</span><h3>Crear un reporte o comentario</h3><div class="steps">
+      <div class="step"><strong>01 / FORMULARIO</strong><p>El widget entrega un token asociado a la acción.</p></div><div class="step"><strong>02 / SERVER ACTION</strong><p>Se comprueban sesión, permisos y política CAPTCHA.</p></div><div class="step"><strong>03 / SITEVERIFY</strong><p>Reporty envía token y secreto a Cloudflare y valida la respuesta.</p></div><div class="step"><strong>04 / WORKFLOW</strong><p>Solo si pasa: continúa el proceso de publicación y sus controles existentes.</p></div></div>
+      <p class="note">Acciones: <code>crear_reporte</code> y <code>comentar_reporte</code>. La verificación del reporte ocurre antes del claim de envío y del trabajo de imágenes.</p>
+    </article>
+    <article class="flow"><span class="tag">Caso especial · invitado</span><h3>Dos operaciones, dos tokens</h3><p>Primero, Supabase consume un token para crear la sesión anónima. Después, Reporty solicita otro para verificar la creación del reporte. No se reutiliza el primero.</p></article>
+  </section>
+  <section id="seguridad">
+    <h2>Las capas que siguen protegiendo</h2>
+    <div class="grid"><article class="card"><h3>Siteverify</h3><p>Exige éxito, hostname permitido y action esperada; rechaza errores de red y respuestas inválidas. Timeout: 10 segundos.</p></article><article class="card"><h3>Llaves y entorno</h3><p>La site key es pública. El secreto permanece en servidor. Producción falla cerrada si falta configuración y rechaza secretos de prueba.</p></article><article class="card"><h3>Controles existentes</h3><p>Permisos, RLS, límites, identificadores de envío, idempotencia y moderación siguen siendo independientes del CAPTCHA.</p></article></div>
+    <p class="note">Fuera de producción, si no hay site key, el guard permite trabajar sin CAPTCHA. El endpoint falso de pruebas se limita a loopback; en producción solo se admite con hostnames permitidos loopback.</p>
+    <h3>Fuera del alcance deliberadamente</h3><p class="note">Navegación pública, votos, Google OAuth, vinculación de correo de invitados y operaciones administrativas no agregan un challenge nuevo.</p>
+  </section>
+  <section id="pendientes">
+    <h2>Qué falta para entregar</h2>
+    <div class="table-wrap"><table><thead><tr><th>Estado</th><th>Trabajo</th><th>Detalle</th></tr></thead><tbody>
+      <tr><td class="ok">Aprobada</td><td>Review de reportes</td><td>La revisión de <code>04-reports</code> fue aprobada y su cierre confirmado.</td></tr>
+      <tr><td class="pending">Pendiente</td><td>Review de comentarios</td><td>Revisar <code>05-comments</code>. La de autenticación quedó incompleta por un resultado rechazado por el motor; no está aprobada.</td></tr>
+      <tr><td class="pending">Pendiente</td><td>Publicación de la cadena</td><td>Subir tracker y siete slices; crear los PR encadenados. Varias unidades superan 400 líneas y necesitan excepción de tamaño.</td></tr>
+      <tr><td class="pending">Pendiente</td><td>Configuración y despliegue</td><td>Completar ejemplo de entorno; configurar Cloudflare y Hostinger, desplegar y después activar CAPTCHA en Supabase Auth. No se aplicó nada en producción.</td></tr>
+      <tr><td class="pending">Pendiente</td><td>Cobertura y fallos conocidos</td><td>Automatizar mejor invitado desde <code>/auth</code> y móvil/accesibilidad; un test de contacto falla también en main y dos casos E2E comunitarios se reprodujeron en la base anterior.</td></tr>
+      <tr><td class="ok">Verificado</td><td>Árbol integrado</td><td>Última suite registrada: 629 aprobados, 1 omitido y 1 fallo preexistente; lint y TypeScript sin errores. La review de Siteverify fue aprobada.</td></tr>
+    </tbody></table></div>
+    <p class="note">Estas verificaciones corresponden a la sesión de implementación; no son una nueva ejecución de pruebas de este documento.</p>
+  </section>
+  <section id="archivos"><h2>Por dónde empezar a leer</h2><div class="grid paths"><article class="card"><h3>Widget y Auth</h3><p><code>components/turnstile-widget.tsx</code><br><code>app/auth/actions.ts</code><br><code>app/auth/page.tsx</code></p></article><article class="card"><h3>Verificación y escritura</h3><p><code>lib/security/turnstile.server.ts</code><br><code>lib/security/turnstile-guard.server.ts</code><br><code>app/reportes/nuevo/actions.ts</code><br><code>app/reportes/[id]/actions.ts</code></p></article><article class="card"><h3>Entrega y pruebas</h3><p><code>docs/turnstile.md</code><br><code>odd/tasks/turnstile-reporty.md</code><br><code>e2e/support/fake-siteverify.mjs</code></p><p>Estos archivos están en distintas ramas de la cadena preparada.</p></article></div></section>
+  <footer class="footer">Documento estático de arquitectura · Estado registrado durante la preparación de la entrega · No contiene credenciales.</footer>
+</main>
+</body>
+</html>

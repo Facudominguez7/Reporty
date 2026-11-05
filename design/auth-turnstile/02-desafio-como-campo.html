@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Desafío como campo — /auth</title>
+<style>
+  /* Tokens de design/system.md. Sin recursos externos: SVG en línea y pila del sistema. */
+  :root{
+    --background:oklch(94.463% 0.00213 14.416);
+    --foreground:oklch(0.19 0.01 95);
+    --card:oklch(1 0 0);
+    --card-foreground:oklch(0.19 0.01 95);
+    --primary:oklch(0.57 0.12 157);
+    --primary-foreground:oklch(0.985 0 0);
+    --secondary:#000000;
+    --secondary-foreground:#ffffff;
+    --muted:oklch(96.115% 0.00011 271.152);
+    --muted-foreground:oklch(0.45 0.028 157);
+    --destructive:oklch(0.57 0.18 25);
+    --border:oklch(78.892% 0.00009 271.152);
+    --input:oklch(96.416% 0.00011 271.152);
+    --ring:oklch(0.62 0.08 230);
+    --radius:0.75rem;
+    --radius-sm:var(--radius);
+    --radius-md:var(--radius);
+    --radius-lg:var(--radius);
+    --radius-xl:var(--radius);
+    --radius-pill:999px;
+    --surface-subtle:oklch(94.007% 0.00011 271.152);
+    --semantic-info:oklch(0.56 0.11 240);
+    --semantic-success:oklch(0.57 0.12 157);
+    --card-shadow:7px 7px 12px color-mix(in oklab, var(--foreground) 20%, transparent);
+    --fuente:"Geist","Geist Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:40px 48px 48px;min-width:1440px;background:var(--background);color:var(--foreground);
+    font-family:var(--fuente);font-feature-settings:"cv02","cv03","cv04","cv11";-webkit-font-smoothing:antialiased;
+  }
+  h1{font-size:1.5rem;line-height:1.2;letter-spacing:-.01em;margin:6px 0 8px;font-weight:600}
+  h2{font-size:.6875rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground);margin:0 0 10px;font-weight:600}
+  p{margin:0}
+  .encabezado{display:flex;align-items:flex-start;justify-content:space-between;gap:32px;margin-bottom:22px}
+  .etiqueta-dir{font-size:.75rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground)}
+  .brief{max-width:760px;font-size:.9375rem;line-height:1.6;color:var(--muted-foreground)}
+  .tradeoff{flex:0 0 380px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:14px 16px;box-shadow:var(--card-shadow);font-size:.8125rem;line-height:1.55}
+  .tradeoff strong{display:block;font-size:.6875rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:6px}
+
+  .escenario{
+    position:relative;border:1px solid var(--border);border-radius:var(--radius);padding:40px;overflow:hidden;
+    display:flex;align-items:flex-start;justify-content:center;min-height:944px;
+    background-color:var(--surface-subtle);
+    background-image:
+      linear-gradient(to bottom, rgb(255 255 255 / .3), rgb(255 255 255 / .55)),
+      radial-gradient(circle at 22% 26%, color-mix(in oklab, var(--primary) 14%, transparent) 0 92px, transparent 93px),
+      radial-gradient(circle at 79% 72%, color-mix(in oklab, var(--semantic-info) 12%, transparent) 0 76px, transparent 77px),
+      linear-gradient(90deg, color-mix(in oklab, var(--border) 45%, transparent) 0 1px, transparent 1px),
+      linear-gradient(0deg, color-mix(in oklab, var(--border) 45%, transparent) 0 1px, transparent 1px);
+    background-size:auto, auto, auto, 96px 96px, 96px 96px;
+  }
+  .rotulo{position:absolute;top:12px;left:12px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);padding:4px 10px;font-size:.6875rem;color:var(--muted-foreground);letter-spacing:.02em}
+
+  .tarjeta{
+    width:448px;display:flex;flex-direction:column;gap:16px;padding:16px 0;background:var(--card);
+    color:var(--card-foreground);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+  .tarjeta-cabecera{padding:0 20px;display:flex;flex-direction:column;gap:6px}
+  .tarjeta-titulo{font-size:1.25rem;line-height:1.1;font-weight:600;letter-spacing:-.01em}
+  .tarjeta-desc{font-size:.875rem;line-height:1.5;color:var(--muted-foreground)}
+  .tarjeta-cuerpo{padding:0 20px;display:flex;flex-direction:column;gap:20px}
+  .bloque{display:flex;flex-direction:column;gap:16px}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:var(--radius-pill);border:1px solid transparent;font-family:inherit;font-size:.875rem;font-weight:500;white-space:nowrap}
+  .btn-full{width:100%}
+  .btn-primario{background:var(--primary);color:var(--primary-foreground)}
+  .btn-outline{background:var(--background);border-color:var(--border);color:var(--foreground)}
+  .btn-sm{min-height:36px;font-size:.75rem;padding:0 14px}
+  .btn-deshabilitado{opacity:.5}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--background),0 0 0 4px var(--ring)}
+
+  .separador{display:flex;align-items:center;gap:12px;font-size:.75rem;text-transform:uppercase;letter-spacing:.2em;color:var(--muted-foreground)}
+  .separador span{height:1px;flex:1;background:var(--border)}
+
+  .tabs-lista{display:grid;grid-template-columns:1fr 1fr;gap:4px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--input);padding:4px;box-shadow:var(--card-shadow)}
+  .tab{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 12px;border-radius:var(--radius-pill);border:1px solid transparent;font-family:inherit;font-size:.875rem;font-weight:500;color:var(--foreground);background:transparent}
+  .tab[aria-selected="true"]{background:var(--secondary);color:var(--secondary-foreground);border-color:var(--secondary)}
+
+  .campo{display:flex;flex-direction:column;gap:8px}
+  .campo-etiqueta{font-size:.875rem;font-weight:500;line-height:1}
+  .campo-envoltura{position:relative}
+  .input{width:100%;min-height:40px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--input);padding:8px 12px 8px 40px;font-family:inherit;font-size:.875rem;color:var(--foreground)}
+  .input::placeholder{color:var(--muted-foreground)}
+  .icono{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted-foreground);display:flex}
+  .ojo{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:32px;height:32px;border:0;border-radius:var(--radius-pill);background:transparent;color:var(--muted-foreground)}
+  .enlace{font-size:.875rem;color:var(--primary);text-decoration:none}
+  .centrado{display:flex;justify-content:center}
+
+  /* El desafío entra en la ritmo de campos: misma etiqueta, sin párrafo. */
+  .campo-verificacion{display:flex;flex-direction:column;gap:8px}
+  .campo-verificacion .campo-etiqueta{display:flex;align-items:center;gap:8px}
+  .pista-opcional{font-size:.75rem;font-weight:400;color:var(--muted-foreground)}
+  .widget{
+    display:flex;align-items:center;gap:12px;width:300px;height:65px;padding:0 12px;
+    border:1px solid var(--border);border-radius:4px;background:var(--input);
+  }
+  .widget-caja{width:24px;height:24px;flex:0 0 auto;border:2px solid var(--muted-foreground);border-radius:3px;background:var(--card);display:flex;align-items:center;justify-content:center;color:transparent}
+  .widget-caja[data-verificado="si"]{border-color:var(--primary);background:var(--primary);color:var(--primary-foreground)}
+  .widget-texto{flex:1;min-width:0}
+  .widget-texto strong{display:block;font-size:.8125rem;font-weight:500;line-height:1.25;color:var(--foreground)}
+  .widget-texto small{display:block;font-size:.5625rem;margin-top:3px;color:var(--muted-foreground)}
+  .widget-logo{display:flex;flex-direction:column;align-items:flex-end;gap:2px;color:var(--muted-foreground);font-size:.5rem}
+  .estado{font-size:.75rem;color:var(--muted-foreground)}
+  .estado[data-tono="error"]{color:var(--destructive)}
+
+  .invitado{display:flex;flex-direction:column;gap:12px;padding-top:20px;border-top:1px solid var(--border)}
+  .invitado-texto{display:flex;flex-direction:column;gap:4px;text-align:center}
+  .invitado-titulo{font-size:.875rem;font-weight:500}
+  .invitado-desc{font-size:.75rem;color:var(--muted-foreground)}
+
+  .rejilla{display:grid;grid-template-columns:390px 390px 1fr;gap:24px;margin-top:24px;align-items:start}
+  .movil{border:1px solid var(--border);border-radius:calc(var(--radius) + 8px);background:var(--card);overflow:hidden;box-shadow:var(--card-shadow)}
+  .movil-pantalla{padding:16px;background-color:var(--surface-subtle);background-image:linear-gradient(to bottom, rgb(255 255 255 / .3), rgb(255 255 255 / .55)), linear-gradient(90deg, color-mix(in oklab, var(--border) 45%, transparent) 0 1px, transparent 1px), linear-gradient(0deg, color-mix(in oklab, var(--border) 45%, transparent) 0 1px, transparent 1px);background-size:auto, 96px 96px, 96px 96px}
+  .movil-recorte{overflow:hidden}
+  .movil .tarjeta{width:100%;box-shadow:none}
+  .movil-pie{border-top:1px solid var(--border);padding:10px 14px;font-size:.6875rem;color:var(--muted-foreground);background:var(--card)}
+
+  .panel-notas{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:18px 20px;box-shadow:var(--card-shadow);display:flex;flex-direction:column;gap:16px}
+  .nota-titulo{font-size:.6875rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:6px}
+  .nota-texto{font-size:.8125rem;line-height:1.6;color:var(--foreground)}
+  .tachado{color:var(--destructive);text-decoration:line-through;text-decoration-thickness:1px}
+  .fila-estado{display:grid;grid-template-columns:300px minmax(0,1fr);gap:8px 16px;align-items:center;padding:12px 0;border-bottom:1px solid color-mix(in oklab, var(--border) 55%, transparent)}
+  .fila-estado:last-child{border-bottom:0;padding-bottom:0}
+  .fila-estado-cabecera{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:.75rem;color:var(--muted-foreground)}
+  .fila-estado .btn{align-self:start;justify-self:start}
+  .fila-estado > .grupo-envio{grid-column:1/-1}
+  .insignia{border:1px solid var(--border);border-radius:var(--radius-pill);padding:2px 8px;font-size:.625rem;letter-spacing:.04em;text-transform:uppercase}
+  .insignia[data-tono="ok"]{border-color:color-mix(in oklab, var(--primary) 45%, var(--border));color:var(--primary)}
+  .pie{margin-top:20px;font-size:.75rem;color:var(--muted-foreground);line-height:1.6}
+  .pie strong{color:var(--foreground);font-weight:600}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  @media (max-width:1439px){body{min-width:0}.rejilla{grid-template-columns:1fr}.encabezado{flex-direction:column}.tradeoff{flex:1 1 auto}}
+</style>
+</head>
+<body>
+  <header class="encabezado">
+    <div>
+      <p class="etiqueta-dir">Dirección 02 · Reporty · /auth</p>
+      <h1>Desafío como campo</h1>
+      <p class="brief">
+        El párrafo desaparece y la verificación adopta la forma de un campo más del formulario: una
+        etiqueta corta —«Verificación de seguridad»— con el mismo peso y medida que «Correo
+        electrónico», y el widget debajo. La línea de estado se calla mientras todo va bien y solo
+        aparece cuando hay algo que decir.
+      </p>
+    </div>
+    <div class="tradeoff">
+      <strong>Tradeoff</strong>
+      La pantalla gana una guía de tres palabras sin volver al párrafo, pero exige un cambio pequeño
+      en <code>turnstile-widget.tsx</code> para aceptar una etiqueta visible y no duplicar el texto
+      de estado.
+    </div>
+  </header>
+
+  <section class="escenario" aria-label="Modal de acceso en escritorio: tarjeta de 448 px con el desafío como campo">
+    <p class="rotulo">escritorio · 1440 px · tarjeta 448 px · estado inicial (sin token)</p>
+
+    <article class="tarjeta" aria-label="Acceso a tu cuenta Reporty">
+      <div class="tarjeta-cabecera">
+        <div class="tarjeta-titulo">Tu cuenta Reporty</div>
+        <div class="tarjeta-desc">Ingresá o registrate para comentar, votar y sumar puntos. Para reportar también podés continuar como invitado.</div>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <div class="bloque">
+          <button class="btn btn-outline btn-full" type="button">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.63h6.46a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.08 3.58-5.16 3.58-8.8Z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.94-2.93l-3.87-3c-1.07.72-2.44 1.14-4.07 1.14-3.13 0-5.78-2.11-6.72-4.96h-4v3.09A12 12 0 0 0 12 24Z"/>
+              <path fill="#FBBC05" d="M5.28 14.25A7.21 7.21 0 0 1 4.9 12c0-.78.14-1.54.38-2.25V6.66h-4A12 12 0 0 0 0 12c0 1.93.46 3.75 1.28 5.34l4-3.09Z"/>
+              <path fill="#EA4335" d="M12 4.79c1.76 0 3.35.61 4.6 1.8l3.43-3.43A11.51 11.51 0 0 0 12 0 12 12 0 0 0 1.28 6.66l4 3.09C6.22 6.9 8.87 4.79 12 4.79Z"/>
+            </svg>
+            Continuar con Google
+          </button>
+        </div>
+
+        <div class="separador"><span></span>o continuá con email<span></span></div>
+
+        <div class="tabs-lista" role="tablist" aria-label="Ingreso o registro">
+          <button class="tab" role="tab" aria-selected="true" type="button">Ingresar</button>
+          <button class="tab" role="tab" aria-selected="false" type="button">Registrarme</button>
+        </div>
+
+        <div class="bloque">
+          <div class="campo">
+            <label class="campo-etiqueta" for="d2-email">Correo electrónico</label>
+            <div class="campo-envoltura">
+              <span class="icono"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg></span>
+              <input class="input" id="d2-email" type="email" placeholder="tu@email.com" value="vecina.delbarrio@correo.com" readonly>
+            </div>
+          </div>
+
+          <div class="campo">
+            <label class="campo-etiqueta" for="d2-clave">Contraseña</label>
+            <div class="campo-envoltura">
+              <span class="icono"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+              <input class="input" id="d2-clave" type="password" placeholder="••••••••" value="••••••••" readonly style="padding-right:44px">
+              <button class="ojo" type="button" aria-label="Mostrar contraseña">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="centrado"><a class="enlace" href="#">¿Olvidaste tu contraseña?</a></div>
+
+          <!-- Sin párrafo: una etiqueta y el widget, con la misma cadencia que los campos de arriba. -->
+          <div class="campo-verificacion">
+            <span class="campo-etiqueta" id="d2-verificacion">
+              Verificación de seguridad
+              <span class="pista-opcional">un paso para las tres acciones</span>
+            </span>
+            <div class="widget" role="img" aria-label="Representación estática del widget de Cloudflare Turnstile, todavía sin resolver">
+              <span class="widget-caja" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>
+              </span>
+              <span class="widget-texto">
+                <strong>Verifica que eres humano</strong>
+                <small>Cloudflare Turnstile</small>
+              </span>
+              <span class="widget-logo" aria-hidden="true">
+                <svg width="26" height="13" viewBox="0 0 26 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M18.6 10.4H5.3a2.6 2.6 0 0 1-.3-5.2 3.6 3.6 0 0 1 6.6-1.4 2.9 2.9 0 0 1 4.4 1.1 2.4 2.4 0 0 1 2.6 5.5Z"/><path d="M21.4 10.4h-2.6a2.1 2.1 0 0 0-.4-3.9 3 3 0 0 0-1-1.4 2.6 2.6 0 0 1 4 5.3Z"/></svg>
+                <span>Cloudflare</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primario btn-full btn-deshabilitado" type="button" disabled aria-describedby="d2-verificacion">Ingresar</button>
+
+        <div class="invitado">
+          <div class="invitado-texto">
+            <p class="invitado-titulo">¿Querés continuar como invitado?</p>
+            <p class="invitado-desc">Podés crear y seguir reportes, pero no comentar ni votar.</p>
+          </div>
+          <button class="btn btn-outline btn-full btn-deshabilitado" type="button" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Continuar como invitado
+          </button>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="rejilla" aria-label="Comportamiento responsive y estados del desafío">
+    <div>
+      <h2>Móvil · 390 px · mitad superior</h2>
+      <div class="movil">
+        <div class="movil-pantalla movil-recorte" style="height:544px">
+          <article class="tarjeta" aria-label="Acceso en móvil, mitad superior">
+            <div class="tarjeta-cabecera">
+              <div class="tarjeta-titulo">Tu cuenta Reporty</div>
+              <div class="tarjeta-desc">Ingresá o registrate para comentar, votar y sumar puntos. Para reportar también podés continuar como invitado.</div>
+            </div>
+            <div class="tarjeta-cuerpo">
+              <div class="bloque">
+                <button class="btn btn-outline btn-full" type="button">
+                  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.63h6.46a5.52 5.52 0 0 1-2.39 3.62v3h3.87c2.26-2.08 3.58-5.16 3.58-8.8Z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.94-2.93l-3.87-3c-1.07.72-2.44 1.14-4.07 1.14-3.13 0-5.78-2.11-6.72-4.96h-4v3.09A12 12 0 0 0 12 24Z"/>
+                    <path fill="#FBBC05" d="M5.28 14.25A7.21 7.21 0 0 1 4.9 12c0-.78.14-1.54.38-2.25V6.66h-4A12 12 0 0 0 0 12c0 1.93.46 3.75 1.28 5.34l4-3.09Z"/>
+                    <path fill="#EA4335" d="M12 4.79c1.76 0 3.35.61 4.6 1.8l3.43-3.43A11.51 11.51 0 0 0 12 0 12 12 0 0 0 1.28 6.66l4 3.09C6.22 6.9 8.87 4.79 12 4.79Z"/>
+                  </svg>
+                  Continuar con Google
+                </button>
+              </div>
+              <div class="separador"><span></span>o continuá con email<span></span></div>
+              <div class="tabs-lista" role="tablist" aria-label="Ingreso o registro">
+                <button class="tab" role="tab" aria-selected="true" type="button">Ingresar</button>
+                <button class="tab" role="tab" aria-selected="false" type="button">Registrarme</button>
+              </div>
+              <div class="bloque">
+                <div class="campo">
+                  <label class="campo-etiqueta" for="d2m-email">Correo electrónico</label>
+                  <div class="campo-envoltura">
+                    <span class="icono"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg></span>
+                    <input class="input" id="d2m-email" type="email" placeholder="tu@email.com" value="vecina.delbarrio@correo.com" readonly>
+                  </div>
+                </div>
+                <div class="campo">
+                  <label class="campo-etiqueta" for="d2m-clave">Contraseña</label>
+                  <div class="campo-envoltura">
+                    <span class="icono"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+                    <input class="input" id="d2m-clave" type="password" placeholder="••••••••" value="••••••••" readonly style="padding-right:44px">
+                    <button class="ojo" type="button" aria-label="Mostrar contraseña">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="centrado"><a class="enlace" href="#">¿Olvidaste tu contraseña?</a></div>
+              </div>
+            </div>
+          </article>
+        </div>
+        <p class="movil-pie">La etiqueta del desafío cae en el mismo carril que las demás: sin saltos ni anchos raros al cambiar de pestaña.</p>
+      </div>
+    </div>
+
+    <div>
+      <h2>Móvil · 390 px · mitad inferior</h2>
+      <div class="movil">
+        <div class="movil-pantalla movil-recorte" style="height:544px">
+          <article class="tarjeta" aria-label="Acceso en móvil, verificación y envío">
+            <div class="tarjeta-cuerpo">
+              <div class="campo-verificacion">
+                <span class="campo-etiqueta">
+                  Verificación de seguridad
+                  <span class="pista-opcional">un paso para las tres acciones</span>
+                </span>
+                <div class="widget" role="img" aria-label="Representación estática del widget de Cloudflare Turnstile, sin resolver">
+                  <span class="widget-caja" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>
+                  </span>
+                  <span class="widget-texto">
+                    <strong>Verifica que eres humano</strong>
+                    <small>Cloudflare Turnstile</small>
+                  </span>
+                  <span class="widget-logo" aria-hidden="true">
+                    <svg width="26" height="13" viewBox="0 0 26 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M18.6 10.4H5.3a2.6 2.6 0 0 1-.3-5.2 3.6 3.6 0 0 1 6.6-1.4 2.9 2.9 0 0 1 4.4 1.1 2.4 2.4 0 0 1 2.6 5.5Z"/><path d="M21.4 10.4h-2.6a2.1 2.1 0 0 0-.4-3.9 3 3 0 0 0-1-1.4 2.6 2.6 0 0 1 4 5.3Z"/></svg>
+                    <span>Cloudflare</span>
+                  </span>
+                </div>
+              </div>
+
+              <button class="btn btn-primario btn-full btn-deshabilitado" type="button" disabled>Ingresar</button>
+
+              <div class="invitado">
+                <div class="invitado-texto">
+                  <p class="invitado-titulo">¿Querés continuar como invitado?</p>
+                  <p class="invitado-desc">Podés crear y seguir reportes, pero no comentar ni votar.</p>
+                </div>
+                <button class="btn btn-outline btn-full btn-deshabilitado" type="button" disabled>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  Continuar como invitado
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+        <p class="movil-pie">Etiqueta de 14 px + widget de 300 px: el ancho útil de 318 px alcanza incluso con la pista opcional.</p>
+      </div>
+    </div>
+
+    <div class="panel-notas">
+      <div>
+        <p class="nota-titulo">Se elimina</p>
+        <p class="nota-texto tachado">«La verificación de seguridad es una sola y sirve para ingresar, crear tu cuenta o continuar como invitado. Después de cada intento te pedimos una nueva.»</p>
+      </div>
+      <div>
+        <p class="nota-titulo">Se conserva</p>
+        <p class="nota-texto">
+          Una sola verificación para ingreso, registro e invitado, montada fuera de las pestañas para
+          que no se desmonte al cambiarlas, y el reinicio del desafío después de cada intento (abajo,
+          estado «Después de un intento fallido»).
+        </p>
+      </div>
+      <div>
+        <p class="nota-titulo">Estados del desafío</p>
+        <div class="fila-estado">
+          <div class="fila-estado-cabecera"><span>En reposo · etiqueta sola</span><span class="insignia">sin texto extra</span></div>
+          <div class="widget" role="img" aria-label="Widget sin resolver" style="width:300px">
+            <span class="widget-caja" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></span>
+            <span class="widget-texto"><strong>Verifica que eres humano</strong><small>Cloudflare Turnstile</small></span>
+          </div>
+        </div>
+        <div class="fila-estado">
+          <div class="fila-estado-cabecera"><span>Verificada</span><span class="insignia" data-tono="ok">envío activo</span></div>
+          <div class="widget" role="img" aria-label="Widget resuelto" style="width:300px">
+            <span class="widget-caja" data-verificado="si" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></span>
+            <span class="widget-texto"><strong>Verifica que eres humano</strong><small>Cloudflare Turnstile</small></span>
+          </div>
+          <p class="estado">Verificación de seguridad completada.</p>
+        </div>
+        <div class="fila-estado">
+          <div class="fila-estado-cabecera"><span>Error del desafío</span><span class="insignia">con reintento</span></div>
+          <div class="widget" role="img" aria-label="Widget con error" style="width:300px">
+            <span class="widget-caja" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg></span>
+            <span class="widget-texto"><strong>Verifica que eres humano</strong><small>Cloudflare Turnstile</small></span>
+          </div>
+          <p class="estado" data-tono="error">No pudimos completar la verificación de seguridad.</p>
+          <button class="btn btn-outline btn-sm" type="button" style="align-self:flex-start">Reintentar la verificación</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="pie">
+    <strong>Representación estática.</strong> El widget es un dibujo con tokens del sistema: no
+    ejecuta Cloudflare ni verifica nada. Para llevar esta dirección al código hay que sumar a
+    <code>TurnstileWidget</code> una etiqueta visible opcional y mostrar la línea de estado solo en
+    error, verificado o widget no disponible.
+  </p>
+</body>
+</html>
