@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures"
-import { signIn } from "./support/auth"
+import { openAuthTab, signIn, submitAuth } from "./support/auth"
 import { rejectNextVerification, resetSiteverify } from "./support/siteverify"
 import { uniqueTag } from "./support/test-data"
 
@@ -98,7 +98,9 @@ test.describe("reports", () => {
     // The guest choice precedes the anonymous session, which is created on click.
     await page.goto("/reportes/nuevo")
     await expect(page).toHaveURL(/\/auth/)
-    await page.getByRole("button", { name: "Continuar como invitado" }).click()
+    // The submit only renders while the guest tab is the active one.
+    await openAuthTab(page, "Invitado")
+    await submitAuth(page, "Continuar como invitado")
     await expect(page).toHaveURL(/\/reportes\/nuevo$/)
     await fillReportForm(page, titulo)
     await page.locator("#images").setInputFiles(await heavyPhoto(page))

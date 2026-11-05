@@ -1,28 +1,7 @@
-import type { Page } from "@playwright/test"
-
 import { expect, test } from "./fixtures"
-import { signIn } from "./support/auth"
+import { openAuthTab, signIn, submitAuth } from "./support/auth"
 import { confirmLinkPath, waitForAuthEmail } from "./support/mailpit"
 import { TEST_PASSWORD } from "./support/test-data"
-
-/**
- * Opens one of the `/auth` tabs and waits for it to be selected.
- *
- * A click dispatched right after the page scrolls is dropped by the browser: its hit test still
- * uses the pre-scroll layers, so the pointer lands where the tab used to be (the signup answer
- * scrolls the page). The attempt is retried until the tab reports itself as selected.
- *
- * @param page - Page showing the auth tabs.
- * @param name - Visible name of the tab.
- */
-async function openTab(page: Page, name: string) {
-  const tab = page.getByRole("tab", { name })
-
-  await expect(async () => {
-    await tab.click({ timeout: 5_000 })
-    await expect(tab).toHaveAttribute("aria-selected", "true", { timeout: 1_000 })
-  }).toPass({ timeout: 15_000 })
-}
 
 test.describe("accounts", () => {
   test("signing up needs the email confirmation before the account can sign in", async ({ page, testData }) => {
@@ -30,7 +9,7 @@ test.describe("accounts", () => {
 
     await page.goto("/auth")
     // Switching tabs right away mounts the signup challenge while the shared script still loads.
-    await openTab(page, "Registrarme")
+    await openAuthTab(page, "Registrarme")
     const registro = page.getByRole("tabpanel", { name: "Registrarme" })
     await registro.getByLabel("Nombre").fill("Ana")
     await registro.getByLabel("Apellido").fill("Prueba")
@@ -38,18 +17,18 @@ test.describe("accounts", () => {
     await registro.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD)
     await registro.getByLabel("Confirmar contraseña").fill(TEST_PASSWORD)
     await registro.getByRole("checkbox").check()
-    await registro.getByRole("button", { name: "Crear cuenta" }).click()
+    await submitAuth(page, "Crear cuenta")
 
     // The same copy also arrives as a toast, so the form's own alert is what gets asserted.
     await expect(registro.getByText("Te enviamos un correo de confirmación.")).toBeVisible()
     await testData.trackUserByEmail(email)
 
     // Before confirming, the password alone is not enough.
-    await openTab(page, "Ingresar")
+    await openAuthTab(page, "Ingresar")
     const ingreso = page.getByRole("tabpanel", { name: "Ingresar" })
     await ingreso.getByLabel("Correo electrónico").fill(email)
     await ingreso.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD)
-    await ingreso.getByRole("button", { name: "Ingresar", exact: true }).click()
+    await submitAuth(page, "Ingresar")
     await expect(ingreso.getByText("Primero confirmá tu correo desde el enlace que te enviamos.")).toBeVisible()
 
     const confirmation = await waitForAuthEmail(email, "Confirmá tu cuenta de Reporty")
@@ -66,7 +45,7 @@ test.describe("accounts", () => {
     await page.goto("/auth")
     await page.getByLabel("Correo electrónico").fill(user.email)
     await page.getByLabel("Contraseña", { exact: true }).fill("Not-The-Password-1!")
-    await page.getByRole("button", { name: "Ingresar", exact: true }).click()
+    await submitAuth(page, "Ingresar")
 
     // The same copy also appears as a toast, so the form's own alert is asserted.
     const ingreso = page.getByRole("tabpanel", { name: "Ingresar" })
