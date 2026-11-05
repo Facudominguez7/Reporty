@@ -19,6 +19,7 @@ import {
   votarReparadoWorkflow,
 } from "@/lib/use-cases/reportes"
 import { canParticipateInCommunity, getUserRoleContext, puedeOperarCuadrillas } from "@/lib/authz/roles"
+import { verificarCaptchaDeAccion } from "@/lib/security/turnstile-guard.server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
@@ -66,6 +67,68 @@ function mutationErrorMessage(error: unknown, fallback: string) {
 
 const GUEST_COMMUNITY_ERROR = "Vinculá tu correo para comentar y votar. Como invitado podés crear y seguir tus reportes."
 
+/**
+ * Action que Turnstile vincula al aporte público. `components/report-detail/comments-section.tsx`
+ * renderiza el challenge con el mismo valor, así un token emitido para otro formulario no
+ * puede reutilizarse acá. Las votaciones quedan sin CAPTCHA: ya exigen identidad permanente y
+ * un único voto por reporte.
+ */
+const ACCION_CAPTCHA_COMENTARIO = "comentar_reporte"
+
+/**
+ * Exige la verificación anti bots del aporte público. Se ejecuta después de autorizar a quien
+ * comenta y antes del workflow, así un token rechazado no publica, no suma puntos ni envía la
+ * notificación al dueño del reporte.
+ *
+ * @param captchaToken - Token de un solo uso emitido por el challenge del formulario.
+ * @returns Texto de error a devolver, o `null` cuando el aporte puede publicarse.
+ */
+async function verificarCaptchaDeComentario(captchaToken: string | null | undefined): Promise<string | null> {
+  const resultado = await verificarCaptchaDeAccion({
+    token: captchaToken,
+    expectedAction: ACCION_CAPTCHA_COMENTARIO,
+  })
+
+  return resultado.ok ? null : resultado.mensaje
+}
+
+/**
+ * Publica un aporte de la comunidad en un reporte.
+ *
+ * @param reporteId - Reporte que recibe el aporte.
+ * @param aporte - Clave del aporte elegido en el formulario de actualizaciones.
+ * @param captchaToken - Token Turnstile del challenge resuelto para esta publicación.
+ * @returns Aporte creado y puntos otorgados, o el error en español que se muestra en el formulario.
+ */
+export async function crearComentarioAction(reporteId: number, aporte: string, captchaToken?: string | null) {
+  try {
+    const parsedReportId = reportIdSchema.parse(reporteId)
+    const parsedAporte = parseAporteKey(contributionSchema.parse(aporte))
+    if (!parsedAporte) return { success: false as const, error: "Elegí una actualización válida." }
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false as const, error: "Tenés que iniciar sesión para comentar." }
+    }
+
+    const { data: contextoRol } = await getUserRoleContext(supabase, user.id)
+    if (!canParticipateInCommunity(user, contextoRol?.roleId)) {
+      return { success: false as const, error: GUEST_COMMUNITY_ERROR }
+    }
+
+    const captchaError = await verificarCaptchaDeComentario(captchaToken)
+    if (captchaError) {
+      return { success: false as const, error: captchaError }
+    }
+
+    return await crearComentarioWorkflow(createAdminClient(), parsedReportId, user.id, parsedAporte)
+  } catch (error) {
+    return { success: false as const, error: mutationErrorMessage(error, "No pudimos publicar tu comentario.") }
+  }
+}
 export async function votarNoExisteAction(reporteId: number) {
   try {
     const parsedReportId = reportIdSchema.parse(reporteId)
@@ -117,31 +180,6 @@ export async function votarReparadoAction(reporteId: number) {
     return await votarReparadoWorkflow(createAdminClient(), parsedReportId, user.id)
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos registrar tu voto.") }
-  }
-}
-
-export async function crearComentarioAction(reporteId: number, aporte: string) {
-  try {
-    const parsedReportId = reportIdSchema.parse(reporteId)
-    const parsedAporte = parseAporteKey(contributionSchema.parse(aporte))
-    if (!parsedAporte) return { success: false as const, error: "Elegí una actualización válida." }
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false as const, error: "Tenés que iniciar sesión para comentar." }
-    }
-
-    const { data: contextoRol } = await getUserRoleContext(supabase, user.id)
-    if (!canParticipateInCommunity(user, contextoRol?.roleId)) {
-      return { success: false as const, error: GUEST_COMMUNITY_ERROR }
-    }
-
-    return await crearComentarioWorkflow(createAdminClient(), parsedReportId, user.id, parsedAporte)
-  } catch (error) {
-    return { success: false as const, error: mutationErrorMessage(error, "No pudimos publicar tu comentario.") }
   }
 }
 

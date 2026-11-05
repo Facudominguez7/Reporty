@@ -922,7 +922,7 @@ export function ReporteDetalleClient({
               reportOwnerId={reporte.usuario_id}
               isAdmin={isAdmin}
               isClosed={Boolean(isReporteCerrado)}
-              onSubmitComment={(content) => crearComentarioAction(reporte.id, content)}
+              onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
               onDeleteComment={async (commentId) => {
                 const result = await eliminarComentarioPropioAction(commentId)
                 return result.success ? { success: true } : { success: false, error: String(result.error || "") }
