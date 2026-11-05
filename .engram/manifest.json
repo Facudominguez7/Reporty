@@ -312,6 +312,14 @@
       "sessions": 3,
       "memories": 5,
       "prompts": 0
+    },
+    {
+      "id": "e5774b06",
+      "created_by": "octid",
+      "created_at": "2026-11-05T15:21:56.3642873Z",
+      "sessions": 72,
+      "memories": 45,
+      "prompts": 0
     }
   ]
 }
