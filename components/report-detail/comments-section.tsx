@@ -42,6 +42,7 @@ import {
   TURNSTILE_NO_DISPONIBLE,
   TurnstileWidget,
 } from "@/components/turnstile-widget";
+import { debeAvisarVerificacionVencida } from "./verificacion-de-aporte";
 
 /**
  * Action que Turnstile vincula al aporte público. `app/reportes/[id]/actions.ts` verifica el
@@ -117,6 +118,13 @@ export function CommentsSection({
     !isSubmitting &&
     !captchaNoDisponible &&
     (!needsCaptcha || captchaToken !== null);
+  // El widget queda detrás del diálogo: si el token vence con el diálogo abierto, se explica ahí.
+  const verificacionVencida = debeAvisarVerificacionVencida({
+    exigeVerificacion: needsCaptcha,
+    verificacionNoDisponible: captchaNoDisponible,
+    token: captchaToken,
+    publicando: isSubmitting,
+  });
 
   /**
    * Olvida el token que se acaba de consumir y pide un challenge nuevo, así un reintento nunca
@@ -447,6 +455,15 @@ export function CommentsSection({
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {verificacionVencida && (
+            <Alert variant="destructive">
+              <AlertTitle>La verificación de seguridad venció</AlertTitle>
+              <AlertDescription>
+                Tocá Cancelar y completá de nuevo la verificación del formulario.
+                Tu actualización elegida se conserva.
+              </AlertDescription>
+            </Alert>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>
               Cancelar

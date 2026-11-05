@@ -2,7 +2,7 @@ import { createElement } from "react"
 import { renderToString } from "react-dom/server"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import type { TurnstileRenderOptions } from "../../components/turnstile-widget"
+import type { TurnstileApi, TurnstileRenderOptions } from "../../components/turnstile-widget"
 import { TURNSTILE_TEST_SITE_KEY } from "./constants"
 
 type WidgetModule = typeof import("../../components/turnstile-widget")
@@ -31,6 +31,8 @@ const fakeTurnstile = () => {
 const callbacks = () => ({ onToken: vi.fn(), onError: vi.fn() })
 
 afterEach(() => {
+  // Ninguna prueba deja temporizadores falsos activos para las que siguen.
+  vi.useRealTimers()
   vi.unstubAllEnvs()
   vi.resetModules()
 })
@@ -350,7 +352,7 @@ describe("carga compartida del script de Turnstile", () => {
     const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
     const api = fakeTurnstile().api
 
-    await expect(esperarApiTurnstile(() => api)).resolves.toBe(api)
+    await expect(esperarApiTurnstile({ obtenerApi: () => api })).resolves.toBe(api)
   })
 
   it("espera a la API cuando el script todavía está cargando", async () => {
@@ -358,7 +360,7 @@ describe("carga compartida del script de Turnstile", () => {
     const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
     const api = fakeTurnstile().api
     let cargada: typeof api | undefined
-    const espera = esperarApiTurnstile(() => cargada)
+    const espera = esperarApiTurnstile({ obtenerApi: () => cargada })
 
     await vi.advanceTimersByTimeAsync(500)
     cargada = api
@@ -371,7 +373,7 @@ describe("carga compartida del script de Turnstile", () => {
   it("devuelve null si la API nunca llega para mostrar el estado no disponible", async () => {
     vi.useFakeTimers()
     const { esperarApiTurnstile, TURNSTILE_SCRIPT_TIMEOUT_MS } = await importWidget(TURNSTILE_TEST_SITE_KEY)
-    const espera = esperarApiTurnstile(() => undefined)
+    const espera = esperarApiTurnstile({ obtenerApi: () => undefined })
 
     await vi.advanceTimersByTimeAsync(TURNSTILE_SCRIPT_TIMEOUT_MS + 100)
 
@@ -386,6 +388,150 @@ describe("carga compartida del script de Turnstile", () => {
 
     expect(script).not.toContain("onReady")
     expect(script).not.toContain("onLoad")
-    expect(codigo).toContain("esperarApiTurnstile()")
+    expect(codigo).toContain("esperarApiTurnstile({")
+  })
+
+  it("deja de consultar la API al cancelar la espera y no resuelve tarde", async () => {
+    vi.useFakeTimers()
+    const { esperarApiTurnstile, TURNSTILE_SCRIPT_TIMEOUT_MS } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const control = new AbortController()
+    let resultado: TurnstileApi | null | "pendiente" = "pendiente"
+
+    const espera = esperarApiTurnstile({ obtenerApi: () => undefined, signal: control.signal })
+    void espera.then((api) => {
+      resultado = api
+    })
+
+    control.abort()
+    // Sin esto, un widget desmontado seguiría consultando `window.turnstile` 20 s más.
+    expect(vi.getTimerCount()).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(TURNSTILE_SCRIPT_TIMEOUT_MS + 100)
+
+    // Nadie reacciona a una carga que ya no importa: el estado del formulario no cambia.
+    expect(resultado).toBe("pendiente")
+    vi.useRealTimers()
+  })
+
+  it("acepta una espera ya cancelada sin consultar la API ni dejar temporizadores", async () => {
+    vi.useFakeTimers()
+    const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const obtenerApi = vi.fn<() => TurnstileApi | undefined>(() => undefined)
+    const control = new AbortController()
+    control.abort()
+
+    esperarApiTurnstile({ obtenerApi, signal: control.signal })
+
+    // Una espera cancelada no consulta nada: no hay carga que le interese.
+    expect(obtenerApi).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+    vi.useRealTimers()
+  })
+})
+
+/**
+ * `esperarApiTurnstile` se exporta desde el módulo y ya se consumía con argumentos posicionales
+ * `(obtenerApi, limiteMs)`. Esa firma no puede romperse para agregar la cancelación.
+ */
+describe("contrato posicional de la espera acotada", () => {
+  it("resuelve con la API usando la firma histórica (obtenerApi)", async () => {
+    const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const api = fakeTurnstile().api
+
+    await expect(esperarApiTurnstile(() => api)).resolves.toBe(api)
+  })
+
+  it("respeta el límite posicional (obtenerApi, limiteMs)", async () => {
+    vi.useFakeTimers()
+    const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    let resultado: TurnstileApi | null | "pendiente" = "pendiente"
+
+    const espera = esperarApiTurnstile(() => undefined, 1_000)
+    void espera.then((api) => {
+      resultado = api
+    })
+
+    await vi.advanceTimersByTimeAsync(900)
+    expect(resultado).toBe("pendiente")
+
+    await vi.advanceTimersByTimeAsync(200)
+    expect(resultado).toBeNull()
+    vi.useRealTimers()
+  })
+
+  it("no entrega la API cuando la señal ya estaba cancelada antes de llamar", async () => {
+    const { esperarApiTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const api = fakeTurnstile().api
+    const control = new AbortController()
+    control.abort()
+    let resultado: TurnstileApi | null | "pendiente" = "pendiente"
+
+    void esperarApiTurnstile({ obtenerApi: () => api, signal: control.signal }).then((valor) => {
+      resultado = valor
+    })
+
+    // Se vacían las microtareas: una promesa resuelta ya habría entregado la API.
+    await new Promise((resolver) => setTimeout(resolver, 0))
+
+    expect(resultado).toBe("pendiente")
+  })
+})
+
+/**
+ * Cuando el script de Cloudflare tarda más que la espera acotada, el widget queda sin salida:
+ * sólo una recarga de la página lo recuperaba. El reintento debe volver a esperar la API.
+ */
+describe("reintento de la verificación", () => {
+  it("reinicia la espera acotada cuando la API de Cloudflare nunca llegó", async () => {
+    const { decidirReintentoDeVerificacion } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    expect(decidirReintentoDeVerificacion({ tieneDesafio: false, apiLista: false })).toBe("reiniciar-espera")
+  })
+
+  it("remonta el desafío cuando la API está lista pero el render falló", async () => {
+    const { decidirReintentoDeVerificacion } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    expect(decidirReintentoDeVerificacion({ tieneDesafio: false, apiLista: true })).toBe("remontar-desafio")
+  })
+
+  it("resetea el desafío existente sin volver a montarlo", async () => {
+    const { decidirReintentoDeVerificacion } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    expect(decidirReintentoDeVerificacion({ tieneDesafio: true, apiLista: true })).toBe("resetear-desafio")
+    expect(decidirReintentoDeVerificacion({ tieneDesafio: true, apiLista: false })).toBe("resetear-desafio")
+  })
+
+  it("ofrece el botón de reintento también cuando el script no llegó", async () => {
+    const { mostrarReintentoDeVerificacion } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    expect(mostrarReintentoDeVerificacion("unavailable")).toBe(true)
+    expect(mostrarReintentoDeVerificacion("error")).toBe(true)
+    expect(mostrarReintentoDeVerificacion("idle")).toBe(false)
+    expect(mostrarReintentoDeVerificacion("verified")).toBe(false)
+  })
+
+  it("conserva la indicación honesta de revisar la conexión y recargar la página", async () => {
+    const { copyDeEstadoTurnstile } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    // Reintentar vuelve a esperar la API; no recarga un script bloqueado. El texto no puede
+    // prometer una recuperación que depende del navegador o de la red.
+    expect(copyDeEstadoTurnstile.unavailable).toContain("conexión")
+    expect(copyDeEstadoTurnstile.unavailable).toContain("recargá la página")
+    expect(copyDeEstadoTurnstile.error).toBe("No pudimos completar la verificación de seguridad.")
+    expect(copyDeEstadoTurnstile.idle).toBe("Verificación de seguridad")
+    expect(copyDeEstadoTurnstile.verified).toBe("Verificación de seguridad completada.")
+  })
+
+  it("conecta el reintento con una nueva espera cancelable en el efecto del widget", async () => {
+    const { readFileSync } = await import("node:fs")
+    const codigo = readFileSync(new URL("../../components/turnstile-widget.tsx", import.meta.url), "utf8")
+
+    // Vitest corre sin DOM y el repositorio no tiene renderer de React: el cableado del
+    // efecto se verifica sobre el código que el navegador ejecuta.
+    expect(codigo).toMatch(/esperarApiTurnstile\(\{[^}]*signal/) // la espera se puede cancelar
+    expect(codigo).toMatch(/setWaitAttempt\(/)
+    expect(codigo).toContain("}, [scriptReady, waitAttempt])")
+    expect(codigo).toContain("mostrarReintentoDeVerificacion(status)")
+    expect(codigo).toContain('type="button" variant="outline" size="sm" onClick={retry}')
   })
 })
