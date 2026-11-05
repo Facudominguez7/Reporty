@@ -22,6 +22,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: SITE_NAME, description: SITE_DESCRIPTION },
   icons: {
     icon: [
+      { url: "/favicon_io/favicon.svg", type: "image/svg+xml" },
       { url: "/favicon_io/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon_io/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon_io/favicon.ico" },
