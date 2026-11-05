@@ -321,42 +321,131 @@ export const TURNSTILE_SCRIPT_TIMEOUT_MS = 20_000
 /** Interval between checks while the shared script is still loading. */
 const TURNSTILE_SCRIPT_POLL_MS = 50
 
+export type TurnstileStatus = "idle" | "verified" | "error" | "unavailable"
+
+/** Texto de cada estado; los formularios y las pruebas leen el mismo texto que muestra el widget. */
+export const copyDeEstadoTurnstile: Record<TurnstileStatus, string> = {
+  idle: "Verificación de seguridad",
+  verified: "Verificación de seguridad completada.",
+  error: "No pudimos completar la verificación de seguridad.",
+  // Reintentar vuelve a esperar la API, pero no recarga un script que el navegador bloqueó:
+  // la instrucción de recargar la página sigue siendo la salida honesta para el caso offline.
+  unavailable: "No pudimos cargar la verificación de seguridad. Revisá tu conexión y recargá la página.",
+}
+
 /**
- * Resolves once the Cloudflare API exists. `next/script` cannot tell this reliably: it marks
- * a shared src as loaded as soon as a second instance starts waiting, so a widget mounted
- * later during the load (a tab switch) would be told it is ready while the API is still
- * missing. Every widget checks the API itself instead.
+ * Cómo continúa el reintento según el estado actual de la verificación.
  *
- * @param obtenerApi - Reads the API; defaults to `window.turnstile`.
- * @param limiteMs - Maximum wait before giving up.
- * @returns The API, or `null` when it never arrived (blocked or offline).
+ * - `resetear-desafio`: hay un desafío montado, así que sólo hace falta un token nuevo.
+ * - `remontar-desafio`: la API está cargada pero el render falló, así que se reusa el contenedor.
+ * - `reiniciar-espera`: la API nunca llegó (script lento o todavía en vuelo), así que la espera
+ *   acotada arranca de nuevo en vez de dejar el widget sin salida.
+ */
+export type ReintentoDeVerificacion = "resetear-desafio" | "remontar-desafio" | "reiniciar-espera"
+
+/**
+ * Decide qué hace el botón de reintento sin tocar el estado de React.
+ *
+ * @param params.tieneDesafio - Si hay un desafío montado en este momento.
+ * @param params.apiLista - Si la API de Cloudflare ya está disponible.
+ * @returns La acción que debe ejecutar el reintento.
+ */
+export function decidirReintentoDeVerificacion({
+  tieneDesafio,
+  apiLista,
+}: {
+  tieneDesafio: boolean
+  apiLista: boolean
+}): ReintentoDeVerificacion {
+  if (tieneDesafio) return "resetear-desafio"
+  return apiLista ? "remontar-desafio" : "reiniciar-espera"
+}
+
+/**
+ * El reintento se ofrece siempre que la verificación no esté resuelta: un error interno o un
+ * script que nunca llegó. El segundo caso dejaba al widget sin más recuperación que recargar
+ * la página entera.
+ *
+ * @param status - Estado actual del widget.
+ * @returns Si hay que renderizar el control de reintento.
+ */
+export function mostrarReintentoDeVerificacion(status: TurnstileStatus): boolean {
+  return status === "error" || status === "unavailable"
+}
+
+/** Opciones de la espera acotada; el efecto del widget sólo pasa la señal de cancelación. */
+export type TurnstileApiWaitOptions = {
+  /** Lee la API; por defecto `window.turnstile`. */
+  obtenerApi?: () => TurnstileApi | undefined
+  /** Espera máxima antes de darse por vencido. */
+  limiteMs?: number
+  /**
+   * Cancela la espera cuando el widget se desmonta o se reintenta. Después de cancelar, la
+   * promesa nunca se resuelve: nadie reacciona a una carga que ya no importa.
+   */
+  signal?: AbortSignal
+}
+
+/**
+ * Firma histórica posicional: `(obtenerApi, limiteMs)`. Se conserva porque el módulo la
+ * exporta y sus consumidores ya la usaban así; sólo agrega la cancelación opcional al final.
  */
 export function esperarApiTurnstile(
-  obtenerApi: () => TurnstileApi | undefined = () => window.turnstile,
+  obtenerApi?: () => TurnstileApi | undefined,
+  limiteMs?: number,
+  opciones?: TurnstileApiWaitOptions,
+): Promise<TurnstileApi | null>
+/** Firma por opciones, que es la que usa el efecto del widget para poder cancelar la espera. */
+export function esperarApiTurnstile(opciones?: TurnstileApiWaitOptions): Promise<TurnstileApi | null>
+/**
+ * Resuelve cuando la API de Cloudflare existe. `next/script` no puede avisarlo de forma
+ * confiable: marca un src compartido como cargado apenas una segunda instancia empieza a
+ * esperar, así que un widget montado más tarde durante la carga (un cambio de pestaña) creería
+ * que está listo con la API todavía ausente. Cada widget consulta la API por su cuenta.
+ *
+ * Acepta la firma histórica posicional y la variante por opciones; en ambas `obtenerApi` lee la
+ * API (por defecto `window.turnstile`) y `limiteMs` acota la espera. Con `signal` ya cancelada
+ * no se consulta la API: la promesa queda pendiente a propósito.
+ *
+ * @returns La API, o `null` cuando nunca llegó dentro del límite (bloqueada o sin conexión).
+ */
+export function esperarApiTurnstile(
+  obtenerApiUOpciones: (() => TurnstileApi | undefined) | TurnstileApiWaitOptions = () => window.turnstile,
   limiteMs = TURNSTILE_SCRIPT_TIMEOUT_MS,
+  opciones: TurnstileApiWaitOptions = {},
 ): Promise<TurnstileApi | null> {
-  const disponible = obtenerApi()
+  const configuracion =
+    typeof obtenerApiUOpciones === "function"
+      ? { obtenerApi: obtenerApiUOpciones, limiteMs, signal: opciones.signal }
+      : {
+          obtenerApi: obtenerApiUOpciones.obtenerApi ?? (() => window.turnstile),
+          limiteMs: obtenerApiUOpciones.limiteMs ?? TURNSTILE_SCRIPT_TIMEOUT_MS,
+          signal: obtenerApiUOpciones.signal,
+        }
+
+  // Una espera cancelada de antemano no consulta ni entrega la API: ya no importa.
+  if (configuracion.signal?.aborted) return new Promise<TurnstileApi | null>(() => {})
+
+  const disponible = configuracion.obtenerApi()
   if (disponible) return Promise.resolve(disponible)
 
   return new Promise((resolve) => {
     const inicio = Date.now()
     const intervalo = setInterval(() => {
-      const api = obtenerApi()
-      if (api || Date.now() - inicio >= limiteMs) {
-        clearInterval(intervalo)
-        resolve(api ?? null)
-      }
+      const api = configuracion.obtenerApi()
+      if (!api && Date.now() - inicio < configuracion.limiteMs) return
+      clearInterval(intervalo)
+      configuracion.signal?.removeEventListener("abort", alCancelar)
+      resolve(api ?? null)
     }, TURNSTILE_SCRIPT_POLL_MS)
+
+    /** Corta el sondeo sin resolver: quien esperaba ya abandonó esta espera. */
+    function alCancelar() {
+      clearInterval(intervalo)
+    }
+
+    configuracion.signal?.addEventListener("abort", alCancelar, { once: true })
   })
-}
-
-type TurnstileStatus = "idle" | "verified" | "error" | "unavailable"
-
-const statusCopy: Record<TurnstileStatus, string> = {
-  idle: "Verificación de seguridad",
-  verified: "Verificación de seguridad completada.",
-  error: "No pudimos completar la verificación de seguridad.",
-  unavailable: "No pudimos cargar la verificación de seguridad. Revisá tu conexión y recargá la página.",
 }
 
 type TurnstileWidgetProps = {
@@ -411,27 +500,31 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
   const actionRef = useRef(action)
   const [scriptReady, setScriptReady] = useState(() => typeof window !== "undefined" && Boolean(window.turnstile))
   const [status, setStatus] = useState<TurnstileStatus>("idle")
-  // Bumped by the retry button when the challenge never rendered.
+  // Lo incrementa el botón de reintento cuando el desafío nunca se renderizó.
   const [mountAttempt, setMountAttempt] = useState(0)
+  // Lo incrementa el botón de reintento cuando la API nunca llegó: reinicia la espera acotada.
+  const [waitAttempt, setWaitAttempt] = useState(0)
   const statusId = useId()
 
   useEffect(() => {
     onTokenChangeRef.current = onTokenChange
   }, [onTokenChange])
 
-  // The challenge mounts only once the API really exists, however the shared script loads.
+  // El desafío se monta sólo cuando la API existe de verdad, sin importar cómo cargue el
+  // script compartido. `waitAttempt` reinicia la espera acotada cuando el reintento lo pide.
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY || scriptReady) return
-    let cancelado = false
-    esperarApiTurnstile().then((api) => {
-      if (cancelado) return
+
+    const control = new AbortController()
+    esperarApiTurnstile({ signal: control.signal }).then((api) => {
       if (api) setScriptReady(true)
       else setStatus("unavailable")
     })
-    return () => {
-      cancelado = true
-    }
-  }, [scriptReady])
+
+    // Desmontar o reintentar corta el sondeo; una espera cancelada nunca se resuelve, así que
+    // el widget no puede pasar a "unavailable" por una carga que ya no está esperando.
+    return () => control.abort()
+  }, [scriptReady, waitAttempt])
 
   useEffect(() => {
     const container = containerRef.current
@@ -484,15 +577,26 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
   }, [resetSignal])
 
   const retry = () => {
-    if (handleRef.current) {
-      setStatus("idle")
-      handleRef.current.reset()
+    const accion = decidirReintentoDeVerificacion({
+      tieneDesafio: Boolean(handleRef.current),
+      apiLista: scriptReady,
+    })
+
+    setStatus("idle")
+
+    if (accion === "resetear-desafio") {
+      handleRef.current?.reset()
       return
     }
 
-    // The challenge never rendered: mount it again instead of resetting nothing.
-    setStatus("idle")
-    setMountAttempt((attempt) => attempt + 1)
+    if (accion === "remontar-desafio") {
+      // El desafío nunca se renderizó: se monta de nuevo en vez de resetear nada.
+      setMountAttempt((attempt) => attempt + 1)
+      return
+    }
+
+    // La API nunca llegó: se espera otra vez en lugar de dejar sólo una recarga de página.
+    setWaitAttempt((attempt) => attempt + 1)
   }
 
   if (!TURNSTILE_SITE_KEY) {
@@ -523,9 +627,9 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
               : "text-xs text-muted-foreground"
           }
         >
-          {statusCopy[status]}
+          {copyDeEstadoTurnstile[status]}
         </p>
-        {status === "error" && (
+        {mostrarReintentoDeVerificacion(status) && (
           <Button type="button" variant="outline" size="sm" onClick={retry}>
             Reintentar la verificación
           </Button>
