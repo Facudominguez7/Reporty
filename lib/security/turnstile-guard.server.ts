@@ -68,6 +68,7 @@ export async function verificarCaptchaDeAccion(input: {
   }
 
   if (!captchaConfigurado() || !secretoConfigurado()) {
+    console.error("Turnstile: falló la verificación por un problema operativo", "configuracion_faltante")
     return { ok: false, tipo: "no_disponible", mensaje: MENSAJE_CAPTCHA_NO_DISPONIBLE }
   }
 
@@ -78,6 +79,15 @@ export async function verificarCaptchaDeAccion(input: {
 
   if (verificacion.ok) {
     return { ok: true }
+  }
+
+  // Solo categorías fijas de fallas operativas; nunca el token, el secreto ni errores externos.
+  if (
+    verificacion.motivo === "configuracion_faltante" ||
+    verificacion.motivo === "secreto_de_prueba_en_produccion" ||
+    verificacion.motivo === "error_de_red"
+  ) {
+    console.error("Turnstile: falló la verificación por un problema operativo", verificacion.motivo)
   }
 
   return { ok: false, tipo: "rechazada", motivo: verificacion.motivo, mensaje: verificacion.mensaje }

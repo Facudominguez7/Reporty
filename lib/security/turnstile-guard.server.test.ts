@@ -49,6 +49,77 @@ afterEach(() => {
 })
 
 describe("verificarCaptchaDeAccion", () => {
+  it("registra fallas operativas sin divulgar credenciales ni registrar tokens inválidos", async () => {
+    const registro = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      configurar()
+      vi.stubEnv("TURNSTILE_ALLOWED_HOSTNAMES", "")
+      const resultado = rechazo(await comentario("token-privado"))
+      expect(resultado).toMatchObject({ tipo: "rechazada", motivo: "configuracion_faltante" })
+      expect(registro).toHaveBeenCalledOnce()
+      expect(JSON.stringify(registro.mock.calls)).not.toContain("token-privado")
+      expect(JSON.stringify(registro.mock.calls)).not.toContain(SECRETO_PRUEBA)
+
+      registro.mockClear()
+      configurar()
+      siteverify({ success: false, "error-codes": ["timeout-or-duplicate"] })
+      expect(rechazo(await comentario())).toMatchObject({ motivo: "token_invalido" })
+      expect(registro).not.toHaveBeenCalled()
+    } finally {
+      registro.mockRestore()
+    }
+  })
+  it("registra errores de red sin exponer entradas ni detalles externos", async () => {
+    configurar()
+    const registro = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("secreto-privado token-privado\nINYECCION")))
+      const resultado = await verificarCaptchaDeAccion({ token: "token-privado", expectedAction: "dato-privado" })
+      expect(resultado).toMatchObject({ ok: false, tipo: "rechazada", motivo: "error_de_red" })
+      expect(registro.mock.calls).toEqual([["Turnstile: falló la verificación por un problema operativo", "error_de_red"]])
+    } finally {
+      registro.mockRestore()
+    }
+  })
+
+  it("registra la configuración incompleta sin exponer datos", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "")
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "")
+    const registro = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      expect(await comentario("token-privado")).toMatchObject({ ok: false, tipo: "no_disponible" })
+      expect(registro.mock.calls).toEqual([["Turnstile: falló la verificación por un problema operativo", "configuracion_faltante"]])
+    } finally {
+      registro.mockRestore()
+    }
+  })
+
+  it("no registra rechazos de action aunque mantiene el bloqueo", async () => {
+    configurar()
+    siteverify({ action: "otra_accion" })
+    const registro = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      expect(rechazo(await comentario())).toMatchObject({ motivo: "action_incorrecta" })
+      expect(registro).not.toHaveBeenCalled()
+    } finally {
+      registro.mockRestore()
+    }
+  })
+
+  it("registra el secreto de prueba rechazado en producción sin exponerlo", async () => {
+    configurar()
+    vi.stubEnv("NODE_ENV", "production")
+    const registro = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      expect(rechazo(await comentario())).toMatchObject({ motivo: "secreto_de_prueba_en_produccion" })
+      expect(registro.mock.calls).toEqual([["Turnstile: falló la verificación por un problema operativo", "secreto_de_prueba_en_produccion"]])
+      expect(JSON.stringify(registro.mock.calls)).not.toContain(SECRETO_PRUEBA)
+    } finally {
+      registro.mockRestore()
+    }
+  })
+
   it("acepta un token válido verificado con la action que espera el servidor", async () => {
     configurar()
     const llamada = siteverify()
