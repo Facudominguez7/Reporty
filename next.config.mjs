@@ -7,7 +7,7 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  allowedDevOrigins: ['192.168.0.107'],
+  allowedDevOrigins: ['192.168.0.107', '*.ts.net', '**.ts.net'],
   // The home is the map. Serving it at `/` with a rewrite saves the browser the
   // extra round trip of a redirect before the page starts loading.
   // One host for search engines: www.reporty.com.ar would otherwise serve the same pages twice.

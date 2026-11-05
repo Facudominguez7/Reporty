@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { execFileSync } from "node:child_process"
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
@@ -21,12 +22,42 @@ export function uniqueTag() {
   return `e2e-${randomUUID().slice(0, 8)}`
 }
 
+/**
+ * Deletes the rows that reference a report with `on delete restrict` and that the service role
+ * cannot remove: those tables grant it read (and update) access only, so the test data would
+ * outlive the test. Arithmetic identifiers keep the statement free of injected values.
+ *
+ * @param reportIds - Reports about to be deleted.
+ */
+function borrarFilasRestringidas(reportIds: number[]) {
+  const url = process.env.E2E_SUPABASE_DB_URL
+  if (!url) throw new Error("Run the E2E suite with `npx playwright test`, which exports the local database URL.")
+  const ids = reportIds.join(",")
+  const consulta = [
+    `delete from public.avisos_retiro_reporte where reporte_id in (${ids});`,
+    `delete from public.puntos_creacion_reporte where reporte_id in (${ids});`,
+    `delete from public.reservas_moderacion where solicitud in (select id from public.moderacion_imagenes where reporte_id in (${ids}));`,
+    `delete from public.moderacion_imagenes where reporte_id in (${ids});`,
+  ].join("\n")
+
+  try {
+    execFileSync("psql", [url, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-c", consulta], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 10_000,
+    })
+  } catch {
+    throw new Error("Could not delete the restricted rows of the tracked reports from the local database.")
+  }
+}
+
 export type TestUser = { id: string; email: string; password: string; username: string }
 
 /**
  * Creates the users and reports a test needs and, once the test ends, hard-deletes every row and
- * storage object it created: reports (with their photos, votes and history), then auth users
- * (which removes their profiles), then the auth emails they got. Pre-existing rows are never touched.
+ * storage object it created: reports (with their photos, votes, moderation queue, awarded points
+ * and history), then auth users (which removes their profiles), then the auth emails they got.
+ * Pre-existing rows are never touched.
  */
 export class TestData {
   private readonly supabase = adminClient()
@@ -135,6 +166,39 @@ export class TestData {
     for (const { id } of data) this.reportIds.add(id)
   }
 
+  /**
+   * Deletes the private moderation queue of tracked reports. Its rows reference the report
+   * with `on delete restrict`, and its private photo lives in a bucket of its own, so both
+   * must go before the report itself.
+   *
+   * @param reportIds - Reports whose moderation rows must disappear first.
+   */
+  private async cleanupModeracion(reportIds: number[]) {
+    const { data: filas, error } = await this.supabase
+      .from("moderacion_imagenes")
+      .select("id, path_privado")
+      .in("reporte_id", reportIds)
+    if (error) throw error
+
+    if (filas.length > 0) {
+      const privados = filas.map((fila) => fila.path_privado)
+      const { error: privadoError } = await this.supabase.storage.from("reportes-pendientes").remove(privados)
+      if (privadoError) throw privadoError
+
+      // Published copies live under `<moderacion id>/`, whatever their token was.
+      for (const { id } of filas) {
+        const { data: objetos, error: listError } = await this.supabase.storage.from("reportes").list(id)
+        if (listError) throw listError
+        const paths = objetos.map((objeto) => `${id}/${objeto.name}`)
+        if (paths.length === 0) continue
+        const { error: publicoError } = await this.supabase.storage.from("reportes").remove(paths)
+        if (publicoError) throw publicoError
+      }
+    }
+
+    borrarFilasRestringidas(reportIds)
+  }
+
   async cleanup() {
     for (const userId of this.userIds) await this.trackReportsOf(userId)
     const reportIds = [...this.reportIds]
@@ -151,6 +215,8 @@ export class TestData {
         const { error: storageError } = await this.supabase.storage.from("reportes").remove(paths)
         if (storageError) throw storageError
       }
+
+      await this.cleanupModeracion(reportIds)
 
       const { error: deleteError } = await this.supabase.from("reportes").delete().in("id", reportIds)
       if (deleteError) throw deleteError

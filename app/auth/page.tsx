@@ -6,18 +6,39 @@
 
 import type React from "react"
 
-import { useActionState, useEffect, useState } from "react"
+import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { useFormStatus } from "react-dom"
-import type { AuthError } from "@supabase/supabase-js"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Eye, EyeOff, Lock, Mail, Phone, User, UserRound } from "lucide-react"
+import { Eye, EyeOff, Lock, Mail, Phone, User } from "lucide-react"
 import { toast } from "sonner"
 
 import { iniciarSesionOAuth, login, signup, type AuthFormState } from "./actions"
 import { obtenerRutaInternaSegura, RUTA_RECUPERAR_CONTRASENA } from "./rutas-seguras"
+import {
+  ETIQUETAS_PESTANA,
+  PESTANAS_AUTH,
+  VERIFICACION_INICIAL,
+  abrirSesionInvitada,
+  entregarTokenAlFormulario,
+  envioDeLaPestana,
+  liberarVerificacion,
+  normalizarPestana,
+  ofrecerToken,
+  reclamarVerificacion,
+  type EstadoVerificacion,
+  type OperacionVerificada,
+  type PestanaAuth,
+  type ReclamacionVerificacion,
+} from "./verificacion-compartida"
 import { createClient } from "@/utils/supabase/client"
-import { TURNSTILE_SITE_KEY, TurnstileWidget } from "@/components/turnstile-widget"
+import {
+  MENSAJE_CAPTCHA_NO_DISPONIBLE,
+  TURNSTILE_CONFIGURADO,
+  TURNSTILE_NO_DISPONIBLE,
+  TurnstileWidget,
+  valoresTrasIntentoFallido,
+} from "@/components/turnstile-widget"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,12 +46,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-function guestSessionErrorMessage(error: AuthError) {
-  if (error.status === 429) return "Demasiados intentos desde tu conexión. Probá de nuevo en unos minutos."
-  if (error.code === "anonymous_provider_disabled") return "No está disponible el acceso como invitado. Iniciá sesión para continuar."
-  if (error.message.toLowerCase().includes("captcha")) return "Completá la verificación de seguridad e intentá nuevamente."
-  return "No pudimos preparar tu sesión de invitado. Intentá nuevamente."
-}
+/** Passwords the signup form holds once it has nothing left to protect. */
+const CONTRASENAS_VACIAS = { password: "", confirmPassword: "" }
 
 /**
  * Renderiza la experiencia principal de ingreso y registro de usuarios.
@@ -41,10 +58,13 @@ export default function AuthPage() {
   const searchParams = useSearchParams()
   const supabase = createClient()
   const [checkingSession, setCheckingSession] = useState(true)
-  const [guestCaptchaToken, setGuestCaptchaToken] = useState<string | null>(null)
-  const [guestCaptchaReset, setGuestCaptchaReset] = useState(0)
+  // Una sola verificación atiende al ingreso, al registro y al acceso como invitado.
+  const [verificacion, setVerificacion] = useState<EstadoVerificacion>(VERIFICACION_INICIAL)
+  // El ref es la fuente de verdad del reclamo: se actualiza antes de cualquier re-render.
+  const verificacionRef = useRef<EstadoVerificacion>(VERIFICACION_INICIAL)
   const [guestError, setGuestError] = useState<string | null>(null)
-  const [guestPending, setGuestPending] = useState(false)
+  // Pestaña activa: define qué envío acompaña a la verificación compartida.
+  const [pestana, setPestana] = useState<PestanaAuth>("ingreso")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loginEmail, setLoginEmail] = useState("")
@@ -53,21 +73,126 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const passwordsMatch = signupPassword === confirmPassword
   const initialState: AuthFormState = { error: undefined, message: undefined }
-  const [loginState, loginAction] = useActionState(login, initialState)
-  const [signupState, signupAction] = useActionState(signup, initialState)
+  const [loginState, loginAction, loginPending] = useActionState(login, initialState)
+  const [signupState, signupAction, signupPending] = useActionState(signup, initialState)
   const nextPath = obtenerRutaInternaSegura(searchParams.get("next"))
   const oauthError = searchParams.get("error") === "oauth"
   const enlaceError = searchParams.get("error") === "enlace"
-  const needsGuestCaptcha = TURNSTILE_SITE_KEY !== ""
+  const needsCaptcha = TURNSTILE_CONFIGURADO
+  // Production without a site key cannot challenge anybody: the forms fail closed instead
+  // of submitting an unprotected request that the provider may accept.
+  const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE
+  const lastLoginState = useRef(loginState)
+  const lastSignupState = useRef(signupState)
+
+  /**
+   * Aplica el estado siguiente de la verificación de forma síncrona.
+   *
+   * @param siguiente - Estado que reemplaza al actual.
+   */
+  const aplicarVerificacion = useCallback((siguiente: EstadoVerificacion) => {
+    if (siguiente === verificacionRef.current) return
+    verificacionRef.current = siguiente
+    setVerificacion(siguiente)
+  }, [])
+
+  /**
+   * Reclama la verificación compartida para una operación.
+   *
+   * El reclamo se resuelve contra el ref, así que dos envíos en el mismo instante no pueden
+   * quedarse con el mismo token: el segundo no encuentra la verificación libre.
+   *
+   * @param operacion - Acción que va a consumir el token.
+   * @returns Reclamo con el token a enviar, o `null` si la operación no puede enviarse.
+   */
+  const reclamar = useCallback(
+    (operacion: OperacionVerificada): ReclamacionVerificacion | null => {
+      const reclamacion = reclamarVerificacion(verificacionRef.current, operacion, needsCaptcha)
+      if (!reclamacion) return null
+      aplicarVerificacion(reclamacion.estado)
+      return reclamacion
+    },
+    [aplicarVerificacion, needsCaptcha],
+  )
+
+  /**
+   * Libera la verificación cuando la operación que la tomó terminó.
+   *
+   * @param operacion - Acción que dejó de estar en curso.
+   */
+  const liberar = useCallback(
+    (operacion: OperacionVerificada) => {
+      aplicarVerificacion(liberarVerificacion(verificacionRef.current, operacion))
+    },
+    [aplicarVerificacion],
+  )
+
+  /**
+   * Registra el token que entregó el desafío compartido.
+   *
+   * @param token - Token emitido, o `null` cuando expiró o falló el desafío.
+   */
+  const recibirToken = useCallback(
+    (token: string | null) => {
+      aplicarVerificacion(ofrecerToken(verificacionRef.current, token))
+    },
+    [aplicarVerificacion],
+  )
+
+  /**
+   * Construye el manejador de envío de un formulario protegido.
+   *
+   * El reclamo es síncrono: un segundo envío en el mismo instante no encuentra la
+   * verificación libre y se cancela antes de que React llame a la acción del servidor.
+   *
+   * @param operacion - Acción que consume la verificación.
+   * @returns Manejador de `onSubmit` para ese formulario.
+   */
+  const enviarFormulario =
+    (operacion: OperacionVerificada) => (evento: React.FormEvent<HTMLFormElement>) => {
+      const reclamacion = reclamar(operacion)
+      if (!reclamacion) {
+        evento.preventDefault()
+        return
+      }
+      entregarTokenAlFormulario(evento.currentTarget, reclamacion.token)
+    }
 
   useEffect(() => {
+    // The effect also runs while the passwords are edited: only a new attempt is announced.
+    if (signupState === lastSignupState.current) return
+    lastSignupState.current = signupState
     if (signupState?.error) toast.error(signupState.error)
     if (signupState?.message) toast.success(signupState.message)
-  }, [signupState])
+    // El token ya se descartó al reclamarlo, antes de enviarlo: el formulario conserva lo
+    // tipeado y el desafío nuevo llega por su propio reinicio.
+    // Keep what was typed after any failure (a rejected CAPTCHA included); only a created
+    // account clears the passwords.
+    const contrasenas = valoresTrasIntentoFallido(
+      signupState,
+      { password: signupPassword, confirmPassword },
+      CONTRASENAS_VACIAS,
+    )
+    setSignupPassword(contrasenas.password)
+    setConfirmPassword(contrasenas.confirmPassword)
+  }, [confirmPassword, signupPassword, signupState])
 
   useEffect(() => {
     if (loginState?.error) toast.error(loginState.error)
+    if (loginState === lastLoginState.current) return
+    lastLoginState.current = loginState
   }, [loginState])
+
+  // La acción del servidor terminó y la verificación vuelve a estar libre. Se libera con el
+  // pendiente en `false`, nunca con un token gastado: el token se descartó al reclamarlo,
+  // antes de que el pedido saliera.
+  useEffect(() => {
+    if (!loginPending) liberar("ingreso")
+  }, [liberar, loginPending])
+
+  useEffect(() => {
+    if (!signupPending) liberar("registro")
+  }, [liberar, signupPending])
 
   useEffect(() => {
     let cancelled = false
@@ -84,30 +209,27 @@ export default function AuthPage() {
     return () => { cancelled = true }
   }, [nextPath])
 
-  const handleSignup = async (formData: FormData) => {
-    await signupAction(formData)
-    setSignupPassword("")
-    setConfirmPassword("")
-  }
-
+  /**
+   * Abre la sesión anónima con la verificación compartida.
+   *
+   * @returns Promesa que resuelve cuando la sesión se abrió o el error quedó visible.
+   */
   const continueAsGuest = async () => {
-    if (guestPending || (needsGuestCaptcha && !guestCaptchaToken)) return
-
-    setGuestPending(true)
-    setGuestError(null)
-    const { error } = await supabase.auth.signInAnonymously(
-      guestCaptchaToken ? { options: { captchaToken: guestCaptchaToken } } : undefined,
-    )
-
-    if (error) {
-      setGuestPending(false)
-      setGuestCaptchaToken(null)
-      setGuestCaptchaReset((signal) => signal + 1)
-      setGuestError(guestSessionErrorMessage(error))
+    if (captchaNoDisponible) {
+      setGuestError(MENSAJE_CAPTCHA_NO_DISPONIBLE)
       return
     }
 
-    window.location.assign(nextPath)
+    setGuestError(null)
+    const abierta = await abrirSesionInvitada({
+      reclamar,
+      liberar,
+      abrirSesion: (token) =>
+        supabase.auth.signInAnonymously(token ? { options: { captchaToken: token } } : undefined),
+      alFallar: setGuestError,
+    })
+
+    if (abierta) window.location.assign(nextPath)
   }
 
   if (checkingSession) {
@@ -123,6 +245,12 @@ export default function AuthPage() {
             <CardDescription>Ingresá o registrate para comentar, votar y sumar puntos. Para reportar también podés continuar como invitado.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            {captchaNoDisponible && (
+              <Alert variant="destructive">
+                <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
+                <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
+              </Alert>
+            )}
             {oauthError && (
               <Alert variant="destructive">
                 <AlertTitle>No se pudo iniciar sesión</AlertTitle>
@@ -150,13 +278,14 @@ export default function AuthPage() {
               <span className="h-px flex-1 bg-border" />
             </div>
 
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Ingresar</TabsTrigger>
-                <TabsTrigger value="register">Registrarme</TabsTrigger>
-              </TabsList>
+            <Tabs
+              value={pestana}
+              onValueChange={(valor) => setPestana(normalizarPestana(valor))}
+              className="w-full"
+            >
+              <PestanasAuth />
 
-              <TabsContent value="login" className="space-y-5 pt-2">
+              <TabsContent value="ingreso" className="space-y-5 pt-2">
                 {loginState?.error && (
                   <Alert variant="destructive">
                     <AlertTitle>Error al iniciar sesión</AlertTitle>
@@ -164,8 +293,15 @@ export default function AuthPage() {
                   </Alert>
                 )}
 
-                <form action={loginAction} className="space-y-4">
+                <form
+                  id="formulario-ingreso"
+                  action={loginAction}
+                  className="space-y-4"
+                  onSubmit={enviarFormulario("ingreso")}
+                >
                   <input type="hidden" name="next" value={nextPath} />
+                  {/* Consumed by Supabase as `captchaToken`; empty until the challenge passes. */}
+                  <input type="hidden" name="captcha_token" value={verificacion.token ?? ""} />
                   <Field label="Correo electrónico" htmlFor="login-email">
                     <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -209,13 +345,11 @@ export default function AuthPage() {
                       ¿Olvidaste tu contraseña?
                     </Link>
                   </div>
-
-                  <SubmitButton label="Ingresar" pendingLabel="Ingresando..." />
                 </form>
 
               </TabsContent>
 
-              <TabsContent value="register" className="space-y-5 pt-2">
+              <TabsContent value="registro" className="space-y-5 pt-2">
                 {signupState?.error && (
                   <Alert variant="destructive">
                     <AlertTitle>No se pudo crear la cuenta</AlertTitle>
@@ -223,8 +357,15 @@ export default function AuthPage() {
                   </Alert>
                 )}
 
-                <form action={handleSignup} className="space-y-4">
+                <form
+                  id="formulario-registro"
+                  action={signupAction}
+                  className="space-y-4"
+                  onSubmit={enviarFormulario("registro")}
+                >
                   <input type="hidden" name="next" value={nextPath} />
+                  {/* Consumed by Supabase as `captchaToken`; empty until the challenge passes. */}
+                  <input type="hidden" name="captcha_token" value={verificacion.token ?? ""} />
                   <div className="grid gap-4 md:grid-cols-2">
                     <Field label="Nombre" htmlFor="register-name">
                       <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -362,29 +503,147 @@ export default function AuthPage() {
                       <AlertDescription>{signupState.message}</AlertDescription>
                     </Alert>
                   )}
-
-                  <Button type="submit" className="w-full" disabled={!passwordsMatch}>
-                    Crear cuenta
-                  </Button>
                 </form>
               </TabsContent>
-            </Tabs>
 
-            <div className="space-y-3 border-t border-border pt-5">
-              <div className="space-y-1 text-center">
-                <p className="text-sm font-medium">¿Querés continuar como invitado?</p>
-                <p className="text-xs text-muted-foreground">Podés crear y seguir reportes, pero no comentar ni votar.</p>
-              </div>
-              {needsGuestCaptcha && <TurnstileWidget onTokenChange={setGuestCaptchaToken} resetSignal={guestCaptchaReset} />}
-              {guestError && <Alert variant="destructive"><AlertDescription>{guestError}</AlertDescription></Alert>}
-              <Button type="button" variant="outline" className="w-full" onClick={continueAsGuest} disabled={guestPending || (needsGuestCaptcha && !guestCaptchaToken)}>
-                <UserRound className="size-4" aria-hidden="true" />
-                {guestPending ? "Preparando sesión..." : "Continuar como invitado"}
-              </Button>
-            </div>
+              <TabsContent value="invitado" className="space-y-5 pt-2">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Podés crear y seguir reportes, pero no comentar ni votar.
+                </p>
+                {guestError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{guestError}</AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+
+              {/* Una sola verificación para las tres acciones: ingreso, registro e invitado.
+                  Vive fuera de los paneles para que cambiar de pestaña no desmonte el desafío
+                  ni descarte su token, y el envío de la pestaña activa queda justo debajo. */}
+              <GrupoVerificacionYEnvio
+                pestana={pestana}
+                verificacion={verificacion}
+                needsCaptcha={needsCaptcha}
+                captchaNoDisponible={captchaNoDisponible}
+                loginPending={loginPending}
+                signupPending={signupPending}
+                passwordsMatch={passwordsMatch}
+                onToken={recibirToken}
+                onContinuarComoInvitado={continueAsGuest}
+              />
+            </Tabs>
           </CardContent>
         </Card>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Lista de pestañas de la tarjeta: ingreso, registro e invitado.
+ *
+ * Las tres opciones están siempre a la vista, así el acceso como invitado no obliga a buscar
+ * una sección al final de la tarjeta. El ancho se reparte en tres columnas y el texto reduce su
+ * relleno en pantallas angostas para que ninguna etiqueta desborde.
+ *
+ * @returns Lista de pestañas con sus valores y etiquetas del sistema.
+ */
+function PestanasAuth() {
+  return (
+    <TabsList className="grid w-full grid-cols-3">
+      {PESTANAS_AUTH.map((valor) => (
+        <TabsTrigger key={valor} value={valor} className="px-2 sm:px-3">
+          {ETIQUETAS_PESTANA[valor]}
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  )
+}
+
+/**
+ * Superficie que reúne el desafío de seguridad con el envío de la pestaña activa.
+ *
+ * El grupo vive fuera de los paneles de pestañas: cambiar entre Ingresar, Registrarme e
+ * Invitado no desmonta el desafío ni descarta el token vigente. El botón de envío permanece
+ * dentro del grupo y sigue referenciando su formulario con `form`, así el pedido usa el
+ * `FormData` real del formulario aunque el botón viva fuera de él.
+ *
+ * @param props.pestana - Pestaña activa: define qué envío acompaña al desafío.
+ * @param props.verificacion - Estado de la verificación compartida.
+ * @param props.needsCaptcha - Indica si la pantalla exige resolver el desafío.
+ * @param props.captchaNoDisponible - Indica que producción se quedó sin site key.
+ * @param props.loginPending - Acción de ingreso en curso.
+ * @param props.signupPending - Acción de registro en curso.
+ * @param props.passwordsMatch - Indica si el registro puede enviarse.
+ * @param props.onToken - Recibe el token del desafío o `null` cuando se invalida.
+ * @param props.onContinuarComoInvitado - Abre la sesión anónima.
+ * @returns Grupo con el desafío arriba del envío de la pestaña activa.
+ */
+function GrupoVerificacionYEnvio({
+  pestana,
+  verificacion,
+  needsCaptcha,
+  captchaNoDisponible,
+  loginPending,
+  signupPending,
+  passwordsMatch,
+  onToken,
+  onContinuarComoInvitado,
+}: {
+  pestana: PestanaAuth
+  verificacion: EstadoVerificacion
+  needsCaptcha: boolean
+  captchaNoDisponible: boolean
+  loginPending: boolean
+  signupPending: boolean
+  passwordsMatch: boolean
+  onToken: (token: string | null) => void
+  onContinuarComoInvitado: () => void
+}) {
+  // El envío de la pestaña activa y su bloqueo los decide el módulo de la verificación.
+  const envio = envioDeLaPestana({
+    pestana,
+    verificacion,
+    exigeDesafio: needsCaptcha,
+    captchaNoDisponible,
+    ingresoPendiente: loginPending,
+    registroPendiente: signupPending,
+    contrasenasCoinciden: passwordsMatch,
+  })
+
+  return (
+    <div
+      role="group"
+      aria-label="Verificación de seguridad y envío"
+      className="space-y-3 rounded-[var(--radius)] border border-border bg-surface-subtle p-3"
+    >
+      {needsCaptcha && <TurnstileWidget onTokenChange={onToken} resetSignal={verificacion.desafios} />}
+
+      {envio.operacion === "ingreso" && (
+        <SubmitButton
+          form="formulario-ingreso"
+          label={envio.etiqueta}
+          pendingLabel={envio.etiquetaPendiente}
+          pending={envio.pendiente}
+          disabled={envio.bloqueado}
+        />
+      )}
+
+      {envio.operacion === "registro" && (
+        <SubmitButton
+          form="formulario-registro"
+          label={envio.etiqueta}
+          pendingLabel={envio.etiquetaPendiente}
+          pending={envio.pendiente}
+          disabled={envio.bloqueado}
+        />
+      )}
+
+      {envio.operacion === "invitado" && (
+        <Button type="button" className="w-full" onClick={onContinuarComoInvitado} disabled={envio.bloqueado}>
+          {envio.pendiente ? envio.etiquetaPendiente : envio.etiqueta}
+        </Button>
+      )}
     </div>
   )
 }
@@ -413,15 +672,34 @@ function Field({
 }
 
 /**
- * Botón de envío que refleja el estado pendiente del formulario actual.
+ * Botón de envío de un formulario protegido por la verificación compartida.
  *
- * @param props - Textos a mostrar según el estado de envío.
- * @returns Botón deshabilitado durante el envío del formulario.
+ * Vive fuera del formulario para que el desafío de Cloudflare quede justo arriba de él, así
+ * que lo referencia con `form` y recibe el estado pendiente de la acción en lugar de leerlo
+ * con `useFormStatus`.
+ *
+ * @param props.form - Id del formulario que envía.
+ * @param props.label - Texto del botón en reposo.
+ * @param props.pendingLabel - Texto mientras la acción está en curso.
+ * @param props.pending - Indica si la acción de ese formulario está en curso.
+ * @param props.disabled - Indica si el envío todavía no es válido.
+ * @returns Botón de envío deshabilitado durante el envío o mientras falta una verificación.
  */
-function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
-  const { pending } = useFormStatus()
+function SubmitButton({
+  form,
+  label,
+  pendingLabel,
+  pending = false,
+  disabled = false,
+}: {
+  form: string
+  label: string
+  pendingLabel: string
+  pending?: boolean
+  disabled?: boolean
+}) {
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
+    <Button type="submit" form={form} className="w-full" disabled={pending || disabled}>
       {pending ? pendingLabel : label}
     </Button>
   )

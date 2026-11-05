@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "03-grupo-verificacion-envio.html",
+  "handoffs": {
+    "03-grupo-verificacion-envio.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-04T18:13:38.342Z",
+      "startedAt": "2026-11-04T18:29:40.111Z",
+      "implementedAt": "2026-11-04T18:34:38.770Z",
+      "note": "Ingreso, registro e invitado verificados contra Supabase local; CAPTCHA global de Supabase desactivado y review nativa pendiente.",
+      "previewUrl": "http://127.0.0.1:3000/auth"
+    }
+  }
+}

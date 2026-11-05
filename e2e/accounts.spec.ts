@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures"
-import { signIn } from "./support/auth"
+import { openAuthTab, signIn, submitAuth } from "./support/auth"
 import { confirmLinkPath, waitForAuthEmail } from "./support/mailpit"
 import { TEST_PASSWORD } from "./support/test-data"
 
@@ -8,24 +8,28 @@ test.describe("accounts", () => {
     const email = testData.newEmail()
 
     await page.goto("/auth")
-    await page.getByRole("tab", { name: "Registrarme" }).click()
-    await page.getByLabel("Nombre").fill("Ana")
-    await page.getByLabel("Apellido").fill("Prueba")
-    await page.getByLabel("Correo electrónico").fill(email)
-    await page.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD)
-    await page.getByLabel("Confirmar contraseña").fill(TEST_PASSWORD)
-    await page.getByRole("checkbox").check()
-    await page.getByRole("button", { name: "Crear cuenta" }).click()
+    // Switching tabs right away mounts the signup challenge while the shared script still loads.
+    await openAuthTab(page, "Registrarme")
+    const registro = page.getByRole("tabpanel", { name: "Registrarme" })
+    await registro.getByLabel("Nombre").fill("Ana")
+    await registro.getByLabel("Apellido").fill("Prueba")
+    await registro.getByLabel("Correo electrónico").fill(email)
+    await registro.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD)
+    await registro.getByLabel("Confirmar contraseña").fill(TEST_PASSWORD)
+    await registro.getByRole("checkbox").check()
+    await submitAuth(page, "Crear cuenta")
 
-    await expect(page.getByText("Te enviamos un correo de confirmación.")).toBeVisible()
+    // The same copy also arrives as a toast, so the form's own alert is what gets asserted.
+    await expect(registro.getByText("Te enviamos un correo de confirmación.")).toBeVisible()
     await testData.trackUserByEmail(email)
 
     // Before confirming, the password alone is not enough.
-    await page.getByRole("tab", { name: "Ingresar" }).click()
-    await page.getByLabel("Correo electrónico").fill(email)
-    await page.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD)
-    await page.getByRole("button", { name: "Ingresar", exact: true }).click()
-    await expect(page.getByText("Primero confirmá tu correo desde el enlace que te enviamos.")).toBeVisible()
+    await openAuthTab(page, "Ingresar")
+    const ingreso = page.getByRole("tabpanel", { name: "Ingresar" })
+    await ingreso.getByLabel("Correo electrónico").fill(email)
+    await ingreso.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD)
+    await submitAuth(page, "Ingresar")
+    await expect(ingreso.getByText("Primero confirmá tu correo desde el enlace que te enviamos.")).toBeVisible()
 
     const confirmation = await waitForAuthEmail(email, "Confirmá tu cuenta de Reporty")
     await page.goto(confirmLinkPath(confirmation))
@@ -41,9 +45,11 @@ test.describe("accounts", () => {
     await page.goto("/auth")
     await page.getByLabel("Correo electrónico").fill(user.email)
     await page.getByLabel("Contraseña", { exact: true }).fill("Not-The-Password-1!")
-    await page.getByRole("button", { name: "Ingresar", exact: true }).click()
+    await submitAuth(page, "Ingresar")
 
-    await expect(page.getByText("El correo o la contraseña no son correctos.")).toBeVisible()
+    // The same copy also appears as a toast, so the form's own alert is asserted.
+    const ingreso = page.getByRole("tabpanel", { name: "Ingresar" })
+    await expect(ingreso.getByText("El correo o la contraseña no son correctos.")).toBeVisible()
     await expect(page).toHaveURL(/\/auth/)
   })
 
