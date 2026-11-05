@@ -71,6 +71,17 @@ describe("verificarTurnstile", () => {
     expect(llamada).not.toHaveBeenCalled()
   })
 
+  it("2 — acepta un token de exactamente 2048 caracteres y lo envía a Siteverify", async () => {
+    configurar()
+    const llamada = espiaFetch()
+    const token = "a".repeat(2048)
+    const resultado = await verificarTurnstile({ token })
+
+    expect(resultado).toEqual({ ok: true })
+    expect(llamada).toHaveBeenCalledTimes(1)
+    expect(llamada.mock.calls[0][1].body.get("response")).toBe(token)
+  })
+
   it("2 — rechaza localmente un token con espacios o caracteres de control", async () => {
     configurar()
     const llamada = espiaFetch()
@@ -187,10 +198,12 @@ describe("verificarTurnstile", () => {
     espiaFetch(new Response("error", { status: 503 }))
     const http = await verificarTurnstile({ token: "tok" })
     expect(http.ok).toBe(false)
+    if (!http.ok) expect(http.motivo).toBe("error_de_red")
 
     espiaFetch(new Response("{ no json", { status: 200 }))
     const json = await verificarTurnstile({ token: "tok" })
     expect(json.ok).toBe(false)
+    if (!json.ok) expect(json.motivo).toBe("error_de_red")
   })
 
   it("8 — falla cerrada y reporta error de red ante internal-error de Siteverify", async () => {

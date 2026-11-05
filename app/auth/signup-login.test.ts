@@ -267,6 +267,22 @@ describe("login", () => {
     expect(mocks.redirect).not.toHaveBeenCalled()
   })
 
+  // El código `captcha_failed` es el que devuelve Supabase cuando deshabilita el CAPTCHA en
+  // el panel o cuando Cloudflare rechaza el token; debe caer en el mismo mensaje que `captcha`.
+  it("pide completar la verificación de seguridad cuando el login falla con captcha_failed", async () => {
+    mocks.signInWithPassword.mockResolvedValueOnce({
+      data: { session: null, user: null },
+      error: apiError("Captcha verification failed", 400, "captcha_failed"),
+    })
+
+    await expect(login(undefined, loginForm())).resolves.toEqual({
+      error: "Completá la verificación de seguridad e intentá nuevamente.",
+    })
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+    expect(mocks.redirect).not.toHaveBeenCalled()
+    expect(console.error).not.toHaveBeenCalled()
+  })
+
   it("forwards the Turnstile token to Supabase when the form sends one", async () => {
     mocks.signInWithPassword.mockResolvedValueOnce({ data: {}, error: null })
     const form = loginForm()
