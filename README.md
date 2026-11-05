@@ -200,15 +200,17 @@ sequenceDiagram
    ```
 
 3. **Configurar variables de entorno**
-   ```bash
-   cp .env.example .env
-   ```
-   Editar `.env` con tus credenciales:
+   Crear `.env.local` con tus credenciales (git lo ignora; `npm run db:setup` genera además `.env.development.local` para el Supabase local):
    ```env
    NEXT_PUBLIC_SUPABASE_URL=tu_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
    RESEND_API_KEY=tu_resend_api_key
    NEXT_PUBLIC_APP_URL=http://localhost:3000
+   # Cloudflare Turnstile (ver docs/turnstile.md). Claves de prueba oficiales para desarrollo:
+   NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+   TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+   # Con las claves de prueba Siteverify responde example.com; en producción: reporty.com.ar
+   TURNSTILE_ALLOWED_HOSTNAMES=example.com
    # Opcional: habilita la gestión de cuadrillas (desactivada si no se define)
    CUADRILLAS_ENABLED=true
    # Opcional: ID de medición de Google Analytics 4 (G-XXXXXXXXXX).
@@ -230,7 +232,7 @@ sequenceDiagram
 - **Unitarias:** `npm test` (Vitest).
 - **De punta a punta:** `npm run test:e2e` (Playwright). Recorren los flujos principales en una build de producción contra el Supabase local, nunca contra producción:
   1. Levantar Supabase local con `npm run db:start` (ver `supabase/README.md`).
-  2. Ejecutar `npm run test:e2e`. La primera vez compila la app y la sirve en el puerto 3100; los correos de autenticación quedan en el Mailpit del Supabase local y los de notificación en un Resend falso del puerto 3199, así que no se envía ningún correo real.
+  2. Ejecutar `npm run test:e2e`. La primera vez compila la app y la sirve en el puerto 3100; los correos de autenticación quedan en el Mailpit del Supabase local y los de notificación en un Resend falso del puerto 3199, así que no se envía ningún correo real. Turnstile corre de verdad con la site key de prueba oficial, y el servidor verifica los tokens contra un Siteverify falso del puerto 3198 (`TURNSTILE_SITEVERIFY_URL`, que solo acepta loopback). La limpieza de datos necesita `psql` en el PATH.
   3. Para ver el navegador mientras corren: `E2E_HEADED=1 npm run test:e2e`.
 
   Usan el Google Chrome instalado (no descargan navegadores). Cada prueba borra los usuarios, reportes y fotos que creó, aunque falle. Si una prueba falla, su traza queda en `test-results/` y se abre con `npx playwright show-trace <ruta>/trace.zip`.
