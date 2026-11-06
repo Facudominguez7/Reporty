@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "start": "next start",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:load": "node scripts/carga/ejecutar.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
