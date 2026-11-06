@@ -15,7 +15,8 @@ it("places the history back button in the report title bar", () => {
   const props = {
     reporte: {
       id: 5, titulo: "Reporte", descripcion: "Detalle", created_at: "2026-11-01T12:00:00Z",
-      estado_id: 1, estados: { nombre: "Pendiente" }, categorias: { nombre: "Otros" },
+      usuario_id: "user", categoria_id: 1, prioridad_id: 1,
+      estado_id: 1, estados: { id: 1, nombre: "Pendiente" }, categorias: { nombre: "Otros" },
       prioridades: { nombre: "Baja" }, fotos_reporte: [], lat: null, lon: null,
       votos: { noExiste: { count: 0, hasVoted: false }, reparado: { count: 0, hasVoted: false } },
     },

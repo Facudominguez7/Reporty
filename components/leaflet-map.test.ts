@@ -47,7 +47,7 @@ const report = {
   author: "User", createdAt: "2025-01-01",
 }
 
-function render(reports: typeof report[]) {
+function render(reports: Parameters<typeof LeafletMap>[0]["reports"]) {
   mocks.refIndex = 0
   renderToStaticMarkup(createElement(LeafletMap, { reports }))
 }

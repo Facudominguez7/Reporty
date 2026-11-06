@@ -6,6 +6,7 @@ vi.mock("react", async (original) => ({
   ...await original<typeof import("react")>(),
   useState: (initial: unknown) => [mocks.states[mocks.index++] ?? initial, vi.fn()],
   useRef: (initial: unknown) => mocks.refs[mocks.refIndex++] ??= { current: initial },
+  useEffect: vi.fn(),
 }))
 vi.mock("next/dynamic", () => ({ default: () => () => null }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }))

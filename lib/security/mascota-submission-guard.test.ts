@@ -25,14 +25,14 @@ describe("validatePetSubmission", () => {
   })
 
   it.each([
-    ...["12a3", "+123", "12 3", " 123", "123-456", "１２３"].map((telefono) => [{ tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0, telefono }]),
-    [{ tipoAnimal: "loro", descripcion: "ave", lat: 0, lon: 0, telefono: "123" }],
-    [{ tipoAnimal: "gato", descripcion: " ", lat: 0, lon: 0, telefono: "123" }],
-    [{ tipoAnimal: "gato", descripcion: "ok", lat: 91, lon: 0, telefono: "123" }],
-    [{ tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: -181, telefono: "123" }],
-    [{ tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0, telefono: " " }],
-    [{ tipoAnimal: "gato", descripcion: "ok", lat: Number.NaN, lon: 0, telefono: "123" }],
-    [{ tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0 }],
+    ...["12a3", "+123", "12 3", " 123", "123-456", "１２３"].map((telefono) => ({ tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0, telefono })),
+    { tipoAnimal: "loro", descripcion: "ave", lat: 0, lon: 0, telefono: "123" },
+    { tipoAnimal: "gato", descripcion: " ", lat: 0, lon: 0, telefono: "123" },
+    { tipoAnimal: "gato", descripcion: "ok", lat: 91, lon: 0, telefono: "123" },
+    { tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: -181, telefono: "123" },
+    { tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0, telefono: " " },
+    { tipoAnimal: "gato", descripcion: "ok", lat: Number.NaN, lon: 0, telefono: "123" },
+    { tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0 },
   ])("rejects invalid, missing, or out-of-range fields", (input) => {
     expect(() => validatePetSubmission(input as never)).toThrow()
   })

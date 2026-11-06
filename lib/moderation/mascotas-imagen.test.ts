@@ -33,7 +33,7 @@ function client() {
         return builder
       }),
     })),
-    storage: { from: vi.fn((bucket: string) => ({ upload: async (path: string) => { uploads.push(`${bucket}/${path}`); return { error: null } } })) },
+    storage: { from: vi.fn((bucket: string) => ({ upload: async (path: string): Promise<{ error: { message: string } | null }> => { uploads.push(`${bucket}/${path}`); return { error: null } } })) },
     rpc: vi.fn(async (name: string) => {
       calls.push(name)
       if (name === "reservar_operaciones_moderacion") return { data: true, error: null }
