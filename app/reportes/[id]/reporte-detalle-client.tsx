@@ -28,7 +28,6 @@ import {
   Pencil,
   Calendar,
   Flag,
-  ThumbsUp,
   ThumbsDown,
   Trash2,
   CheckCircle2,
@@ -68,13 +67,22 @@ import { getNameFromRelation, getUserInitials, getUsernameFromRelation } from "@
 import { ChipEstadoOperativo } from "@/components/cuadrillas/chip-estado-operativo";
 import { LineaTiempoOperativa } from "@/components/cuadrillas/linea-tiempo-operativa";
 import { CommentsSection } from "@/components/report-detail/comments-section";
+import {
+  EvidenciaReparacion,
+  type AccionesEvidenciaReparacion,
+  type ResultadoAccionReparacion,
+} from "@/components/report-detail/evidencia-reparacion";
+import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
 import { ReportContactDialog } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
 import {
   actualizarReporteAdminAction,
   cambiarEstadoAdminAction,
+  confirmarReparacionAction,
   crearComentarioAction,
+  impugnarReparacionAction,
+  informarReparacionAction,
   quitarFotoReporteAdminAction,
   reemplazarFotoReporteAdminAction,
   eliminarComentarioAdminAction,
@@ -82,7 +90,6 @@ import {
   eliminarReporteAdminAction,
   eliminarReportePropioAction,
   votarNoExisteAction,
-  votarReparadoAction,
 } from "./actions";
 
 dayjs.extend(utc);
@@ -168,6 +175,11 @@ export type ReporteDetalleInicial = {
   gestionOperativa: GestionOperativaDetalle | null;
   /** Computed on the server from the visitor's role; the vote actions check it again. */
   puedeVotar: boolean;
+  /**
+   * Evidencia de reparación con su estado visible y lo que puede hacer esta persona.
+   * Se calcula en el servidor; `null` cuando no hay nada que mostrar (S10, S11).
+   */
+  evidenciaReparacion?: SeccionReparacionVista | null;
 };
 
 /**
@@ -189,6 +201,7 @@ export function ReporteDetalleClient({
   fechaCambioEstado,
   gestionOperativa,
   puedeVotar,
+  evidenciaReparacion = null,
 }: ReporteDetalleInicial) {
   const router = useRouter();
   const [isAdminEditing, setIsAdminEditing] = useState(false);
@@ -200,10 +213,8 @@ export function ReporteDetalleClient({
   const [votosCount, setVotosCount] = useState(reporte?.votos.noExiste.count ?? 0);
   const [hasVoted, setHasVoted] = useState(reporte?.votos.noExiste.hasVoted ?? false);
   const [isVoting, setIsVoting] = useState(false);
+  // Los votos históricos «reparado» se siguen mostrando: el flujo nuevo no los borra (S15).
   const [votosReparadoCount, setVotosReparadoCount] = useState(reporte?.votos.reparado.count ?? 0);
-  const [hasVotedReparado, setHasVotedReparado] = useState(reporte?.votos.reparado.hasVoted ?? false);
-  const [isVotingReparado, setIsVotingReparado] = useState(false);
-  const [cerradoPorVoto, setCerradoPorVoto] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{ src: string; alt: string } | null>(null);
 
@@ -211,7 +222,6 @@ export function ReporteDetalleClient({
   const [showDeleteReporteDialog, setShowDeleteReporteDialog] = useState(false);
   const [showVoteLoginDialog, setShowVoteLoginDialog] = useState(false);
   const [showVoteNoExisteDialog, setShowVoteNoExisteDialog] = useState(false);
-  const [showVoteReparadoDialog, setShowVoteReparadoDialog] = useState(false);
 
   const startAdminEditing = () => {
     if (!isAdmin || !reporte) return;
@@ -247,9 +257,8 @@ export function ReporteDetalleClient({
 
   // IDs de estados según la base de datos: 1 = Pendiente, 2 = Reparado, 3 = Rechazado
   // Verificar si el reporte está cerrado (Reparado o Rechazado) usando IDs
-  const isReporteCerrado = reporte && (
-    cerradoPorVoto || reporte.estado_id === REPORT_STATE_IDS.REPARADO ||
-    reporte.estado_id === REPORT_STATE_IDS.RECHAZADO
+  const isReporteCerrado = Boolean(
+    reporte && (reporte.estado_id === REPORT_STATE_IDS.REPARADO || reporte.estado_id === REPORT_STATE_IDS.RECHAZADO),
   );
 
   const handleVoteNoExiste = async () => {
@@ -280,7 +289,6 @@ export function ReporteDetalleClient({
       setVotosCount(result.data.votosNoExiste);
       setVotosReparadoCount(result.data.votosReparado);
       setHasVoted(true);
-      setHasVotedReparado(false);
       toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_NO_EXISTE} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
 
     } catch (error) {
@@ -294,51 +302,41 @@ export function ReporteDetalleClient({
     }
   };
 
-  const handleVoteReparado = async () => {
-    if (!reporte) return;
-    if (currentUser?.is_anonymous) {
-      setShowVoteLoginDialog(true);
-      return;
+  /**
+   * Confirma la reparación informada. El servidor valida autoría, elegibilidad,
+   * duplicados y umbral: acá solo se envía la evidencia que la ficha muestra.
+   */
+  const confirmarEvidenciaReparacion = async (): Promise<ResultadoAccionReparacion> => {
+    const evidenciaId = evidenciaReparacion?.evidencia?.evidenciaId;
+    if (!reporte || !evidenciaId) {
+      return { success: false, error: "No pudimos identificar la evidencia de reparación." };
     }
-    if (!currentUser) {
-      router.push(`/auth?next=/reportes/${reporte.id}`);
-      return;
-    }
-    setShowVoteReparadoDialog(true);
+    return confirmarReparacionAction(reporte.id, evidenciaId);
   };
 
-  const confirmVoteReparado = async () => {
-    if (!currentUser || !reporte) return;
-
-    setIsVotingReparado(true);
-    try {
-      const result = await votarReparadoAction(reporte.id);
-
-      if (!result.success) {
-        toast.error(result.error || "Error al registrar el voto");
-        return;
-      }
-
-      setVotosCount(result.data.votosNoExiste);
-      setVotosReparadoCount(result.data.votosReparado);
-      setHasVoted(false);
-      setHasVotedReparado(true);
-      toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_REPARADO} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
-
-      if (result.data.stateChangedTo) {
-        setCerradoPorVoto(true);
-        toast.success("¡Reporte marcado como reparado!");
-        setTimeout(() => window.location.reload(), 1500);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al procesar el voto", {
-        description: "Por favor, intenta nuevamente"
-      });
-    } finally {
-      setIsVotingReparado(false);
-      setShowVoteReparadoDialog(false);
+  /** Impugna la reparación; el motivo es obligatorio y lo valida el servidor (S4, S5). */
+  const impugnarEvidenciaReparacion = async (motivo: string): Promise<ResultadoAccionReparacion> => {
+    const evidenciaId = evidenciaReparacion?.evidencia?.evidenciaId;
+    if (!reporte || !evidenciaId) {
+      return { success: false, error: "No pudimos identificar la evidencia de reparación." };
     }
+    return impugnarReparacionAction(reporte.id, evidenciaId, motivo);
+  };
+
+  /** Informa una reparación con su foto; el pipeline existente la manda a moderación (S2, S13). */
+  const informarEvidenciaReparacion = async (
+    comentario: string,
+    imagen: File,
+    captchaToken: string | null,
+  ): Promise<ResultadoAccionReparacion> => {
+    if (!reporte) return { success: false, error: "No pudimos informar la reparación." };
+    return informarReparacionAction(reporte.id, comentario, imagen, captchaToken);
+  };
+
+  const accionesReparacion: AccionesEvidenciaReparacion = {
+    onConfirmar: confirmarEvidenciaReparacion,
+    onImpugnar: impugnarEvidenciaReparacion,
+    onInformar: informarEvidenciaReparacion,
   };
 
   const handleShareReport = async () => {
@@ -580,6 +578,10 @@ export function ReporteDetalleClient({
   const adminBaseForRender = adminBase ?? adminDraftForRender;
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
     ? formatRepairDuration(reporte.created_at, fechaCambioEstado)
+    : null;
+  const fotoOriginalDelReporte = reporte.fotos_reporte?.find((foto) => Boolean(foto.publicUrl ?? foto.url));
+  const fotoAntesComparacion = fotoOriginalDelReporte
+    ? { src: (fotoOriginalDelReporte.publicUrl ?? fotoOriginalDelReporte.url) as string, fecha: reporte.created_at }
     : null;
   const showVoteButtons = (!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado;
   const showVoteFooter = Boolean(
@@ -862,18 +864,7 @@ export function ReporteDetalleClient({
                     <hr className="mb-2 border-border" />
                     <div className="flex flex-wrap items-center gap-1.5">
                       {showVoteButtons && (
-                        <div role="group" aria-label="Votar sobre el reporte" className="mx-auto grid w-full max-w-72 grid-cols-3 justify-items-center gap-4">
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-primary hover:bg-primary/10"
-                            onClick={handleVoteReparado}
-                            disabled={hasVotedReparado || isVotingReparado || isVoting}
-                            aria-pressed={hasVotedReparado}
-                          >
-                            <ThumbsUp className="size-4" />
-                            Reparado{hasVotedReparado ? " · Tu voto" : ""}
-                          </Button>
+                        <div role="group" aria-label="Acciones sobre el reporte" className="mx-auto grid w-full max-w-56 grid-cols-2 justify-items-center gap-4">
                           <Button
                             variant="ghost"
                             size="xs"
@@ -890,7 +881,7 @@ export function ReporteDetalleClient({
                               size="xs"
                               className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-destructive hover:bg-destructive/10"
                               onClick={handleVoteNoExiste}
-                              disabled={hasVoted || isVoting || isVotingReparado}
+                              disabled={hasVoted || isVoting}
                               aria-pressed={hasVoted}
                             >
                               <ThumbsDown className="size-4" />
@@ -898,11 +889,6 @@ export function ReporteDetalleClient({
                             </Button>
                           )}
                         </div>
-                      )}
-                      {currentUser && hasVoted && hasVotedReparado && (
-                        <p role="status" className="text-xs text-muted-foreground">
-                          Tus votos históricos son contradictorios y requieren revisión. No se modificaron.
-                        </p>
                       )}
                       {isReporteCerrado && (
                         <span className="text-xs text-muted-foreground">
@@ -914,6 +900,14 @@ export function ReporteDetalleClient({
                 )}
               </CardContent>
             </Card>
+
+            {evidenciaReparacion && (
+              <EvidenciaReparacion
+                seccion={evidenciaReparacion}
+                fotoAntes={fotoAntesComparacion}
+                acciones={accionesReparacion}
+              />
+            )}
 
             <CommentsSection
               comments={comentarios}
@@ -1133,7 +1127,7 @@ export function ReporteDetalleClient({
               </span>
               ¿Confirmar voto «No existe»?
             </AlertDialogTitle>
-            <AlertDialogDescription>{hasVotedReparado ? "Cambiar tu voto no suma puntos adicionales." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
+            <AlertDialogDescription>{hasVoted ? "Tu voto ya está registrado." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isVoting}>Cancelar</AlertDialogCancel>
@@ -1150,40 +1144,6 @@ export function ReporteDetalleClient({
               ) : (
                 <>
                   <ThumbsDown className="w-4 h-4 mr-2" />
-                  Confirmar Voto
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* AlertDialog - Votar Reparado */}
-      <AlertDialog open={showVoteReparadoDialog} onOpenChange={setShowVoteReparadoDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-              </span>
-              ¿Confirmar que está reparado?
-            </AlertDialogTitle>
-            <AlertDialogDescription>{hasVoted ? "Cambiar tu voto no suma puntos adicionales." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isVotingReparado}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmVoteReparado}
-              disabled={isVotingReparado}
-            >
-              {isVotingReparado ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Votando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
                   Confirmar Voto
                 </>
               )}
