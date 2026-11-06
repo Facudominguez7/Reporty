@@ -63,7 +63,15 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (sesionVencida({ inicioMs, ahoraMs, rolId })) {
-      await supabase.auth.signOut({ scope: 'local' })
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) {
+        // signOut keeps the cookies when the revocation request fails; clear them here so the
+        // browser and the handlers that run later in this request no longer see the session.
+        const cookiesAuth = request.cookies.getAll().filter(({ name }) => name.startsWith('sb-'))
+        cookiesAuth.forEach(({ name }) => request.cookies.delete(name))
+        supabaseResponse = NextResponse.next({ request })
+        cookiesAuth.forEach(({ name }) => supabaseResponse.cookies.set(name, '', { path: '/', maxAge: 0 }))
+      }
       user = null
     }
   }

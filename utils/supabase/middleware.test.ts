@@ -156,3 +156,36 @@ describe("updateSession with an expiring session", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1")
   })
 })
+
+describe("updateSession when revoking an expired session fails", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321")
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon")
+    mocks.getUser.mockReset().mockResolvedValue({
+      data: { user: { id: "u1", is_anonymous: false, last_sign_in_at: new Date(Date.now() - 31 * DIA).toISOString() } },
+    })
+    mocks.getSession.mockReset().mockResolvedValue({ data: { session: { access_token: tokenAutenticadoHace(31 * DIA) } } })
+    mocks.signOut.mockReset().mockResolvedValue({ error: { message: "network" } })
+    mocks.perfil.mockReset().mockResolvedValue({ data: { rol_id: 2 }, error: null })
+    mocks.from.mockReset().mockImplementation(() => ({
+      select: () => ({ eq: () => ({ single: mocks.perfil }) }),
+    }))
+  })
+
+  it("still clears the Supabase auth cookies for the browser and for the rest of the request", async () => {
+    const solicitud = new NextRequest(new URL("/mapa", "http://localhost:3000"), {
+      headers: { cookie: "sb-127-auth-token.0=parte0; sb-127-auth-token.1=parte1; otra=valor" },
+    })
+
+    const response = await updateSession(solicitud)
+
+    expect(response.headers.get("location")).toBeNull()
+    for (const nombre of ["sb-127-auth-token.0", "sb-127-auth-token.1"]) {
+      expect(response.cookies.get(nombre)?.value).toBe("")
+      expect(response.cookies.get(nombre)?.maxAge).toBe(0)
+      expect(solicitud.cookies.has(nombre)).toBe(false)
+    }
+    expect(solicitud.cookies.get("otra")?.value).toBe("valor")
+    expect(response.cookies.get("otra")).toBeUndefined()
+  })
+})
