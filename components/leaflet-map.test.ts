@@ -57,6 +57,7 @@ describe("LeafletMap initial view", () => {
     mocks.calls.length = 0
     mocks.icons.length = 0
     mocks.refs.length = 0
+    mocks.refIndex = 0
     mocks.listeners.clear()
     mocks.cleanups.length = 0
     vi.clearAllMocks()
@@ -70,21 +71,67 @@ describe("LeafletMap initial view", () => {
     expect(mocks.marker.bindPopup).toHaveBeenCalledOnce()
   })
 
-  it("renders both pet states with escaped details and a stable detail link", () => {
+  it("renders escaped pet details inside a native detail link", () => {
     render([])
     // Rerender with a pet while the imperative map instance is active.
     mocks.refIndex = 0
     renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: "Gato <script>", description: `Blanca & "curiosa"`, status: "Encontrada", createdAt: "2026-01-02", phone: `123" onclick="x`, image: "javascript:alert(1)", coordinates: [-27.36, -55.89] }] }))
     const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
-    expect(popup).toContain("/mascotas/9")
-    expect(popup).toContain('data-share-pet="9"')
-    expect(popup).toContain("Compartir")
-    expect(popup).not.toContain(">Compartir</a>")
+    expect(popup.trim()).toMatch(/^<a href="\/mascotas\/9"[^>]*>[\s\S]*<\/a>$/)
+    expect(popup).toContain("display:block;min-width:250px")
+    expect(popup.match(/^\s*<a[^>]*>/)?.[0]).not.toMatch(/\b(?:tabindex|onclick|onkeydown)\s*=/i)
+    expect(popup).not.toContain("data-share-pet")
+    expect(popup).not.toContain("Ver ficha")
+    expect(popup).not.toContain("Compartir")
     expect(popup).toContain("Encontrada")
     expect(popup).toContain("Gato &lt;script&gt;")
     expect(popup).toContain("Blanca &amp; &quot;curiosa&quot;")
     expect(popup).not.toContain("javascript:")
     expect(popup).not.toContain(`onclick="x`)
+  })
+
+  it("keeps the incident marker click callback", () => {
+    const select = vi.fn()
+    renderToStaticMarkup(createElement(LeafletMap, { reports: [report], onSeleccionarReporte: select }))
+    const click = mocks.marker.on.mock.calls.find(([event]) => event === "click")?.[1] as () => void
+    click()
+    expect(select).toHaveBeenCalledWith(report.id)
+  })
+
+  it("matches incident popup layout while linking the entire pet content", () => {
+    vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
+    render([{ ...report, image: "/report.jpg" }])
+    const incidentPopup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    mocks.refIndex = 0
+    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: 'Gato "<mimo>"', description: "A&".repeat(60), status: "Perdida", createdAt: "2026-01-02", phone: '<123>', image: '/foto?x="&y=1', coordinates: [-27.36, -55.89] }] }))
+    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    for (const style of ["min-width:250px;max-width:270px", "font-size:15px;font-weight:700", "margin-bottom:10px;overflow:hidden;border-radius:10px", "width:100%;height:124px;object-fit:cover", "min-height:26px", "padding-top:10px;border-top:1px solid var(--border)"]) {
+      expect(incidentPopup).toContain(style)
+      expect(popup).toContain(style)
+    }
+    expect(popup.indexOf("<h3")).toBeLessThan(popup.indexOf("<img"))
+    expect(popup).toContain('src="https://reporty.test/foto?x=%22&amp;y=1"')
+    expect(popup).toContain('alt="Gato &quot;&lt;mimo&gt;&quot;"')
+    expect(popup).toContain("Teléfono: &lt;123&gt;")
+    expect(popup).toContain(`${"A&amp;".repeat(55)}...`)
+    expect(popup).toContain("background:var(--destructive)")
+    expect(popup).not.toContain("Ver ficha")
+    expect(popup).not.toContain("Compartir")
+    expect(popup).toContain('href="/mascotas/9"')
+    expect(popup).not.toContain("data-share-pet")
+    expect(popup).not.toContain("data-share-status")
+    expect(popup).not.toContain("Prioridad")
+    vi.unstubAllGlobals()
+  })
+
+  it("does not create markers for invalid pet IDs", () => {
+    render([])
+    mocks.refIndex = 0
+    const pet = { id: 9, species: "Gato", description: "", status: "Perdida" as const, createdAt: "2026-01-02", phone: "123", image: "", coordinates: [-27.36, -55.89] as [number, number] }
+    const invalidIds = [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '9" onclick="x']
+    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: invalidIds.map((id) => ({ ...pet, id: id as number })) }))
+    expect(mocks.marker.bindPopup).not.toHaveBeenCalled()
+    expect(mocks.cluster.addLayer).not.toHaveBeenCalled()
   })
 
   it("uses semantic theme colors for pet markers", () => {
@@ -124,70 +171,6 @@ describe("LeafletMap initial view", () => {
     expect(image.style.display).toBe("none")
     for (const cleanup of mocks.cleanups) cleanup()
     expect(mocks.container.removeEventListener).toHaveBeenCalledWith("error", expect.any(Function), true)
-    vi.unstubAllGlobals()
-  })
-
-  it("shares the stable pet URL from the popup and reports clipboard fallback", async () => {
-    const share = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal("navigator", { share })
-    vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
-    render([])
-    mocks.refIndex = 0
-    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: "Gato", description: "Blanca", status: "Encontrada", createdAt: "2026-01-02", phone: "123", image: "", coordinates: [-27.36, -55.89] }] }))
-    const listener = mocks.listeners.get("click")!
-    const output = { textContent: "" }
-    await listener({ target: { closest: () => ({ dataset: { sharePet: "9" }, parentElement: { querySelector: () => output } }) }, preventDefault: vi.fn() })
-    expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining("/mascotas/9") }))
-    expect(output.textContent).toBe("Enlace compartido.")
-
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
-    output.textContent = ""
-    await listener({ target: { closest: () => ({ dataset: { sharePet: "9" }, parentElement: { querySelector: () => output } }) }, preventDefault: vi.fn() })
-    expect(output.textContent).toBe("Enlace copiado.")
-    for (const cleanup of mocks.cleanups) cleanup()
-    expect(mocks.container.removeEventListener).toHaveBeenCalledWith("click", expect.any(Function))
-    vi.unstubAllGlobals()
-  })
-
-  it("ignores unrelated popup clicks and reports a cancelled share without copying", async () => {
-    const share = vi.fn().mockRejectedValue(new DOMException("closed", "AbortError"))
-    const writeText = vi.fn()
-    vi.stubGlobal("navigator", { share, clipboard: { writeText } })
-    vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
-    render([])
-    mocks.refIndex = 0
-    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: "Gato", description: "Blanca", status: "Encontrada", createdAt: "2026-01-02", phone: "123", image: "", coordinates: [-27.36, -55.89] }] }))
-    const listener = mocks.listeners.get("click")!
-    const preventDefault = vi.fn()
-    await listener({ target: { closest: () => null }, preventDefault })
-    expect(share).not.toHaveBeenCalled()
-    expect(preventDefault).not.toHaveBeenCalled()
-
-    const output = { textContent: "" }
-    await listener({ target: { closest: () => ({ dataset: { sharePet: "9" }, parentElement: { querySelector: () => output } }) }, preventDefault })
-    expect(output.textContent).toBe("Compartir cancelado.")
-    expect(writeText).not.toHaveBeenCalled()
-    vi.unstubAllGlobals()
-  })
-
-  it("falls back to clipboard when the system share rejects and reports total failure honestly", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal("navigator", { share: vi.fn().mockRejectedValue(new Error("unavailable")), clipboard: { writeText } })
-    vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
-    render([])
-    mocks.refIndex = 0
-    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 12, species: "Perro", description: "Negro", status: "Perdida", createdAt: "2026-01-02", phone: "456", image: "", coordinates: [-27.36, -55.89] }] }))
-    const listener = mocks.listeners.get("click")!
-    const output = { textContent: "" }
-    const event = { target: { closest: () => ({ dataset: { sharePet: "12" }, parentElement: { querySelector: () => output } }) }, preventDefault: vi.fn() }
-    await listener(event)
-    expect(writeText).toHaveBeenCalledWith("https://reporty.test/mascotas/12")
-    expect(output.textContent).toBe("Enlace copiado.")
-
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } })
-    output.textContent = ""
-    await listener(event)
-    expect(output.textContent).toBe("No pudimos compartir ni copiar el enlace.")
     vi.unstubAllGlobals()
   })
 
