@@ -15,6 +15,11 @@ import { toast } from "sonner"
 
 import { iniciarSesionOAuth, login, signup, type AuthFormState } from "./actions"
 import { obtenerRutaInternaSegura, RUTA_RECUPERAR_CONTRASENA } from "./rutas-seguras"
+import { descripcionAcceso, requiereCuentaRegistrada } from "@/lib/auth/rutas-con-cuenta"
+
+/** Aviso cuando el destino exige una cuenta registrada y se eligió el acceso como invitado. */
+const MENSAJE_CUENTA_REQUERIDA =
+  "Para publicar una mascota perdida necesitás una cuenta con correo confirmado. Registrate o iniciá sesión."
 import {
   ETIQUETAS_PESTANA,
   PESTANAS_AUTH,
@@ -76,6 +81,8 @@ export default function AuthPage() {
   const [loginState, loginAction, loginPending] = useActionState(login, initialState)
   const [signupState, signupAction, signupPending] = useActionState(signup, initialState)
   const nextPath = obtenerRutaInternaSegura(searchParams.get("next"))
+  // El destino puede exigir cuenta registrada: entonces el acceso como invitado no se ofrece.
+  const solicitaCuenta = requiereCuentaRegistrada(nextPath)
   const oauthError = searchParams.get("error") === "oauth"
   const enlaceError = searchParams.get("error") === "enlace"
   const needsCaptcha = TURNSTILE_CONFIGURADO
@@ -198,7 +205,7 @@ export default function AuthPage() {
     let cancelled = false
     createClient().auth.getUser().then(({ data, error }) => {
       if (cancelled) return
-      if (!error && data.user && !(data.user.is_anonymous && nextPath === "/mascotas/nueva")) {
+      if (!error && data.user && !(data.user.is_anonymous && solicitaCuenta)) {
         window.location.replace(nextPath)
         return
       }
@@ -207,7 +214,7 @@ export default function AuthPage() {
       if (!cancelled) setCheckingSession(false)
     })
     return () => { cancelled = true }
-  }, [nextPath])
+  }, [nextPath, solicitaCuenta])
 
   /**
    * Abre la sesión anónima con la verificación compartida.
@@ -215,6 +222,12 @@ export default function AuthPage() {
    * @returns Promesa que resuelve cuando la sesión se abrió o el error quedó visible.
    */
   const continueAsGuest = async () => {
+    if (solicitaCuenta) {
+      // Abrir una sesión anónima acá dejaría a la persona en un bucle entre /auth y el destino.
+      setGuestError(MENSAJE_CUENTA_REQUERIDA)
+      setPestana("registro")
+      return
+    }
     if (captchaNoDisponible) {
       setGuestError(MENSAJE_CAPTCHA_NO_DISPONIBLE)
       return
@@ -242,7 +255,7 @@ export default function AuthPage() {
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-xl">Tu cuenta Reporty</CardTitle>
-            <CardDescription>Ingresá o registrate para comentar, votar y sumar puntos. Para reportar también podés continuar como invitado.</CardDescription>
+            <CardDescription>{descripcionAcceso(solicitaCuenta)}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {captchaNoDisponible && (
@@ -283,7 +296,7 @@ export default function AuthPage() {
               onValueChange={(valor) => setPestana(normalizarPestana(valor))}
               className="w-full"
             >
-              <PestanasAuth />
+              <PestanasAuth conInvitado={!solicitaCuenta} />
 
               <TabsContent value="ingreso" className="space-y-5 pt-2">
                 {loginState?.error && (
@@ -506,6 +519,7 @@ export default function AuthPage() {
                 </form>
               </TabsContent>
 
+              {!solicitaCuenta && (
               <TabsContent value="invitado" className="space-y-5 pt-2">
                 <p className="text-sm leading-6 text-muted-foreground">
                   Podés crear y seguir reportes, pero no comentar ni votar.
@@ -516,6 +530,7 @@ export default function AuthPage() {
                   </Alert>
                 )}
               </TabsContent>
+              )}
 
               {/* Una sola verificación para las tres acciones: ingreso, registro e invitado.
                   Vive fuera de los paneles para que cambiar de pestaña no desmonte el desafío
@@ -548,10 +563,11 @@ export default function AuthPage() {
  *
  * @returns Lista de pestañas con sus valores y etiquetas del sistema.
  */
-function PestanasAuth() {
+function PestanasAuth({ conInvitado }: { conInvitado: boolean }) {
+  const pestanas = conInvitado ? PESTANAS_AUTH : PESTANAS_AUTH.filter((valor) => valor !== "invitado")
   return (
-    <TabsList className="grid w-full grid-cols-3">
-      {PESTANAS_AUTH.map((valor) => (
+    <TabsList className={`grid w-full ${conInvitado ? "grid-cols-3" : "grid-cols-2"}`}>
+      {pestanas.map((valor) => (
         <TabsTrigger key={valor} value={valor} className="px-2 sm:px-3">
           {ETIQUETAS_PESTANA[valor]}
         </TabsTrigger>
