@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  ArrowLeft,
   MapPin,
   Pencil,
   Calendar,
@@ -593,6 +594,7 @@ export function ReporteDetalleClient({
       <div className="page-container space-y-4 md:space-y-6 lg:space-y-8">
         <section className="space-y-3">
           <PageTitleBar
+            leading={<Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Volver" title="Volver"><ArrowLeft className="size-4" aria-hidden="true" /></Button>}
             icon={<FileSearch2 className="size-4" />}
             title="Detalle del reporte"
             description="Consultá el estado y los avances del reporte."

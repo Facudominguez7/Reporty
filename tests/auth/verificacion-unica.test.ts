@@ -73,10 +73,18 @@ describe("verificación de seguridad compartida en /auth", () => {
     // Un único grupo, renderizado una vez y fuera de los paneles que se desmontan.
     expect(contar(codigo, "<GrupoVerificacionYEnvio")).toBe(1)
     expect(codigo.indexOf("<GrupoVerificacionYEnvio")).toBeGreaterThan(codigo.lastIndexOf("</TabsContent>"))
-    // La superficie que el sistema de diseño pide para el grupo.
-    expect(codigo).toContain('role="group"')
-    expect(codigo).toContain('aria-label="Verificación de seguridad y envío"')
-    expect(codigo).toContain("rounded-[var(--radius)] border border-border bg-surface-subtle p-3")
+    // El grupo accesible conserva su identidad; la decoración exterior es intencionalmente mínima.
+    const etiquetaGrupo = codigo.indexOf('aria-label="Verificación de seguridad y envío"')
+    const inicioGrupo = codigo.lastIndexOf("<div", etiquetaGrupo)
+    const finGrupo = codigo.indexOf(">", etiquetaGrupo)
+    const grupo = codigo.slice(inicioGrupo, finGrupo)
+
+    expect(inicioGrupo).toBeGreaterThan(-1)
+    expect(grupo).toContain('role="group"')
+    expect(grupo).toContain('aria-label="Verificación de seguridad y envío"')
+    expect(grupo).toContain('className="space-y-3"')
+    expect(grupo).not.toContain("border")
+    expect(grupo).not.toContain("bg-surface-subtle")
     // Los tres envíos cuelgan del grupo y comparten el mismo bloqueo.
     expect(contar(codigo, "disabled={envio.bloqueado}")).toBe(3)
   })
@@ -170,11 +178,13 @@ describe("verificación de seguridad compartida en /auth", () => {
   })
 
   it("entrega al grupo el estado que decide el bloqueo de la pestaña activa", () => {
-    const grupo = recortar(
-      fuentePagina(),
-      "function GrupoVerificacionYEnvio",
-      "\n/**\n * Agrupa una etiqueta accesible",
-    )
+    const codigo = fuentePagina()
+    const inicio = codigo.indexOf("function GrupoVerificacionYEnvio")
+    const siguienteFuncion = codigo.indexOf("function ", inicio + 1)
+    const grupo = codigo.slice(inicio, siguienteFuncion)
+
+    expect(inicio).toBeGreaterThan(-1)
+    expect(siguienteFuncion).toBeGreaterThan(inicio)
 
     // El grupo delega la decisión en el módulo compartido, que la prueba por comportamiento.
     expect(grupo).toContain("envioDeLaPestana({")

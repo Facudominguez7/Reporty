@@ -13,6 +13,7 @@ import "leaflet.markercluster"
 
 import { getCategoryColor, getPriorityColor, getStatusColor } from "@/components/report-card"
 import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/catalog"
+import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
 import {
   INITIAL_MAP_VIEW_CONFIG,
@@ -41,6 +42,7 @@ interface Report {
 export interface LeafletMapProps {
   reports: Report[]
   onSeleccionarReporte?: (reporteId: number) => void
+  mascotas?: MascotaMapa[]
 }
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
@@ -127,6 +129,7 @@ const popupIcons = {
   priority: createLucideIconMarkup('<path d="M4 22V4" /><path d="M4 4h11l-1 5 1 5H4" />'),
   author: createLucideIconMarkup('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />'),
   date: createLucideIconMarkup('<path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" />'),
+  phone: createLucideIconMarkup('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.9.68 2.8a2 2 0 0 1-.45 2.11L8.07 9.91a16 16 0 0 0 6 6l1.28-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.68A2 2 0 0 1 22 16.92z" />'),
 } as const
 
 type PopupChipTone = {
@@ -253,7 +256,7 @@ const createPopupContent = (
   `
 }
 
-export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMapProps) {
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
@@ -327,6 +330,12 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
     // so the effect below requests the tiles of the final view and nothing else.
     // Limit panning to the reports map's regional bounds.
     const [south, west, north, east] = POSADAS_BOUNDS
+    const handlePetImageError = (event: Event) => {
+      const image = event.target
+      if (image instanceof HTMLImageElement && image.dataset.petMarkerImage !== undefined) image.style.display = "none"
+    }
+    container.addEventListener("error", handlePetImageError, true)
+
     const map = L.map(container, {
       scrollWheelZoom: true,
       zoomControl: true,
@@ -378,6 +387,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
     clusterGroupRef.current = clusterGroup
 
     return () => {
+      container.removeEventListener("error", handlePetImageError, true)
       clusterGroupRef.current?.clearLayers()
       clusterGroupRef.current = null
       tileLayerRef.current = null
@@ -411,6 +421,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
 
     clusterGroup.clearLayers()
 
+    const visibleItems = reports.length ? reports : mascotas
     for (const report of reports) {
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
         icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo)),
@@ -430,17 +441,45 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
       clusterGroup.addLayer(marker)
     }
 
+    for (const pet of mascotas) {
+      if (!Number.isSafeInteger(pet.id) || pet.id <= 0) continue
+      const imageUrl = toSafeImageUrl(pet.image)
+      const label = `${pet.species} ${pet.status.toLowerCase()}`
+      const marker = L.marker(pet.coordinates, { title: label, alt: label, icon: L.divIcon({ className: "pet-marker", html: `<span aria-hidden="true" style="position:relative;display:grid;place-items:center;width:38px;height:38px;overflow:hidden;border:3px solid var(--map-marker-stroke);border-radius:50%;background:${pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)"};color:var(--map-marker-foreground);font-weight:700;box-shadow:var(--elevation-soft)">${pet.status === "Perdida" ? "P" : "E"}${imageUrl ? `<img data-pet-marker-image src="${escapeHtml(imageUrl)}" alt="" style="position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:cover;border-radius:50%">` : ""}</span>`, iconSize: [38, 38], iconAnchor: [19, 19] }) })
+      const description = pet.description ?? ""
+      const popup = `
+        <a href="/mascotas/${pet.id}" style="display:block;min-width:250px;max-width:270px;color:var(--foreground);font-size:13px;line-height:1.45;text-decoration:none;">
+          <div style="margin-bottom:10px;">
+            <h3 style="margin:0 0 6px;font-size:15px;font-weight:700;line-height:1.3;color:var(--foreground);">${escapeHtml(pet.species)}</h3>
+            <p style="margin:0;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-foreground);">
+              <span style="display:inline-flex;color:var(--primary);">${popupIcons.phone}</span>
+              <span>Teléfono: ${escapeHtml(pet.phone)}</span>
+            </p>
+          </div>
+          ${imageUrl ? `<div style="margin-bottom:10px;overflow:hidden;border-radius:10px;"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(pet.species)}" style="display:block;width:100%;height:124px;object-fit:cover;" /></div>` : ""}
+          <p style="margin:0 0 10px;font-size:13px;color:var(--foreground);line-height:1.5;">${escapeHtml(description.length > 110 ? `${description.substring(0, 110)}...` : description)}</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+            ${createPopupChip(escapeHtml(pet.status), { background: pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)", border: "transparent", text: pet.status === "Perdida" ? "var(--destructive-foreground)" : "var(--primary-foreground)" }, popupIcons.status)}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground);">
+            <span style="display:inline-flex;">${popupIcons.date}</span><span>${escapeHtml(new Date(pet.createdAt).toLocaleDateString("es-AR"))}</span>
+          </div>
+        </a>`
+      marker.bindPopup(popup, { maxWidth: 300 })
+      clusterGroup.addLayer(marker)
+    }
+
     if (isInitialView) {
       return
     }
 
-    if (reports.length === 0) {
+    if (visibleItems.length === 0) {
       map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
       return
     }
 
     const bounds = L.latLngBounds(
-      reports.map((report) => [report.coordinates[0], report.coordinates[1]] as L.LatLngTuple)
+      visibleItems.map((item) => [item.coordinates[0], item.coordinates[1]] as L.LatLngTuple)
     )
 
     if (!bounds.isValid()) {
@@ -453,7 +492,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
     }
 
     map.fitBounds(bounds.pad(INITIAL_MAP_VIEW_CONFIG.padding))
-  }, [getIcon, onSeleccionarReporte, reports])
+  }, [getIcon, onSeleccionarReporte, reports, mascotas])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }

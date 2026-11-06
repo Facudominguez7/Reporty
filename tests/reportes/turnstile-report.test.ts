@@ -243,7 +243,7 @@ describe("contrato del envío final con Turnstile", () => {
     const codigo = pageSource()
     const inicioExito = codigo.indexOf("if (!result.success) {")
     const exito = codigo.slice(inicioExito, codigo.indexOf("setShowResultDialog(true)", inicioExito))
-    const despuesDelFallo = exito.slice(exito.indexOf("return\n      }"))
+    const despuesDelFallo = exito.slice(exito.search(/return\r?\n      }/))
 
     expect(despuesDelFallo).toContain("requestNewCaptcha()")
   })
