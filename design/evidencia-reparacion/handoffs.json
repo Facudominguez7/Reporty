@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-deslizador-antes-despues.html",
+  "handoffs": {
+    "01-deslizador-antes-despues.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-06T13:40:35.335Z",
+      "startedAt": "2026-11-06T13:40:35.425Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/evidencia-reparacion.md",
+      "note": "Implementación iniciada; backend de evidencia en curso."
+    }
+  }
+}
