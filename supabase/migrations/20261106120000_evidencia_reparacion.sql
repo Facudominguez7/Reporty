@@ -794,8 +794,47 @@ create trigger resolver_evidencia_al_cerrar_reporte
 -- El voto comunitario «reparado» queda reemplazado por el flujo de evidencia
 -- ============================================================================
 
+-- BEGIN voto-exclusivo
+-- Este bloque se extrae completo en scripts/local-supabase/test-report-vote-exclusivo.sh
+-- porque la base local todavía no tiene aplicada esta migración.
+--
+-- Archivo durable, server-only y de solo agregado del voto «reparado» retirado
+-- cuando la misma cuenta cambia a «no existe». Conserva la identidad original del
+-- voto (id, reporte, cuenta y fecha en que se emitió) y la fecha del reemplazo, sin
+-- reabrir el voto activo: el resumen, el umbral y los puntos siguen contando solo el
+-- voto vigente (S9, S15). Las claves foráneas conservan el borrado en cascada que ya
+-- tenía votos_reparado, así que un borrado físico de reporte o cuenta no queda
+-- bloqueado por la historia.
+create table public.votos_reparado_historial (
+  id bigint generated always as identity primary key,
+  voto_id bigint not null,
+  reporte_id bigint not null references public.reportes(id) on delete cascade,
+  usuario_id uuid not null references public.profiles(id) on delete cascade,
+  votado_at timestamptz not null,
+  reemplazado_at timestamptz not null default clock_timestamp(),
+  motivo text not null default 'Voto reparado reemplazado por el voto no existe',
+  -- Un voto original se archiva una sola vez: repetir el cambio nunca duplica historia.
+  unique (voto_id)
+);
+comment on table public.votos_reparado_historial is
+'Historial append-only del voto reparado reemplazado por no existe; solo service_role escribe y lee.';
+comment on column public.votos_reparado_historial.voto_id is
+'Identidad original de la fila retirada de votos_reparado.';
+comment on column public.votos_reparado_historial.votado_at is
+'Fecha original del voto retirado; nunca se reescribe.';
+comment on column public.votos_reparado_historial.reemplazado_at is
+'Fecha del cambio a no existe que retiró el voto activo.';
+create index votos_reparado_historial_fecha
+  on public.votos_reparado_historial (votado_at desc);
+
+-- Historial sin políticas de cliente: ni lectura ni escritura desde el navegador.
+alter table public.votos_reparado_historial enable row level security;
+revoke all on public.votos_reparado_historial from public, anon, authenticated, service_role;
+-- Sin UPDATE ni DELETE: la historia no se reescribe (S9).
+grant select, insert on public.votos_reparado_historial to service_role;
+
 -- Se conserva la rama de «no existe» sin cambios; solo se rechaza el voto nuevo
--- «reparado» (el historial de votos_reparado queda intacto, S15).
+-- «reparado» y el voto histórico reemplazado se archiva en lugar de perderse (S15).
 create or replace function public.registrar_voto_exclusivo(p_reporte_id bigint, p_usuario_id uuid, p_tipo text)
 returns jsonb language plpgsql security definer set search_path = pg_catalog, public as $$
 declare
@@ -833,7 +872,17 @@ begin
   v_cambio := (p_tipo='no_existe' and v_si) or (p_tipo='reparado' and v_no);
   if v_cambio then
     if v_no then delete from public.votos_no_existe where reporte_id=p_reporte_id and usuario_id=p_usuario_id;
-    else delete from public.votos_reparado where reporte_id=p_reporte_id and usuario_id=p_usuario_id; end if;
+    else
+      -- El voto «reparado» retirado se archiva antes de borrarse, en la misma
+      -- transacción: la identidad, la cuenta, el reporte y la fecha original se
+      -- conservan y repetir el cambio no duplica la historia (S9, S15).
+      insert into public.votos_reparado_historial(voto_id, reporte_id, usuario_id, votado_at)
+        select r.id, r.reporte_id, r.usuario_id, r.created_at
+        from public.votos_reparado r
+        where r.reporte_id=p_reporte_id and r.usuario_id=p_usuario_id
+        on conflict (voto_id) do nothing;
+      delete from public.votos_reparado where reporte_id=p_reporte_id and usuario_id=p_usuario_id;
+    end if;
   end if;
   if v_primero or v_cambio then
     if p_tipo='no_existe' then insert into public.votos_no_existe(reporte_id,usuario_id) values(p_reporte_id,p_usuario_id);
@@ -860,7 +909,8 @@ begin
     'votos_reparado', v_reparados);
 end $$;
 comment on function public.registrar_voto_exclusivo(bigint,uuid,text) is
-'Voto exclusivo serializado con premio atómico solo en el primer voto; el voto reparado ya no se acepta (lo reemplaza la evidencia de reparación).';
+'Voto exclusivo serializado con premio atómico solo en el primer voto; el voto reparado ya no se acepta (lo reemplaza la evidencia de reparación) y el voto retirado se archiva.';
+-- END voto-exclusivo
 
 -- ============================================================================
 -- Auditoría: se amplía el catálogo de acciones sin reescribir filas históricas

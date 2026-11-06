@@ -978,11 +978,17 @@ select pg_temp.exigir(not has_table_privilege('anon','public.evidencias_reparaci
   and not has_table_privilege('authenticated','public.evidencias_reparacion','update')
   and not has_table_privilege('authenticated','public.verificaciones_reparacion','select')
   and not has_table_privilege('authenticated','public.verificaciones_reparacion','insert')
-  and not has_table_privilege('authenticated','public.verificaciones_reparacion','update'),
-  'Las tablas de evidencia no tienen privilegios de cliente');
+  and not has_table_privilege('authenticated','public.verificaciones_reparacion','update')
+  and not has_table_privilege('anon','public.votos_reparado_historial','select')
+  and not has_table_privilege('authenticated','public.votos_reparado_historial','select')
+  and not has_table_privilege('authenticated','public.votos_reparado_historial','insert'),
+  'Las tablas de evidencia y el historial de votos no tienen privilegios de cliente');
 select pg_temp.exigir(has_table_privilege('service_role','public.evidencias_reparacion','select')
-  and has_table_privilege('service_role','public.verificaciones_reparacion','insert'),
-  'Solo service_role opera las tablas de evidencia');
+  and has_table_privilege('service_role','public.verificaciones_reparacion','insert')
+  and has_table_privilege('service_role','public.votos_reparado_historial','insert')
+  and not has_table_privilege('service_role','public.votos_reparado_historial','update')
+  and not has_table_privilege('service_role','public.votos_reparado_historial','delete'),
+  'Solo service_role opera las tablas de evidencia y el historial de votos es append-only');
 select pg_temp.exigir(
   not has_function_privilege('anon','public.crear_evidencia_reparacion(bigint,uuid,text,text)','execute')
   and not has_function_privilege('authenticated','public.crear_evidencia_reparacion(bigint,uuid,text,text)','execute')
