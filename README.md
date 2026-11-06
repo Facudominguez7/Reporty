@@ -236,6 +236,12 @@ sequenceDiagram
   3. Para ver el navegador mientras corren: `E2E_HEADED=1 npm run test:e2e`.
 
   Usan el Google Chrome instalado (no descargan navegadores). Cada prueba borra los usuarios, reportes y fotos que creó, aunque falle. Si una prueba falla, su traza queda en `test-results/` y se abre con `npx playwright show-trace <ruta>/trace.zip`.
+- **De carga:** `npm run test:load` (k6 en Docker, sin dependencias npm). Recorre `/`, `/mapa`, `/reportes`, el detalle de un reporte y `/sitemap.xml` con usuarios concurrentes. Corre solo contra una build de producción local con el Supabase local; **nunca apuntes una prueba de carga a producción**.
+  1. Levantar Supabase local con `npm run db:start`. Para que el detalle tenga un reporte, la base local necesita datos (`npm run db:setup`).
+  2. Ejecutar `npm run test:load`. Compila la app, la sirve en el puerto 3100 (o reutiliza un servidor que ya esté ahí) y corre `scripts/carga/paginas-publicas.js` con la imagen `grafana/k6`.
+  3. Por defecto sube a 20 usuarios virtuales y los mantiene 1 minuto; se cambia con `USUARIOS=50 DURACION=2m npm run test:load`.
+
+  Falla (código 99) si más del 1 % de los pedidos da error o si el p95 de alguna página supera los 2 s. El resumen queda en `test-results/carga/resumen.json`.
 
 ---
 
