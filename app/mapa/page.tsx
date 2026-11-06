@@ -10,6 +10,7 @@
 
 import { MapaClient } from "./mapa-client"
 import { getReportMapData, getCategorias, getPrioridades } from "@/database/queries/reportes/get-reportes"
+import { getMascotasMapa } from "@/database/queries/mascotas/mapa"
 import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/seo/site"
 
@@ -46,7 +47,7 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
   const { search, categoria, estado, prioridad } = params
 
   // Reports and filter options don't depend on each other, so they load at the same time.
-  const [{ data: reportes, error }, { data: categorias }, { data: prioridades }] = await Promise.all([
+  const [{ data: reportes, error }, { data: categorias }, { data: prioridades }, { data: mascotas, error: mascotasError }] = await Promise.all([
     getReportMapData({
       search,
       categoria,
@@ -57,6 +58,7 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
     }),
     getCategorias(),
     getPrioridades(),
+    getMascotasMapa(),
   ])
 
   return (
@@ -66,6 +68,8 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
       // Todo el mapa está en Pendiente, así que no hay estado por el cual filtrar.
       estados={[]}
       prioridades={prioridades ?? []}
+      mascotas={mascotas ?? []}
+      petError={mascotasError?.message ?? null}
       error={error?.message ?? null}
     />
   )

@@ -4,7 +4,7 @@ import { useCallback, useRef, useState, useTransition } from "react"
 import { preconnect } from "react-dom"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { AlertCircle, FilePlus2, List, Plus, Search, SlidersHorizontal, X } from "lucide-react"
+import { AlertCircle, FilePlus2, List, Plus, Search, SlidersHorizontal, X, PawPrint } from "lucide-react"
 import { useSearchParams, useServerInsertedHTML } from "next/navigation"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -16,6 +16,7 @@ import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
+import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript } from "@/lib/map/initial-view"
 
 const loadMapContainer = () => import("@/components/map-container").then((m) => m.MapContainer)
@@ -40,9 +41,16 @@ type MapaClientProps = {
   estados: { id: number; nombre: string }[]
   prioridades: { id: number; nombre: string }[]
   error: string | null
+  petError: string | null
+  mascotas: MascotaMapa[]
 }
 
-export function MapaClient({ reportes, categorias, estados, prioridades, error }: MapaClientProps) {
+export function PetLayerError({ error }: { error: string | null }) {
+  if (!error) return null
+  return <div role="alert" className="absolute left-1/2 top-20 z-30 w-[min(92vw,32rem)] -translate-x-1/2 rounded-lg border border-destructive/30 bg-card/95 p-3 text-sm text-destructive shadow-lg">No se pudieron cargar las mascotas: {error}</div>
+}
+
+export function MapaClient({ reportes, mascotas, categorias, estados, prioridades, error, petError }: MapaClientProps) {
   // The map tiles are the largest paint of this page. Rendering this hint during SSR
   // puts it in the document head, so the tile connection opens while the map code downloads.
   preconnect("https://tile.openstreetmap.org")
@@ -60,6 +68,7 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
   const searchParams = useSearchParams()
   const [showFilters, setShowFilters] = useState(false)
   const [showActions, setShowActions] = useState(false)
+  const [layer, setLayer] = useState<"reportes" | "mascotas">("reportes")
   const [isPending, startTransition] = useTransition()
 
   const activeFilters = [
@@ -101,8 +110,16 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
             </Alert>
           </div>
         ) : (
-          <MapContainer reports={reportes} showLegend />
+          <MapContainer reports={reportes} mascotas={mascotas} layer={layer} showLegend />
         )}
+      </div>
+
+      {layer === "mascotas" && !error && <PetLayerError error={petError} />}
+
+      <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)]">
+        <div className="pointer-events-auto flex rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur" role="group" aria-label="Capa del mapa">
+          {([['reportes', 'Reportes'], ['mascotas', 'Mascotas']] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => setLayer(value)}>{label}</Button>)}
+        </div>
       </div>
 
       <div className="pointer-events-none absolute left-3 top-3 z-30 pt-[max(env(safe-area-inset-top),0rem)] sm:left-5 sm:top-5">
@@ -164,6 +181,10 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
               <FilePlus2 className="size-4" aria-hidden="true" />
               Crear reporte
             </Link>
+            <Link href="/mascotas/nueva" className={mapActionLinkClassName}>
+              <PawPrint className="size-4" aria-hidden="true" />
+              Cargar mascota perdida
+            </Link>
             <Link href="/reportes" className={mapActionLinkClassName}>
               <List className="size-4" aria-hidden="true" />
               Ver reportes
@@ -175,7 +196,7 @@ export function MapaClient({ reportes, categorias, estados, prioridades, error }
           variant="floating-primary"
           size="icon-xl"
           onClick={() => setShowActions((prev) => !prev)}
-          aria-label={showActions ? "Cerrar acciones de reportes" : "Abrir acciones de reportes"}
+          aria-label={showActions ? "Cerrar acciones" : "Abrir acciones"}
           aria-expanded={showActions}
         >
           {showActions ? <X className="size-6" aria-hidden="true" /> : <Plus className="size-6" aria-hidden="true" />}

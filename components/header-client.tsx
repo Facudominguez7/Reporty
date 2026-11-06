@@ -49,7 +49,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
   const bottomItems: NavItem[] = [
     { href: "/mapa", label: "Mapa", icon: Map },
     { href: "/reportes", label: "Reportes", icon: List },
-    { href: "/reportes/nuevo", label: "Crear", icon: Plus },
+    { href: "/crear", label: "Crear", icon: Plus },
     { href: "/comunidad", label: "Comunidad", icon: Users },
     getAccountNavItem(user),
   ];
@@ -61,7 +61,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
   const isActive = (href: string) => {
     if (href === "/mapa") return pathname === "/" || pathname.startsWith("/mapa");
     if (href === "/reportes") return pathname.startsWith("/reportes") && !pathname.startsWith("/reportes/nuevo");
-    if (href === "/reportes/nuevo") return pathname.startsWith("/reportes/nuevo");
+    if (href === "/crear") return pathname === "/crear" || pathname.startsWith("/reportes/nuevo");
     if (href === "/dashboard") return pathname.startsWith("/dashboard");
     if (href === "/auth") return pathname.startsWith("/auth");
     if (href === "/mis-reportes") return pathname.startsWith("/mis-reportes");
@@ -108,7 +108,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
                 active ? "text-primary" : "text-secondary-foreground/70 hover:text-secondary-foreground"
               }`}
             >
-              {href === "/reportes/nuevo" ? (
+              {href === "/crear" ? (
                 <span className={`${buttonVariants({ variant: "default", size: "icon-lg" })} -mt-3 size-10 border-2 border-secondary shadow-xl`}>
                   <Icon className="size-4.5" aria-hidden="true" />
                 </span>

@@ -13,6 +13,8 @@ import "leaflet.markercluster"
 
 import { getCategoryColor, getPriorityColor, getStatusColor } from "@/components/report-card"
 import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/catalog"
+import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
+import { shareReport } from "@/lib/share/share-report"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
 import {
   INITIAL_MAP_VIEW_CONFIG,
@@ -41,6 +43,7 @@ interface Report {
 export interface LeafletMapProps {
   reports: Report[]
   onSeleccionarReporte?: (reporteId: number) => void
+  mascotas?: MascotaMapa[]
 }
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
@@ -253,12 +256,14 @@ const createPopupContent = (
   `
 }
 
-export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMapProps) {
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
   const hasInitialViewRef = useRef(false)
+  const mascotasRef = useRef(mascotas)
+  mascotasRef.current = mascotas
 
   const iconsByPriority = useMemo(() => {
     const mk = (color: string, category: string, hasCrew = false) =>
@@ -327,6 +332,21 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
     // so the effect below requests the tiles of the final view and nothing else.
     // Limit panning to the reports map's regional bounds.
     const [south, west, north, east] = POSADAS_BOUNDS
+    const handlePetShare = async (event: Event) => {
+      const target = event.target as HTMLElement | null
+      const button = target?.closest<HTMLButtonElement>("button[data-share-pet]")
+      const id = Number(button?.dataset.sharePet)
+      if (!button || !Number.isSafeInteger(id) || id < 1) return
+      event.preventDefault()
+      const pet = mascotasRef.current.find((item) => item.id === id)
+      if (!pet) return
+      const status = button.parentElement?.querySelector<HTMLElement>("[data-share-status]")
+      const url = new URL(`/mascotas/${id}`, window.location.origin).href
+      const outcome = await shareReport({ title: `${pet.species} ${pet.status.toLowerCase()}`, text: `Mirá esta mascota en Reporty: ${pet.species} ${pet.status.toLowerCase()}`, url }, navigator)
+      if (status) status.textContent = outcome === "shared" ? "Enlace compartido." : outcome === "copied" ? "Enlace copiado." : outcome === "cancelled" ? "Compartir cancelado." : "No pudimos compartir ni copiar el enlace."
+    }
+    container.addEventListener("click", handlePetShare)
+
     const map = L.map(container, {
       scrollWheelZoom: true,
       zoomControl: true,
@@ -378,6 +398,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
     clusterGroupRef.current = clusterGroup
 
     return () => {
+      container.removeEventListener("click", handlePetShare)
       clusterGroupRef.current?.clearLayers()
       clusterGroupRef.current = null
       tileLayerRef.current = null
@@ -411,6 +432,7 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
 
     clusterGroup.clearLayers()
 
+    const visibleItems = reports.length ? reports : mascotas
     for (const report of reports) {
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
         icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo)),
@@ -430,17 +452,26 @@ export default function LeafletMap({ reports, onSeleccionarReporte }: LeafletMap
       clusterGroup.addLayer(marker)
     }
 
+    for (const pet of mascotas) {
+      const marker = L.marker(pet.coordinates, { icon: L.divIcon({ className: "pet-marker", html: `<span style="display:grid;place-items:center;width:38px;height:38px;border:3px solid white;border-radius:50%;background:${pet.status === "Perdida" ? "#dc2626" : "#16a34a"};color:white;font-weight:700;box-shadow:0 2px 8px #0005">${pet.status === "Perdida" ? "P" : "E"}</span>`, iconSize: [38, 38], iconAnchor: [19, 19] }) })
+      const imageUrl = toSafeImageUrl(pet.image)
+      const detailUrl = `/mascotas/${pet.id}`
+      const popup = `<div style="min-width:230px;max-width:270px;color:var(--foreground)"><strong>${escapeHtml(pet.species)}</strong>${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(pet.species)}" style="display:block;width:100%;height:120px;object-fit:cover;margin:8px 0;border-radius:8px">` : ""}<p>${escapeHtml(pet.description)}</p><p><b>Estado:</b> ${escapeHtml(pet.status)}</p><p><b>Publicado:</b> ${escapeHtml(new Date(pet.createdAt).toLocaleDateString("es-AR"))}</p><p><b>Teléfono:</b> ${escapeHtml(pet.phone)}</p><a href="${detailUrl}">Ver ficha</a> <button type="button" data-share-pet="${pet.id}" style="margin-left:8px">Compartir</button><span data-share-status aria-live="polite" style="display:block"></span></div>`
+      marker.bindPopup(popup, { maxWidth: 300 })
+      clusterGroup.addLayer(marker)
+    }
+
     if (isInitialView) {
       return
     }
 
-    if (reports.length === 0) {
+    if (visibleItems.length === 0) {
       map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
       return
     }
 
     const bounds = L.latLngBounds(
-      reports.map((report) => [report.coordinates[0], report.coordinates[1]] as L.LatLngTuple)
+      visibleItems.map((item) => [item.coordinates[0], item.coordinates[1]] as L.LatLngTuple)
     )
 
     if (!bounds.isValid()) {

@@ -615,7 +615,7 @@ function GrupoVerificacionYEnvio({
     <div
       role="group"
       aria-label="Verificación de seguridad y envío"
-      className="space-y-3 rounded-[var(--radius)] border border-border bg-surface-subtle p-3"
+      className="space-y-3"
     >
       {needsCaptcha && <TurnstileWidget onTokenChange={onToken} resetSignal={verificacion.desafios} />}
 
