@@ -57,6 +57,27 @@ create function pg_temp.impugnacion(p_evidencia uuid, p_usuario uuid) returns uu
   where evidencia_id = p_evidencia and usuario_id = p_usuario and tipo = 'impugnacion'
 $$;
 
+-- Instantánea ordenada de las fotos publicadas de un reporte (S9).
+create function pg_temp.fotos(p_reporte bigint) returns jsonb language sql stable as $$
+  select coalesce(jsonb_agg(to_jsonb(f) order by f.id), '[]'::jsonb)
+  from public.fotos_reporte f where f.reporte_id = p_reporte
+$$;
+
+-- Sonda A3: la evidencia solo puede insertarse después de bloquear el perfil del
+-- autor. Una fila bloqueada por esta transacción deja en xmax el xid actual.
+-- Se crea dentro de la transacción de prueba: el rollback final la elimina.
+create function private.sonda_bloqueo_perfil_autor() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not exists (select 1 from public.profiles p
+    where p.id = new.autor_id and p.xmax::text <> '0') then
+    raise exception 'A3: la evidencia se insertó sin bloquear el perfil del autor';
+  end if;
+  return new;
+end $$;
+create trigger zz_sonda_bloqueo_perfil_autor before insert on public.evidencias_reparacion
+  for each row execute function private.sonda_bloqueo_perfil_autor();
+
 -- Recorre la moderación real de una evidencia: reclamo, aprobación y publicación.
 create function pg_temp.publicar_evidencia(p_evidencia uuid, p_url text) returns void
 language plpgsql as $$
@@ -78,7 +99,8 @@ end $$;
 -- Fixtures sintéticas: ids explícitos (sin secuencias) y roles/estados del repo.
 -- u01 autor de reportes · u02 autor de evidencia · u03..u06 confirmadores ·
 -- u07 admin · u08 operador · u09 invitado · u10 anónimo · u11 sin confirmar ·
--- u12 impugnador · u13 autor bajo límite diario.
+-- u12 impugnador · u13 autor bajo límite diario · u14/u15 autores de las regresiones
+-- del veredicto (cada cuenta informa como máximo el cupo diario).
 -- ---------------------------------------------------------------------------
 insert into public.roles(id,nombre) values (1,'admin'),(2,'ciudadano'),(3,'interesado'),(4,'operador'),(5,'invitado')
   on conflict (id) do nothing;
@@ -96,7 +118,9 @@ insert into auth.users(id,email,email_confirmed_at) values
  ('30000000-0000-0000-0000-000000000009','evidencia-invitado@ejemplo.invalid',now()),
  ('30000000-0000-0000-0000-000000000011','evidencia-sin-confirmar@ejemplo.invalid',null),
  ('30000000-0000-0000-0000-000000000012','evidencia-impugna@ejemplo.invalid',now()),
- ('30000000-0000-0000-0000-000000000013','evidencia-limite@ejemplo.invalid',now());
+ ('30000000-0000-0000-0000-000000000013','evidencia-limite@ejemplo.invalid',now()),
+ ('30000000-0000-0000-0000-000000000014','evidencia-regresion1@ejemplo.invalid',now()),
+ ('30000000-0000-0000-0000-000000000015','evidencia-regresion2@ejemplo.invalid',now());
 insert into auth.users(id,email,is_anonymous) values
  ('30000000-0000-0000-0000-000000000010','evidencia-anonimo@ejemplo.invalid',true);
 update public.profiles set rol_id = 1 where id = '30000000-0000-0000-0000-000000000007';
@@ -109,11 +133,14 @@ update public.profiles set puntos = 0 where id in
 -- -92004 admin aprueba y revierte · -92005 admin rechaza · -92006 evidencia única ·
 -- -92007 reporte cerrado · -92008 foto rechazada · -92009 foto de reporte (regresión) ·
 -- -92010..-92013 límite diario · -92014 voto reparado · -92015 elegibilidad ·
--- -92016 reporte rechazado.
+-- -92016 reporte rechazado · -92017 aprobación sin foto · -92018/-92019 admin con
+-- impugnaciones · -92020 verificaciones repetidas · -92021 impugnación que bloquea ·
+-- -92022 fotos originales (S9) · -92023/-92024 cierre directo a 2 y a 3 ·
+-- -92025 cierre directo sin foto · -92026 cierre directo sin evidencia.
 insert into public.reportes(id,usuario_id,titulo,lat,lon,estado_id)
 select -92000 - n, '30000000-0000-0000-0000-000000000001',
   'Evidencia de reparación ' || n, 0, 0, case when n = 7 then 2 else 1 end
-from generate_series(1,16) n;
+from generate_series(1,26) n;
 
 -- ---------------------------------------------------------------------------
 -- S12/S15: solo cuentas registradas con email confirmado informan reparaciones.
@@ -407,6 +434,8 @@ select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
   'PRE08','Administrador no autorizado');
 select pg_temp.exigir((select estado='informada' from public.evidencias_reparacion
   where reporte_id=-92004), 'El rechazo de autorización no cambia la evidencia');
+-- Aprobar exige la foto publicada (A1): la evidencia se publica antes.
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92004),'https://ejemplo.invalid/reparacion-92004.webp');
 select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92004),
   '30000000-0000-0000-0000-000000000007','aprobar','Obra verificada en el lugar')
   ->> 'cerrado') = 'true', 'Aprobar la evidencia cierra el reporte');
@@ -477,12 +506,15 @@ select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
 select public.crear_evidencia_reparacion(-92016,'30000000-0000-0000-0000-000000000002',
   'Evidencia sobre reporte que será rechazado',pg_temp.huella(16));
 reset role;
+-- El cierre directo ya resolvió la evidencia activa (A4).
 update public.reportes set estado_id=3 where id=-92016;
 set local role service_role;
+select pg_temp.exigir((select estado='rechazada' from public.evidencias_reparacion
+  where reporte_id=-92016), 'El cierre directo rechaza la evidencia sin foto publicada');
 select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
   pg_temp.evidencia(-92016),'30000000-0000-0000-0000-000000000007','aprobar')$q$,
   'PRE05','El reporte ya está cerrado');
-select pg_temp.exigir((select estado='informada' from public.evidencias_reparacion
+select pg_temp.exigir((select estado='rechazada' from public.evidencias_reparacion
   where reporte_id=-92016), 'Una aprobación rechazada no cambia la evidencia');
 
 -- ---------------------------------------------------------------------------
@@ -606,6 +638,304 @@ select pg_temp.exigir((public.registrar_voto_exclusivo(-92014,
   'Repetir el voto no existe sigue siendo idempotente');
 select pg_temp.exigir((select puntos=1 from public.profiles
   where id='30000000-0000-0000-0000-000000000003'), 'Repetir el voto no acredita otro punto');
+
+-- ---------------------------------------------------------------------------
+-- S8 (P1/A1): aprobar exige una evidencia con foto publicada, nunca una informada.
+-- ---------------------------------------------------------------------------
+reset role;
+update public.profiles set puntos=0 where id='30000000-0000-0000-0000-000000000001';
+set local role service_role;
+select public.crear_evidencia_reparacion(-92017,'30000000-0000-0000-0000-000000000006',
+  'Evidencia todavía en moderación',pg_temp.huella(30));
+select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
+  pg_temp.evidencia(-92017),'30000000-0000-0000-0000-000000000007','aprobar')$q$,
+  'PRE12','La evidencia todavía no tiene foto publicada: no se puede aprobar la reparación');
+select pg_temp.exigir((select estado='informada' and publicada_at is null and resuelta_at is null
+  from public.evidencias_reparacion where reporte_id=-92017),
+  'P1: la aprobación rechazada deja la evidencia informada y sin resolver');
+select pg_temp.exigir((select estado_id=1 from public.reportes where id=-92017),
+  'P1: la aprobación rechazada no cierra el reporte');
+select pg_temp.exigir(not exists (select 1 from public.historial_estados where reporte_id=-92017),
+  'P1: la aprobación rechazada no registra historial');
+select pg_temp.exigir((select puntos=0 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'), 'P1: la aprobación rechazada no acredita puntos');
+select pg_temp.exigir(not exists (select 1 from public.audit_events where report_id=-92017
+  and action='evidence_approved'), 'P1: la aprobación rechazada no se audita como aprobación');
+-- Publicada la foto, la aprobación administrativa sigue funcionando.
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92017),'https://ejemplo.invalid/reparacion-92017.webp');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92017),
+  '30000000-0000-0000-0000-000000000007','aprobar') ->> 'cerrado') = 'true',
+  'Publicada la foto, la aprobación administrativa cierra el reporte');
+
+-- ---------------------------------------------------------------------------
+-- S8 (P2/A2): aprobar resuelve las impugnaciones pendientes como descartadas.
+-- ---------------------------------------------------------------------------
+reset role;
+update public.profiles set puntos=0 where id='30000000-0000-0000-0000-000000000001';
+set local role service_role;
+select public.crear_evidencia_reparacion(-92018,'30000000-0000-0000-0000-000000000003',
+  'Evidencia con impugnación que resuelve la administración',pg_temp.huella(31));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92018),'https://ejemplo.invalid/reparacion-92018.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92018),
+  '30000000-0000-0000-0000-000000000004','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92018),
+  '30000000-0000-0000-0000-000000000005','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92018),
+  '30000000-0000-0000-0000-000000000012','impugnacion','La foto no es de este bache');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92018),
+  '30000000-0000-0000-0000-000000000007','aprobar','Verificada en el lugar')
+  ->> 'impugnaciones_pendientes')::integer = 0, 'P2: aprobar deja cero impugnaciones pendientes');
+select pg_temp.exigir((select estado='descartada' and resuelta_at is not null
+  and resuelta_por='30000000-0000-0000-0000-000000000007'
+  and motivo='La foto no es de este bache'
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92018) and tipo='impugnacion'),
+  'P2: la impugnación pendiente queda descartada con el administrador y su fecha');
+select pg_temp.exigir((select estado='validada' from public.evidencias_reparacion where reporte_id=-92018),
+  'P2: la evidencia aprobada queda validada');
+select pg_temp.exigir((select estado_id=2 from public.reportes where id=-92018),
+  'P2: el reporte queda Reparado');
+select pg_temp.exigir((select puntos=5 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'), 'P2: aprobar acredita cinco puntos una sola vez');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92018),
+  '30000000-0000-0000-0000-000000000007','aprobar') ->> 'repetida') = 'true',
+  'P2: repetir la aprobación es idempotente');
+select pg_temp.exigir((select puntos=5 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'), 'P2: la repetición no acredita puntos extra');
+select pg_temp.exigir((select count(*)=1 from public.historial_estados where reporte_id=-92018),
+  'P2: la repetición no duplica el historial');
+select pg_temp.exigir((select estado='descartada' and resuelta_por='30000000-0000-0000-0000-000000000007'
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92018) and tipo='impugnacion'),
+  'P2: la repetición conserva la impugnación resuelta');
+
+-- ---------------------------------------------------------------------------
+-- S8 (P2/A2): rechazar resuelve las impugnaciones pendientes como aceptadas.
+-- S6 (P7): el autor de la evidencia tampoco puede impugnarla.
+-- ---------------------------------------------------------------------------
+reset role;
+update public.profiles set puntos=0 where id='30000000-0000-0000-0000-000000000001';
+set local role service_role;
+select public.crear_evidencia_reparacion(-92019,'30000000-0000-0000-0000-000000000004',
+  'Evidencia que la administración rechaza',pg_temp.huella(32));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92019),'https://ejemplo.invalid/reparacion-92019.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92019),
+  '30000000-0000-0000-0000-000000000003','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92019),
+  '30000000-0000-0000-0000-000000000012','impugnacion','La vereda sigue rota');
+select pg_temp.rechazar($q$select public.registrar_verificacion_reparacion(
+  pg_temp.evidencia(-92019),'30000000-0000-0000-0000-000000000004','impugnacion','Impugno mi propia foto')$q$,
+  'PRE02','No podés validar tu propia evidencia');
+select pg_temp.exigir((select count(*)=2 from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92019)), 'P7: el autor no deja verificación propia');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92019),
+  '30000000-0000-0000-0000-000000000007','rechazar','La foto no muestra la reparación')
+  ->> 'impugnaciones_pendientes')::integer = 0, 'P2: rechazar deja cero impugnaciones pendientes');
+select pg_temp.exigir((select estado='aceptada' and resuelta_at is not null
+  and resuelta_por='30000000-0000-0000-0000-000000000007'
+  and motivo='La vereda sigue rota'
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92019) and tipo='impugnacion'),
+  'P2: la impugnación pendiente queda aceptada con el administrador y su fecha');
+select pg_temp.exigir((select estado='rechazada' from public.evidencias_reparacion where reporte_id=-92019),
+  'P2: la evidencia rechazada queda rechazada');
+select pg_temp.exigir((select estado_id=1 from public.reportes where id=-92019),
+  'P2: rechazar la evidencia deja el reporte pendiente');
+select pg_temp.exigir((select puntos=0 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'), 'P2: rechazar no acredita puntos');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92019),
+  '30000000-0000-0000-0000-000000000007','rechazar') ->> 'repetida') = 'true',
+  'P2: repetir el rechazo es idempotente');
+select pg_temp.exigir((select estado='aceptada' and resuelta_por='30000000-0000-0000-0000-000000000007'
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92019) and tipo='impugnacion'),
+  'P2: la repetición conserva la impugnación aceptada');
+
+-- ---------------------------------------------------------------------------
+-- S5/S12 (P4): repetir la misma verificación es idempotente y no premia de nuevo.
+-- ---------------------------------------------------------------------------
+reset role;
+update public.profiles set puntos=0 where id='30000000-0000-0000-0000-000000000001';
+set local role service_role;
+select public.crear_evidencia_reparacion(-92020,'30000000-0000-0000-0000-000000000014',
+  'Evidencia con verificaciones repetidas',pg_temp.huella(33));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92020),'https://ejemplo.invalid/reparacion-92020.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92020),
+  '30000000-0000-0000-0000-000000000003','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92020),
+  '30000000-0000-0000-0000-000000000004','confirmacion');
+select pg_temp.exigir((public.registrar_verificacion_reparacion(pg_temp.evidencia(-92020),
+  '30000000-0000-0000-0000-000000000005','confirmacion') ->> 'cerrado') = 'true',
+  'P4: la tercera confirmación cierra la reparación');
+select pg_temp.exigir((public.registrar_verificacion_reparacion(pg_temp.evidencia(-92020),
+  '30000000-0000-0000-0000-000000000005','confirmacion') ->> 'repetida') = 'true',
+  'P4: la misma verificación repetida es idempotente');
+select pg_temp.exigir((select puntos=5 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'), 'P4: la repetición no acredita puntos extra');
+select pg_temp.exigir((select count(*)=1 from public.historial_estados where reporte_id=-92020),
+  'P4: la repetición no duplica el historial');
+select pg_temp.exigir((select count(*)=3 from public.audit_events where report_id=-92020
+  and action='evidence_confirmed'), 'P4: la repetición no duplica la auditoría');
+
+-- ---------------------------------------------------------------------------
+-- S5 (P6): la impugnación pendiente bloquea el cierre; descartarla cierra una sola
+-- vez y una confirmación posterior al cierre ya no se acepta.
+-- ---------------------------------------------------------------------------
+reset role;
+update public.profiles set puntos=0 where id='30000000-0000-0000-0000-000000000001';
+set local role service_role;
+select public.crear_evidencia_reparacion(-92021,'30000000-0000-0000-0000-000000000015',
+  'Evidencia con impugnación pendiente',pg_temp.huella(34));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92021),'https://ejemplo.invalid/reparacion-92021.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92021),
+  '30000000-0000-0000-0000-000000000003','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92021),
+  '30000000-0000-0000-0000-000000000004','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92021),
+  '30000000-0000-0000-0000-000000000012','impugnacion','La zanja sigue abierta');
+select pg_temp.exigir((public.registrar_verificacion_reparacion(pg_temp.evidencia(-92021),
+  '30000000-0000-0000-0000-000000000006','confirmacion') ->> 'cerrado') = 'false',
+  'P6: con una impugnación pendiente la tercera confirmación no cierra');
+select pg_temp.exigir((select estado_id=1 from public.reportes where id=-92021)
+  and (select puntos=0 from public.profiles where id='30000000-0000-0000-0000-000000000001'),
+  'P6: sin cierre no hay estado Reparado ni puntos');
+select pg_temp.exigir((public.resolver_impugnacion_reparacion(
+  pg_temp.impugnacion(pg_temp.evidencia(-92021),'30000000-0000-0000-0000-000000000012'),
+  '30000000-0000-0000-0000-000000000007','descartada','La impugnación no se sostiene')
+  ->> 'cerrado') = 'true', 'P6: descartar la impugnación cierra la reparación');
+select pg_temp.exigir((public.resolver_impugnacion_reparacion(
+  pg_temp.impugnacion(pg_temp.evidencia(-92021),'30000000-0000-0000-0000-000000000012'),
+  '30000000-0000-0000-0000-000000000007','descartada') ->> 'repetida') = 'true',
+  'P6: repetir el descarte es idempotente');
+select pg_temp.exigir((select puntos=5 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'), 'P6: el cierre acredita cinco puntos una sola vez');
+select pg_temp.exigir((select count(*)=1 from public.historial_estados where reporte_id=-92021),
+  'P6: el cierre repetido no duplica el historial');
+select pg_temp.rechazar($q$select public.registrar_verificacion_reparacion(
+  pg_temp.evidencia(-92021),'30000000-0000-0000-0000-000000000001','confirmacion')$q$,
+  'PRE05','La evidencia no está en verificación');
+select pg_temp.exigir((select count(*)=3 from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92021) and tipo='confirmacion'),
+  'P6: la cuarta confirmación posterior al cierre no se registra');
+
+-- ---------------------------------------------------------------------------
+-- Regresión (P9): las filas históricas de moderación quedan en destino «reporte».
+-- ---------------------------------------------------------------------------
+reset role;
+insert into public.moderacion_imagenes(id,reporte_id,propietario_id,hash_sha256,path_privado)
+values ('40000000-0000-0000-0000-000000000019',-92026,
+  '30000000-0000-0000-0000-000000000001',pg_temp.huella(35),
+  '30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000019');
+select pg_temp.exigir((select destino='reporte' and evidencia_id is null
+  from public.moderacion_imagenes where id='40000000-0000-0000-0000-000000000019'),
+  'P9: una fila de moderación sin destino explícito queda en reporte');
+select pg_temp.exigir((select count(*)=2 and bool_and(destino='reporte' and evidencia_id is null)
+  from public.moderacion_imagenes
+  where id in ('40000000-0000-0000-0000-000000000006','40000000-0000-0000-0000-000000000009')),
+  'P9: las filas históricas de moderación conservan destino reporte sin evidencia');
+
+-- ---------------------------------------------------------------------------
+-- S9: el flujo completo, incluida la reversión, no toca las fotos del reporte.
+-- ---------------------------------------------------------------------------
+insert into public.fotos_reporte(id,reporte_id,url,bucket,path)
+values (50000001,-92022,'https://ejemplo.invalid/reporte-92022-original.webp','reportes',
+  '30000000-0000-0000-0000-000000000001/foto-original-92022');
+select pg_temp.exigir(set_config('prueba.fotos_antes', pg_temp.fotos(-92022)::text, false) is not null,
+  'S9: se toma la instantánea de las fotos originales');
+set local role service_role;
+select public.crear_evidencia_reparacion(-92022,'30000000-0000-0000-0000-000000000003',
+  'Reparación con foto original publicada',pg_temp.huella(36));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92022),'https://ejemplo.invalid/reparacion-92022.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92022),
+  '30000000-0000-0000-0000-000000000004','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92022),
+  '30000000-0000-0000-0000-000000000005','confirmacion');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92022),
+  '30000000-0000-0000-0000-000000000006','confirmacion');
+select pg_temp.exigir((select estado_id=2 from public.reportes where id=-92022),
+  'S9: el flujo comunitario cierra el reporte con una foto original previa');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92022),
+  '30000000-0000-0000-0000-000000000007','revertir','La reparación no estaba terminada')
+  ->> 'revertido') = 'true', 'S9: la reversión administrativa devuelve el reporte a Pendiente');
+select pg_temp.exigir(pg_temp.fotos(-92022)::text = current_setting('prueba.fotos_antes'),
+  'S9: las fotografías originales del reporte no cambian en ningún paso del flujo');
+select pg_temp.exigir((select estado_id=1 and deleted_at is null from public.reportes where id=-92022),
+  'S9: tras revertir el reporte queda Pendiente y visible');
+
+-- ---------------------------------------------------------------------------
+-- S8/S9 (A4): el cierre directo del reporte resuelve la evidencia activa y sus
+-- impugnaciones sin escribir puntos ni historial (los escribe la aplicación).
+-- ---------------------------------------------------------------------------
+reset role;
+update public.profiles set puntos=0 where id='30000000-0000-0000-0000-000000000001';
+set local role service_role;
+select public.crear_evidencia_reparacion(-92023,'30000000-0000-0000-0000-000000000014',
+  'Evidencia que resuelve el cierre directo',pg_temp.huella(37));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92023),'https://ejemplo.invalid/reparacion-92023.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92023),
+  '30000000-0000-0000-0000-000000000012','impugnacion','El bache sigue en la esquina');
+reset role;
+update public.reportes set estado_id=2 where id=-92023;
+set local role service_role;
+select pg_temp.exigir((select estado='validada' and resuelta_at is not null
+  from public.evidencias_reparacion where reporte_id=-92023),
+  'A4: con foto publicada el cierre directo a Reparado valida la evidencia');
+select pg_temp.exigir((select estado='descartada' and resuelta_at is not null
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92023) and tipo='impugnacion'),
+  'A4: validar la evidencia descarta las impugnaciones pendientes');
+select pg_temp.exigir((select puntos=0 from public.profiles
+  where id='30000000-0000-0000-0000-000000000001'),
+  'A4: el trigger no acredita puntos (los escribe la aplicación)');
+select pg_temp.exigir(not exists (select 1 from public.historial_estados where reporte_id=-92023),
+  'A4: el trigger no escribe historial (lo escribe la aplicación)');
+-- Un cierre repetido no reabre ni vuelve a resolver la evidencia ya resuelta.
+reset role;
+update public.reportes set estado_id=1 where id=-92023;
+update public.reportes set estado_id=2 where id=-92023;
+set local role service_role;
+select pg_temp.exigir((select estado='validada' from public.evidencias_reparacion where reporte_id=-92023),
+  'A4: un cierre repetido no reabre la evidencia ya resuelta');
+select pg_temp.exigir((select estado='descartada' from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92023) and tipo='impugnacion'),
+  'A4: un cierre repetido no reabre las impugnaciones resueltas');
+-- Cierre directo a Rechazado: rechaza la evidencia y acepta sus impugnaciones.
+select public.crear_evidencia_reparacion(-92024,'30000000-0000-0000-0000-000000000015',
+  'Evidencia de un reporte que se rechaza',pg_temp.huella(38));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92024),'https://ejemplo.invalid/reparacion-92024.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92024),
+  '30000000-0000-0000-0000-000000000012','impugnacion','La foto es de otro lugar');
+reset role;
+update public.reportes set estado_id=3 where id=-92024;
+set local role service_role;
+select pg_temp.exigir((select estado='rechazada' and resuelta_at is not null
+  and motivo_resolucion='Reporte cerrado por administración'
+  from public.evidencias_reparacion where reporte_id=-92024),
+  'A4: el cierre directo a Rechazado rechaza la evidencia con su motivo');
+select pg_temp.exigir((select estado='aceptada' and resuelta_at is not null
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92024) and tipo='impugnacion'),
+  'A4: rechazar la evidencia acepta sus impugnaciones pendientes');
+select pg_temp.exigir((select estado_id=3 from public.reportes where id=-92024),
+  'A4: el cierre directo conserva el estado Rechazado');
+-- Sin foto publicada el cierre directo a Reparado no valida la evidencia.
+select public.crear_evidencia_reparacion(-92025,'30000000-0000-0000-0000-000000000002',
+  'Evidencia todavía en moderación para un cierre directo',pg_temp.huella(39));
+reset role;
+update public.reportes set estado_id=2 where id=-92025;
+set local role service_role;
+select pg_temp.exigir((select estado='rechazada' and publicada_at is null
+  and motivo_resolucion='Reporte cerrado por administración'
+  from public.evidencias_reparacion where reporte_id=-92025),
+  'A4: sin foto publicada el cierre directo no valida la evidencia');
+-- Sin evidencia activa el cierre directo no crea ni resuelve nada.
+reset role;
+update public.reportes set estado_id=3 where id=-92026;
+set local role service_role;
+select pg_temp.exigir(not exists (select 1 from public.evidencias_reparacion where reporte_id=-92026),
+  'A4: el cierre directo sin evidencia no crea ni resuelve nada');
+select pg_temp.exigir((select estado_id=3 from public.reportes where id=-92026),
+  'A4: el cierre directo sin evidencia conserva el estado del reporte');
 
 -- ---------------------------------------------------------------------------
 -- S12: auditoría con actor, reporte, título y hora para cada acción.

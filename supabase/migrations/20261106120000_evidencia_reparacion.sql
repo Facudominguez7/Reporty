@@ -31,9 +31,10 @@ create table public.evidencias_reparacion (
   motivo_resolucion text,
   check (char_length(btrim(comentario)) between 1 and 500),
   -- «informada» espera moderación: todavía no hay foto pública. La verificación
-  -- exige foto publicada; una aprobación administrativa puede resolverla antes.
+  -- y la validación exigen foto publicada: la aprobación administrativa también.
   check (estado <> 'informada' or publicada_at is null),
   check (estado <> 'en_verificacion' or publicada_at is not null),
+  check (estado <> 'validada' or publicada_at is not null),
   -- La foto pública se completa entera o queda ausente.
   check ((url is null) = (bucket is null) and (url is null) = (path is null)),
   check ((thumbnail_url is null) = (thumbnail_path is null)),
@@ -72,7 +73,10 @@ create table public.verificaciones_reparacion (
   check (tipo = 'impugnacion' or (motivo is null and estado = 'pendiente')),
   check (tipo <> 'impugnacion' or char_length(btrim(coalesce(motivo,''))) between 1 and 500),
   check ((estado = 'pendiente') = (resuelta_at is null)),
-  check (estado = 'pendiente' or resuelta_por is not null)
+  -- El cierre directo del reporte resuelve impugnaciones sin actor identificable
+  -- en la base (lo escribe la aplicación), así que la fecha es obligatoria y el
+  -- administrador queda registrado cuando la resolución viene de una RPC.
+  check (estado = 'pendiente' or resuelta_at is not null)
 );
 comment on table public.verificaciones_reparacion is
 'Confirmaciones e impugnaciones por evidencia; una fila por usuario y evidencia. Solo service_role escribe.';
@@ -80,6 +84,8 @@ comment on column public.verificaciones_reparacion.motivo is
 'Motivo obligatorio de la impugnación; nunca se reescribe al resolver.';
 comment on column public.verificaciones_reparacion.motivo_resolucion is
 'Motivo del administrador al aceptar o descartar la impugnación.';
+comment on column public.verificaciones_reparacion.resuelta_por is
+'Administrador que resolvió la impugnación; nulo = resolución automática por cierre del reporte.';
 create index verificaciones_reparacion_conteo
   on public.verificaciones_reparacion (evidencia_id, tipo, estado);
 
@@ -409,6 +415,10 @@ begin
     where reporte_id = p_reporte_id and hash_sha256 = p_hash_sha256) then
     raise exception using errcode = 'PRE03', message = 'Esa fotografía ya fue registrada en este reporte';
   end if;
+  -- Serializa el cupo diario: el perfil del autor se bloquea después del reporte,
+  -- en el mismo orden global que registrar_voto_exclusivo (reporte → perfiles),
+  -- antes de contar las evidencias de las últimas 24 horas (S7).
+  perform 1 from public.profiles where id = p_autor_id for no key update;
   select count(*) into v_recientes from public.evidencias_reparacion
     where autor_id = p_autor_id and created_at > clock_timestamp() - interval '24 hours';
   if v_recientes >= 3 then
@@ -650,7 +660,12 @@ begin
   if p_accion = 'aprobar' then
     if v_evidencia.estado = 'validada' then
       v_repetida := true;
-    elsif v_evidencia.estado not in ('informada','en_verificacion') then
+    elsif v_evidencia.estado = 'informada' then
+      -- Aprobar exige la foto ya publicada: la reparación se valida sobre la
+      -- evidencia que la comunidad puede ver (S8, S11).
+      raise exception using errcode = 'PRE12',
+        message = 'La evidencia todavía no tiene foto publicada: no se puede aprobar la reparación';
+    elsif v_evidencia.estado <> 'en_verificacion' then
       raise exception using errcode = 'PRE09',
         message = 'La evidencia rechazada o revertida no se puede aprobar';
     else
@@ -658,6 +673,12 @@ begin
         resuelta_at = clock_timestamp(), resuelta_por = p_administrador_id,
         motivo_resolucion = coalesce(v_motivo, 'Aprobada por administración')
         where id = p_evidencia_id;
+      -- La evidencia aprobada no deja impugnaciones abiertas: quedan descartadas
+      -- con el administrador y la fecha de resolución (S8).
+      update public.verificaciones_reparacion set estado = 'descartada',
+        resuelta_at = clock_timestamp(), resuelta_por = p_administrador_id,
+        motivo_resolucion = coalesce(v_motivo, 'Evidencia aprobada por administración')
+        where evidencia_id = p_evidencia_id and tipo = 'impugnacion' and estado = 'pendiente';
       v_cerrado := private.cerrar_reporte_por_reparacion(v_reporte, p_administrador_id,
         coalesce(v_motivo, 'Reparación aprobada por administración'));
       perform private.registrar_auditoria_evidencia('evidence_approved', p_administrador_id, v_reporte);
@@ -673,6 +694,12 @@ begin
         resuelta_at = clock_timestamp(), resuelta_por = p_administrador_id,
         motivo_resolucion = coalesce(v_motivo, 'Rechazada por administración')
         where id = p_evidencia_id;
+      -- La evidencia rechazada deja sus impugnaciones pendientes como aceptadas
+      -- con el administrador y la fecha de resolución (S8).
+      update public.verificaciones_reparacion set estado = 'aceptada',
+        resuelta_at = clock_timestamp(), resuelta_por = p_administrador_id,
+        motivo_resolucion = coalesce(v_motivo, 'Evidencia rechazada por administración')
+        where evidencia_id = p_evidencia_id and tipo = 'impugnacion' and estado = 'pendiente';
       perform private.registrar_auditoria_evidencia('evidence_rejected', p_administrador_id, v_reporte);
     end if;
   else
@@ -713,7 +740,55 @@ begin
 end;
 $$;
 comment on function public.resolver_evidencia_reparacion_admin(uuid, uuid, text, text) is
-'Aprueba, rechaza o revierte una evidencia; revertir devuelve el reporte a Pendiente y descuenta los cinco puntos.';
+'Aprueba, rechaza o revierte una evidencia; aprobar exige foto publicada, resuelve las impugnaciones pendientes y revertir devuelve el reporte a Pendiente y descuenta los cinco puntos.';
+
+-- ============================================================================
+-- Cierre directo del reporte (Admin/Operador)
+-- ============================================================================
+
+-- Cuando el reporte deja Pendiente por cualquier camino, la evidencia activa se
+-- resuelve con el nuevo estado: Reparado con foto publicada la valida; cualquier
+-- otro cierre la rechaza. No escribe puntos ni historial: el cierre directo los
+-- registra en la aplicación como hoy, y los cierres comunitario y administrativo
+-- resuelven la evidencia antes de tocar el reporte, así que aquí no encuentran
+-- evidencia activa (sin doble premio ni cierres recursivos).
+-- Auditoría: no se agrega una acción nueva porque el trigger no puede identificar
+-- al actor del cierre (lo hace la aplicación) y el catálogo de audit_events exige
+-- actor para toda acción de evidencia; el cierre queda atribuido en historial_estados,
+-- que la aplicación escribe con el usuario que lo ejecutó.
+create function private.resolver_evidencia_al_cerrar_reporte()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare v_evidencia uuid; v_publicada boolean;
+begin
+  if new.estado_id is not distinct from old.estado_id then return null; end if;
+  if new.estado_id is null or new.estado_id not in (2,3) then return null; end if;
+  -- Mismo orden de bloqueo que las RPC: el reporte ya está bloqueado por el
+  -- update que dispara este trigger; después la evidencia.
+  select e.id, (e.publicada_at is not null and e.url is not null)
+    into v_evidencia, v_publicada
+    from public.evidencias_reparacion e
+    where e.reporte_id = new.id and e.estado in ('informada','en_verificacion')
+    for update;
+  if not found then return null; end if;
+  update public.evidencias_reparacion set
+    estado = case when v_publicada and new.estado_id = 2 then 'validada' else 'rechazada' end,
+    resuelta_at = clock_timestamp(),
+    motivo_resolucion = 'Reporte cerrado por administración'
+  where id = v_evidencia;
+  update public.verificaciones_reparacion set
+    estado = case when v_publicada and new.estado_id = 2 then 'descartada' else 'aceptada' end,
+    resuelta_at = clock_timestamp()
+  where evidencia_id = v_evidencia and tipo = 'impugnacion' and estado = 'pendiente';
+  return null;
+end;
+$$;
+comment on function private.resolver_evidencia_al_cerrar_reporte() is
+'Resuelve la evidencia activa y sus impugnaciones cuando el reporte deja Pendiente por un cierre directo.';
+revoke all on function private.resolver_evidencia_al_cerrar_reporte() from public, anon, authenticated;
+
+create trigger resolver_evidencia_al_cerrar_reporte
+  after update of estado_id on public.reportes
+  for each row execute function private.resolver_evidencia_al_cerrar_reporte();
 
 -- ============================================================================
 -- El voto comunitario «reparado» queda reemplazado por el flujo de evidencia
