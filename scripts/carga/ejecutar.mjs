@@ -6,8 +6,9 @@
  *   USUARIOS=50 DURACION=2m npm run test:load  otra intensidad
  *
  * Compila la app y la sirve en el puerto 3100 contra el Supabase local, con la misma
- * configuración que las pruebas E2E (sin correos reales ni Google Analytics). Si ya hay un
- * servidor en ese puerto, lo reutiliza. Después corre k6 con Docker (`grafana/k6`), así que no
+ * configuración que las pruebas E2E (sin correos reales ni Google Analytics). Si el puerto ya
+ * está ocupado, corta: no reutiliza servidores ajenos, que podrían apuntar a producción o a una
+ * build vieja. Después corre k6 con Docker (`grafana/k6`), así que no
  * agrega dependencias npm, y deja el resumen en `test-results/carga/resumen.json`.
  * Nunca apunta a producción.
  */
@@ -161,12 +162,16 @@ function correrK6() {
 
 const supabase = supabaseLocal()
 await exigirApiSupabase(supabase.API_URL)
-const servidor = (await appResponde()) ? null : await levantarApp(supabase)
+if (await appResponde()) {
+  console.error(`El puerto ${PUERTO} ya está ocupado. Cerrá ese servidor: la prueba levanta su propia build contra el Supabase local.`)
+  process.exit(1)
+}
+const servidor = await levantarApp(supabase)
 let codigo = 1
 try {
   codigo = correrK6()
 } finally {
-  if (servidor) detenerApp(servidor)
+  detenerApp(servidor)
 }
 console.log(`Resumen guardado en ${path.relative(RAIZ, path.join(DIR_RESULTADOS, "resumen.json"))}.`)
 process.exit(codigo)
