@@ -1,26 +1,16 @@
 /** Contratos de acciones: errores seguros y revalidación solo tras éxito. */
 import { beforeEach, expect, it, vi } from "vitest"
-const dobles = vi.hoisted(() => ({ ejecutar: vi.fn(), editar: vi.fn(), subirFoto: vi.fn(), auth: vi.fn(), procesar: vi.fn(), conciliar: vi.fn(), revalidar: vi.fn() }))
-vi.mock("@/lib/moderation/administracion.server", () => ({ ejecutarRevision: dobles.ejecutar, editarMascotaAdministrativamente: dobles.editar, subirFotoReemplazoMascotaAdministrativamente: dobles.subirFoto, autorizarAdministracion: dobles.auth, conciliarAvisoMascotaAdministrativamente: dobles.conciliar }))
+const dobles = vi.hoisted(() => ({ ejecutar: vi.fn(), editar: vi.fn(), auth: vi.fn(), procesar: vi.fn(), conciliar: vi.fn(), revalidar: vi.fn() }))
+vi.mock("@/lib/moderation/administracion.server", () => ({ ejecutarRevision: dobles.ejecutar, editarMascotaAdministrativamente: dobles.editar, autorizarAdministracion: dobles.auth, conciliarAvisoMascotaAdministrativamente: dobles.conciliar }))
 vi.mock("@/lib/moderation/avisos-mascotas.server", () => ({ procesarAvisosMascota: dobles.procesar }))
 vi.mock("next/cache", () => ({ revalidatePath: dobles.revalidar }))
-import { conciliarAvisoMascotaAction, editarMascotaAction, reemplazarFotoMascotaAction, reintentarAvisosMascotaAction, revisarImagenAction } from "./actions"
+import { conciliarAvisoMascotaAction, editarMascotaAction, reintentarAvisosMascotaAction, revisarImagenAction } from "./actions"
 beforeEach(() => { vi.clearAllMocks(); dobles.auth.mockResolvedValue({ servicio: {} }) })
 it("éxito revalida administración y lectores sin estado municipal", async () => {
   dobles.ejecutar.mockResolvedValue({ exito: true, mensaje: "Listo", reporteId: 7 })
   await revisarImagenAction("id", "aprobar")
   expect(dobles.ejecutar).toHaveBeenCalledWith("id", "aprobar")
   expect(dobles.revalidar.mock.calls.map(([ruta]) => ruta)).toEqual(["/dashboard/moderacion", "/reportes/7", "/mapa", "/reportes", "/mis-reportes", "/dashboard", "/", "/sitemap.xml"])
-})
-it("replacement photo action forwards upload and refreshes only after private submission succeeds", async () => {
-  const form = new FormData()
-  form.set("mascotaId", "12")
-  const foto = new File(["synthetic"], "pet.webp", { type: "image/webp" })
-  form.set("foto", foto)
-  dobles.subirFoto.mockResolvedValue({ exito: true, mascotaId: 12, imagenId: "new-evidence", mensaje: "En revisión" })
-  expect(await reemplazarFotoMascotaAction(form)).toMatchObject({ exito: true, imagenId: "new-evidence" })
-  expect(dobles.subirFoto).toHaveBeenCalledWith(12, foto)
-  expect(dobles.revalidar).toHaveBeenCalledOnce()
 })
 it("edición exitosa revalida las rutas de mascota", async () => {
   dobles.editar.mockResolvedValue({ exito: true, mascotaId: 12, mensaje: "Listo" })

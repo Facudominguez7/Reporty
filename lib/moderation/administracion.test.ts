@@ -9,7 +9,7 @@ vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: dobles.servicio })
 vi.mock("@/lib/media/preparar-imagen-reporte.server", () => ({ prepararImagenReporte: dobles.preparar }))
 vi.mock("@/lib/authz/roles", async (original) => ({ ...await original<object>(), getUserRoleContext: dobles.rol }))
 vi.mock("./imagenes-reporte.server", () => ({ publicarImagenModerada: dobles.publicar, limpiarImagenModerada: dobles.limpiar }))
-import { autorizarAdministracion, listarImagenesAdministrativas, obtenerImagenPrivada, ejecutarRevision, editarMascotaAdministrativamente, subirFotoReemplazoMascotaAdministrativamente } from "./administracion.server"
+import { autorizarAdministracion, listarImagenesAdministrativas, obtenerImagenPrivada, ejecutarRevision, editarMascotaAdministrativamente } from "./administracion.server"
 const id = "e1a3f644-9c40-4a40-9000-000000000001"
 const bytes = Buffer.from("RIFF0000WEBPimagen")
 let fila: Record<string, unknown>
@@ -36,154 +36,10 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-function mockReplacementMetadataFailure(concurrentFinalizer: boolean, finalizerResponseLost = false, currentReadFailed = false, reconcileFails = false, petBeforeReadFailed = false) {
-  const evidence = {
-    id, propietario_id: "owner", path_privado: "owner/private", path_publico: null,
-    hash_sha256: createHash("sha256").update(bytes).digest("hex"), decision: "REVIEW", estado: "pendiente",
-    estado_publicacion: "pendiente", publish_token: null, reemplaza_mascota_id: 9, mascota_id: null, motivos: [] as string[],
-  }
-  let petReads = 0
-  const remove = vi.fn(async () => ({ error: null }))
-  const upload = vi.fn(async () => ({ error: null }))
-  let publicDownloads = 0
-  const from = vi.fn((table: string) => {
-    let selected = ""
-    let idFilter: unknown
-    let updatePayload: Record<string, unknown> | null = null
-    const query: Record<string, any> = {}
-    for (const method of ["select", "eq", "is", "update", "limit", "single", "maybeSingle", "contains"]) query[method] = vi.fn((...args: unknown[]) => {
-      if (method === "select") selected = String(args[0])
-      if (method === "eq" && args[0] === "id") idFilter = args[1]
-      if (method === "update") updatePayload = args[0] as Record<string, unknown>
-      if (method === "contains" && updatePayload) {
-        Object.assign(evidence, updatePayload)
-        return Promise.resolve({ error: null })
-      }
-      if (method === "single") {
-        if (table === "mascotas_fotos_moderacion" && idFilter === "old-evidence") return Promise.resolve({ data: null, error: { message: "metadata unavailable" } })
-        return Promise.resolve({ data: evidence, error: null })
-      }
-      if (method === "maybeSingle") {
-        if (table === "mascotas_fotos_moderacion" && updatePayload) {
-          Object.assign(evidence, updatePayload)
-          return Promise.resolve({ data: { id }, error: null })
-        }
-        if (table === "mascotas_fotos_moderacion") return Promise.resolve({ data: evidence, error: null })
-        if (table === "mascotas_perdidas") {
-          petReads += 1
-          if (selected === "id") return Promise.resolve({ data: { id: 9 }, error: null })
-          if (selected === "foto_moderacion_id") return Promise.resolve(petBeforeReadFailed
-            ? { data: null, error: { message: "pre-finalization lookup unavailable" } }
-            : { data: { foto_moderacion_id: "old-evidence" }, error: null })
-          if (currentReadFailed && selected === "foto_moderacion_id,foto_path") return Promise.resolve({ data: null, error: { message: "pet lookup unavailable" } })
-          return Promise.resolve({ data: concurrentFinalizer ? { foto_moderacion_id: id, foto_path: `mascotas/${id}.webp` } : { foto_moderacion_id: "old-evidence", foto_path: "mascotas/old-evidence.webp" }, error: null })
-        }
-      }
-      if (method === "limit") return Promise.resolve({ data: concurrentFinalizer ? [{ id: 9 }] : [], error: null })
-      return query
-    })
-    return query
-  })
-  const service = {
-    from,
-    storage: { from: vi.fn((bucket: string) => ({
-      download: vi.fn(async () => {
-        if (bucket === "reportes-pendientes") return { data: new Blob([bytes]), error: null }
-        publicDownloads += 1
-        return publicDownloads === 1 ? { data: null, error: { statusCode: "404" } } : { data: null, error: { statusCode: "404" } }
-      }), upload, remove, getPublicUrl: vi.fn(() => ({ data: { publicUrl: "https://example.invalid/photo" } })),
-    })) },
-  }
-  dobles.servicio.mockReturnValue(service)
-  rpc.mockImplementation(async (name: string) => name === "reclamar_reemplazo_foto_mascota"
-    ? { data: "claim-token", error: null }
-    : name === "finalizar_reemplazo_foto_mascota"
-      ? finalizerResponseLost ? { data: null, error: { message: "response lost" } }
-        : { data: concurrentFinalizer ? "" : "mascotas/old-evidence.webp", error: null }
-      : name === "conciliar_reemplazo_foto_mascota"
-        ? reconcileFails ? { data: null, error: { message: "marker persistence failed" } }
-          : { data: concurrentFinalizer ? "actual" : "limpieza", error: null }
-        : { data: null, error: null })
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })))
-  return { evidence, from, upload, remove }
-}
-
 describe("frontera administrativa", () => {
-  it("finalizes instead of deleting the uploaded photo when old-photo metadata lookup fails", async () => {
-    const flow = mockReplacementMetadataFailure(false)
-    const result = await ejecutarRevision(id, "aprobar")
-    expect(result).toMatchObject({ exito: true, mensaje: expect.stringContaining("foto anterior quedó pendiente") })
-    expect(rpc).toHaveBeenCalledWith("finalizar_reemplazo_foto_mascota", { p_evidencia_id: id, p_token: "claim-token" })
-    expect(flow.remove).not.toHaveBeenCalled()
-  })
-  it("does not delete a photo when a concurrent finalizer committed but its response was lost", async () => {
-    const flow = mockReplacementMetadataFailure(true, true)
-    const result = await ejecutarRevision(id, "aprobar")
-    expect(result).toMatchObject({ exito: true, mensaje: expect.stringContaining("ya está activo") })
-    expect(flow.remove).not.toHaveBeenCalled()
-    expect(rpc).toHaveBeenCalledWith("finalizar_reemplazo_foto_mascota", { p_evidencia_id: id, p_token: "claim-token" })
-  })
-  it("reconciles before cleanup when the pre-finalization listing lookup fails", async () => {
-    const flow = mockReplacementMetadataFailure(false, false, false, false, true)
-    const result = await ejecutarRevision(id, "aprobar")
-    expect(result).toMatchObject({ exito: false, mensaje: expect.stringContaining("limpieza quedó registrada") })
-    expect(rpc).toHaveBeenCalledWith("conciliar_reemplazo_foto_mascota", { p_evidencia_id: id })
-    expect(flow.remove).not.toHaveBeenCalledWith([`mascotas/${id}.webp`])
-  })
-  it("persists reconciliation after finalizer and follow-up lookup are uncertain", async () => {
-    const flow = mockReplacementMetadataFailure(false, true, true)
-    const result = await ejecutarRevision(id, "aprobar")
-    expect(result).toMatchObject({ exito: false, mensaje: expect.stringContaining("limpieza quedó registrada") })
-    expect(rpc).toHaveBeenCalledWith("conciliar_reemplazo_foto_mascota", { p_evidencia_id: id })
-    expect(flow.remove).not.toHaveBeenCalled()
-  })
-  it("fails closed if durable reconciliation marker persistence fails", async () => {
-    const flow = mockReplacementMetadataFailure(false, true, true, true)
-    const result = await ejecutarRevision(id, "aprobar")
-    expect(result).toMatchObject({ exito: false, mensaje: expect.stringContaining("ni registrar su limpieza") })
-    expect(flow.remove).not.toHaveBeenCalled()
-  })
-  it("recognizes a concurrent finalizer through durable reconciliation without deleting the active photo", async () => {
-    const flow = mockReplacementMetadataFailure(true, true, true)
-    const result = await ejecutarRevision(id, "aprobar")
-    expect(result).toMatchObject({ exito: true, mensaje: expect.stringContaining("ya está activo") })
-    expect(rpc).toHaveBeenCalledWith("conciliar_reemplazo_foto_mascota", { p_evidencia_id: id })
-    expect(flow.remove).not.toHaveBeenCalled()
-  })
-  it("reconciliation retry keeps a now-current replacement and clears its pending marker", async () => {
-    const flow = mockReplacementMetadataFailure(true)
-    flow.evidence.estado_publicacion = "rechazada"
-    flow.evidence.motivos = ["limpieza_publica_pendiente"]
-    const result = await ejecutarRevision(id, "limpiar")
-    expect(result).toMatchObject({ exito: true })
-    expect(flow.remove).not.toHaveBeenCalledWith([`mascotas/${id}.webp`])
-  })
-  it("reconciliation retry deletes only a non-current replacement that is already non-publishable", async () => {
-    const flow = mockReplacementMetadataFailure(false)
-    flow.evidence.estado_publicacion = "rechazada"
-    flow.evidence.motivos = ["limpieza_publica_pendiente"]
-    const result = await ejecutarRevision(id, "limpiar")
-    expect(result).toMatchObject({ exito: true })
-    expect(flow.remove).toHaveBeenCalledWith([`mascotas/${id}.webp`])
-  })
-  it("stores an admin replacement privately under a DB-created moderation row", async () => {
-    fila.propietario_id = "owner-id"
-    rpc.mockImplementation(async (_name, params) => ({ data: params.p_evidencia_id, error: null }))
-    const file = new File(["image"], "pet.webp", { type: "image/webp" })
-    const result = await subirFotoReemplazoMascotaAdministrativamente(9, file)
-    expect(result).toMatchObject({ exito: true, mascotaId: 9, imagenId: expect.any(String) })
-    expect(dobles.preparar).toHaveBeenCalledWith(file)
-    expect(rpc).toHaveBeenCalledWith("crear_revision_reemplazo_foto_mascota", { p_mascota_id: 9, p_evidencia_id: result.imagenId, p_hash: createHash("sha256").update(bytes).digest("hex") })
-    const storage = dobles.servicio.mock.results[0].value.storage.from
-    expect(storage).toHaveBeenCalledWith("reportes-pendientes")
-    expect(storage.mock.results[0].value.upload).toHaveBeenCalledWith(`owner-id/${result.imagenId}`, bytes, expect.objectContaining({ upsert: false, contentType: "image/webp" }))
-  })
-  it("does not process or store an unapproved caller's replacement photo", async () => {
-    dobles.rol.mockResolvedValue({ data: { roleId: 2 }, error: null })
-    const file = new File(["image"], "pet.webp", { type: "image/webp" })
-    await expect(subirFotoReemplazoMascotaAdministrativamente(9, file)).rejects.toMatchObject({ estado: 403 })
-    expect(dobles.preparar).not.toHaveBeenCalled()
-    expect(dobles.servicio).not.toHaveBeenCalled()
+  it.each(["12a3", "+123", "12 3", "123-4"])("rejects invalid phone %s before DB access", async (telefono) => {
+    await expect(editarMascotaAdministrativamente({ id: 9, tipoAnimal: "perro", descripcion: "Edit", lat: 0, lon: 0, telefono, estado: "perdida" })).rejects.toMatchObject({ estado: 400 })
+    expect(rpc).not.toHaveBeenCalled()
   })
   it("admin edits allowed fields via authenticated RPC, not service-role writes", async () => {
     const input = { id: 9, tipoAnimal: "gato" as const, descripcion: "Revisada", lat: -34, lon: -56, telefono: "555123", estado: "perdida" as const }

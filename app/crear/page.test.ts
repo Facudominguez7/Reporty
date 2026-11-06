@@ -14,6 +14,8 @@ describe("CrearPage", () => {
     expect(markup).toContain("<h1")
     expect(markup).toContain('class="flex flex-1 items-stretch"')
     expect(markup).toContain("grid-rows-2")
+    expect(markup).toContain("max-w-4xl")
+    expect(markup).toContain("sm:max-w-none")
     expect(markup).toContain("sm:grid-rows-1 sm:grid-cols-2")
     expect(markup).toContain("Contá qué está pasando en tu zona")
     expect(markup).toContain("Ayudá a encontrar una mascota")

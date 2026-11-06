@@ -19,7 +19,7 @@ export function MascotaCompactCard({ pet }: { pet: MascotaLista }) {
         </div>
         <div className="flex min-w-0 flex-col items-end gap-1.5">
           <Badge variant="secondary" className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{pet.type}</Badge>
-          <Badge variant={pet.status === "Perdida" ? "destructive" : "default"} className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{pet.status}</Badge>
+          <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{pet.status}</Badge>
         </div>
         <ChevronRight className="size-5 flex-none text-muted-foreground/70" aria-hidden="true" />
       </div></CardContent>

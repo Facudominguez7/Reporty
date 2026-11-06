@@ -6,7 +6,7 @@ const mascotaSubmissionSchema = z.object({
   descripcion: z.string().trim().min(1).max(5000),
   lat: z.number().finite().min(-90).max(90),
   lon: z.number().finite().min(-180).max(180),
-  telefono: z.string().trim().min(1).max(40),
+  telefono: z.string().min(1).max(40).regex(/^[0-9]+$/),
 }).strict()
 
 export type MascotaSubmission = z.infer<typeof mascotaSubmissionSchema>

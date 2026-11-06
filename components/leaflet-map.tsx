@@ -346,6 +346,11 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       if (status) status.textContent = outcome === "shared" ? "Enlace compartido." : outcome === "copied" ? "Enlace copiado." : outcome === "cancelled" ? "Compartir cancelado." : "No pudimos compartir ni copiar el enlace."
     }
     container.addEventListener("click", handlePetShare)
+    const handlePetImageError = (event: Event) => {
+      const image = event.target
+      if (image instanceof HTMLImageElement && image.dataset.petMarkerImage !== undefined) image.style.display = "none"
+    }
+    container.addEventListener("error", handlePetImageError, true)
 
     const map = L.map(container, {
       scrollWheelZoom: true,
@@ -399,6 +404,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
 
     return () => {
       container.removeEventListener("click", handlePetShare)
+      container.removeEventListener("error", handlePetImageError, true)
       clusterGroupRef.current?.clearLayers()
       clusterGroupRef.current = null
       tileLayerRef.current = null
@@ -453,8 +459,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
 
     for (const pet of mascotas) {
-      const marker = L.marker(pet.coordinates, { icon: L.divIcon({ className: "pet-marker", html: `<span style="display:grid;place-items:center;width:38px;height:38px;border:3px solid white;border-radius:50%;background:${pet.status === "Perdida" ? "#dc2626" : "#16a34a"};color:white;font-weight:700;box-shadow:0 2px 8px #0005">${pet.status === "Perdida" ? "P" : "E"}</span>`, iconSize: [38, 38], iconAnchor: [19, 19] }) })
       const imageUrl = toSafeImageUrl(pet.image)
+      const label = `${pet.species} ${pet.status.toLowerCase()}`
+      const marker = L.marker(pet.coordinates, { title: label, alt: label, icon: L.divIcon({ className: "pet-marker", html: `<span aria-hidden="true" style="position:relative;display:grid;place-items:center;width:38px;height:38px;overflow:hidden;border:3px solid var(--map-marker-stroke);border-radius:50%;background:${pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)"};color:var(--map-marker-foreground);font-weight:700;box-shadow:var(--elevation-soft)">${pet.status === "Perdida" ? "P" : "E"}${imageUrl ? `<img data-pet-marker-image src="${escapeHtml(imageUrl)}" alt="" style="position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:cover;border-radius:50%">` : ""}</span>`, iconSize: [38, 38], iconAnchor: [19, 19] }) })
       const detailUrl = `/mascotas/${pet.id}`
       const popup = `<div style="min-width:230px;max-width:270px;color:var(--foreground)"><strong>${escapeHtml(pet.species)}</strong>${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(pet.species)}" style="display:block;width:100%;height:120px;object-fit:cover;margin:8px 0;border-radius:8px">` : ""}<p>${escapeHtml(pet.description)}</p><p><b>Estado:</b> ${escapeHtml(pet.status)}</p><p><b>Publicado:</b> ${escapeHtml(new Date(pet.createdAt).toLocaleDateString("es-AR"))}</p><p><b>Teléfono:</b> ${escapeHtml(pet.phone)}</p><a href="${detailUrl}">Ver ficha</a> <button type="button" data-share-pet="${pet.id}" style="margin-left:8px">Compartir</button><span data-share-status aria-live="polite" style="display:block"></span></div>`
       marker.bindPopup(popup, { maxWidth: 300 })
@@ -484,7 +491,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
 
     map.fitBounds(bounds.pad(INITIAL_MAP_VIEW_CONFIG.padding))
-  }, [getIcon, onSeleccionarReporte, reports])
+  }, [getIcon, onSeleccionarReporte, reports, mascotas])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }

@@ -16,6 +16,28 @@ beforeEach(() => {
 })
 
 describe("crearMascotaWorkflow", () => {
+  const input = {
+    propietarioId: "owner", tipoAnimal: "perro" as const, descripcion: "Collar azul", lat: -34, lon: -56,
+    telefono: "112233", image: new File(["photo"], "photo.webp", { type: "image/webp" }),
+  }
+
+  it("reports publication only when the approved photo has a pet ID", async () => {
+    expect(await crearMascotaWorkflow({} as never, input)).toMatchObject({
+      success: true, data: { mascotaId: 1, moderation: "APPROVED", pointsAwarded: 10 },
+    })
+    moderate.mockResolvedValueOnce({ mascotaId: null, decision: "APPROVED", pointsAwarded: 0, mensaje: "Publicación pendiente" })
+    expect(await crearMascotaWorkflow({} as never, input)).toMatchObject({
+      success: true, data: { mascotaId: null, moderation: "PENDING", message: "Publicación pendiente" },
+    })
+  })
+
+  it.each(["REVIEW", "REJECTED"] as const)("preserves the %s moderation message", async (decision) => {
+    moderate.mockResolvedValueOnce({ mascotaId: null, decision, pointsAwarded: 0, mensaje: "Moderación pendiente" })
+    expect(await crearMascotaWorkflow({} as never, input)).toMatchObject({
+      success: true, data: { mascotaId: null, moderation: decision, message: "Moderación pendiente" },
+    })
+  })
+
   it("rejects unsupported photo types before moderation", async () => {
     const result = await crearMascotaWorkflow({} as never, {
       propietarioId: "owner", tipoAnimal: "perro", descripcion: "Collar azul", lat: -34, lon: -56,

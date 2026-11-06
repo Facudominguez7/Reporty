@@ -6,10 +6,15 @@ const PHOTO_PATH = /^mascotas\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0
 
 type CleanupResult = { removed: boolean; pending: boolean; publiclyAccessible: boolean }
 
-function notFound(error: unknown) {
+async function notFound(error: unknown) {
   if (!error || typeof error !== "object") return false
-  const detail = error as { statusCode?: unknown; status?: unknown }
-  return detail.statusCode === "404" || detail.statusCode === 404 || detail.status === 404
+  const detail = error as { name?: unknown; originalError?: unknown }
+  const response = error instanceof Response ? error : detail.name === "StorageUnknownError" ? detail.originalError : null
+  if (!(response instanceof Response) || response.status !== 400) return false
+  try {
+    const body = await response.clone().json()
+    return (body?.statusCode === "404" || body?.statusCode === 404) && body?.code === "NoSuchKey" && body?.error === "not_found"
+  } catch { return false }
 }
 
 async function recordPending(supabase: SupabaseClient, evidenceId: string, reasons: string[]) {
@@ -48,8 +53,8 @@ export async function limpiarFotoMascotaRetirada(supabase: SupabaseClient, masco
     const current = await supabase.storage.from(PUBLIC_BUCKET).download(pet.foto_path)
     const publicUrl = supabase.storage.from(PUBLIC_BUCKET).getPublicUrl(pet.foto_path).data.publicUrl
     const response = await fetch(publicUrl, { method: "GET", cache: "no-store", signal: AbortSignal.timeout(5000) })
-    const publicUrlInaccessible = [401, 403, 404, 410].includes(response.status)
-    absent = !current.data && notFound(current.error) && publicUrlInaccessible
+    const publicUrlInaccessible = [401, 403, 404, 410].includes(response.status) || await notFound(response)
+    absent = !current.data && publicUrlInaccessible && await notFound(current.error)
   } catch { /* Unknown Storage outcomes must never be reported as private. */ }
   if (!absent) {
     await recordPending(supabase, evidence.id, evidence.motivos ?? [])

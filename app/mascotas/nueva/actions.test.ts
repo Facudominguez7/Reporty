@@ -45,6 +45,15 @@ describe("crearMascotaAction", () => {
     expect(result).toMatchObject({ success: true, data: { cleanupPending: true, publiclyAccessible: true } })
   })
 
+  it("reports an unchanged found publication without attempting photo cleanup", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: { id: "owner", is_anonymous: false } }, error: null })
+    sessionRpc.mockResolvedValueOnce({ data: false, error: null })
+    const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue({ data: { id: 7, retirada_at: null }, error: null }) }
+    createAdminClient.mockReturnValue({ from: vi.fn().mockReturnValue(query) })
+    expect(await retirarMascotaPropiaAction(7)).toMatchObject({ success: false, error: expect.stringContaining("encontrada") })
+    expect(cleanupPhoto).not.toHaveBeenCalled()
+  })
+
   it("requires a photo before obtaining a service client", async () => {
     const result = await crearMascotaAction(form())
     expect(result).toMatchObject({ success: false })

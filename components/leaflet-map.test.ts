@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => {
   const calls: string[] = []
+  const icons: Array<{ className: string; html: string }> = []
   const refs: Array<{ current: unknown }> = []
   const listeners = new Map<string, (event: unknown) => void>()
   const cleanups: Array<() => void> = []
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => {
   const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
   const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), getLayers: vi.fn(() => []) }
   const marker = { bindPopup: vi.fn(), on: vi.fn() }
-  return { calls, refs, listeners, cleanups, container, map, cluster, marker, refIndex: 0 }
+  return { calls, icons, refs, listeners, cleanups, container, map, cluster, marker, refIndex: 0 }
 })
 
 vi.mock("react", async (importOriginal) => {
@@ -32,7 +33,7 @@ vi.mock("leaflet", () => ({
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
     marker: () => mocks.marker,
-    divIcon: () => ({}),
+    divIcon: (icon: { className: string; html: string }) => { mocks.icons.push(icon); return {} },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
   },
 }))
@@ -54,6 +55,7 @@ function render(reports: typeof report[]) {
 describe("LeafletMap initial view", () => {
   beforeEach(() => {
     mocks.calls.length = 0
+    mocks.icons.length = 0
     mocks.refs.length = 0
     mocks.listeners.clear()
     mocks.cleanups.length = 0
@@ -83,6 +85,46 @@ describe("LeafletMap initial view", () => {
     expect(popup).toContain("Blanca &amp; &quot;curiosa&quot;")
     expect(popup).not.toContain("javascript:")
     expect(popup).not.toContain(`onclick="x`)
+  })
+
+  it("uses semantic theme colors for pet markers", () => {
+    render([])
+    mocks.refIndex = 0
+    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [
+      { id: 9, species: "Gato", description: "Blanca", status: "Perdida", createdAt: "2026-01-02", phone: "123", image: "", coordinates: [-27.36, -55.89] },
+      { id: 10, species: "Perro", description: "Negro", status: "Encontrada", createdAt: "2026-01-02", phone: "456", image: "", coordinates: [-27.36, -55.89] },
+    ] }))
+    const petMarkers = mocks.icons.filter(({ className }) => className === "pet-marker")
+    expect(petMarkers.map(({ html }) => html)).toEqual([
+      expect.stringContaining("background:var(--destructive)"),
+      expect.stringContaining("background:var(--primary)"),
+    ])
+    expect(petMarkers.every(({ html }) => !/#(?:[\da-f]{3}){1,2}\b/i.test(html))).toBe(true)
+  })
+
+  it("safely embeds pet thumbnails and reveals the status fallback on image failure", () => {
+    vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
+    class FakeImage { dataset = { petMarkerImage: "" }; style = { display: "" } }
+    vi.stubGlobal("HTMLImageElement", FakeImage)
+    render([])
+    mocks.refIndex = 0
+    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [
+      { id: 9, species: "Gato", description: "Blanca", status: "Perdida", createdAt: "2026-01-02", phone: "123", image: '/api/mascotas/9/foto?x="&y=1', coordinates: [-27.36, -55.89] },
+      { id: 10, species: "Perro", description: "Negro", status: "Encontrada", createdAt: "2026-01-02", phone: "123", image: "javascript:alert(1)", coordinates: [-27.36, -55.89] },
+    ] }))
+    const markers = mocks.icons.filter(({ className }) => className === "pet-marker")
+    expect(markers[0].html).toContain('src="https://reporty.test/api/mascotas/9/foto?x=%22&amp;y=1"')
+    expect(markers[0].html).toContain(">P<img")
+    expect(markers[0].html).toContain("var(--map-marker-stroke)")
+    expect(markers[0].html).not.toMatch(/onerror\s*=/i)
+    expect(markers[1].html).not.toContain("<img")
+    expect(markers[1].html).toContain(">E</span>")
+    const image = new FakeImage()
+    mocks.listeners.get("error")!({ target: image })
+    expect(image.style.display).toBe("none")
+    for (const cleanup of mocks.cleanups) cleanup()
+    expect(mocks.container.removeEventListener).toHaveBeenCalledWith("error", expect.any(Function), true)
+    vi.unstubAllGlobals()
   })
 
   it("shares the stable pet URL from the popup and reports clipboard fallback", async () => {

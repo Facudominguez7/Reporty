@@ -17,7 +17,6 @@ import type { User } from "@supabase/supabase-js";
 import { buttonVariants } from "@/components/ui/button";
 import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { ContactsDialog } from "@/components/contacts-dialog";
-import { BackButton } from "@/components/back-button";
 import { needsPasswordSetup } from "@/lib/authz/guest-account";
 
 interface HeaderClientProps {
@@ -56,7 +55,6 @@ export function HeaderClient({ user }: HeaderClientProps) {
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
   const showTopHeader = !isAdminRoute && pathname !== "/" && pathname !== "/mapa" && !pathname.startsWith("/auth");
-  const isReportDetail = /^\/reportes\/\d+$/.test(pathname);
 
   const isActive = (href: string) => {
     if (href === "/mapa") return pathname === "/" || pathname.startsWith("/mapa");
@@ -73,11 +71,6 @@ export function HeaderClient({ user }: HeaderClientProps) {
       {showTopHeader && <div className="h-[calc(3.75rem+env(safe-area-inset-top))] shrink-0 sm:h-[calc(4.75rem+env(safe-area-inset-top))]" aria-hidden="true" />}
       {showTopHeader && (
         <header className="app-header fixed inset-x-0 top-0 z-40 flex min-h-[3.75rem] items-center justify-center bg-transparent px-4 pt-[env(safe-area-inset-top)] sm:min-h-[4.75rem] sm:px-6">
-          {isReportDetail && (
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 sm:left-6">
-              <BackButton />
-            </div>
-          )}
           <Link href="/" className="inline-flex rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-secondary" aria-label="Reporty, ir al inicio">
             <Image
               src="/logos/logoSinBg.png"

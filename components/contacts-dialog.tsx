@@ -7,6 +7,8 @@ import { createClient } from "@/utils/supabase/client"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const GROUP_LABELS = {
@@ -82,16 +84,24 @@ export function ContactsDialog() {
           <DialogDescription className="text-[11px] sm:text-sm">Canales de atención por tipo de reporte y emergencias.</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
-          <label className="min-w-0 space-y-1 text-xs font-medium">Ciudad
-            <select aria-label="Ciudad" value={municipality} onChange={(event) => { setResult(null); setMunicipality(event.target.value) }} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-normal">
-              <option>Posadas</option><option>Candelaria</option><option>Garupá</option>
-            </select>
-          </label>
-          <label className="min-w-0 space-y-1 text-xs font-medium">Tipo de reporte
-            <select aria-label="Tipo de reporte" value={category} onChange={(event) => { setResult(null); setCategory(event.target.value as keyof typeof GROUP_LABELS) }} className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-normal">
-              {(Object.keys(GROUP_LABELS) as Array<keyof typeof GROUP_LABELS>).map((group) => <option key={group} value={group}>{GROUP_LABELS[group]}</option>)}
-            </select>
-          </label>
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="contact-city" className="text-xs">Ciudad</Label>
+            <Select value={municipality} onValueChange={(value) => { setResult(null); setMunicipality(value) }}>
+              <SelectTrigger id="contact-city" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+              <SelectContent className="w-full">
+                <SelectItem value="Posadas">Posadas</SelectItem><SelectItem value="Candelaria">Candelaria</SelectItem><SelectItem value="Garupá">Garupá</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="contact-category" className="text-xs">Tipo de reporte</Label>
+            <Select value={category} onValueChange={(value) => { setResult(null); setCategory(value as keyof typeof GROUP_LABELS) }}>
+              <SelectTrigger id="contact-category" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+              <SelectContent className="w-full">
+                {(Object.keys(GROUP_LABELS) as Array<keyof typeof GROUP_LABELS>).map((group) => <SelectItem key={group} value={group}>{GROUP_LABELS[group]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Tabs defaultValue="contactos" className="min-w-0">
           <TabsList className="grid w-full shrink-0 grid-cols-2 gap-0">

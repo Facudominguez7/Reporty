@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 const dobles = vi.hoisted(() => ({ listar: vi.fn(), redirigir: vi.fn((ruta: string) => { throw new Error(ruta) }) }))
 vi.mock("@/lib/moderation/administracion.server", () => ({ listarImagenesAdministrativas: dobles.listar }))
 vi.mock("next/navigation", () => ({ redirect: dobles.redirigir, useRouter: () => ({ refresh: vi.fn() }) }))
-vi.mock("./actions", () => ({ revisarImagenAction: vi.fn(), reintentarAvisosMascotaAction: vi.fn(), conciliarAvisoMascotaAction: vi.fn(), editarMascotaAction: vi.fn(), reemplazarFotoMascotaAction: vi.fn() }))
+vi.mock("./actions", () => ({ revisarImagenAction: vi.fn(), reintentarAvisosMascotaAction: vi.fn(), conciliarAvisoMascotaAction: vi.fn(), editarMascotaAction: vi.fn() }))
 import Pagina, { dynamic, revalidate, metadata } from "./page"
 beforeEach(() => vi.clearAllMocks())
 it.each([401, 403])("denegación %s no renderiza cola", async (estado) => {

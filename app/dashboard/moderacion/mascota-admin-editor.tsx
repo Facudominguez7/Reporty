@@ -1,22 +1,12 @@
 "use client"
 import { useState, useTransition, type FormEvent } from "react"
 import { Button } from "@/components/ui/button"
-import { editarMascotaAction, reemplazarFotoMascotaAction } from "./actions"
+import { editarMascotaAction } from "./actions"
 import type { EdicionMascotaAdmin } from "@/lib/moderation/administracion.server"
 
 export function EditorMascotaAdmin({ mascota }: { mascota: EdicionMascotaAdmin }) {
   const [mensaje, setMensaje] = useState("")
   const [pendiente, startTransition] = useTransition()
-  const [fotoPendiente, startFotoTransition] = useTransition()
-  const [fotoMensaje, setFotoMensaje] = useState("")
-  function solicitarFoto(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    startFotoTransition(async () => {
-      const resultado = await reemplazarFotoMascotaAction(form)
-      setFotoMensaje(resultado.mensaje)
-    })
-  }
   function guardar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -48,7 +38,8 @@ export function EditorMascotaAdmin({ mascota }: { mascota: EdicionMascotaAdmin }
       <input name="lon" type="number" step="any" min="-180" max="180" defaultValue={mascota.lon} required />
     </label>
     <label className="grid gap-1">Teléfono público
-      <input name="telefono" type="tel" maxLength={40} defaultValue={mascota.telefono} required />
+      <input name="telefono" type="tel" inputMode="numeric" pattern="[0-9]+" maxLength={40} defaultValue={mascota.telefono} onChange={(event) => { event.currentTarget.value = event.currentTarget.value.replace(/[^0-9]/g, "") }} aria-describedby="telefono-admin-ayuda" required />
+      <span id="telefono-admin-ayuda">Ingresá solo números, sin espacios ni símbolos.</span>
     </label>
     <label className="grid gap-1">Estado
       <select name="estado" defaultValue={mascota.estado} required>
@@ -57,15 +48,6 @@ export function EditorMascotaAdmin({ mascota }: { mascota: EdicionMascotaAdmin }
     </label>
     <Button type="submit" disabled={pendiente}>{pendiente ? "Guardando…" : "Guardar cambios"}</Button>
     <p role="status" aria-live="polite">{mensaje}</p>
-  </form>
-  <form aria-label={`Solicitar reemplazo de foto para mascota ${mascota.id}`} onSubmit={solicitarFoto} className="grid gap-3 rounded-md border p-4">
-    <input type="hidden" name="mascotaId" value={mascota.id} />
-    <label className="grid gap-1">Solicitar cambio de foto
-      <input name="foto" type="file" accept="image/jpeg,image/png,image/webp" required />
-    </label>
-    <p className="text-sm text-muted-foreground">La foto nueva se guarda en privado y no reemplaza la actual hasta que administración la apruebe.</p>
-    <Button type="submit" variant="outline" disabled={fotoPendiente}>{fotoPendiente ? "Enviando a revisión…" : "Enviar foto a revisión"}</Button>
-    <p role="status" aria-live="polite">{fotoMensaje}</p>
   </form>
   </div>
 }

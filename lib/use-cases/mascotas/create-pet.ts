@@ -6,7 +6,7 @@ import { validateUploadedReportImage } from "@/lib/media/report-image-validation
 import { validatePetSubmission, type MascotaSubmission } from "@/lib/security/mascota-submission-guard.server"
 import { crearFotoMascotaModerada } from "@/lib/moderation/mascotas-imagen.server"
 
-type Result = { success: true; data: { mascotaId: number | null; moderation: "APPROVED" | "REVIEW" | "REJECTED"; pointsAwarded: number } } | { success: false; error: string }
+type Result = { success: true; data: { mascotaId: number | null; moderation: "APPROVED" | "PENDING" | "REVIEW" | "REJECTED"; pointsAwarded: number; message: string } } | { success: false; error: string }
 
 /** Create only from the verified session owner and after image moderation has a durable result. */
 export async function crearMascotaWorkflow(
@@ -36,6 +36,11 @@ export async function crearMascotaWorkflow(
   })
   return {
     success: true,
-    data: { mascotaId: result.mascotaId, moderation: result.decision, pointsAwarded: result.pointsAwarded },
+    data: {
+      mascotaId: result.mascotaId,
+      moderation: result.decision === "APPROVED" && (!Number.isSafeInteger(result.mascotaId) || result.mascotaId! <= 0) ? "PENDING" : result.decision,
+      pointsAwarded: result.pointsAwarded,
+      message: result.mensaje,
+    },
   }
 }

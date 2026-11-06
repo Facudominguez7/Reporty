@@ -15,7 +15,6 @@ type MascotaRow = {
   tipo_animal?: string
   estado?: string
   descripcion?: string | null
-  foto_path?: string
   publicada_at?: string
   moderacion_estado?: string
   retirada_at?: string | null
@@ -24,7 +23,7 @@ type MascotaRow = {
 export function mapPetForListing(row: MascotaRow, image = ""): MascotaLista | null {
   if (!row || (row.moderacion_estado !== undefined && row.moderacion_estado !== "aprobada") ||
       (row.retirada_at !== undefined && row.retirada_at !== null) || !Number.isInteger(row.id) || !row.tipo_animal || !row.descripcion?.trim() ||
-      !row.foto_path || !row.publicada_at || !["perro", "gato", "otro"].includes(row.tipo_animal) ||
+      !row.publicada_at || !["perro", "gato", "otro"].includes(row.tipo_animal) ||
       !["perdida", "encontrada"].includes(row.estado ?? "")) return null
   const type = row.tipo_animal === "otro" ? "Otro animal" : row.tipo_animal[0].toUpperCase() + row.tipo_animal.slice(1)
   const status = row.estado === "perdida" ? "Perdida" : "Encontrada"
@@ -40,8 +39,8 @@ export async function getMascotasListado(filters: { tipo?: string; estado?: stri
   const limite = Math.min(Math.max(filters.limite ?? 12, 1), 50)
   const offset = Math.max(filters.offset ?? 0, 0)
   const supabase = createPublicClient()
-  let query = supabase.from("mascotas_perdidas")
-    .select("id,tipo_animal,estado,descripcion,foto_path,publicada_at")
+  let query = supabase.from("mascotas_perdidas_publicas")
+    .select("id,tipo_animal,estado,descripcion,publicada_at")
   if (["perro", "gato", "otro"].includes(filters.tipo ?? "")) query = query.eq("tipo_animal", filters.tipo!)
   if (["perdida", "encontrada"].includes(filters.estado ?? "")) query = query.eq("estado", filters.estado!)
   const search = filters.search?.trim().slice(0, 100)
@@ -51,6 +50,6 @@ export async function getMascotasListado(filters: { tipo?: string; estado?: stri
   const hasMore = rows.length > limite
   return { data: rows.slice(0, limite).map((row) => mapPetForListing(
     row,
-    supabase.storage.from("reportes").getPublicUrl(row.foto_path).data.publicUrl,
+    `/api/mascotas/${row.id}/foto`,
   )).filter((pet): pet is MascotaLista => pet !== null), hasMore, error }
 }

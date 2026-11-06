@@ -4,7 +4,7 @@ import { validatePetSubmission } from "./mascota-submission-guard.server"
 describe("validatePetSubmission", () => {
   it("accepts complete pet fields and normalizes whitespace", () => {
     expect(validatePetSubmission({
-      tipoAnimal: "perro", descripcion: "  Marrón, collar rojo  ", lat: -34, lon: -56, telefono: "  1122334455  ",
+      tipoAnimal: "perro", descripcion: "  Marrón, collar rojo  ", lat: -34, lon: -56, telefono: "1122334455",
     })).toEqual({
       tipoAnimal: "perro", descripcion: "Marrón, collar rojo", lat: -34, lon: -56, telefono: "1122334455",
     })
@@ -25,6 +25,7 @@ describe("validatePetSubmission", () => {
   })
 
   it.each([
+    ...["12a3", "+123", "12 3", " 123", "123-456", "１２３"].map((telefono) => [{ tipoAnimal: "gato", descripcion: "ok", lat: 0, lon: 0, telefono }]),
     [{ tipoAnimal: "loro", descripcion: "ave", lat: 0, lon: 0, telefono: "123" }],
     [{ tipoAnimal: "gato", descripcion: " ", lat: 0, lon: 0, telefono: "123" }],
     [{ tipoAnimal: "gato", descripcion: "ok", lat: 91, lon: 0, telefono: "123" }],

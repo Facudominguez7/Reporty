@@ -5,6 +5,7 @@ import { prepararImagenReporte } from "@/lib/media/preparar-imagen-reporte.serve
 import { moderarImagen } from "./sightengine.server"
 import type { ResultadoModeracion } from "./tipos"
 import type { MascotaSubmission } from "@/lib/security/mascota-submission-guard.server"
+import { esObjetoAusente } from "./imagenes-reporte.server"
 
 const PRIVATE_BUCKET = "reportes-pendientes"
 const PUBLIC_BUCKET = "reportes"
@@ -41,7 +42,7 @@ export async function crearFotoMascotaModerada(
       const evidence = existing.data as Evidence
       if (evidence.decision === "APPROVED") {
         const retry = await publicarMascotaAprobada(supabase, evidence, input)
-        return { ...retry, decision: "APPROVED", mensaje: retry.mascotaId ? "Mascota publicada." : "La foto fue aprobada; la publicación quedó pendiente y puede reintentarse." }
+        return { ...retry, decision: "APPROVED", mensaje: retry.mascotaId ? "Mascota publicada." : "La foto fue aprobada, pero la publicación quedó pendiente. No la vuelvas a enviar; necesita revisión administrativa." }
       }
       return { mascotaId: evidence.mascota_id, decision: evidence.decision, pointsAwarded: 0, mensaje: resultadoSeguro(evidence.decision) }
     }
@@ -54,7 +55,7 @@ export async function crearFotoMascotaModerada(
   })
   if (upload.error) {
     await supabase.from("mascotas_fotos_moderacion").update({ motivos: ["carga_privada_pendiente"] }).eq("id", id)
-    return { mascotaId: null, decision: "REVIEW", pointsAwarded: 0, mensaje: resultadoSeguro("REVIEW") }
+    return { mascotaId: null, decision: "REVIEW", pointsAwarded: 0, mensaje: "No pudimos guardar la foto para revisión. La publicación no está disponible y necesita revisión administrativa." }
   }
 
   const reservation = await supabase.rpc("reservar_operaciones_moderacion", { p_solicitud: id, p_operaciones: 2 })
@@ -91,7 +92,7 @@ export async function crearFotoMascotaModerada(
   }
 
   const published = await publicarMascotaAprobada(supabase, evidence, input)
-  return { ...published, decision: "APPROVED", mensaje: published.mascotaId ? "Mascota publicada." : "La foto fue aprobada; la publicación quedó pendiente y puede reintentarse." }
+  return { ...published, decision: "APPROVED", mensaje: published.mascotaId ? "Mascota publicada." : "La foto fue aprobada, pero la publicación quedó pendiente. No la vuelvas a enviar; necesita revisión administrativa." }
 }
 
 async function readPrivateBytes(supabase: SupabaseClient, evidence: Evidence) {
@@ -110,7 +111,7 @@ async function savePublicObject(supabase: SupabaseClient, path: string, bytes: U
     if (existing.data.size !== bytes.length || hash(new Uint8Array(await existing.data.arrayBuffer())) !== hash(bytes)) throw new Error("public_object_mismatch")
     return
   }
-  if (!existing.error || !(["404", 404].includes((existing.error as { statusCode?: string | number }).statusCode ?? ""))) throw new Error("public_object_unverifiable")
+  if (!await esObjetoAusente(existing.error)) throw new Error("public_object_unverifiable")
   const { error } = await bucket.upload(path, bytes, { upsert: false, contentType: "image/webp", cacheControl: "0" })
   if (error) {
     const retry = await bucket.download(path)
@@ -162,13 +163,7 @@ export async function publicarMascotaAprobada(
   if (uploadNeeded && !publicObject.data) {
     try { await savePublicObject(supabase, path, bytes) }
     catch {
-      // Only release the claim after Storage has definitively confirmed that no public object exists.
-      const retry = await supabase.storage.from(PUBLIC_BUCKET).download(path)
-      const absent = !retry.data && ["404", 404].includes((retry.error as { statusCode?: string | number } | null)?.statusCode ?? "")
-      if (absent) {
-        await supabase.from("mascotas_fotos_moderacion").update({ estado_publicacion: "pendiente", publish_token: null })
-          .eq("id", evidence.id).eq("estado_publicacion", "publicando").eq("publish_token", token)
-      }
+      // An upload with an uncertain outcome may still complete; retain its claim.
       return { mascotaId: null, pointsAwarded: 0 }
     }
   } else if (!existsAndMatches) {

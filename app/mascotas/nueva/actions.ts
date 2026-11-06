@@ -41,7 +41,7 @@ export async function retirarMascotaPropiaAction(mascotaId: number) {
         .select("id,retirada_at,foto_limpieza_estado").eq("id", mascotaId)
         .eq("propietario_id", user.id).maybeSingle()
       if (lookupError || !propia?.retirada_at || propia.foto_limpieza_estado === "completada") {
-        return { success: false as const, error: "La publicación no está disponible o no te pertenece." }
+        return { success: false as const, error: "La publicación no está disponible, no te pertenece o ya fue marcada como encontrada." }
       }
     }
 

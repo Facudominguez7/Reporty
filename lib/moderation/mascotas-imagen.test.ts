@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createHash } from "node:crypto"
 
 const { preparar, moderar } = vi.hoisted(() => ({ preparar: vi.fn(), moderar: vi.fn() }))
 vi.mock("server-only", () => ({}))
@@ -48,6 +49,57 @@ beforeEach(() => {
 })
 
 describe("publicarMascotaAprobada", () => {
+  function publicationClient(state: "pendiente" | "publicando", uploadError = false, status = 400) {
+    const evidence = { id: "photo", propietario_id: "owner", path_privado: "private", decision: "APPROVED", estado_publicacion: state, publish_token: state === "publicando" ? "old-token" : null, hash_sha256: createHash("sha256").update(canonical).digest("hex") }
+    const missing = () => ({ data: null, error: { name: "StorageUnknownError", originalError: new Response(JSON.stringify({ statusCode: "404", error: "not_found", code: "NoSuchKey" }), { status }) } })
+    let uploaded = false
+    const upload = vi.fn(async () => { uploaded = !uploadError; return { error: uploadError ? new Error("uncertain") : null } })
+    const update = vi.fn(() => {
+      const builder = { eq: () => builder, select: () => ({ maybeSingle: async () => ({ data: { id: "photo" }, error: null }) }) }
+      return builder
+    })
+    const supabase = {
+      from: vi.fn((table: string) => ({
+        select: () => ({ eq: () => ({ single: async () => ({ data: evidence, error: null }), maybeSingle: async () => ({ data: null, error: null }) }) }),
+        update,
+      })),
+      storage: { from: (bucket: string) => ({
+        download: async () => bucket === "reportes-pendientes" || uploaded ? { data: new Blob([canonical]), error: null } : missing(),
+        upload,
+      }) },
+      rpc: vi.fn(async (name: string) => ({ data: name === "reclamar_publicacion_mascota" ? "new-token" : 9, error: null })),
+    }
+    return { supabase, evidence, upload, update }
+  }
+
+  const fields = { tipoAnimal: "perro", descripcion: "Collar azul", lat: -34, lon: -56, telefono: "112233" } as const
+
+  it("publishes a fresh claim when Storage wraps a NoSuchKey response", async () => {
+    const { supabase, evidence, upload } = publicationClient("pendiente")
+    expect(await publicarMascotaAprobada(supabase as never, evidence as never, fields)).toEqual({ mascotaId: 9, pointsAwarded: 10 })
+    expect(upload).toHaveBeenCalledOnce()
+  })
+
+  it("does not reupload for an outstanding claim even if the object is absent", async () => {
+    const { supabase, evidence, upload } = publicationClient("publicando")
+    expect(await publicarMascotaAprobada(supabase as never, evidence as never, fields)).toEqual({ mascotaId: null, pointsAwarded: 0 })
+    expect(upload).not.toHaveBeenCalled()
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it("does not upload when the apparent missing-object response has an unexpected HTTP status", async () => {
+    const { supabase, evidence, upload } = publicationClient("pendiente", false, 500)
+    expect(await publicarMascotaAprobada(supabase as never, evidence as never, fields)).toEqual({ mascotaId: null, pointsAwarded: 0 })
+    expect(upload).not.toHaveBeenCalled()
+  })
+
+  it("keeps the claim after an uncertain upload failure", async () => {
+    const { supabase, evidence, upload, update } = publicationClient("pendiente", true)
+    expect(await publicarMascotaAprobada(supabase as never, evidence as never, fields)).toEqual({ mascotaId: null, pointsAwarded: 0 })
+    expect(upload).toHaveBeenCalledOnce()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   it("never republishes an already withdrawn pet photo", async () => {
     const evidence = { id: "photo", propietario_id: "owner", decision: "APPROVED", estado_publicacion: "publicada", path_publico: "mascotas/photo.webp" }
     const storage = { from: vi.fn() }
@@ -69,6 +121,20 @@ describe("publicarMascotaAprobada", () => {
 })
 
 describe("crearFotoMascotaModerada", () => {
+  it("does not claim the image was stored for review when the private upload fails", async () => {
+    const supabase = client()
+    supabase.storage.from.mockReturnValueOnce({ upload: async () => ({ error: { message: "upload failed" } }) })
+
+    const result = await crearFotoMascotaModerada(supabase as never, {
+      propietarioId: "owner", tipoAnimal: "perro", descripcion: "Collar azul", lat: -34, lon: -56,
+      telefono: "112233", image: new File([canonical], "pet.webp", { type: "image/webp" }),
+    })
+
+    expect(result).toMatchObject({ mascotaId: null, decision: "REVIEW" })
+    expect(result.mensaje).toContain("No pudimos guardar la foto")
+    expect(supabase.calls).not.toContain("crear_mascota_perdida")
+  })
+
   it("fails closed to private REVIEW when provider operation accounting is unexpected", async () => {
     const supabase = client()
     moderar.mockResolvedValue({ decision: "APPROVED", motivos: ["indicadores_seguros"], operaciones: 1, proveedor: "sightengine" })

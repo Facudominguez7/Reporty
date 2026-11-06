@@ -28,7 +28,7 @@ export default function CrearPage() {
           description="Elegí qué tipo de publicación querés compartir."
         />
         <div className="flex flex-1 items-stretch">
-          <div className="mx-auto grid w-full max-w-4xl grid-rows-2 gap-6 pb-4 sm:grid-rows-1 sm:grid-cols-2 sm:gap-8 sm:pb-6">
+          <div className="mx-auto grid w-full max-w-4xl grid-rows-2 gap-6 pb-4 sm:max-w-none sm:grid-rows-1 sm:grid-cols-2 sm:gap-8 sm:pb-6">
             {options.map(({ href, title, description, icon: Icon }) => (
               <Link
                 key={href}

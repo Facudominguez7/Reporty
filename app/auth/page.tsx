@@ -198,7 +198,7 @@ export default function AuthPage() {
     let cancelled = false
     createClient().auth.getUser().then(({ data, error }) => {
       if (cancelled) return
-      if (!error && data.user) {
+      if (!error && data.user && !(data.user.is_anonymous && nextPath === "/mascotas/nueva")) {
         window.location.replace(nextPath)
         return
       }

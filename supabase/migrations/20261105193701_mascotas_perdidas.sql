@@ -59,12 +59,6 @@ create table public.mascotas_perdidas (
 );
 alter table public.mascotas_fotos_moderacion add constraint mascotas_fotos_moderacion_mascota_fk
   foreign key (mascota_id) references public.mascotas_perdidas(id) on delete restrict;
-alter table public.mascotas_fotos_moderacion add column reemplaza_mascota_id bigint
-  references public.mascotas_perdidas(id) on delete restrict;
-create unique index mascotas_fotos_moderacion_reemplazo_activo_idx
-  on public.mascotas_fotos_moderacion (reemplaza_mascota_id)
-  where reemplaza_mascota_id is not null and decision in ('REVIEW','APPROVED')
-    and estado_publicacion in ('pendiente','publicando');
 create index mascotas_perdidas_publicas_idx on public.mascotas_perdidas (publicada_at desc)
   where retirada_at is null;
 create index mascotas_perdidas_tipo_estado_idx on public.mascotas_perdidas (tipo_animal, estado)
@@ -186,12 +180,19 @@ revoke all on public.mascotas_fotos_moderacion, public.mascotas_perdidas,
 grant select, insert, update on public.mascotas_fotos_moderacion to service_role;
 grant select on public.mascotas_perdidas, public.puntos_creacion_mascota to service_role;
 grant update (foto_limpieza_estado) on public.mascotas_perdidas to service_role;
-grant select (id, propietario_id, foto_path, tipo_animal, descripcion, lat, lon,
-  telefono, estado, publicada_at) on public.mascotas_perdidas to anon, authenticated;
+grant select (id, tipo_animal, descripcion, lat, lon, telefono, estado, publicada_at)
+  on public.mascotas_perdidas to anon, authenticated;
 grant usage, select on sequence public.mascotas_perdidas_id_seq to service_role;
 
 create policy mascotas_perdidas_public_read on public.mascotas_perdidas
   for select to anon, authenticated using (retirada_at is null and moderacion_estado='aprobada');
+
+create view public.mascotas_perdidas_publicas
+  with (security_invoker = true) as
+  select id, tipo_animal, estado, descripcion, lat, lon, telefono, publicada_at
+  from public.mascotas_perdidas;
+revoke all on public.mascotas_perdidas_publicas from public;
+grant select on public.mascotas_perdidas_publicas to anon, authenticated;
 
 create function moderacion_privada.crear_mascota_perdida(
   p_propietario_id uuid, p_foto_moderacion_id uuid, p_tipo_animal text,
@@ -218,7 +219,7 @@ begin
     if v_retirada_at is not null then raise exception 'Publicación retirada'; end if;
     return v_id;
   end if;
-  if v_foto.mascota_id is not null or v_foto.reemplaza_mascota_id is not null then
+  if v_foto.mascota_id is not null then
     raise exception 'Evidencia fotográfica ya utilizada';
   end if;
   v_path := v_foto.path_publico;
@@ -294,129 +295,6 @@ begin
 end;
 $$;
 
-create function moderacion_privada.crear_revision_reemplazo_foto_mascota(
-  p_mascota_id bigint, p_evidencia_id uuid, p_hash text
-) returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_pet public.mascotas_perdidas%rowtype;
-begin
-  if not exists (
-    select 1 from public.profiles p join auth.users u on u.id=p.id
-    where p.id=auth.uid() and p.rol_id=1 and u.is_anonymous is false
-  ) then raise exception 'Se requiere administración'; end if;
-  if p_evidencia_id is null or p_hash is null or p_hash !~ '^[0-9a-f]{64}$' then
-    raise exception 'Datos de reemplazo de foto inválidos';
-  end if;
-  select * into v_pet from public.mascotas_perdidas
-    where id=p_mascota_id and retirada_at is null and moderacion_estado='aprobada' for update;
-  if not found then return null; end if;
-  insert into public.mascotas_fotos_moderacion(
-    id,propietario_id,path_privado,path_publico,hash_sha256,decision,motivos,operaciones,
-    tipo_animal,descripcion,lat,lon,telefono,estado,aprobado_at,estado_publicacion,
-    mascota_id,reemplaza_mascota_id
-  ) values (
-    p_evidencia_id,v_pet.propietario_id,v_pet.propietario_id::text || '/' || p_evidencia_id::text,
-    null,p_hash,'REVIEW','[]',0,v_pet.tipo_animal,v_pet.descripcion,v_pet.lat,v_pet.lon,v_pet.telefono,
-    'pendiente',null,'pendiente',null,p_mascota_id
-  );
-  return p_evidencia_id;
-exception when unique_violation then return null;
-end;
-$$;
-
-create function moderacion_privada.reclamar_reemplazo_foto_mascota(p_evidencia_id uuid)
-returns uuid language plpgsql security definer set search_path = '' as $$
-declare v_evidencia public.mascotas_fotos_moderacion%rowtype; v_token uuid;
-begin
-  if not exists (
-    select 1 from public.profiles p join auth.users u on u.id=p.id
-    where p.id=auth.uid() and p.rol_id=1 and u.is_anonymous is false
-  ) then raise exception 'Se requiere administración'; end if;
-  select * into v_evidencia from public.mascotas_fotos_moderacion
-    where id=p_evidencia_id and reemplaza_mascota_id is not null for update;
-  if not found or v_evidencia.decision <> 'APPROVED' or v_evidencia.estado <> 'aprobada' then return null; end if;
-  if v_evidencia.estado_publicacion='publicando' and v_evidencia.publish_token is not null then
-    return v_evidencia.publish_token;
-  end if;
-  if v_evidencia.estado_publicacion <> 'pendiente' then return null; end if;
-  if not exists (select 1 from public.mascotas_perdidas where id=v_evidencia.reemplaza_mascota_id and retirada_at is null) then return null; end if;
-  v_token := gen_random_uuid();
-  update public.mascotas_fotos_moderacion set estado_publicacion='publicando', publish_token=v_token
-    where id=p_evidencia_id and decision='APPROVED' and estado_publicacion='pendiente';
-  if not found then return null; end if;
-  return v_token;
-end;
-$$;
-
-create function moderacion_privada.finalizar_reemplazo_foto_mascota(p_evidencia_id uuid, p_token uuid)
-returns text language plpgsql security definer set search_path = '' as $$
-declare
-  v_evidencia public.mascotas_fotos_moderacion%rowtype;
-  v_pet public.mascotas_perdidas%rowtype;
-  v_old_path text;
-  v_new_path text;
-begin
-  if not exists (
-    select 1 from public.profiles p join auth.users u on u.id=p.id
-    where p.id=auth.uid() and p.rol_id=1 and u.is_anonymous is false
-  ) then raise exception 'Se requiere administración'; end if;
-  select * into v_evidencia from public.mascotas_fotos_moderacion where id=p_evidencia_id for update;
-  if not found or v_evidencia.reemplaza_mascota_id is null then return null; end if;
-  v_new_path := 'mascotas/' || p_evidencia_id::text || '.webp';
-  if v_evidencia.estado_publicacion='publicada' and v_evidencia.path_publico=v_new_path then return ''; end if;
-  if v_evidencia.decision <> 'APPROVED' or v_evidencia.estado <> 'aprobada'
-    or v_evidencia.estado_publicacion <> 'publicando' or v_evidencia.publish_token is distinct from p_token
-    or p_token is null then return null; end if;
-  select * into v_pet from public.mascotas_perdidas
-    where id=v_evidencia.reemplaza_mascota_id and retirada_at is null and moderacion_estado='aprobada' for update;
-  if not found or v_pet.propietario_id <> v_evidencia.propietario_id then return null; end if;
-  v_old_path := v_pet.foto_path;
-  update public.mascotas_fotos_moderacion set motivos = case
-    when motivos @> '["foto_reemplazada","limpieza_publica_pendiente"]'::jsonb then motivos
-    when motivos @> '["foto_reemplazada"]'::jsonb then motivos || '["limpieza_publica_pendiente"]'::jsonb
-    when motivos @> '["limpieza_publica_pendiente"]'::jsonb then motivos || '["foto_reemplazada"]'::jsonb
-    else motivos || '["foto_reemplazada","limpieza_publica_pendiente"]'::jsonb end
-    where id=v_pet.foto_moderacion_id;
-  update public.mascotas_perdidas set foto_moderacion_id=p_evidencia_id, foto_path=v_new_path
-    where id=v_pet.id and foto_path=v_old_path and retirada_at is null;
-  if not found then return null; end if;
-  update public.mascotas_fotos_moderacion set mascota_id=v_pet.id, path_publico=v_new_path,
-    estado_publicacion='publicada', publish_token=null, motivos=motivos - 'limpieza_publica_pendiente'
-    where id=p_evidencia_id and estado_publicacion='publicando' and publish_token=p_token;
-  if not found then raise exception 'No se pudo finalizar el reemplazo'; end if;
-  return v_old_path;
-end;
-$$;
-
-create function moderacion_privada.conciliar_reemplazo_foto_mascota(p_evidencia_id uuid)
-returns text language plpgsql security definer set search_path = '' as $$
-declare
-  v_evidencia public.mascotas_fotos_moderacion%rowtype;
-  v_pet public.mascotas_perdidas%rowtype;
-  v_path text;
-begin
-  if not exists (
-    select 1 from public.profiles p join auth.users u on u.id=p.id
-    where p.id=auth.uid() and p.rol_id=1 and u.is_anonymous is false
-  ) then raise exception 'Se requiere administración'; end if;
-  select * into v_evidencia from public.mascotas_fotos_moderacion
-    where id=p_evidencia_id and reemplaza_mascota_id is not null for update;
-  if not found then return null; end if;
-  v_path := 'mascotas/' || p_evidencia_id::text || '.webp';
-  select * into v_pet from public.mascotas_perdidas where id=v_evidencia.reemplaza_mascota_id for update;
-  if found and v_pet.foto_moderacion_id=p_evidencia_id and v_pet.foto_path=v_path then
-    return 'actual';
-  end if;
-  if v_evidencia.estado_publicacion not in ('publicando','publicada','rechazada') then return null; end if;
-  update public.mascotas_fotos_moderacion set
-    estado_publicacion=case when estado_publicacion='publicando' then 'rechazada' else estado_publicacion end,
-    publish_token=null,
-    motivos=case when motivos @> '["limpieza_publica_pendiente"]'::jsonb
-      then motivos else motivos || '["limpieza_publica_pendiente"]'::jsonb end
-    where id=p_evidencia_id;
-  return 'limpieza';
-end;
-$$;
-
 create function moderacion_privada.retirar_mascota_moderacion(p_mascota_id bigint)
 returns boolean language plpgsql security definer set search_path = '' as $$
 declare v_premio public.puntos_creacion_mascota%rowtype;
@@ -456,25 +334,9 @@ create function public.editar_mascota_moderacion(
 ) returns boolean language sql security invoker set search_path = '' as $$
   select moderacion_privada.editar_mascota_moderacion($1,$2,$3,$4,$5,$6,$7)
 $$;
-create function public.crear_revision_reemplazo_foto_mascota(p_mascota_id bigint, p_evidencia_id uuid, p_hash text)
-returns uuid language sql security invoker set search_path = '' as $$
-  select moderacion_privada.crear_revision_reemplazo_foto_mascota($1,$2,$3)
-$$;
-create function public.reclamar_reemplazo_foto_mascota(p_evidencia_id uuid)
-returns uuid language sql security invoker set search_path = '' as $$
-  select moderacion_privada.reclamar_reemplazo_foto_mascota($1)
-$$;
-create function public.finalizar_reemplazo_foto_mascota(p_evidencia_id uuid, p_token uuid)
-returns text language sql security invoker set search_path = '' as $$
-  select moderacion_privada.finalizar_reemplazo_foto_mascota($1,$2)
-$$;
 create function public.retirar_mascota_moderacion(p_mascota_id bigint)
 returns boolean language sql security invoker set search_path = '' as $$
   select moderacion_privada.retirar_mascota_moderacion($1)
-$$;
-create function public.conciliar_reemplazo_foto_mascota(p_evidencia_id uuid)
-returns text language sql security invoker set search_path = '' as $$
-  select moderacion_privada.conciliar_reemplazo_foto_mascota($1)
 $$;
 
 revoke all on schema moderacion_privada from public, anon, authenticated;
@@ -483,14 +345,6 @@ revoke all on function moderacion_privada.crear_mascota_perdida(uuid,uuid,text,t
   moderacion_privada.marcar_mascota_encontrada(bigint), moderacion_privada.retirar_mascota_propia(bigint),
   moderacion_privada.retirar_mascota_moderacion(bigint),
   moderacion_privada.editar_mascota_moderacion(bigint,text,text,double precision,double precision,text,text),
-  moderacion_privada.crear_revision_reemplazo_foto_mascota(bigint,uuid,text),
-  moderacion_privada.reclamar_reemplazo_foto_mascota(uuid),
-  moderacion_privada.finalizar_reemplazo_foto_mascota(uuid,uuid),
-  moderacion_privada.conciliar_reemplazo_foto_mascota(uuid),
-  public.conciliar_reemplazo_foto_mascota(uuid),
-  public.crear_revision_reemplazo_foto_mascota(bigint,uuid,text),
-  public.reclamar_reemplazo_foto_mascota(uuid),
-  public.finalizar_reemplazo_foto_mascota(uuid,uuid),
   public.editar_mascota_moderacion(bigint,text,text,double precision,double precision,text,text),
   public.crear_mascota_perdida(uuid,uuid,text,text,double precision,double precision,text),
   public.marcar_mascota_encontrada(bigint), public.retirar_mascota_propia(bigint), public.retirar_mascota_moderacion(bigint),
@@ -500,20 +354,12 @@ grant execute on function moderacion_privada.crear_mascota_perdida(uuid,uuid,tex
   to service_role;
 grant execute on function moderacion_privada.marcar_mascota_encontrada(bigint),
   moderacion_privada.retirar_mascota_propia(bigint), moderacion_privada.retirar_mascota_moderacion(bigint),
-  moderacion_privada.editar_mascota_moderacion(bigint,text,text,double precision,double precision,text,text),
-  moderacion_privada.crear_revision_reemplazo_foto_mascota(bigint,uuid,text),
-  moderacion_privada.reclamar_reemplazo_foto_mascota(uuid),
-  moderacion_privada.finalizar_reemplazo_foto_mascota(uuid,uuid),
-  moderacion_privada.conciliar_reemplazo_foto_mascota(uuid)
+  moderacion_privada.editar_mascota_moderacion(bigint,text,text,double precision,double precision,text,text)
   to authenticated;
 grant execute on function public.crear_mascota_perdida(uuid,uuid,text,text,double precision,double precision,text)
   to service_role;
 grant execute on function public.marcar_mascota_encontrada(bigint),
   public.retirar_mascota_propia(bigint), public.retirar_mascota_moderacion(bigint),
-  public.editar_mascota_moderacion(bigint,text,text,double precision,double precision,text,text),
-  public.crear_revision_reemplazo_foto_mascota(bigint,uuid,text),
-  public.reclamar_reemplazo_foto_mascota(uuid),
-  public.finalizar_reemplazo_foto_mascota(uuid,uuid),
-  public.conciliar_reemplazo_foto_mascota(uuid) to authenticated;
+  public.editar_mascota_moderacion(bigint,text,text,double precision,double precision,text,text) to authenticated;
 grant execute on function public.reclamar_publicacion_mascota(uuid) to service_role;
 commit;

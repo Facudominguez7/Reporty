@@ -22,4 +22,14 @@ describe("HeaderClient create navigation", () => {
     expect(markup).toContain('aria-current="page" aria-label="Crear"')
     path.value = "/crear"
   })
+
+  it("keeps the global header without a back button on report details and other routes", () => {
+    for (const route of ["/reportes/5", "/reportes/nuevo", "/crear"]) {
+      path.value = route
+      const markup = renderToStaticMarkup(createElement(HeaderClient, { user: null }))
+      expect(markup).not.toContain('aria-label="Volver"')
+      expect(markup).toContain('aria-label="Reporty, ir al inicio"')
+    }
+    path.value = "/crear"
+  })
 })

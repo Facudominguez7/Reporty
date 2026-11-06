@@ -3,21 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { autorizarAdministracion } from "@/lib/moderation/administracion.server"
 import { procesarAvisosMascota } from "@/lib/moderation/avisos-mascotas.server"
-import { conciliarAvisoMascotaAdministrativamente, editarMascotaAdministrativamente, ejecutarRevision, subirFotoReemplazoMascotaAdministrativamente, type EdicionMascotaAdmin, type OperacionRevision, type ResultadoRevision } from "@/lib/moderation/administracion.server"
-
-/** Decide o recupera evidencia sin aceptar identidades administrativas desde el navegador. */
-export async function reemplazarFotoMascotaAction(form: FormData): Promise<ResultadoRevision> {
-  try {
-    const mascotaId = Number(form.get("mascotaId"))
-    const foto = form.get("foto")
-    if (typeof foto === "string" || !(foto instanceof File)) return { exito: false, mensaje: "Seleccioná una foto válida." }
-    const resultado = await subirFotoReemplazoMascotaAdministrativamente(mascotaId, foto)
-    if (resultado.exito) revalidatePath("/dashboard/moderacion")
-    return resultado
-  } catch {
-    return { exito: false, mensaje: "No se pudo enviar la foto a revisión privada." }
-  }
-}
+import { conciliarAvisoMascotaAdministrativamente, editarMascotaAdministrativamente, ejecutarRevision, type EdicionMascotaAdmin, type OperacionRevision, type ResultadoRevision } from "@/lib/moderation/administracion.server"
 
 export async function reintentarAvisosMascotaAction(mascotaId: number): Promise<ResultadoRevision> {
   try {
