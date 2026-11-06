@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
   obtenerGestionOperativaDetalle: vi.fn(),
+  obtenerSeccionReparacion: vi.fn(),
   crearComentarioWorkflow: vi.fn(),
 }))
 
@@ -48,6 +49,9 @@ vi.mock("@/lib/authz/roles", async (importOriginal) => ({
 vi.mock("@/lib/use-cases/cuadrillas/detalle-operativo", () => ({
   obtenerGestionOperativaDetalle: mocks.obtenerGestionOperativaDetalle,
 }))
+vi.mock("@/lib/use-cases/reportes/evidencia-reparacion-detalle.server", () => ({
+  obtenerSeccionReparacion: mocks.obtenerSeccionReparacion,
+}))
 
 const ROLE = { ADMIN: 1, CIUDADANO: 2, OPERADOR: 4, INVITADO: 5 }
 
@@ -73,6 +77,7 @@ describe("ReporteDetallePage", () => {
       cuadrillaNombre: null,
       eventos: [],
     })
+    mocks.obtenerSeccionReparacion.mockReset().mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -187,5 +192,29 @@ describe("ReporteDetallePage", () => {
     const result = await crearComentarioAction(5, "Llamé a la municipalidad")
     expect(result.success).toBe(false)
     expect(mocks.crearComentarioWorkflow).not.toHaveBeenCalled()
+  })
+  it("pasa la sección de evidencia de reparación al detalle con el estado del reporte", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    const seccion = { umbral: 3, evidencia: null, puedeInformar: false }
+    mocks.obtenerSeccionReparacion.mockResolvedValue(seccion)
+
+    const page = await renderPage()
+
+    expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1)
+    expect(page.props.evidenciaReparacion).toEqual(seccion)
+    // La ficha existente se conserva: comentarios, historial y fotografías siguen llegando.
+    expect(page.props.comentarios).toEqual([])
+    expect(page.props.historialEstados).toEqual([])
+    expect(page.props.fotografiaPendiente).toBe(false)
+  })
+
+  it("sigue mostrando el reporte cuando la evidencia de reparación no se puede leer", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.obtenerSeccionReparacion.mockRejectedValue(new Error("base no disponible"))
+
+    const page = await renderPage()
+
+    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1 })
+    expect(page.props.evidenciaReparacion).toBeNull()
   })
 })

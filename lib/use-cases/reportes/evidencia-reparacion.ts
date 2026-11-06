@@ -25,6 +25,10 @@ import {
 } from "@/lib/moderation/imagenes-reporte.server"
 import { sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
 import { getReportContext } from "./detail-mutations"
+import {
+  COMENTARIO_REPARACION_MAX,
+  MOTIVO_IMPUGNACION_MAX,
+} from "./evidencia-reparacion-limites"
 
 /**
  * Confirmaciones independientes que validan una reparación («inicialmente tres», S5).
@@ -35,11 +39,9 @@ export const UMBRAL_CONFIRMACIONES_REPARACION = 3
 /** Límite diario de evidencias por cuenta, igual al cupo de `crear_evidencia_reparacion`. */
 export const EVIDENCIAS_REPARACION_POR_DIA = 3
 
-/** Longitud máxima del comentario de la evidencia (`evidencias_reparacion.comentario`). */
-export const COMENTARIO_REPARACION_MAX = 500
-
-/** Longitud máxima del motivo de una impugnación (`verificaciones_reparacion.motivo`). */
-export const MOTIVO_IMPUGNACION_MAX = 500
+// Los límites de texto viven en un módulo sin `server-only` para que el formulario
+// de la ficha pueda mostrarlos; acá se reexportan para no duplicar literales.
+export { COMENTARIO_REPARACION_MAX, MOTIVO_IMPUGNACION_MAX }
 
 /** Texto único para las cuentas que todavía no pueden informar ni verificar (S15). */
 export const MENSAJE_CUENTA_REPARACION_REQUERIDA =
