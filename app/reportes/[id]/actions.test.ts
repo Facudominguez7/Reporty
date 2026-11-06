@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(), createAdminClient: vi.fn(), actualizarDatosReporte: vi.fn(),
   reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), revalidatePath: vi.fn(),
   crearComentario: vi.fn(), votarNoExiste: vi.fn(), votarReparado: vi.fn(),
+  informarReparacion: vi.fn(), verificarReparacion: vi.fn(),
+  resolverEvidencia: vi.fn(), resolverImpugnacion: vi.fn(),
 }))
 vi.mock("@/utils/supabase/server", () => ({ createClient: mocks.createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }))
@@ -17,7 +19,14 @@ vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
   votarNoExisteWorkflow: mocks.votarNoExiste,
   votarReparadoWorkflow: mocks.votarReparado,
 }))
-import { actualizarReporteAdminAction, cambiarEstadoAdminAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, quitarFotoReporteAdminAction, reemplazarFotoReporteAdminAction, votarNoExisteAction, votarReparadoAction } from "./actions"
+vi.mock("@/lib/use-cases/reportes/evidencia-reparacion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/use-cases/reportes/evidencia-reparacion")>()),
+  informarReparacionWorkflow: mocks.informarReparacion,
+  verificarReparacionWorkflow: mocks.verificarReparacion,
+  resolverEvidenciaReparacionWorkflow: mocks.resolverEvidencia,
+  resolverImpugnacionReparacionWorkflow: mocks.resolverImpugnacion,
+}))
+import { actualizarReporteAdminAction, cambiarEstadoAdminAction, confirmarReparacionAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, impugnarReparacionAction, informarReparacionAction, quitarFotoReporteAdminAction, reemplazarFotoReporteAdminAction, resolverEvidenciaReparacionAdminAction, resolverImpugnacionReparacionAdminAction, votarNoExisteAction, votarReparadoAction } from "./actions"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -33,7 +42,6 @@ const invalidIdMessage = JSON.stringify([{ code: "too_small", minimum: 0, type: 
 const cases = [
   ["votarNoExiste", (id: number) => votarNoExisteAction(id), "Tenés que iniciar sesión para votar."],
   ["crearComentario", (id: number) => crearComentarioAction(id, "problema_sigue_igual"), "Tenés que iniciar sesión para comentar."],
-  ["votarReparado", (id: number) => votarReparadoAction(id), "Tenés que iniciar sesión para votar."],
   ["eliminarComentarioPropio", (id: number) => eliminarComentarioPropioAction(id), "Tenés que iniciar sesión para eliminar el comentario."],
   ["eliminarComentarioAdmin", (id: number) => eliminarComentarioAdminAction(id), "Tenés que iniciar sesión para eliminar el comentario."],
   ["eliminarReportePropio", (id: number) => eliminarReportePropioAction(id), "Tenés que iniciar sesión para eliminar el reporte."],
@@ -153,9 +161,8 @@ it.each([
   const consulta = { select: () => consulta, eq: () => consulta, single: async () => ({ data: { rol_id: rol, roles: null }, error: null }) }
   mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "votante", is_anonymous: anonimo } } }) }, from: () => consulta })
   mocks.createAdminClient.mockReturnValue({ from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: {} }) }) }) }) })
-  await votarReparadoAction(7)
   await votarNoExisteAction(7)
-  expect(mocks.createAdminClient).toHaveBeenCalledTimes(permitido ? 2 : 0)
+  expect(mocks.createAdminClient).toHaveBeenCalledTimes(permitido ? 1 : 0)
 })
 
 it("preserves invalid contribution feedback before external work", async () => {
@@ -194,10 +201,10 @@ function configurarTurnstile() {
 }
 
 /** Sesión con el rol pedido; el guard se evalúa después de la autorización. */
-function sesionConRol(rol: number | null, anonimo = false, id = "ciudadano-1") {
+function sesionConRol(rol: number | null, anonimo = false, id = "ciudadano-1", emailConfirmado: string | null = "2026-01-01T00:00:00.000Z") {
   const consulta = { select: () => consulta, eq: () => consulta, single: async () => ({ data: { rol_id: rol, roles: null }, error: null }) }
   mocks.createClient.mockResolvedValue({
-    auth: { getUser: async () => ({ data: { user: { id, is_anonymous: anonimo } } }) },
+    auth: { getUser: async () => ({ data: { user: { id, is_anonymous: anonimo, email_confirmed_at: emailConfirmado } } }) },
     from: () => consulta,
   })
 }
@@ -325,14 +332,270 @@ describe("acciones de voto sin CAPTCHA", () => {
     mocks.votarReparado.mockResolvedValue({ success: true, data: { votosNoExiste: 0, votosReparado: 1, primero: true } })
   })
 
-  it("registra los votos sin consultar Siteverify ni pedir token", async () => {
+  it("registra el voto no existe sin consultar Siteverify ni pedir token", async () => {
     const llamada = siteverify()
 
     await expect(votarNoExisteAction(7)).resolves.toMatchObject({ success: true })
-    await expect(votarReparadoAction(7)).resolves.toMatchObject({ success: true })
 
     expect(llamada).not.toHaveBeenCalled()
     expect(mocks.votarNoExiste).toHaveBeenCalledWith({}, 7, "ciudadano-1")
-    expect(mocks.votarReparado).toHaveBeenCalledWith({}, 7, "ciudadano-1")
+  })
+
+  it("retira el voto reparado: nunca escribe estado ni cierra el reporte", async () => {
+    const llamada = siteverify()
+
+    expect(await votarReparadoAction(7)).toEqual({
+      success: false,
+      error: "El voto «reparado» fue reemplazado: informá la reparación con una foto y la comunidad la verifica.",
+    })
+    expect(llamada).not.toHaveBeenCalled()
+    expect(mocks.votarReparado).not.toHaveBeenCalled()
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+const EVIDENCIA_ID = "11111111-1111-4111-8111-111111111111"
+const IMPUGNACION_ID = "22222222-2222-4222-8222-222222222222"
+const TOKEN_DE_EVIDENCIA = "tok-evidencia-1234"
+const COMENTARIO = "  Bache tapado y señalizado  "
+const MENSAJE_SIN_SESION = "Tenés que iniciar sesión para informar una reparación."
+const MENSAJE_CUENTA_REPARACION =
+  "Necesitás una cuenta registrada con el correo confirmado para informar y verificar reparaciones."
+const MENSAJE_COMENTARIO = "Contá en hasta 500 caracteres qué se reparó."
+const MENSAJE_EVIDENCIA_INVALIDA = "No pudimos identificar la evidencia de reparación."
+
+/** Respuesta controlada de Siteverify para la action del formulario de evidencia. */
+function siteverifyEvidencia(overrides: Record<string, unknown> = {}) {
+  return siteverify({ action: "informar_reparacion", ...overrides })
+}
+
+/** Foto de evidencia con tipo aceptado; el servidor valida los bytes reales. */
+function fotoEvidencia() {
+  return new File([new Uint8Array([1, 2, 3, 4])], "reparado.png", { type: "image/png" })
+}
+
+describe("informarReparacionAction — evidencia con moderación y Turnstile", () => {
+  beforeEach(() => {
+    configurarTurnstile()
+    siteverifyEvidencia()
+    sesionConRol(2)
+    mocks.createAdminClient.mockReturnValue({})
+    mocks.informarReparacion.mockResolvedValue({
+      success: true,
+      data: { evidenciaId: EVIDENCIA_ID, estado: "en_verificacion", publicada: true, motivos: [], advertencias: [] },
+    })
+  })
+
+  it("exige sesión antes de moderar la foto", async () => {
+    mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
+    const llamada = siteverifyEvidencia()
+
+    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+      success: false,
+      error: MENSAJE_SIN_SESION,
+    })
+    expect(llamada).not.toHaveBeenCalled()
+    expect(mocks.informarReparacion).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [2, true, "2026-01-01T00:00:00.000Z", "sesión anónima"],
+    [2, false, null, "correo sin confirmar"],
+    [5, false, "2026-01-01T00:00:00.000Z", "rol invitado"],
+    [1, false, "2026-01-01T00:00:00.000Z", "administrador"],
+    [4, false, "2026-01-01T00:00:00.000Z", "operador"],
+  ])("rechaza %s/%s/%s (%s) antes del CAPTCHA", async (rol, anonimo, correo, _caso) => {
+    sesionConRol(rol as number, anonimo as boolean, "cuenta-1", correo as string | null)
+    const llamada = siteverifyEvidencia()
+
+    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+      success: false,
+      error: MENSAJE_CUENTA_REPARACION,
+    })
+    expect(llamada).not.toHaveBeenCalled()
+    expect(mocks.informarReparacion).not.toHaveBeenCalled()
+  })
+
+  it("verifica el token con la action de la evidencia y después ejecuta el workflow", async () => {
+    const llamada = siteverifyEvidencia()
+
+    const resultado = await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)
+
+    expect(resultado).toMatchObject({ success: true })
+    expect(llamada).toHaveBeenCalledOnce()
+    const [url, opciones] = llamada.mock.calls[0]
+    expect(url).toBe(SITEVERIFY_URL)
+    expect(opciones.body.get("response")).toBe(TOKEN_DE_EVIDENCIA)
+    expect(mocks.informarReparacion).toHaveBeenCalledOnce()
+    expect(mocks.informarReparacion).toHaveBeenCalledWith({}, 7, "ciudadano-1", {
+      comentario: "Bache tapado y señalizado",
+      image: expect.any(File),
+    })
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
+  })
+
+  it("rechaza un envío directo sin token sin moderar la foto", async () => {
+    const llamada = siteverifyEvidencia()
+
+    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia())).toEqual({
+      success: false,
+      error: "La verificación falló o venció. Completá la verificación y volvé a intentarlo.",
+    })
+    expect(llamada).not.toHaveBeenCalled()
+    expect(mocks.informarReparacion).not.toHaveBeenCalled()
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+  })
+
+  it("valida comentario y foto antes de abrir la sesión", async () => {
+    expect(await informarReparacionAction(7, "   ", fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+      success: false,
+      error: MENSAJE_COMENTARIO,
+    })
+    expect(await informarReparacionAction(7, COMENTARIO, "no es un archivo" as unknown as File, TOKEN_DE_EVIDENCIA)).toEqual({
+      success: false,
+      error: "Adjuntá una fotografía de la reparación.",
+    })
+    expect(mocks.createClient).not.toHaveBeenCalled()
+    expect(mocks.informarReparacion).not.toHaveBeenCalled()
+  })
+
+  it("informa el rechazo del workflow sin revalidar", async () => {
+    mocks.informarReparacion.mockResolvedValue({ success: false, error: "Alcanzaste el límite de 3 evidencias de reparación por día." })
+
+    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+      success: false,
+      error: "Alcanzaste el límite de 3 evidencias de reparación por día.",
+    })
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe("confirmarReparacionAction e impugnarReparacionAction", () => {
+  beforeEach(() => {
+    configurarTurnstile()
+    sesionConRol(2)
+    mocks.createAdminClient.mockReturnValue({})
+    mocks.verificarReparacion.mockResolvedValue({
+      success: true,
+      data: {
+        tipo: "confirmacion", repetida: false, evidenciaEstado: "en_verificacion", reporteEstadoId: 1,
+        cerrado: false, confirmaciones: 1, impugnaciones: 0, impugnacionesPendientes: 0, umbral: 3,
+      },
+    })
+  })
+
+  it("registra la confirmación sin CAPTCHA y revalida el reporte", async () => {
+    const llamada = siteverify()
+
+    await expect(confirmarReparacionAction(7, EVIDENCIA_ID)).resolves.toMatchObject({ success: true })
+
+    expect(llamada).not.toHaveBeenCalled()
+    expect(mocks.verificarReparacion).toHaveBeenCalledWith({}, EVIDENCIA_ID, "ciudadano-1", "confirmacion", undefined)
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
+  })
+
+  it("envía el motivo de la impugnación al workflow", async () => {
+    mocks.verificarReparacion.mockResolvedValue({
+      success: true,
+      data: {
+        tipo: "impugnacion", repetida: false, evidenciaEstado: "en_verificacion", reporteEstadoId: 1,
+        cerrado: false, confirmaciones: 0, impugnaciones: 1, impugnacionesPendientes: 1, umbral: 3,
+      },
+    })
+
+    await expect(impugnarReparacionAction(7, EVIDENCIA_ID, "  El bache sigue  ")).resolves.toMatchObject({ success: true })
+
+    expect(mocks.verificarReparacion).toHaveBeenCalledWith({}, EVIDENCIA_ID, "ciudadano-1", "impugnacion", "El bache sigue")
+  })
+
+  it.each([
+    [2, true, "2026-01-01T00:00:00.000Z"],
+    [2, false, null],
+    [5, false, "2026-01-01T00:00:00.000Z"],
+    [1, false, "2026-01-01T00:00:00.000Z"],
+    [4, false, "2026-01-01T00:00:00.000Z"],
+  ])("rechaza rol %s anónimo %s correo %s antes de verificar", async (rol, anonimo, correo) => {
+    sesionConRol(rol as number, anonimo as boolean, "cuenta-1", correo as string | null)
+
+    expect(await confirmarReparacionAction(7, EVIDENCIA_ID)).toEqual({ success: false, error: MENSAJE_CUENTA_REPARACION })
+    expect(mocks.verificarReparacion).not.toHaveBeenCalled()
+  })
+
+  it("exige sesión para confirmar o impugnar", async () => {
+    mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
+
+    expect(await confirmarReparacionAction(7, EVIDENCIA_ID)).toEqual({
+      success: false,
+      error: "Tenés que iniciar sesión para confirmar o impugnar una reparación.",
+    })
+    expect(mocks.verificarReparacion).not.toHaveBeenCalled()
+  })
+
+  it("rechaza un identificador de evidencia inválido sin abrir sesión", async () => {
+    expect(await confirmarReparacionAction(7, "no-es-uuid")).toEqual({ success: false, error: MENSAJE_EVIDENCIA_INVALIDA })
+    expect(mocks.createClient).not.toHaveBeenCalled()
+  })
+})
+
+describe("acciones administrativas de evidencia", () => {
+  beforeEach(() => {
+    sesionConRol(1, false, "admin-1")
+    mocks.createAdminClient.mockReturnValue({})
+    mocks.resolverEvidencia.mockResolvedValue({
+      success: true,
+      data: {
+        accion: "aprobar", repetida: false, evidenciaEstado: "validada", reporteEstadoId: 2,
+        cerrado: true, revertido: false, confirmaciones: 1, impugnaciones: 0, impugnacionesPendientes: 0,
+      },
+    })
+    mocks.resolverImpugnacion.mockResolvedValue({
+      success: true,
+      data: {
+        accion: "descartada", repetida: false, evidenciaEstado: "en_verificacion", reporteEstadoId: 1,
+        cerrado: false, revertido: false, confirmaciones: 1, impugnaciones: 1, impugnacionesPendientes: 0,
+      },
+    })
+  })
+
+  it("aprueba una evidencia y revalida el reporte", async () => {
+    await expect(resolverEvidenciaReparacionAdminAction(7, EVIDENCIA_ID, "aprobar", "  Foto clara  ")).resolves.toMatchObject({ success: true })
+
+    expect(mocks.resolverEvidencia).toHaveBeenCalledWith({}, EVIDENCIA_ID, "admin-1", "aprobar", "Foto clara")
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
+  })
+
+  it("revierte una reparación validada", async () => {
+    await resolverEvidenciaReparacionAdminAction(7, EVIDENCIA_ID, "revertir")
+
+    expect(mocks.resolverEvidencia).toHaveBeenCalledWith({}, EVIDENCIA_ID, "admin-1", "revertir", undefined)
+  })
+
+  it("resuelve una impugnación pendiente", async () => {
+    await resolverImpugnacionReparacionAdminAction(7, IMPUGNACION_ID, "descartada", "  Sigue igual  ")
+
+    expect(mocks.resolverImpugnacion).toHaveBeenCalledWith({}, IMPUGNACION_ID, "admin-1", "descartada", "Sigue igual")
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
+  })
+
+  it("rechaza acciones administrativas desconocidas sin abrir sesión", async () => {
+    expect(await resolverEvidenciaReparacionAdminAction(7, EVIDENCIA_ID, "publicar" as never)).toEqual({
+      success: false,
+      error: "Acción administrativa inválida.",
+    })
+    expect(await resolverImpugnacionReparacionAdminAction(7, IMPUGNACION_ID, "ignorada" as never)).toEqual({
+      success: false,
+      error: "Elegí aceptar o descartar la impugnación.",
+    })
+    expect(mocks.createClient).not.toHaveBeenCalled()
+  })
+
+  it("exige sesión para revisar evidencias", async () => {
+    mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
+
+    expect(await resolverEvidenciaReparacionAdminAction(7, EVIDENCIA_ID, "aprobar")).toEqual({
+      success: false,
+      error: "Tenés que iniciar sesión para revisar la evidencia.",
+    })
   })
 })

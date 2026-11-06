@@ -102,6 +102,48 @@ describe("frontera administrativa", () => {
     expect(await ejecutarRevision(id, "avisar")).toMatchObject({ exito: false })
     expect(dobles.avisar).not.toHaveBeenCalled()
   })
+  it("lee el destino de la fila para distinguir la evidencia de una foto de reporte", async () => {
+    await ejecutarRevision(id, "rechazar")
+    expect(consulta.select.mock.calls.flat().join(",")).toContain("destino")
+  })
+  it("rechazar la foto de una evidencia de reparación conserva el reporte y no envía aviso", async () => {
+    Object.assign(fila, { destino: "evidencia_reparacion", evidencia_id: "evidencia-1" })
+    expect(await ejecutarRevision(id, "rechazar")).toEqual({
+      exito: true, reporteId: 7, mensaje: "Evidencia de reparación rechazada; el reporte y sus fotos se conservan.",
+    })
+    expect(dobles.avisar).not.toHaveBeenCalled()
+    expect(dobles.limpiar).toHaveBeenCalledWith(dobles.servicio.mock.results[0].value, id)
+  })
+  it("rechazar la foto de una evidencia con limpieza pendiente tampoco retira el reporte", async () => {
+    Object.assign(fila, { destino: "evidencia_reparacion", evidencia_id: "evidencia-1" })
+    dobles.limpiar.mockResolvedValue(["limpieza_privada_pendiente"])
+    expect(await ejecutarRevision(id, "rechazar")).toEqual({
+      exito: true, reporteId: 7,
+      mensaje: "Evidencia de reparación rechazada; el reporte se conserva. Limpieza pendiente.",
+    })
+    expect(dobles.avisar).not.toHaveBeenCalled()
+  })
+  it("avisar y conciliar no retiran el reporte por la foto de una evidencia", async () => {
+    Object.assign(fila, {
+      destino: "evidencia_reparacion", evidencia_id: "evidencia-1", decision: "REJECTED", estado_publicacion: "rechazada",
+    })
+    expect(await ejecutarRevision(id, "avisar")).toEqual({
+      exito: false, mensaje: "La foto de una evidencia de reparación no retira el reporte.",
+    })
+    expect(await ejecutarRevision(id, "conciliar")).toEqual({
+      exito: false, mensaje: "La foto de una evidencia de reparación no retira el reporte.",
+    })
+    expect(dobles.avisar).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+  it("la cola no consulta avisos de retiro para la foto de una evidencia", async () => {
+    Object.assign(fila, {
+      destino: "evidencia_reparacion", evidencia_id: "evidencia-1", decision: "REJECTED", estado_publicacion: "rechazada",
+    })
+    const lista = await listarImagenesAdministrativas(0, true)
+    expect(dobles.servicio.mock.results[0].value.from).not.toHaveBeenCalledWith("avisos_retiro_reporte")
+    expect(lista[0].aviso).toBeUndefined()
+  })
   it("rechazo comunica retiro aunque el aviso quede pendiente", async () => {
     expect(await ejecutarRevision(id, "rechazar")).toMatchObject({ exito: true, reporteId: 7, mensaje: expect.stringContaining("Reporte retirado") })
     expect(dobles.avisar).toHaveBeenCalledWith(dobles.servicio.mock.results[0].value, 7)
