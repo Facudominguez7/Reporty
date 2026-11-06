@@ -20,7 +20,7 @@ function escenario(inicial: Record<string, unknown> | null = null) {
   const objetos = new Map<string, Uint8Array>()
   let fila: Record<string, unknown> | null = inicial
   let errorDescarga: unknown = null
-  const fallos = { cuota: false, copia: false, confirmar: false, eliminar: false, privado: false, privadoExcepcion: false, registro: false, decision: false, borrado: false, propietario: "persona", carrera: false, carreraBorrado: false, creacion: "" as string, creacionMensaje: "El reporte ya tiene una evidencia de reparación activa", lectura: 0, evidencia: { id: "evidencia-1", autor_id: "persona", estado: "informada", comentario: "Bache tapado" } as Record<string, unknown> | null }
+  const fallos = { cuota: false, copia: false, confirmar: false, eliminar: false, privado: false, privadoExcepcion: false, privadoRespuestaPerdida: false, registro: false, decision: false, borrado: false, propietario: "persona", carrera: false, carreraBorrado: false, creacion: "" as string, creacionMensaje: "El reporte ya tiene una evidencia de reparación activa", lectura: 0, evidencia: { id: "evidencia-1", autor_id: "persona", estado: "informada", comentario: "Bache tapado" } as Record<string, unknown> | null }
   const rpc = vi.fn(async (nombre: string, p: Record<string, unknown>) => {
     eventos.push(nombre)
     if (nombre === "crear_evidencia_reparacion") {
@@ -100,6 +100,8 @@ function escenario(inicial: Record<string, unknown> | null = null) {
       if ((bucket === "reportes" && fallos.copia) || (bucket !== "reportes" && fallos.privado)) return { error: { message: "fallo" } }
       if (objetos.has(`${bucket}/${path}`)) return { error: { statusCode: "409" } }
       objetos.set(`${bucket}/${path}`, new Uint8Array(bytes))
+      // Storage guardó los bytes pero la respuesta no llegó al servidor.
+      if (bucket === "reportes-pendientes" && fallos.privadoRespuestaPerdida) return { error: { message: "respuesta perdida" } }
       return { error: null }
     }),
     download: vi.fn(async (path: string) => {
@@ -550,6 +552,19 @@ describe("evidencia de reparación en el pipeline de moderación", () => {
     expect(e.eventos).not.toContain("decidir_imagen_moderacion")
     expect(e.eventos).not.toContain("subir:reportes")
     expect(moderarImagen).not.toHaveBeenCalled()
+  })
+
+  it("acepta la carga privada cuya respuesta se perdió si Storage ya guardó los mismos bytes", async () => {
+    const e = escenario(filaEvidencia())
+    e.fallos.privadoRespuestaPerdida = true
+
+    const resultado = await moderarYGuardarImagenEvidenciaReparacion(e.supabase, await entradaEvidencia())
+
+    // Los bytes confirmados en Storage cuentan como carga hecha: se clasifica una sola vez.
+    expect(resultado).toMatchObject({ evidenciaId: "evidencia-1", estado: "APPROVED", publicada: true })
+    expect(e.fila().motivos).not.toContain("carga_privada_pendiente")
+    expect(moderarImagen).toHaveBeenCalledOnce()
+    expect(e.eventos.filter((evento) => evento === "confirmar_publicacion_moderacion")).toHaveLength(1)
   })
 
   it("rechaza como no reanudable una foto distinta aunque el comentario también cambie", async () => {
