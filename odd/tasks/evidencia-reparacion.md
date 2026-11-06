@@ -1,0 +1,56 @@
+Feature: evidencia fotográfica y verificación comunitaria de reparaciones (issue #145, "agregar foto del reporte reparado").
+Branch: `feat/evidencia-reparacion` from `origin/main` `c5b5393`; delivery: work-unit commits on the feature branch, push/PR are the user's decision.
+Checks: Vitest (`npm test`), pgTAP SQL (`supabase/tests/`), Playwright (`npm run test:e2e`), `npm run lint`, `npx tsc --noEmit`.
+
+## Specs
+
+User request (L1), quoted verbatim:
+
+- S1: "Permitir que cualquier usuario autenticado adjunte una fotografía y un comentario para informar que un problema fue reparado."
+- S2: "No cambiar automáticamente el estado a Reparado al subir una fotografía."
+- S3: "Incorporar una etapa de verificación comunitaria."
+- S4: "Permitir que usuarios autenticados confirmen o impugnen una reparación."
+- S5: "Exigir inicialmente tres confirmaciones independientes para considerar una reparación validada, siempre que no existan impugnaciones pendientes."
+- S6: "Evitar que el autor de la evidencia valide su propia fotografía."
+- S7: "Aplicar controles contra votos duplicados y abuso de cuentas."
+- S8: "Permitir que administradores aprueben, rechacen o reviertan una reparación."
+- S9: "Conservar el historial de estados y todas las fotografías originales."
+- S10: "Mostrar en el detalle del reporte una comparación visual «Antes / Después» cuando exista evidencia de reparación."
+- S11: "Diferenciar claramente «Reparación informada», «En verificación» y «Reparado»."
+- S12 (Seguridad): "Implementar autorización del lado del servidor y políticas RLS correspondientes." / "Validar archivos, tamaño y tipo real de imagen." / "Aplicar el sistema de moderación de fotografías existente." / "No permitir votos duplicados." / "Registrar usuario, fecha y acción en auditoría." / "Evitar modificaciones directas de estados desde el cliente." / "Diseñar una transición transaccional e idempotente para confirmar reparaciones."
+- S13 (Diseño): "Utilizar gentle:design para mantener la identidad visual actual de Reporty." / "Evitar formularios innecesarios y facilitar la carga de evidencia desde dispositivos móviles."
+- S14 (Implementación): "Antes de modificar código, inspeccionar el esquema de base de datos y las implementaciones existentes. Diseñar las migraciones necesarias sin romper reportes históricos. Implementar backend, frontend y pruebas automatizadas." / "No introducir dependencias adicionales salvo que sean justificadas. Documentar las reglas de negocio y los criterios de aceptación."
+- S15 (Decisions, L2–L3):
+  - The new flow replaces the community «Reparado» vote ("Reemplazarlo por el nuevo flujo"); the «No existe» vote and the direct Admin/Operador closure stay; historical votes are kept.
+  - Three confirmations without pending challenges move the report to Reparado automatically ("Pasa a Reparado automáticamente"); an admin can revert it.
+  - A challenge ("impugnación") blocks validation and goes to Admin → Revisiones; the admin accepts it (evidence rejected, report stays pending) or dismisses it (verification continues) ("Opcion A si").
+  - Participants are registered accounts with a confirmed email; guests/anonymous sessions are excluded; Admin/Operador do not vote; the report creator may confirm ("Cuentas registradas con email confirmado").
+  - Working state definitions: «Reparación informada» = evidence submitted, photo in moderation; «En verificación» = photo published, collecting confirmations; «Reparado» = validated by 3 confirmations or approved by an admin.
+
+## Tasks
+
+- T1 — S14 — explore (gentle-ai-explore): DB schema, vote RPCs, audit, state history, moderation RPCs — done; map in L4.
+- T2 — S10, S11, S13 — gentle-design artboards on the canvas, user picks one — pending.
+- T3 — S1–S9, S12, S14 — migration: evidence, verification votes, challenges, transactional RPCs, RLS, audit, moderation link; pgTAP tests — done (worker mw4ytwkn-4-ai6y); evidence in L7.
+- T4 — S1–S8, S12, S15 — server use-cases and actions (evidence upload with moderation and Turnstile, confirm/challenge, admin approve/reject/revert); replace the «Reparado» vote; Vitest — pending.
+- T5 — S8, S15 — Admin → Revisiones queue for challenges and evidence — pending.
+- T6 — S10, S11, S13 — report detail UI: states, Antes/Después, mobile evidence upload, confirm/challenge — pending.
+- T7 — S1–S15 — E2E, business rules and acceptance criteria doc — pending.
+- T8 — S1–S15 — independent verification (high risk: items 1 and 2) and native review — pending.
+
+## Log
+
+- L1 — User request verbatim (2026-11-06), after relaying Octavio Duarte's message "fijate ese tema de / agregar imagen reparada / centrate en eso": the full brief "Implementar en Reporty un sistema de evidencia fotográfica y verificación comunitaria de problemas urbanos reparados. …" quoted in S1–S14.
+- L2 — Questionnaire answers: «Reemplazarlo por el nuevo flujo (recomendado)»; «Pasa a Reparado automáticamente (recomendado)»; «Cuentas registradas con email confirmado (recomendado)»; on challenges the user asked "que es eso de impugnacion".
+- L3 — After the explanation of challenges, the user answered "Opcion A si".
+- L4 — T1 map (explorer mw4ydgqb-2-nu6n): votes `votos_reparado`/`votos_no_existe` (UNIQUE per user, client inserts revoked) closed in SQL by `registrar_voto_exclusivo` (`20261029120000_votos_exclusivos.sql:34-95`, service_role, threshold 5 → `estado_id=2`, +5 points, `historial_estados`); No Existe admin queue `reportes_revision_rechazo` + `app/admin/moderacion/reportes-actions.ts`; audit `audit_events` (`20261027150338_admin_audit.sql`, CHECK on action names, trigger writer); moderation `moderacion_imagenes` with owner-only trigger `validar_propietario_moderacion` and `confirmar_publicacion_moderacion` inserting into `fotos_reporte`; TS `moderarYGuardarImagenReporte`/`publicarImagenModerada`; auth helpers `lib/authz/roles.ts` (`isAnonymousUser`, `isGuestRole`, `puedeVotarReportes`), no `email_confirmed_at` helper; Turnstile `verificarCaptchaDeAccion`; rate limit `claim_report_submission`; UI entry `votarReparadoAction` (`app/reportes/[id]/actions.ts:159`) and `handleVoteReparado` (`reporte-detalle-client.tsx:291-323`); SQL tests run by `scripts/local-supabase/test-*.sh` (`begin; migration; test; rollback;` via `docker exec psql`).
+- L5 — T2 (gentle-design, S10/S11/S13/S15): dirección de diseño en `design/evidencia-reparacion/`, tres artboards móviles de 390 px sobre el reporte de ejemplo «Bache en Av. Uruguay y Bolívar» (Calles), con los tres estados, Antes/Después, el flujo mínimo de informar reparación, confirmar/impugnar y la impugnación pendiente: `01-deslizador-antes-despues.html` (deslizador Antes/Después en la galería + barra inferior fija), `02-tarjetas-lado-a-lado-linea-tiempo.html` (tarjetas lado a lado + línea de verificación vertical) y `03-pestanas-hoja-inferior.html` (pestañas Antes/Después + hoja inferior). `design.json` lleva `feature: odd/tasks/evidencia-reparacion.md`. Todavía sin elegir: el usuario decide en el canvas.
+- L6 — Technical design for T3–T5 (parent decision, follows S1–S15 and L4):
+  - Tables (new migration, no edits to applied ones): `evidencias_reparacion` (uuid id, `reporte_id`, `autor_id`, `comentario` ≤500, `estado` in `informada|en_verificacion|validada|rechazada|revertida`, link to `moderacion_imagenes`, public photo `bucket`/`path`/`thumbnail_path`/`url` filled on publish, `created_at`, `publicada_at`, `resuelta_at`, `resuelta_por`, `motivo_resolucion`); partial unique index: at most one active evidence (`informada|en_verificacion`) per report. `verificaciones_reparacion` (`evidencia_id`, `usuario_id`, `tipo` in `confirmacion|impugnacion`, `motivo` required for impugnación, impugnación `estado` in `pendiente|aceptada|descartada`, `resuelta_at`, `resuelta_por`, `created_at`); UNIQUE(`evidencia_id`, `usuario_id`) so a user has one verification per evidence.
+  - RLS enabled on both tables with no client policies; grants only to `service_role`. Clients never write state; reads go through server query modules that expose counts and safe columns only (no voter identities).
+  - Moderation reuse: `moderacion_imagenes` gains a destination (`reporte` default | `evidencia_reparacion`) and the evidence id; `validar_propietario_moderacion` keeps the owner rule for `reporte` and, for evidence, requires `propietario_id` = evidence author; `confirmar_publicacion_moderacion` keeps inserting into `fotos_reporte` for `reporte` and, for evidence, fills the evidence photo and moves it `informada → en_verificacion`. A REJECTED photo moves the evidence to `rechazada`. Original `fotos_reporte` rows are never touched (S9).
+  - RPCs (security definer, `set search_path`, `service_role` only, row locks report → evidence, idempotent): `crear_evidencia_reparacion` (eligibility, report pending, one active evidence, daily limit per user), `registrar_verificacion_reparacion` (eligibility: not anonymous, `rol_id` not in Admin/Operador/Invitado, `auth.users.email_confirmed_at` not null, not the evidence author; repeating the same verification returns the current result; at 3 confirmations with no pending impugnación closes: evidence `validada`, report `estado_id=2`, +5 points to the report author like the current closure, `historial_estados` row), `resolver_impugnacion_reparacion` (Admin: accept → impugnación `aceptada`, evidence `rechazada`; dismiss → `descartada` and re-evaluate the threshold), `resolver_evidencia_reparacion_admin` (Admin: approve → validated + Reparado; reject → `rechazada`; revert a validated one → `revertida`, report back to Pendiente, history row, −5 points).
+  - Threshold 3 lives in one SQL function plus a TS catalog constant ("inicialmente tres").
+  - The old `reparado` vote: `registrar_voto_exclusivo` rejects new `reparado` votes (server-side, S15); `votos_reparado` history kept.
+  - Audit: extend the `audit_events` action CHECK and record evidence submitted, confirmation, impugnación, impugnación resolved, admin approve/reject/revert with actor, report and time.
+- L7 — T3 done: `supabase/migrations/20261106120000_evidencia_reparacion.sql` (821 lines), `supabase/tests/evidencia_reparacion.sql`, `scripts/local-supabase/test-evidencia-reparacion.sh`. Parent re-ran the runner: exit 0, "OK evidencia de reparación: …", `ROLLBACK`; the migration is not applied to the local DB. Worker evidence: moderation SQL tests and `test-report-vote-exclusivo.sh` green with the migration; `no_existe` differential identical (117 lines). Deviations from L6: errors `PRE01`–`PRE11`; points through `adjust_profile_points_atomic` (clamped at 0); the community closure after dismissing a challenge records the admin as `historial_estados.usuario_id`; the existing UNIQUE(`reporte_id`, `hash_sha256`) also dedupes evidence photos per report (`PRE03`). Follow-up for T4: `supabase/tests/report_vote_exclusivo.sql` now fails by design on its `reparado` vote and must be updated; the local DB lacks `20261103145429_automatic_usernames`.
