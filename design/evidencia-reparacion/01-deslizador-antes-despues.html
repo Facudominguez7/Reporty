@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 · Deslizador antes/después y barra inferior fija — Detalle del reporte</title>
+<style>
+  /* Tokens de design/system.md. Sin recursos externos: SVG en línea y pila del sistema. */
+  :root{
+    --background:oklch(94.463% 0.00213 14.416);
+    --foreground:oklch(0.19 0.01 95);
+    --card:oklch(1 0 0);
+    --card-foreground:oklch(0.19 0.01 95);
+    --primary:oklch(0.57 0.12 157);
+    --primary-foreground:oklch(0.985 0 0);
+    /* El verde del sistema con texto blanco mide 4.04:1; al 90% + 10% foreground sube a 4.75:1 (AA). */
+    --primary-fuerte:color-mix(in oklab, var(--primary) 90%, var(--foreground));
+    --secondary:#000000;
+    --secondary-foreground:#ffffff;
+    --muted:oklch(96.115% 0.00011 271.152);
+    --muted-foreground:oklch(0.45 0.028 157);
+    --destructive:oklch(0.57 0.18 25);
+    --destructive-foreground:oklch(0.985 0 0);
+    --border:oklch(78.892% 0.00009 271.152);
+    --input:oklch(96.416% 0.00011 271.152);
+    --ring:oklch(0.62 0.08 230);
+    --radius:0.75rem;
+    --radius-pill:999px;
+    --surface-subtle:oklch(94.007% 0.00011 271.152);
+    --semantic-info:oklch(0.56 0.11 240);
+    --semantic-success:oklch(0.57 0.12 157);
+    --semantic-warning:oklch(0.72 0.13 85);
+    --semantic-danger:oklch(0.57 0.18 25);
+    --semantic-admin:oklch(0.5 0.1 285);
+    --card-shadow:7px 7px 12px color-mix(in oklab, var(--foreground) 20%, transparent);
+    --fuente:"Geist","Geist Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--background)}
+  body{
+    margin:0;width:390px;padding-bottom:24px;background:var(--background);color:var(--foreground);
+    font-family:var(--fuente);font-feature-settings:"cv02","cv03","cv04","cv11";-webkit-font-smoothing:antialiased;
+    font-size:.9375rem;line-height:1.45;
+  }
+  p{margin:0}
+  h1,h2,h3{margin:0;letter-spacing:-.01em}
+  a{color:var(--primary)}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .salto{position:absolute;left:-9999px;top:0;z-index:99;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:.875rem}
+  .salto:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+  /* El input de archivo vive oculto: el anillo de foco se dibuja sobre su etiqueta. */
+  .sr-only:focus-visible + label,.sr-only:focus-visible + .subida{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+
+  /* ---------- Barra superior ---------- */
+  .barra-superior{
+    position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;
+    padding:10px 12px;background:color-mix(in oklab, var(--card) 92%, transparent);
+    border-bottom:1px solid var(--border);backdrop-filter:blur(6px);
+  }
+  .barra-superior h1{font-size:.9375rem;font-weight:600;flex:1;min-width:0}
+  .icono-btn{
+    display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:0 0 auto;
+    border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);color:var(--foreground);text-decoration:none;
+  }
+  .icono-btn svg{width:16px;height:16px}
+
+  /* ---------- Contenedor y tarjetas ---------- */
+  .contenedor{display:flex;flex-direction:column;gap:12px;padding:12px}
+  .tarjeta{
+    display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--card);color:var(--card-foreground);
+    border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+  .tarjeta-titulo{font-size:1.0625rem;font-weight:600;line-height:1.2}
+  .tarjeta-copy{font-size:.8125rem;line-height:1.55;color:var(--muted-foreground)}
+  .meta{display:flex;align-items:center;gap:6px;font-size:.6875rem;color:var(--muted-foreground)}
+  .meta svg{width:13px;height:13px;flex:0 0 auto}
+  .etiqueta-meta{font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-foreground)}
+  .titulo-seccion{font-size:.9375rem;font-weight:600}
+
+  /* ---------- Chips de estado / prioridad / categoría ---------- */
+  .chip-fila{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid transparent;
+    border-radius:var(--radius-pill);font-size:.625rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+  }
+  .chip svg{width:11px;height:11px}
+  .chip-prioridad-alta{background:var(--destructive);color:var(--destructive-foreground)}
+  .chip-categoria{background:var(--semantic-admin);color:var(--card)}
+  .chip-informada{
+    background:color-mix(in oklab, var(--semantic-warning) 16%, var(--card));
+    border-color:color-mix(in oklab, var(--semantic-warning) 48%, var(--border));
+    color:var(--foreground);
+  }
+  .chip-verificacion{background:var(--semantic-info);color:var(--card)}
+  .chip-reparado{background:var(--primary-fuerte);color:var(--primary-foreground)}
+
+  /* ---------- Autor ---------- */
+  .autor{display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted-foreground)}
+  .avatar{
+    display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 auto;
+    border-radius:var(--radius-pill);background:var(--accent,var(--muted));color:var(--foreground);
+    font-size:.625rem;font-weight:600;
+  }
+
+  /* ---------- Comparador antes / después ---------- */
+  .comparador-marco{
+    position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;border-radius:var(--radius);
+    border:1px solid var(--border);background:var(--surface-subtle);--corte:50%;
+  }
+  .capa{position:absolute;inset:0}
+  .capa svg{display:block;width:100%;height:100%}
+  .capa-despues{clip-path:inset(0 0 0 var(--corte))}
+  .marca{
+    position:absolute;top:8px;z-index:2;padding:2px 8px;border-radius:var(--radius-pill);
+    background:color-mix(in oklab, var(--foreground) 82%, transparent);color:var(--card);
+    font-size:.625rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+  }
+  .marca-antes{left:8px}
+  .marca-despues{right:8px}
+  .manija{position:absolute;top:0;bottom:0;left:var(--corte);z-index:2;width:2px;background:var(--card);transform:translateX(-1px)}
+  .manija-punto{
+    position:absolute;top:50%;left:50%;display:flex;align-items:center;justify-content:center;
+    width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:var(--radius-pill);
+    background:var(--card);border:1px solid var(--border);color:var(--foreground);
+    box-shadow:0 2px 8px color-mix(in oklab, var(--foreground) 35%, transparent);font-size:.75rem;
+  }
+  .rango{
+    -webkit-appearance:none;appearance:none;width:100%;height:32px;margin:0;background:transparent;
+  }
+  .rango::-webkit-slider-runnable-track{height:6px;border-radius:var(--radius-pill);background:var(--input);border:1px solid var(--border)}
+  .rango::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:24px;height:24px;margin-top:-10px;border-radius:var(--radius-pill);
+    background:var(--secondary);border:2px solid var(--card);
+  }
+  .rango::-moz-range-track{height:6px;border-radius:var(--radius-pill);background:var(--input);border:1px solid var(--border)}
+  .rango::-moz-range-thumb{width:22px;height:22px;border-radius:var(--radius-pill);background:var(--secondary);border:2px solid var(--card)}
+  .rango:focus-visible{outline:2px solid var(--ring);outline-offset:4px;border-radius:var(--radius-pill)}
+  .ayuda{font-size:.75rem;line-height:1.5;color:var(--muted-foreground)}
+
+  /* ---------- Progreso de confirmaciones ---------- */
+  .progreso{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .segmento{height:8px;border-radius:var(--radius-pill);background:var(--input);border:1px solid var(--border)}
+  .segmento.hecho{background:var(--primary);border-color:var(--primary)}
+  .progreso-texto{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .progreso-cifra{font-size:.875rem;font-weight:600}
+  .confirmaciones{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+  .confirmaciones li{display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted-foreground)}
+  .confirmaciones .tick{
+    display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:0 0 auto;
+    border-radius:var(--radius-pill);background:color-mix(in oklab, var(--semantic-success) 18%, var(--card));color:var(--primary);
+  }
+  .confirmaciones .tick svg{width:10px;height:10px}
+  .confirmaciones .pendiente{
+    display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:0 0 auto;
+    border-radius:var(--radius-pill);border:1px dashed var(--border);color:var(--muted-foreground);
+  }
+
+  /* ---------- Botones ---------- */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;
+    border:1px solid transparent;border-radius:var(--radius-pill);background:var(--card);color:var(--foreground);
+    font-family:inherit;font-size:.875rem;font-weight:500;text-decoration:none;white-space:nowrap;
+  }
+  .btn svg{width:16px;height:16px;flex:0 0 auto}
+  .btn-primario{background:var(--primary-fuerte);color:var(--primary-foreground)}
+  .btn-contorno{background:var(--card);border-color:var(--border)}
+  .btn-impugnar{background:var(--card);border-color:color-mix(in oklab, var(--destructive) 45%, var(--border));color:var(--destructive)}
+  .btn-full{width:100%}
+  .btn-deshabilitado{opacity:.5}
+  .fila-botones{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  /* ---------- Avisos ---------- */
+  .aviso-pausa{
+    display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:var(--radius);
+    background:color-mix(in oklab, var(--semantic-warning) 14%, var(--card));
+    border:1px solid color-mix(in oklab, var(--semantic-warning) 48%, var(--border));
+  }
+  .aviso-pausa svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px;color:var(--foreground)}
+  .aviso-pausa strong{display:block;font-size:.8125rem;font-weight:600}
+  .aviso-pausa p{font-size:.75rem;line-height:1.5}
+
+  /* ---------- Variantes compactas de estado ---------- */
+  .variantes{display:flex;flex-direction:column;gap:12px}
+  .marco-variante{
+    position:relative;padding:26px 12px 12px;border:1px solid var(--border);border-radius:var(--radius);
+    background:var(--surface-subtle);
+  }
+  .rotulo{
+    position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:var(--radius-pill);
+    border:1px solid var(--border);background:var(--card);color:var(--muted-foreground);
+    font-size:.625rem;letter-spacing:.02em;
+  }
+  .variante-tarjeta{
+    display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--card);
+    border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+
+  /* ---------- Formulario de evidencia ---------- */
+  .subida{
+    display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;cursor:pointer;
+    border:1px dashed color-mix(in oklab, var(--primary) 55%, var(--border));border-radius:var(--radius);
+    background:color-mix(in oklab, var(--primary) 6%, var(--card));text-align:center;
+  }
+  .subida svg{width:24px;height:24px;color:var(--primary)}
+  .subida-titulo{font-size:.875rem;font-weight:600}
+  .subida-ayuda{font-size:.75rem;color:var(--muted-foreground)}
+  .campo{display:flex;flex-direction:column;gap:6px}
+  .campo-etiqueta{font-size:.8125rem;font-weight:500}
+  .entrada{
+    width:100%;min-height:44px;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);
+    background:var(--input);color:var(--foreground);font-family:inherit;font-size:.875rem;resize:vertical;
+  }
+  .entrada::placeholder{color:var(--muted-foreground)}
+  .widget{
+    display:flex;align-items:center;gap:10px;width:100%;height:65px;padding:0 12px;
+    border:1px solid var(--border);border-radius:6px;background:var(--card);
+  }
+  .widget-caja{width:22px;height:22px;flex:0 0 auto;border:2px solid var(--muted-foreground);border-radius:3px}
+  .widget-texto{flex:1;min-width:0}
+  .widget-texto strong{display:block;font-size:.8125rem;font-weight:500}
+  .widget-texto small{display:block;font-size:.5625rem;color:var(--muted-foreground);margin-top:2px}
+  .estado-verificacion{font-size:.75rem;color:var(--muted-foreground)}
+
+  /* ---------- Barra inferior fija (representación estática) ---------- */
+  .marco-barra{position:relative;padding:26px 0 0}
+  .barra-fija{
+    display:flex;gap:8px;align-items:center;padding:10px 12px;
+    border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;background:var(--card);
+    box-shadow:0 -8px 22px color-mix(in oklab, var(--foreground) 16%, transparent);
+  }
+  .barra-fija .btn{min-height:44px;font-size:.8125rem}
+
+  .pie{padding:0 12px 8px;font-size:.6875rem;color:var(--muted-foreground);text-align:center;line-height:1.5}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+  /* ---------- Ilustraciones en línea ---------- */
+  .ini-cielo{fill:color-mix(in oklab, var(--semantic-info) 16%, var(--card))}
+  .ini-edificio-a{fill:color-mix(in oklab, var(--foreground) 22%, var(--card))}
+  .ini-edificio-b{fill:color-mix(in oklab, var(--foreground) 34%, var(--card))}
+  .ini-ventana{fill:color-mix(in oklab, var(--card) 70%, var(--semantic-info))}
+  .ini-vereda{fill:color-mix(in oklab, var(--foreground) 14%, var(--card))}
+  .ini-calle{fill:color-mix(in oklab, var(--foreground) 42%, var(--card))}
+  .ini-calle-clara{fill:color-mix(in oklab, var(--foreground) 34%, var(--card))}
+  .ini-linea{fill:color-mix(in oklab, var(--card) 72%, var(--semantic-warning))}
+  .ini-bache{fill:color-mix(in oklab, var(--foreground) 78%, var(--card))}
+  .ini-bache-borde{fill:color-mix(in oklab, var(--foreground) 55%, var(--card))}
+  .ini-charco{fill:color-mix(in oklab, var(--semantic-info) 55%, var(--card));opacity:.55}
+  .ini-parche{fill:color-mix(in oklab, var(--foreground) 30%, var(--card))}
+  .ini-parche-borde{fill:color-mix(in oklab, var(--foreground) 22%, var(--card));opacity:.6}
+  .ini-cono{fill:var(--semantic-warning)}
+  .ini-cono-base{fill:color-mix(in oklab, var(--foreground) 60%, var(--card))}
+</style>
+</head>
+<body>
+<a class="salto" href="#contenido">Saltar al contenido</a>
+
+<header class="barra-superior">
+  <a class="icono-btn" href="#" aria-label="Volver a Reportes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+  </a>
+  <h1>Detalle del reporte</h1>
+  <a class="icono-btn" href="#" aria-label="Compartir reporte">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/></svg>
+  </a>
+</header>
+
+<main id="contenido" class="contenedor">
+
+  <!-- Reporte -->
+  <section class="tarjeta" aria-labelledby="rep-titulo">
+    <p class="meta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+      Creado el día 12 nov. 2025 <strong>(hace 20 días)</strong>
+    </p>
+    <div class="chip-fila">
+      <span class="chip chip-prioridad-alta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        Prioridad alta
+      </span>
+      <span class="chip chip-verificacion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        En verificación
+      </span>
+      <span class="chip chip-categoria">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/></svg>
+        Calles
+      </span>
+    </div>
+    <h2 id="rep-titulo" class="tarjeta-titulo" style="font-size:1.25rem;font-weight:700">Bache en Av. Uruguay y Bolívar</h2>
+    <p class="tarjeta-copy" style="font-size:.75rem;color:var(--foreground)">En la esquina de Av. Uruguay y Bolívar hay un bache de casi un metro que se llena de agua cuando llueve. Ya rompió dos cubiertas de motos y los autos lo esquivan invadiendo la mano contraria.</p>
+    <div class="autor">
+      <span class="avatar" aria-hidden="true">OD</span>
+      <span>Reportado por Octavio Duarte</span>
+    </div>
+  </section>
+
+  <!-- Comparación con deslizador -->
+  <section class="tarjeta" aria-labelledby="comp-titulo">
+    <div>
+      <h2 id="comp-titulo" class="titulo-seccion">Antes y después</h2>
+      <p class="tarjeta-copy">La comunidad ya puede ver la foto de la reparación.</p>
+    </div>
+
+    <div class="comparador-marco" id="marco-01">
+      <div class="capa capa-antes">
+        <svg viewBox="0 0 360 220" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto original del 12 de noviembre: bache profundo con agua acumulada en la esquina de Av. Uruguay y Bolívar">
+          <rect width="360" height="220" class="ini-cielo"/>
+          <rect x="0" y="58" width="132" height="82" class="ini-edificio-a"/>
+          <rect x="150" y="38" width="96" height="102" class="ini-edificio-b"/>
+          <rect x="258" y="66" width="102" height="74" class="ini-edificio-a"/>
+          <rect x="16" y="74" width="18" height="16" class="ini-ventana"/>
+          <rect x="48" y="74" width="18" height="16" class="ini-ventana"/>
+          <rect x="16" y="102" width="18" height="16" class="ini-ventana"/>
+          <rect x="168" y="56" width="20" height="16" class="ini-ventana"/>
+          <rect x="200" y="56" width="20" height="16" class="ini-ventana"/>
+          <rect x="168" y="86" width="20" height="16" class="ini-ventana"/>
+          <rect x="278" y="82" width="18" height="16" class="ini-ventana"/>
+          <rect x="310" y="82" width="18" height="16" class="ini-ventana"/>
+          <rect x="0" y="140" width="360" height="20" class="ini-vereda"/>
+          <rect x="0" y="160" width="360" height="60" class="ini-calle"/>
+          <rect x="0" y="186" width="120" height="7" rx="3" class="ini-linea" opacity=".55"/>
+          <rect x="210" y="186" width="150" height="7" rx="3" class="ini-linea" opacity=".55"/>
+          <path class="ini-bache-borde" d="M96 198c14-16 30-24 52-25 26-1 44 5 58 18 9 9 6 21-8 25-24 6-52 6-78 1-15-3-30-8-24-19Z"/>
+          <path class="ini-bache" d="M104 200c12-12 26-18 45-19 22-1 38 4 50 14 7 6 5 15-6 18-21 5-45 5-67 1-12-2-28-6-22-14Z"/>
+          <path class="ini-charco" d="M112 203c10-8 22-12 38-13 18-1 31 3 41 10 5 4 3 9-5 11-17 4-37 4-56 1-9-1-23-4-18-9Z"/>
+          <path class="ini-bache-borde" d="M70 214c6-3 13-2 17 2M232 216c8-4 17-2 22 2" opacity=".7"/>
+          <path class="ini-cono" d="M286 176h16l-2 24h-12Z"/>
+          <rect x="280" y="200" width="28" height="5" rx="2" class="ini-cono-base"/>
+        </svg>
+      </div>
+      <div class="capa capa-despues">
+        <svg viewBox="0 0 360 220" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto de la reparación del 28 de noviembre: el bache está tapado con asfalto nuevo y la esquina quedó pareja">
+          <rect width="360" height="220" class="ini-cielo"/>
+          <rect x="0" y="58" width="132" height="82" class="ini-edificio-a"/>
+          <rect x="150" y="38" width="96" height="102" class="ini-edificio-b"/>
+          <rect x="258" y="66" width="102" height="74" class="ini-edificio-a"/>
+          <rect x="16" y="74" width="18" height="16" class="ini-ventana"/>
+          <rect x="48" y="74" width="18" height="16" class="ini-ventana"/>
+          <rect x="16" y="102" width="18" height="16" class="ini-ventana"/>
+          <rect x="168" y="56" width="20" height="16" class="ini-ventana"/>
+          <rect x="200" y="56" width="20" height="16" class="ini-ventana"/>
+          <rect x="168" y="86" width="20" height="16" class="ini-ventana"/>
+          <rect x="278" y="82" width="18" height="16" class="ini-ventana"/>
+          <rect x="310" y="82" width="18" height="16" class="ini-ventana"/>
+          <rect x="0" y="140" width="360" height="20" class="ini-vereda"/>
+          <rect x="0" y="160" width="360" height="60" class="ini-calle-clara"/>
+          <rect x="0" y="186" width="120" height="7" rx="3" class="ini-linea" opacity=".55"/>
+          <rect x="210" y="186" width="150" height="7" rx="3" class="ini-linea" opacity=".55"/>
+          <path class="ini-parche-borde" d="M92 190c16-14 34-21 58-22 29-1 50 6 66 21 8 8 4 18-10 21-26 5-56 5-84 0-16-3-36-11-30-20Z"/>
+          <path class="ini-parche" d="M100 193c14-11 30-16 50-17 25-1 43 5 56 17 6 6 3 13-8 15-22 5-48 5-72 1-13-2-31-8-26-16Z"/>
+          <path d="M188 178c10-2 22-1 30 4" stroke="color-mix(in oklab, var(--card) 55%, var(--foreground))" stroke-width="2" fill="none" opacity=".5"/>
+          <path class="ini-cono" d="M286 176h16l-2 24h-12Z"/>
+          <rect x="280" y="200" width="28" height="5" rx="2" class="ini-cono-base"/>
+        </svg>
+      </div>
+      <span class="marca marca-antes">Antes</span>
+      <span class="marca marca-despues">Después</span>
+      <div class="manija" aria-hidden="true"><span class="manija-punto">↔</span></div>
+    </div>
+
+    <label class="sr-only" for="corte-01">Comparar la foto original con la foto de la reparación</label>
+    <input id="corte-01" class="rango" type="range" min="0" max="100" step="1" value="50" aria-describedby="corte-ayuda">
+    <p id="corte-ayuda" class="ayuda">Arrastrá el control —o usá las flechas— para comparar las dos fotos.</p>
+
+    <div class="autor">
+      <span class="avatar" aria-hidden="true">MB</span>
+      <span>Evidencia de Marisa Bogado · 28 nov. 2025, 09:42</span>
+    </div>
+    <p class="tarjeta-copy" style="color:var(--foreground);font-size:.8125rem">«Taparon el bache con asfalto nuevo el viernes. La esquina quedó pareja y ya no se junta agua.»</p>
+  </section>
+
+  <!-- Verificación comunitaria -->
+  <section class="tarjeta" aria-labelledby="ver-titulo">
+    <div>
+      <h2 id="ver-titulo" class="titulo-seccion">En verificación</h2>
+      <p class="tarjeta-copy">La foto ya se publicó y la comunidad la está confirmando. Con 3 confirmaciones el reporte pasa a Reparado.</p>
+    </div>
+
+    <div class="progreso-texto">
+      <p class="progreso-cifra">2 de 3 confirmaciones</p>
+      <p class="ayuda">Falta 1</p>
+    </div>
+    <div class="progreso" role="progressbar" aria-label="Confirmaciones de la reparación" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-valuetext="2 de 3 confirmaciones">
+      <span class="segmento hecho"></span>
+      <span class="segmento hecho"></span>
+      <span class="segmento"></span>
+    </div>
+
+    <ul class="confirmaciones">
+      <li>
+        <span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 13 4 4L19 7"/></svg></span>
+        Sofía Ramírez confirmó el 29 nov.
+      </li>
+      <li>
+        <span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 13 4 4L19 7"/></svg></span>
+        Diego Almirón confirmó el 30 nov.
+      </li>
+      <li>
+        <span class="pendiente" aria-hidden="true">·</span>
+        Falta una confirmación más.
+      </li>
+    </ul>
+
+    <div class="fila-botones">
+      <button class="btn btn-primario" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Confirmar reparación
+      </button>
+      <button class="btn btn-impugnar" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V4"/><path d="M4 4h11l-1.5 4L15 12H4"/></svg>
+        Impugnar
+      </button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:10px">
+      <p class="ayuda">El autor de la foto no puede confirmar su propia evidencia.</p>
+      <p class="ayuda">Para confirmar o impugnar necesitás una cuenta con email confirmado. Si entraste como invitado, creá tu cuenta y verificá el correo.</p>
+    </div>
+  </section>
+
+  <!-- Impugnación pendiente -->
+  <div class="marco-variante">
+    <span class="rotulo">estado alternativo · impugnación pendiente</span>
+    <section class="aviso-pausa" aria-labelledby="pausa-titulo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.4A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      <div>
+        <strong id="pausa-titulo">Impugnación pendiente</strong>
+        <p>La verificación está en pausa hasta que un administrador revise la impugnación de Diego Almirón. Si la acepta, la evidencia se rechaza y el reporte sigue pendiente; si la descarta, vuelven a contar las confirmaciones.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Variantes compactas de los otros dos estados -->
+  <section class="variantes" aria-labelledby="estados-titulo">
+    <h2 id="estados-titulo" class="etiqueta-meta">Los tres estados, lado a lado</h2>
+
+    <div class="marco-variante">
+      <span class="rotulo">variante compacta · reparación informada</span>
+      <div class="variante-tarjeta">
+        <div class="chip-fila">
+          <span class="chip chip-informada">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            Reparación informada
+          </span>
+        </div>
+        <p class="tarjeta-copy">Marisa Bogado informó la reparación el 28 nov. La foto está en moderación y todavía no se muestra en el reporte.</p>
+        <p class="ayuda">Estado del reporte: sigue Pendiente.</p>
+      </div>
+    </div>
+
+    <div class="marco-variante">
+      <span class="rotulo">variante compacta · reparado</span>
+      <div class="variante-tarjeta">
+        <div class="chip-fila">
+          <span class="chip chip-reparado">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            Reparado
+          </span>
+        </div>
+        <p class="tarjeta-copy">Reparado el 1 dic. 2025 a las 18:20, con 3 confirmaciones de la comunidad.</p>
+        <p class="ayuda">Arreglado en 19 días. Podés ver el antes y el después en la ficha.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Informar reparación -->
+  <section class="tarjeta" aria-labelledby="form-titulo">
+    <div>
+      <h2 id="form-titulo" class="titulo-seccion">¿Ya lo arreglaron? Informá la reparación</h2>
+      <p class="tarjeta-copy">Subí una foto del lugar. El reporte no cambia de estado hasta que la comunidad la confirme.</p>
+    </div>
+
+    <input class="sr-only" id="foto-camara-01" type="file" accept="image/*" capture="environment">
+    <label class="subida" for="foto-camara-01">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <span class="subida-titulo">Sacar la foto ahora</span>
+      <span class="subida-ayuda">JPG, PNG o WebP · hasta 15 MB</span>
+    </label>
+
+    <input class="sr-only" id="foto-galeria-01" type="file" accept="image/*">
+    <label class="btn btn-contorno btn-full" for="foto-galeria-01" style="cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5.5-5.5L7 19"/></svg>
+      Elegir de la galería
+    </label>
+
+    <div class="campo">
+      <label class="campo-etiqueta" for="comentario-01">Comentario <span style="font-weight:400;color:var(--muted-foreground)">(opcional)</span></label>
+      <textarea class="entrada" id="comentario-01" rows="2" maxlength="280" placeholder="Ej.: taparon el bache con asfalto nuevo el viernes."></textarea>
+      <p class="ayuda">Una línea alcanza: contá qué se arregló y cuándo.</p>
+    </div>
+
+    <div class="widget" role="img" aria-label="Representación estática del widget de Cloudflare Turnstile, todavía sin resolver">
+      <span class="widget-caja" aria-hidden="true"></span>
+      <span class="widget-texto"><strong>Verifica que eres humano</strong><small>Cloudflare Turnstile</small></span>
+      <span style="font-size:.5rem;color:var(--muted-foreground)">Cloudflare</span>
+    </div>
+    <p class="estado-verificacion" role="status">Verificación de seguridad</p>
+
+    <button class="btn btn-primario btn-full btn-deshabilitado" type="button" disabled>Enviar evidencia</button>
+    <p class="ayuda">La foto pasa por la moderación de siempre antes de publicarse.</p>
+  </section>
+
+  <!-- Barra inferior fija, representada como la ve el vecino sobre cualquier punto del scroll -->
+  <div class="marco-barra">
+    <span class="rotulo">barra inferior fija · visible sobre todo el scroll</span>
+    <div class="barra-fija">
+      <button class="btn btn-primario btn-full" type="button" style="min-height:40px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Confirmar reparación
+      </button>
+      <button class="btn btn-contorno" type="button" style="min-height:40px;padding:0 12px" aria-label="Impugnar la reparación">Impugnar</button>
+    </div>
+  </div>
+
+  <p class="pie">Dirección 01 · deslizador antes/después + barra inferior fija</p>
+</main>
+
+<script>
+  (function () {
+    const marco = document.getElementById('marco-01');
+    const rango = document.getElementById('corte-01');
+    if (!marco || !rango) return;
+    const aplicar = () => marco.style.setProperty('--corte', rango.value + '%');
+    rango.addEventListener('input', aplicar);
+    aplicar();
+  })();
+</script>
+</body>
+</html>

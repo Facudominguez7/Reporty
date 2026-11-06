@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · Pestañas antes/después y hoja inferior — Detalle del reporte</title>
+<style>
+  /* Tokens de design/system.md. Sin recursos externos: SVG en línea y pila del sistema. */
+  :root{
+    --background:oklch(94.463% 0.00213 14.416);
+    --foreground:oklch(0.19 0.01 95);
+    --card:oklch(1 0 0);
+    --card-foreground:oklch(0.19 0.01 95);
+    --primary:oklch(0.57 0.12 157);
+    --primary-foreground:oklch(0.985 0 0);
+    /* El verde del sistema con texto blanco mide 4.04:1; al 90% + 10% foreground sube a 4.75:1 (AA). */
+    --primary-fuerte:color-mix(in oklab, var(--primary) 90%, var(--foreground));
+    --secondary:#000000;
+    --secondary-foreground:#ffffff;
+    --muted:oklch(96.115% 0.00011 271.152);
+    --muted-foreground:oklch(0.45 0.028 157);
+    --destructive:oklch(0.57 0.18 25);
+    --destructive-foreground:oklch(0.985 0 0);
+    --border:oklch(78.892% 0.00009 271.152);
+    --input:oklch(96.416% 0.00011 271.152);
+    --ring:oklch(0.62 0.08 230);
+    --radius:0.75rem;
+    --radius-pill:999px;
+    --surface-subtle:oklch(94.007% 0.00011 271.152);
+    --semantic-info:oklch(0.56 0.11 240);
+    --semantic-success:oklch(0.57 0.12 157);
+    --semantic-warning:oklch(0.72 0.13 85);
+    --semantic-danger:oklch(0.57 0.18 25);
+    --semantic-admin:oklch(0.5 0.1 285);
+    --card-shadow:7px 7px 12px color-mix(in oklab, var(--foreground) 20%, transparent);
+    --fuente:"Geist","Geist Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--background)}
+  body{
+    margin:0;width:390px;padding-bottom:24px;background:var(--background);color:var(--foreground);
+    font-family:var(--fuente);font-feature-settings:"cv02","cv03","cv04","cv11";-webkit-font-smoothing:antialiased;
+    font-size:.9375rem;line-height:1.45;
+  }
+  p{margin:0}
+  h1,h2,h3{margin:0;letter-spacing:-.01em}
+  a{color:var(--primary)}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .salto{position:absolute;left:-9999px;top:0;z-index:99;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:.875rem}
+  .salto:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+  /* El input de archivo vive oculto: el anillo de foco se dibuja sobre su etiqueta. */
+  .sr-only:focus-visible + label,.sr-only:focus-visible + .subida{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius)}
+
+  .barra-superior{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--card)}
+  .barra-superior h1{font-size:.9375rem;font-weight:600;flex:1;min-width:0}
+  .icono-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:0 0 auto;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);color:var(--foreground);text-decoration:none}
+  .icono-btn svg{width:16px;height:16px}
+
+  .contenedor{display:flex;flex-direction:column;gap:12px;padding:12px}
+  .tarjeta{display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow)}
+  .tarjeta-titulo{font-size:1.25rem;font-weight:700;line-height:1.2}
+  .tarjeta-copy{font-size:.8125rem;line-height:1.55;color:var(--muted-foreground)}
+  .titulo-seccion{font-size:.9375rem;font-weight:600}
+  .meta{display:flex;align-items:center;gap:6px;font-size:.6875rem;color:var(--muted-foreground)}
+  .meta svg{width:13px;height:13px;flex:0 0 auto}
+  .etiqueta-meta{font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--muted-foreground)}
+  .ayuda{font-size:.75rem;line-height:1.5;color:var(--muted-foreground)}
+
+  .chip-fila{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid transparent;border-radius:var(--radius-pill);font-size:.625rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  .chip svg{width:11px;height:11px}
+  .chip-prioridad-alta{background:var(--destructive);color:var(--destructive-foreground)}
+  .chip-categoria{background:var(--semantic-admin);color:var(--card)}
+  .chip-informada{background:color-mix(in oklab, var(--semantic-warning) 16%, var(--card));border-color:color-mix(in oklab, var(--semantic-warning) 48%, var(--border));color:var(--foreground)}
+  .chip-verificacion{background:var(--semantic-info);color:var(--card)}
+  .chip-reparado{background:var(--primary-fuerte);color:var(--primary-foreground)}
+
+  .autor{display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted-foreground)}
+  .avatar{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 auto;border-radius:var(--radius-pill);background:var(--muted);color:var(--foreground);font-size:.625rem;font-weight:600}
+
+  /* Pestañas píldora del sistema */
+  .tabs-lista{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--input)}
+  .tab{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:6px 12px;border:1px solid transparent;border-radius:var(--radius-pill);background:transparent;color:var(--foreground);font-family:inherit;font-size:.875rem;font-weight:500}
+  .tab[aria-selected="true"]{background:var(--secondary);color:var(--secondary-foreground);border-color:var(--secondary)}
+  .tab svg{width:14px;height:14px}
+
+  .marco-foto{position:relative;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-subtle);aspect-ratio:4/3}
+  .marco-foto svg{display:block;width:100%;height:100%}
+  .pie-foto{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .pie-foto .fecha{font-size:.6875rem;color:var(--muted-foreground)}
+  .ampliar{display:inline-flex;align-items:center;gap:4px;font-size:.6875rem;font-weight:500;color:var(--primary);text-decoration:none}
+
+  .progreso{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .segmento{height:8px;border-radius:var(--radius-pill);background:var(--input);border:1px solid var(--border)}
+  .segmento.hecho{background:var(--primary);border-color:var(--primary)}
+  .progreso-texto{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .progreso-cifra{font-size:.875rem;font-weight:600}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--radius-pill);background:var(--card);color:var(--foreground);font-family:inherit;font-size:.875rem;font-weight:500;text-decoration:none;white-space:nowrap}
+  .btn svg{width:16px;height:16px;flex:0 0 auto}
+  .btn-primario{background:var(--primary-fuerte);color:var(--primary-foreground)}
+  .btn-contorno{background:var(--card);border-color:var(--border)}
+  .btn-impugnar{background:var(--card);border-color:color-mix(in oklab, var(--destructive) 45%, var(--border));color:var(--destructive)}
+  .btn-full{width:100%}
+  .btn-deshabilitado{opacity:.5}
+  .fila-botones{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  .aviso-pausa{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:var(--radius);background:color-mix(in oklab, var(--semantic-warning) 14%, var(--card));border:1px solid color-mix(in oklab, var(--semantic-warning) 48%, var(--border))}
+  .aviso-pausa svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px;color:var(--foreground)}
+  .aviso-pausa strong{display:block;font-size:.8125rem;font-weight:600}
+  .aviso-pausa p{font-size:.75rem;line-height:1.5}
+
+  .marco-variante{position:relative;padding:26px 12px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-subtle)}
+  .rotulo{position:absolute;top:8px;left:8px;padding:2px 8px;border-radius:var(--radius-pill);border:1px solid var(--border);background:var(--card);color:var(--muted-foreground);font-size:.625rem;letter-spacing:.02em}
+  .variante-tarjeta{display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow)}
+
+  /* Leyenda de estados */
+  .leyenda{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+  .leyenda li{display:flex;flex-direction:column;gap:3px;padding-left:10px;border-left:3px solid var(--border)}
+  .leyenda li.activo{border-left-color:var(--semantic-info)}
+  .leyenda p{font-size:.75rem;line-height:1.5;color:var(--muted-foreground)}
+
+  /* Hoja inferior abierta */
+  .escenario-hoja{position:relative;margin-top:4px;padding:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--background)}
+  .escenario-hoja .rotulo{position:static;display:inline-block;margin:8px}
+  .trasfondo{position:relative;height:88px;background:color-mix(in oklab, var(--foreground) 45%, var(--card));border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .trasfondo::after{content:"página atenuada detrás de la hoja";position:absolute;inset:auto 0 8px;text-align:center;font-size:.6875rem;color:var(--card);opacity:.85}
+  .hoja{display:flex;flex-direction:column;gap:12px;padding:8px 16px 16px;background:var(--card);border-radius:16px 16px 0 0;box-shadow:0 -12px 28px color-mix(in oklab, var(--foreground) 22%, transparent)}
+  .asa{width:40px;height:4px;margin:0 auto 4px;border-radius:var(--radius-pill);background:var(--border)}
+  .hoja-cabecera{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .hoja-titulo{font-size:1rem;font-weight:600}
+  .cerrar{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:0 0 auto;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);color:var(--foreground)}
+  .cerrar svg{width:14px;height:14px}
+
+  .subida{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;cursor:pointer;border:1px dashed color-mix(in oklab, var(--primary) 55%, var(--border));border-radius:var(--radius);background:color-mix(in oklab, var(--primary) 6%, var(--card));text-align:center}
+  .subida svg{width:24px;height:24px;color:var(--primary)}
+  .subida-titulo{font-size:.875rem;font-weight:600}
+  .subida-ayuda{font-size:.75rem;color:var(--muted-foreground)}
+  .campo{display:flex;flex-direction:column;gap:6px}
+  .campo-etiqueta{font-size:.8125rem;font-weight:500}
+  .entrada{width:100%;min-height:44px;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);background:var(--input);color:var(--foreground);font-family:inherit;font-size:.875rem;resize:vertical}
+  .entrada::placeholder{color:var(--muted-foreground)}
+  .widget{display:flex;align-items:center;gap:10px;width:100%;height:65px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:var(--card)}
+  .widget-caja{width:22px;height:22px;flex:0 0 auto;border:2px solid var(--muted-foreground);border-radius:3px}
+  .widget-texto{flex:1;min-width:0}
+  .widget-texto strong{display:block;font-size:.8125rem;font-weight:500}
+  .widget-texto small{display:block;font-size:.5625rem;color:var(--muted-foreground);margin-top:2px}
+  .estado-verificacion{font-size:.75rem;color:var(--muted-foreground)}
+
+  .pie{padding:0 12px 8px;font-size:.6875rem;color:var(--muted-foreground);text-align:center;line-height:1.5}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+  /* Ilustraciones en línea */
+  .ini-cielo{fill:color-mix(in oklab, var(--semantic-info) 16%, var(--card))}
+  .ini-edificio-a{fill:color-mix(in oklab, var(--foreground) 22%, var(--card))}
+  .ini-edificio-b{fill:color-mix(in oklab, var(--foreground) 34%, var(--card))}
+  .ini-ventana{fill:color-mix(in oklab, var(--card) 70%, var(--semantic-info))}
+  .ini-vereda{fill:color-mix(in oklab, var(--foreground) 14%, var(--card))}
+  .ini-calle{fill:color-mix(in oklab, var(--foreground) 42%, var(--card))}
+  .ini-calle-clara{fill:color-mix(in oklab, var(--foreground) 34%, var(--card))}
+  .ini-linea{fill:color-mix(in oklab, var(--card) 72%, var(--semantic-warning))}
+  .ini-bache{fill:color-mix(in oklab, var(--foreground) 78%, var(--card))}
+  .ini-bache-borde{fill:color-mix(in oklab, var(--foreground) 55%, var(--card))}
+  .ini-charco{fill:color-mix(in oklab, var(--semantic-info) 55%, var(--card));opacity:.55}
+  .ini-parche{fill:color-mix(in oklab, var(--foreground) 30%, var(--card))}
+  .ini-parche-borde{fill:color-mix(in oklab, var(--foreground) 22%, var(--card));opacity:.6}
+  .ini-cono{fill:var(--semantic-warning)}
+  .ini-cono-base{fill:color-mix(in oklab, var(--foreground) 60%, var(--card))}
+</style>
+</head>
+<body>
+<a class="salto" href="#contenido">Saltar al contenido</a>
+
+<header class="barra-superior">
+  <a class="icono-btn" href="#" aria-label="Volver a Reportes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+  </a>
+  <h1>Detalle del reporte</h1>
+  <a class="icono-btn" href="#" aria-label="Compartir reporte">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/></svg>
+  </a>
+</header>
+
+<main id="contenido" class="contenedor">
+
+  <section class="tarjeta" aria-labelledby="rep-titulo">
+    <p class="meta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+      Creado el día 12 nov. 2025 <strong>(hace 20 días)</strong>
+    </p>
+    <div class="chip-fila">
+      <span class="chip chip-prioridad-alta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Prioridad alta</span>
+      <span class="chip chip-verificacion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>En verificación</span>
+      <span class="chip chip-categoria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M4 21V8l8-5 8 5v13"/><path d="M9 21v-6h6v6"/></svg>Calles</span>
+    </div>
+    <h2 id="rep-titulo" class="tarjeta-titulo">Bache en Av. Uruguay y Bolívar</h2>
+    <p class="tarjeta-copy" style="color:var(--foreground);font-size:.75rem">En la esquina de Av. Uruguay y Bolívar hay un bache de casi un metro que se llena de agua cuando llueve. Ya rompió dos cubiertas de motos.</p>
+    <div class="autor">
+      <span class="avatar" aria-hidden="true">OD</span>
+      <span>Reportado por Octavio Duarte</span>
+    </div>
+  </section>
+
+  <!-- Comparación con pestañas -->
+  <section class="tarjeta" aria-labelledby="comp-titulo">
+    <h2 id="comp-titulo" class="titulo-seccion">Antes y después</h2>
+
+    <div class="tabs-lista" role="tablist" aria-label="Foto original o foto de la reparación">
+      <button class="tab" id="tab-antes-03" role="tab" aria-selected="false" aria-controls="panel-antes-03" tabindex="-1" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Antes
+      </button>
+      <button class="tab" id="tab-despues-03" role="tab" aria-selected="true" aria-controls="panel-despues-03" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Después
+      </button>
+    </div>
+
+    <div id="panel-antes-03" role="tabpanel" aria-labelledby="tab-antes-03" hidden>
+      <div class="marco-foto">
+        <svg viewBox="0 0 360 270" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto original del 12 de noviembre: bache profundo con agua acumulada en la esquina de Av. Uruguay y Bolívar">
+          <rect width="360" height="270" class="ini-cielo"/>
+          <rect x="0" y="70" width="126" height="100" class="ini-edificio-a"/>
+          <rect x="146" y="48" width="100" height="122" class="ini-edificio-b"/>
+          <rect x="258" y="80" width="102" height="90" class="ini-edificio-a"/>
+          <rect x="16" y="88" width="20" height="18" class="ini-ventana"/>
+          <rect x="52" y="88" width="20" height="18" class="ini-ventana"/>
+          <rect x="16" y="122" width="20" height="18" class="ini-ventana"/>
+          <rect x="164" y="68" width="22" height="18" class="ini-ventana"/>
+          <rect x="200" y="68" width="22" height="18" class="ini-ventana"/>
+          <rect x="164" y="102" width="22" height="18" class="ini-ventana"/>
+          <rect x="282" y="98" width="20" height="18" class="ini-ventana"/>
+          <rect x="318" y="98" width="20" height="18" class="ini-ventana"/>
+          <rect x="0" y="170" width="360" height="22" class="ini-vereda"/>
+          <rect x="0" y="192" width="360" height="78" class="ini-calle"/>
+          <rect x="0" y="228" width="112" height="8" rx="4" class="ini-linea" opacity=".55"/>
+          <rect x="216" y="228" width="144" height="8" rx="4" class="ini-linea" opacity=".55"/>
+          <path class="ini-bache-borde" d="M88 240c16-19 38-30 66-31 32-1 54 7 70 23 11 12 5 26-13 30-30 7-64 7-94 1-19-4-36-11-29-23Z"/>
+          <path class="ini-bache" d="M98 244c14-15 32-23 56-24 27-1 46 5 60 19 8 9 4 20-11 23-26 5-55 5-82 1-14-3-31-8-23-19Z"/>
+          <path class="ini-charco" d="M108 248c12-10 27-15 46-16 22-1 38 4 49 13 6 5 3 12-7 14-21 4-45 4-67 1-12-2-27-6-21-12Z"/>
+          <path class="ini-cono" d="M292 208h18l-3 24h-12Z"/>
+          <rect x="284" y="232" width="34" height="6" rx="3" class="ini-cono-base"/>
+        </svg>
+      </div>
+      <div class="pie-foto" style="margin-top:8px">
+        <span class="fecha">Foto original · 12 nov. 2025 · Octavio Duarte</span>
+        <a class="ampliar" href="#">Ampliar</a>
+      </div>
+    </div>
+
+    <div id="panel-despues-03" role="tabpanel" aria-labelledby="tab-despues-03">
+      <div class="marco-foto">
+        <svg viewBox="0 0 360 270" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto de la reparación del 28 de noviembre: el bache está tapado con asfalto nuevo y la esquina quedó pareja">
+          <rect width="360" height="270" class="ini-cielo"/>
+          <rect x="0" y="70" width="126" height="100" class="ini-edificio-a"/>
+          <rect x="146" y="48" width="100" height="122" class="ini-edificio-b"/>
+          <rect x="258" y="80" width="102" height="90" class="ini-edificio-a"/>
+          <rect x="16" y="88" width="20" height="18" class="ini-ventana"/>
+          <rect x="52" y="88" width="20" height="18" class="ini-ventana"/>
+          <rect x="16" y="122" width="20" height="18" class="ini-ventana"/>
+          <rect x="164" y="68" width="22" height="18" class="ini-ventana"/>
+          <rect x="200" y="68" width="22" height="18" class="ini-ventana"/>
+          <rect x="164" y="102" width="22" height="18" class="ini-ventana"/>
+          <rect x="282" y="98" width="20" height="18" class="ini-ventana"/>
+          <rect x="318" y="98" width="20" height="18" class="ini-ventana"/>
+          <rect x="0" y="170" width="360" height="22" class="ini-vereda"/>
+          <rect x="0" y="192" width="360" height="78" class="ini-calle-clara"/>
+          <rect x="0" y="228" width="112" height="8" rx="4" class="ini-linea" opacity=".55"/>
+          <rect x="216" y="228" width="144" height="8" rx="4" class="ini-linea" opacity=".55"/>
+          <path class="ini-parche-borde" d="M84 232c20-17 44-26 74-27 36-1 62 7 80 25 10 11 5 23-13 27-32 6-68 6-100 0-20-4-45-14-41-25Z"/>
+          <path class="ini-parche" d="M94 236c18-13 38-20 64-21 31-1 54 6 68 20 8 8 4 17-10 20-27 5-57 5-85 0-16-3-40-10-37-19Z"/>
+          <path d="M172 216c14-3 28-1 39 6" stroke="color-mix(in oklab, var(--card) 55%, var(--foreground))" stroke-width="2.5" fill="none" opacity=".5"/>
+          <path class="ini-cono" d="M292 208h18l-3 24h-12Z"/>
+          <rect x="284" y="232" width="34" height="6" rx="3" class="ini-cono-base"/>
+        </svg>
+      </div>
+      <div class="pie-foto" style="margin-top:8px">
+        <span class="fecha">Reparación · 28 nov. 2025, 09:42 · Marisa Bogado</span>
+        <a class="ampliar" href="#">Ampliar</a>
+      </div>
+      <p class="tarjeta-copy" style="margin-top:8px;color:var(--foreground)">«Taparon el bache con asfalto nuevo el viernes. La esquina quedó pareja y ya no se junta agua.»</p>
+    </div>
+  </section>
+
+  <!-- Verificación y acciones -->
+  <section class="tarjeta" aria-labelledby="ver-titulo">
+    <div>
+      <h2 id="ver-titulo" class="titulo-seccion">En verificación</h2>
+      <p class="tarjeta-copy">La foto ya se publicó y la comunidad la está confirmando. Con 3 confirmaciones el reporte pasa a Reparado.</p>
+    </div>
+    <div class="progreso-texto">
+      <p class="progreso-cifra">2 de 3 confirmaciones</p>
+      <p class="ayuda">Falta 1</p>
+    </div>
+    <div class="progreso" role="progressbar" aria-label="Confirmaciones de la reparación" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-valuetext="2 de 3 confirmaciones">
+      <span class="segmento hecho"></span>
+      <span class="segmento hecho"></span>
+      <span class="segmento"></span>
+    </div>
+    <p class="ayuda">Confirmaron Sofía Ramírez (29 nov.) y Diego Almirón (30 nov.).</p>
+
+    <div class="fila-botones" style="border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn btn-primario" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        Confirmar
+      </button>
+      <button class="btn btn-impugnar" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V4"/><path d="M4 4h11l-1.5 4L15 12H4"/></svg>
+        Impugnar
+      </button>
+    </div>
+    <p class="ayuda">El autor de la foto no puede confirmar su propia evidencia.</p>
+    <p class="ayuda">Para confirmar o impugnar necesitás una cuenta con email confirmado; los invitados no participan.</p>
+  </section>
+
+  <!-- Impugnación pendiente -->
+  <div class="marco-variante">
+    <span class="rotulo">estado alternativo · impugnación pendiente</span>
+    <section class="aviso-pausa" aria-labelledby="pausa-titulo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 2.4 17.4A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      <div>
+        <strong id="pausa-titulo">Impugnación pendiente</strong>
+        <p>La verificación está en pausa hasta que un administrador revise la impugnación. Mientras tanto el botón «Confirmar» queda deshabilitado y el contador no avanza.</p>
+      </div>
+    </section>
+    <div class="variante-tarjeta" style="margin-top:10px">
+      <button class="btn btn-contorno btn-full btn-deshabilitado" type="button" disabled>Confirmar reparación</button>
+      <p class="ayuda">Disponible cuando se resuelva la impugnación.</p>
+    </div>
+  </div>
+
+  <!-- Leyenda de los tres estados -->
+  <section class="tarjeta" aria-labelledby="estados-titulo">
+    <h2 id="estados-titulo" class="titulo-seccion">Los tres estados</h2>
+    <ul class="leyenda">
+      <li>
+        <span class="chip chip-informada">Reparación informada</span>
+        <p>Hay una foto nueva en moderación. No se publica todavía y el reporte sigue Pendiente.</p>
+      </li>
+      <li class="activo" aria-current="true">
+        <span class="chip chip-verificacion">En verificación</span>
+        <p>Foto publicada, juntando confirmaciones. Este reporte está acá: 2 de 3.</p>
+      </li>
+      <li>
+        <span class="chip chip-reparado">Reparado</span>
+        <p>3 confirmaciones o aprobación de un administrador. Arreglado en 19 días.</p>
+      </li>
+    </ul>
+  </section>
+
+  <!-- Hoja inferior: informar reparación -->
+  <div class="escenario-hoja">
+    <span class="rotulo">hoja inferior abierta · informar reparación</span>
+    <div class="trasfondo" aria-hidden="true"></div>
+    <div class="hoja" role="dialog" aria-modal="true" aria-labelledby="hoja-titulo">
+      <span class="asa" aria-hidden="true"></span>
+      <div class="hoja-cabecera">
+        <div>
+          <h2 id="hoja-titulo" class="hoja-titulo">Informar reparación</h2>
+          <p class="ayuda">Una foto y, si querés, una línea de comentario.</p>
+        </div>
+        <button class="cerrar" type="button" aria-label="Cerrar la hoja de informar reparación">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input class="sr-only" id="foto-camara-03" type="file" accept="image/*" capture="environment">
+      <label class="subida" for="foto-camara-03">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span class="subida-titulo">Sacar la foto</span>
+        <span class="subida-ayuda">Abre la cámara · JPG, PNG o WebP hasta 15 MB</span>
+      </label>
+      <input class="sr-only" id="foto-galeria-03" type="file" accept="image/*">
+      <label class="btn btn-contorno btn-full" for="foto-galeria-03" style="cursor:pointer;min-height:40px;font-size:.8125rem">
+        Usar una foto de la galería
+      </label>
+
+      <div class="campo">
+        <label class="campo-etiqueta" for="comentario-03">Comentario <span style="font-weight:400;color:var(--muted-foreground)">(opcional)</span></label>
+        <textarea class="entrada" id="comentario-03" rows="2" maxlength="280" placeholder="Ej.: taparon el bache con asfalto nuevo el viernes."></textarea>
+      </div>
+
+      <div class="widget" role="img" aria-label="Representación estática del widget de Cloudflare Turnstile, todavía sin resolver">
+        <span class="widget-caja" aria-hidden="true"></span>
+        <span class="widget-texto"><strong>Verifica que eres humano</strong><small>Cloudflare Turnstile</small></span>
+        <span style="font-size:.5rem;color:var(--muted-foreground)">Cloudflare</span>
+      </div>
+      <p class="estado-verificacion" role="status">Verificación de seguridad</p>
+
+      <button class="btn btn-primario btn-full btn-deshabilitado" type="button" disabled>Enviar evidencia</button>
+      <p class="ayuda">La foto pasa por moderación antes de publicarse.</p>
+    </div>
+  </div>
+
+  <!-- Hoja inferior: impugnar -->
+  <div class="escenario-hoja">
+    <span class="rotulo">hoja inferior abierta · impugnar</span>
+    <div class="trasfondo" aria-hidden="true"></div>
+    <div class="hoja" role="dialog" aria-modal="true" aria-labelledby="hoja-impugnar-titulo">
+      <span class="asa" aria-hidden="true"></span>
+      <div class="hoja-cabecera">
+        <div>
+          <h2 id="hoja-impugnar-titulo" class="hoja-titulo">Impugnar la reparación</h2>
+          <p class="ayuda">Un administrador revisa la impugnación en Revisiones. La verificación queda en pausa hasta que decida.</p>
+        </div>
+        <button class="cerrar" type="button" aria-label="Cerrar la hoja de impugnar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="campo">
+        <label class="campo-etiqueta" for="motivo-03">Motivo</label>
+        <textarea class="entrada" id="motivo-03" rows="3" maxlength="280" placeholder="Ej.: la foto es de otra cuadra, o el bache sigue igual."></textarea>
+        <p class="ayuda">Obligatorio. Contá en una línea por qué la foto no corresponde.</p>
+      </div>
+      <button class="btn btn-impugnar btn-full" type="button">Enviar impugnación</button>
+    </div>
+  </div>
+
+  <p class="pie">Dirección 03 · pestañas antes/después y hoja inferior</p>
+</main>
+
+<script>
+  (function () {
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+    if (!tabs.length) return;
+    const paneles = tabs.map((tab) => document.getElementById(tab.getAttribute('aria-controls')));
+
+    function seleccionar(indice) {
+      tabs.forEach((tab, i) => {
+        const activo = i === indice;
+        tab.setAttribute('aria-selected', activo ? 'true' : 'false');
+        tab.tabIndex = activo ? 0 : -1;
+        if (paneles[i]) paneles[i].hidden = !activo;
+      });
+    }
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => seleccionar(i));
+      tab.addEventListener('keydown', (evento) => {
+        if (evento.key !== 'ArrowRight' && evento.key !== 'ArrowLeft') return;
+        evento.preventDefault();
+        const destino = evento.key === 'ArrowRight' ? (i + 1) % tabs.length : (i - 1 + tabs.length) % tabs.length;
+        seleccionar(destino);
+        tabs[destino].focus();
+      });
+    });
+  })();
+</script>
+</body>
+</html>
