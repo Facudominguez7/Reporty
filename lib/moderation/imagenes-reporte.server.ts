@@ -592,10 +592,13 @@ export async function moderarYGuardarImagenEvidenciaReparacion(
     evidenciaId = String(datos.evidencia_id)
     moderacionId = String(datos.moderacion_id)
     fila = await leerFila(supabase, moderacionId)
-    const carga = await supabase.storage.from(BUCKET_PRIVADO).upload(String(datos.path_privado), imagen.original, {
-      upsert: false, contentType: "image/webp",
-    })
-    if (carga.error) return registrarCargaPrivadaFallida(supabase, fila, evidenciaId)
+    // Igual que la reanudación: si Storage ya guardó estos mismos bytes aunque su respuesta
+    // se perdió, la carga cuenta como hecha; nunca se sobrescribe un objeto distinto.
+    try {
+      await guardarObjeto(supabase, BUCKET_PRIVADO, String(datos.path_privado), imagen.original)
+    } catch {
+      return registrarCargaPrivadaFallida(supabase, fila, evidenciaId)
+    }
     privadoGuardado = true
     return { ...await clasificarYResolver(supabase, fila, imagen.original), evidenciaId }
   } catch {
