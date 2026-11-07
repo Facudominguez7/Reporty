@@ -1,5 +1,6 @@
 -- Administración en el flujo de reparaciones (L21): informa, confirma e impugna
--- como cualquier cuenta habilitada, sin poder validar su propia evidencia (S6).
+-- como cualquier cuenta habilitada; no confirma ni impugna su propia evidencia (S6),
+-- pero desde la moderación sí puede aprobarla (excepción L24).
 -- Operador, invitado, sesión anónima y correo sin confirmar siguen fuera (S15).
 -- El ejecutor abre una transacción, aplica la migración incremental
 -- 20261107120000_admin_participa_reparacion.sql sobre la base ya instalada,
@@ -177,6 +178,26 @@ select pg_temp.exigir(not exists (select 1 from public.audit_events where report
   and action in ('evidence_confirmed','evidence_challenged')),
   'La autovalidación de administración no deja auditoría');
 
+-- Excepción decidida por el dueño (L24, «admin si o si puede hacer todo»): desde la
+-- cola de moderación, administración sí resuelve la impugnación y aprueba su propia
+-- evidencia, igual que ya podía cerrar el reporte como Reparado de forma directa.
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-94004),
+  '40000000-0000-0000-0000-000000000001','impugnacion','No está terminado');
+select public.resolver_impugnacion_reparacion(
+  (select id from public.verificaciones_reparacion
+    where evidencia_id = pg_temp.evidencia(-94004) and tipo = 'impugnacion'),
+  '40000000-0000-0000-0000-000000000003','descartada');
+select pg_temp.exigir((select estado = 'descartada' from public.verificaciones_reparacion
+  where evidencia_id = pg_temp.evidencia(-94004) and tipo = 'impugnacion'),
+  'Administración descarta la impugnación de su propia evidencia');
+select public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-94004),
+  '40000000-0000-0000-0000-000000000003','aprobar');
+select pg_temp.exigir((select estado = 'validada' and resuelta_por = '40000000-0000-0000-0000-000000000003'
+  from public.evidencias_reparacion where id = pg_temp.evidencia(-94004)),
+  'Administración aprueba su propia evidencia desde la moderación');
+select pg_temp.exigir((select estado_id = 2 from public.reportes where id = -94004),
+  'La aprobación de administración deja el reporte como Reparado');
+
 -- ---------------------------------------------------------------------------
 -- S15: operador, invitado, sesión anónima y correo sin confirmar siguen fuera.
 -- ---------------------------------------------------------------------------
@@ -226,4 +247,4 @@ select pg_temp.exigir(
   and not has_function_privilege('authenticated','public.registrar_verificacion_reparacion(uuid,uuid,text,text)','execute'),
   'Las RPC de evidencia siguen reservadas a service_role');
 
-\echo 'OK administración en reparaciones: informa, confirma e impugna sin validar su propia evidencia'
+\echo 'OK administración en reparaciones: informa, confirma e impugna; no vota su propia evidencia y puede aprobarla como moderación'
