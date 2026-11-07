@@ -12,5 +12,8 @@ describe("CrearPage", () => {
     expect(markup).toContain("Crear reporte/incidencia")
     expect(markup).toContain("Cargar mascota perdida")
     expect(markup).toContain("<h1")
+    expect(markup.match(/size-20 sm:size-28/g) ?? []).toHaveLength(2)
+    expect(markup.indexOf("size-20 sm:size-28")).toBeLessThan(markup.indexOf("Crear reporte/incidencia"))
+    expect(markup).not.toContain("lucide-arrow-up-right")
   })
 })

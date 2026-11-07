@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowUpRight, FilePlus2, PawPrint } from "lucide-react"
+import { FilePlus2, PawPrint } from "lucide-react"
 
 import { PageTitleBar } from "@/components/page-title-bar"
 
@@ -33,16 +33,13 @@ export default function CrearPage() {
               <Link
                 key={href}
                 href={href}
-                className="group flex min-h-36 flex-col justify-center gap-5 rounded-3xl border border-border bg-card p-5 text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-64 sm:p-8"
+                className="group flex min-h-56 flex-col items-center justify-center gap-5 rounded-3xl border border-border bg-card p-6 text-center text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-64 sm:p-8"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:size-14" aria-hidden="true">
-                    <Icon className="size-6 sm:size-7" />
-                  </span>
-                  <ArrowUpRight className="size-5 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" />
-                </div>
-                <div className="space-y-1">
-                  <span className="block text-base font-semibold leading-snug sm:text-lg">{title}</span>
+                <span className="flex size-28 items-center justify-center rounded-3xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 sm:size-36" aria-hidden="true">
+                  <Icon className="size-20 sm:size-28" />
+                </span>
+                <div className="max-w-xs space-y-1.5">
+                  <span className="block text-lg font-semibold leading-snug sm:text-xl">{title}</span>
                   <span className="block text-sm leading-5 text-muted-foreground">{description}</span>
                 </div>
               </Link>
