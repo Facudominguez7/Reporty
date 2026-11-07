@@ -10,12 +10,12 @@ Implement admin pet management, inline detail editing, and pet-layer map filters
 5. **S5** User: “Quiero q el redondito en el mapa, ubicado en el tab de /mascotas, sea mas garnde, osea q la imagencita circulas de cada mascota va a ser mas grande tambien” Increase the pet marker circle and its circular photo together, retaining legibility and appropriate map anchoring.
 
 ## Tasks
-- T1 — S1/S2 — Inline — commit: pending (single feature commit on current `main`; no branch)
-- T2 — S3 — Inline — commit: pending (same feature commit)
-- T3 — S1/S2/S3 — Inline — commit: pending (same feature commit)
-- T4 — S4 — Inline — commit: pending (same feature commit)
-- T5 — S5 — Inline — commit: pending (same feature commit)
-- T6 — S1-S5 — Inline — commit: pending (final verification, requested commit/push)
+- T1 — S1/S2 — Inline — commit: `6938732` (current `main`; no branch)
+- T2 — S3 — Inline — commit: `6938732`
+- T3 — S1/S2/S3 — Inline — commit: `6938732`
+- T4 — S4 — Inline — commit: `6938732`
+- T5 — S5 — Inline — commit: `6938732`
+- T6 — S1-S5 — Inline — commit: `6938732` (final verification and requested delivery)
 
 
 ## Log
@@ -30,3 +30,4 @@ Implement admin pet management, inline detail editing, and pet-layer map filters
 - L4: The pet detail server page already calls `auth.getUser()` and redirects both missing and anonymous users to `/auth?next=/mascotas/nueva`; incident creation instead allows guests. No exact “obteniendo sesión” copy exists under `app/mascotas/nueva`; verify whether this is the route transition/load state before changing auth flow. Never authorize a pet form from an unverified local session.
 - L10: Read-only Supabase SQL against `public.mascotas_perdidas` returned two active rows (IDs 2/perro/perdida and 1/gato/encontrada). The server query now uses `createAdminClient()` only after `verificarEsAdmin` passes; unit tests assert the service client is not constructed for non-admins. No contact or owner data was read.
 - L11: “Genial, commitea y pushea hasta aca, sin revision.” Human explicitly authorizes commit and push on the current branch and requests no code review.
+- L12: Feature commit created on the existing `main` branch: `6938732 feat: add admin pet management and map filters`. TypeScript, 36 focused tests, and `git diff --check` passed before commit.
