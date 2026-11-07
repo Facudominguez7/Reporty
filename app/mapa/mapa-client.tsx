@@ -17,7 +17,7 @@ import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { OnboardingModal } from "@/components/onboarding-modal"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
-import { getInitialMapTilePreloadScript } from "@/lib/map/initial-view"
+import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
 
 const loadMapContainer = () => import("@/components/map-container").then((m) => m.MapContainer)
 
@@ -53,7 +53,7 @@ export function PetLayerError({ error }: { error: string | null }) {
 export function MapaClient({ reportes, mascotas, categorias, estados, prioridades, error, petError }: MapaClientProps) {
   // The map tiles are the largest paint of this page. Rendering this hint during SSR
   // puts it in the document head, so the tile connection opens while the map code downloads.
-  preconnect("https://tile.openstreetmap.org")
+  preconnect(MAP_TILE_ORIGIN)
 
   // The tile itself still waits for Leaflet. This script, sent only in the server HTML,
   // computes the first map view for the viewport and preloads its center tile meanwhile.

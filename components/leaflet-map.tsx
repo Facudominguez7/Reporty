@@ -18,6 +18,7 @@ import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/l
 import {
   INITIAL_MAP_VIEW_CONFIG,
   MAP_MAX_ZOOM,
+  MAP_TILE_ATTRIBUTION,
   MAP_TILE_URL,
   POSADAS_BOUNDS,
   POSADAS_MIN_ZOOM,
@@ -346,7 +347,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     })
 
     const tileLayer = L.tileLayer(MAP_TILE_URL, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution: MAP_TILE_ATTRIBUTION,
     })
 
     const clusterGroup = L.markerClusterGroup({

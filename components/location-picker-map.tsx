@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet"
 import L from "leaflet"
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map/initial-view"
 import "leaflet/dist/leaflet.css"
 import { toast } from "sonner"
 import { useMounted } from "@/hooks/use-mounted"
@@ -135,8 +136,8 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, he
         maxZoom={MAP_MAX_ZOOM}
       >
         <TileLayer
-          attribution={`&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="${REPORT_COVERAGE_SOURCE.url}">${REPORT_COVERAGE_SOURCE.attribution}</a>`}
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={`${MAP_TILE_ATTRIBUTION} · <a href="${REPORT_COVERAGE_SOURCE.url}">${REPORT_COVERAGE_SOURCE.attribution}</a>`}
+          url={MAP_TILE_URL}
         />
         <LocationMarker
           onLocationSelect={onLocationSelect}
