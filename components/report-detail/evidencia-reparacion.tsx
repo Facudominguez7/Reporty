@@ -2,11 +2,13 @@
 
 /**
  * Comparación «Antes / Después», estado de la verificación comunitaria y formulario
- * mínimo para informar una reparación en la ficha del reporte (S10, S11, S13).
+ * mínimo para informar una reparación en la ficha del reporte (S10, S11, S13, S16, S17).
  *
  * La ficha es visual: solo presenta lo que la base ya decidió. Confirmar, impugnar e
  * informar se delega a las server actions que recibe por propiedades, así ningún
- * estado, punto ni cierre se calcula en el navegador (S12).
+ * estado, punto ni cierre se calcula en el navegador (S12). El comentario de la
+ * evidencia y el motivo de la impugnación se eligen de listas cerradas: el navegador
+ * envía la clave y el servidor resuelve la frase aprobada.
  */
 
 import { useId, useState } from "react"
@@ -45,7 +47,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import {
   MENSAJE_CAPTCHA_NO_DISPONIBLE,
   TURNSTILE_CONFIGURADO,
@@ -57,7 +58,14 @@ import {
   REPORT_IMAGE_MAX_SOURCE_BYTES,
 } from "@/lib/media/report-images"
 import { optimizeReportImage } from "@/lib/media/optimize-report-image"
-import { MOTIVO_IMPUGNACION_MAX } from "@/lib/use-cases/reportes/evidencia-reparacion-limites"
+import {
+  FRASES_IMPUGNACION,
+  FRASES_REPARACION,
+  PLACEHOLDER_FRASE_IMPUGNACION,
+  PLACEHOLDER_FRASE_REPARACION,
+  PREGUNTA_POR_QUE_NO_ESTA_REPARADO,
+  PREGUNTA_QUE_SE_ARREGLO,
+} from "@/lib/reportes/frases-reparacion"
 import type {
   EvidenciaReparacionVista,
   SeccionReparacionVista,
@@ -75,15 +83,19 @@ const ZONA_HORARIA = "America/Argentina/Buenos_Aires"
  */
 const ACCION_CAPTCHA_INFORMAR_REPARACION = "informar_reparacion"
 
+/** Estilo compartido por los dos desplegables de frases, igual al de «¿Qué novedad tenés?». */
+const ESTILO_SELECT_FRASE =
+  "min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
+
 /** Resultado mínimo que la ficha necesita de una acción: si falló y qué mostrar. */
 export type ResultadoAccionReparacion = { success: boolean; error?: string }
 
 /** Acciones server-side que la ficha delega; el cliente nunca decide el resultado. */
 export type AccionesEvidenciaReparacion = {
   onConfirmar: () => Promise<ResultadoAccionReparacion>
-  onImpugnar: (motivo: string) => Promise<ResultadoAccionReparacion>
+  onImpugnar: (motivoClave: string) => Promise<ResultadoAccionReparacion>
   onInformar: (
-    comentario: string,
+    fraseClave: string,
     imagen: File,
     captchaToken: string | null,
   ) => Promise<ResultadoAccionReparacion>
@@ -321,10 +333,11 @@ function AvisoImpugnacionPendiente() {
 }
 
 /**
- * Diálogo de impugnación: el motivo es obligatorio y se valida en el servidor
- * antes de registrar la impugnación.
+ * Diálogo de impugnación: el motivo se elige de la lista cerrada de S17 y se valida
+ * en el servidor antes de registrar la impugnación. Exportado para que la prueba del
+ * formulario pueda renderizarlo abierto.
  */
-function DialogoImpugnar({
+export function DialogoImpugnar({
   abierto,
   cambiandoAbierto,
   enviando,
@@ -335,6 +348,7 @@ function DialogoImpugnar({
   abierto: boolean
   cambiandoAbierto: (abierto: boolean) => void
   enviando: boolean
+  /** Clave de la frase elegida; vacío mientras no se eligió ninguna. */
   motivo: string
   onMotivo: (motivo: string) => void
   onEnviar: () => void
@@ -351,26 +365,28 @@ function DialogoImpugnar({
             Impugnar la reparación
           </DialogTitle>
           <DialogDescription>
-            Contá por qué la reparación no está hecha. Administración revisa la
+            Elegí por qué la reparación no está hecha. Administración revisa la
             impugnación antes de validar la evidencia.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <label htmlFor={motivoId} className="text-sm font-medium">
-            Motivo de la impugnación
+            {PREGUNTA_POR_QUE_NO_ESTA_REPARADO}
           </label>
-          <Textarea
+          <select
             id={motivoId}
             value={motivo}
             onChange={(event) => onMotivo(event.target.value)}
-            maxLength={MOTIVO_IMPUGNACION_MAX}
             disabled={enviando}
-            placeholder="Ej.: el bache sigue igual, solo taparon una parte."
-            className="min-h-24 resize-y text-sm"
-          />
-          <p className="text-xs text-muted-foreground">
-            Hasta {MOTIVO_IMPUGNACION_MAX} caracteres.
-          </p>
+            className={ESTILO_SELECT_FRASE}
+          >
+            <option value="">{PLACEHOLDER_FRASE_IMPUGNACION}</option>
+            {FRASES_IMPUGNACION.map(({ key, label }) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
         <DialogFooter className="gap-2">
           <DialogClose asChild>
@@ -382,7 +398,7 @@ function DialogoImpugnar({
             type="button"
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={onEnviar}
-            disabled={enviando || motivo.trim().length === 0}
+            disabled={enviando || motivo.length === 0}
           >
             <Flag className="mr-2 size-4" aria-hidden="true" />
             {enviando ? "Enviando..." : "Enviar impugnación"}
@@ -444,7 +460,7 @@ function TarjetaEstadoEvidencia({
   const impugnar = async () => {
     setImpugnando(true)
     try {
-      const resultado = await acciones.onImpugnar(motivo.trim())
+      const resultado = await acciones.onImpugnar(motivo)
       if (!resultado.success) {
         toast.error(resultado.error ?? "No pudimos registrar tu impugnación.")
         return
@@ -575,9 +591,10 @@ function TarjetaEstadoEvidencia({
 }
 
 /**
- * Formulario mínimo mobile-first: una foto con cámara, un comentario corto y la
- * verificación anti bots del resto del sitio (S13). Reusa el pipeline existente:
- * la foto se optimiza en el navegador y entra en la moderación de siempre.
+ * Formulario mínimo mobile-first: una foto con cámara, la frase que describe el
+ * arreglo y la verificación anti bots del resto del sitio (S13, S16). Reusa el
+ * pipeline existente: la foto se optimiza en el navegador y entra en la moderación
+ * de siempre.
  */
 function FormularioEvidenciaReparacion({
   onInformar,
@@ -586,16 +603,16 @@ function FormularioEvidenciaReparacion({
 }) {
   const router = useRouter()
   const [imagen, setImagen] = useState<File | null>(null)
-  const [comentario, setComentario] = useState("")
+  const [frase, setFrase] = useState("")
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaReset, setCaptchaReset] = useState(0)
   const [enviando, setEnviando] = useState(false)
-  const comentarioId = useId()
+  const fraseId = useId()
 
   const necesitaCaptcha = TURNSTILE_CONFIGURADO
   const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE
   const puedeEnviar = Boolean(imagen)
-    && comentario.trim().length > 0
+    && frase.length > 0
     && !enviando
     && !captchaNoDisponible
     && (!necesitaCaptcha || captchaToken !== null)
@@ -618,7 +635,7 @@ function FormularioEvidenciaReparacion({
     setEnviando(true)
     try {
       const optimizada = await optimizeReportImage(imagen)
-      const resultado = await onInformar(comentario.trim(), optimizada.file, captchaToken)
+      const resultado = await onInformar(frase, optimizada.file, captchaToken)
       if (!resultado.success) {
         toast.error(resultado.error ?? "No pudimos informar la reparación.")
         return
@@ -627,7 +644,7 @@ function FormularioEvidenciaReparacion({
         description: "La foto pasa por moderación antes de publicarse.",
       })
       setImagen(null)
-      setComentario("")
+      setFrase("")
       router.refresh()
     } catch (error) {
       console.error("Error al informar la reparación:", error)
@@ -696,22 +713,25 @@ function FormularioEvidenciaReparacion({
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor={comentarioId} className="text-sm font-medium">
-              Comentario
+            <label htmlFor={fraseId} className="text-sm font-medium">
+              {PREGUNTA_QUE_SE_ARREGLO}
             </label>
-            <Textarea
-              id={comentarioId}
-              value={comentario}
-              onChange={(event) => setComentario(event.target.value)}
-              maxLength={500}
-              rows={2}
+            <select
+              id={fraseId}
+              value={frase}
+              onChange={(event) => setFrase(event.target.value)}
               disabled={enviando}
-              placeholder="Ej.: taparon el bache con asfalto nuevo el viernes."
-              className="min-h-20 resize-y text-sm"
-            />
+              className={ESTILO_SELECT_FRASE}
+            >
+              <option value="">{PLACEHOLDER_FRASE_REPARACION}</option>
+              {FRASES_REPARACION.map(({ key, label }) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
             <p className="text-xs text-muted-foreground">
-              Una línea alcanza: contá qué se arregló y cuándo. La foto pasa por la
-              moderación de siempre antes de publicarse.
+              La foto pasa por la moderación de siempre antes de publicarse.
             </p>
           </div>
 

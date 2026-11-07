@@ -126,7 +126,7 @@ describe("informar una reparación", () => {
     const cliente = clienteFalso()
 
     const resultado = await informarReparacionWorkflow(cliente.supabase, 9, "autor", {
-      comentario: "  Bache tapado  ",
+      frase: "taparon_el_bache_con_asfalto_nuevo",
       image: foto(),
     })
 
@@ -137,9 +137,22 @@ describe("informar una reparación", () => {
     expect(mocks.moderarEvidencia).toHaveBeenCalledWith(cliente.supabase, {
       reporteId: 9,
       autorId: "autor",
-      comentario: "Bache tapado",
+      comentario: "Taparon el bache con asfalto nuevo",
       image: expect.any(File),
     })
+  })
+
+  it("resuelve en el servidor la etiqueta de la frase elegida, no el texto del cliente (S16)", async () => {
+    const cliente = clienteFalso()
+
+    await informarReparacionWorkflow(cliente.supabase, 9, "autor", {
+      frase: "  retiraron_el_arbol_o_las_ramas_caidas  ",
+      image: foto(),
+    })
+
+    expect(mocks.moderarEvidencia).toHaveBeenCalledWith(cliente.supabase, expect.objectContaining({
+      comentario: "Retiraron el árbol o las ramas caídas",
+    }))
   })
 
   it("deja la reparación informada sin publicar cuando la foto queda en revisión", async () => {
@@ -152,7 +165,7 @@ describe("informar una reparación", () => {
     })
     const cliente = clienteFalso()
 
-    const resultado = await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })
+    const resultado = await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })
 
     expect(resultado).toEqual({
       success: true,
@@ -176,22 +189,25 @@ describe("informar una reparación", () => {
     })
     const cliente = clienteFalso()
 
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })).toEqual({
       success: false,
       error: "No pudimos guardar la fotografía de la reparación. Reintentá con la misma foto: retomamos la misma evidencia.",
     })
   })
 
   it.each([
-    ["", "Contá en hasta 500 caracteres qué se reparó."],
-    ["   ", "Contá en hasta 500 caracteres qué se reparó."],
-    ["x".repeat(501), "Contá en hasta 500 caracteres qué se reparó."],
-  ])("rechaza el comentario %j sin consultar roles ni moderar", async (comentario, error) => {
+    ["", "vacío"],
+    ["   ", "solo espacios"],
+    ["taparon_el_bache", "clave inexistente"],
+    ["Taparon el bache con asfalto nuevo", "etiqueta en vez de clave"],
+    ["x".repeat(501), "texto libre largo"],
+    ["Bache tapado y señalizado", "texto libre"],
+  ])("rechaza %j (%s) sin consultar roles ni moderar (S16)", async (frase) => {
     const cliente = clienteFalso()
 
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario, image: foto() })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase, image: foto() })).toEqual({
       success: false,
-      error,
+      error: "Elegí qué se arregló de la lista.",
     })
     expect(mocks.getUserRoleContext).not.toHaveBeenCalled()
     expect(mocks.moderarEvidencia).not.toHaveBeenCalled()
@@ -207,7 +223,7 @@ describe("informar una reparación", () => {
     })
     const cliente = clienteFalso()
 
-    const resultado = await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })
+    const resultado = await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })
 
     expect(resultado).toMatchObject({ success: true, data: { estado: "rechazada", publicada: false } })
     expect(cliente.llamadas).toHaveLength(0)
@@ -217,7 +233,7 @@ describe("informar una reparación", () => {
     mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: rol }, error: null })
     const cliente = clienteFalso()
 
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })).toEqual({
       success: false,
       error: MENSAJE_CUENTA,
     })
@@ -228,12 +244,12 @@ describe("informar una reparación", () => {
     mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: 1, roleName: "Admin" }, error: null })
     const cliente = clienteFalso()
 
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "admin-1", { comentario: "Reparado", image: foto() }))
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "admin-1", { frase: "repararon_el_problema_por_completo", image: foto() }))
       .toMatchObject({ success: true, data: { estado: "en_verificacion" } })
     expect(mocks.moderarEvidencia).toHaveBeenCalledWith(cliente.supabase, {
       reporteId: 9,
       autorId: "admin-1",
-      comentario: "Reparado",
+      comentario: "Repararon el problema por completo",
       image: expect.any(File),
     })
   })
@@ -242,7 +258,7 @@ describe("informar una reparación", () => {
     mocks.validarImagen.mockRejectedValue(new Error("La imagen seleccionada no coincide con el formato real del archivo."))
     const cliente = clienteFalso()
 
-    await expect(informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() }))
+    await expect(informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() }))
       .rejects.toThrow("La imagen seleccionada no coincide con el formato real del archivo.")
     expect(mocks.moderarEvidencia).not.toHaveBeenCalled()
   })
@@ -252,11 +268,11 @@ describe("informar una reparación", () => {
     const gif = new File([new Uint8Array([1])], "reparado.gif", { type: "image/gif" })
     const pesada = new File([new Uint8Array(102401)], "reparado.png", { type: "image/png" })
 
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: gif })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: gif })).toEqual({
       success: false,
       error: "La imagen debe estar en formato JPG, PNG o WebP.",
     })
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: pesada })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: pesada })).toEqual({
       success: false,
       error: "La imagen optimizada no puede superar los 100 KB.",
     })
@@ -268,7 +284,7 @@ describe("informar una reparación", () => {
     ["PRE01", "cuenta", MENSAJE_CUENTA],
     ["PRE04", "cupo", "Alcanzaste el límite de 3 evidencias de reparación por día."],
     ["PRE05", "cerrado", "El reporte ya está cerrado o no está disponible para informar una reparación."],
-    ["PRE11", "datos", "Revisá el comentario: debe tener entre 1 y 500 caracteres."],
+    ["PRE11", "frase", "Elegí qué se arregló de la lista."],
     ["XX000", "inesperado", "No pudimos guardar la fotografía."],
   ])("traduce el rechazo %s de la RPC de evidencia", async (codigo, _caso, error) => {
     mocks.moderarEvidencia.mockResolvedValue({
@@ -282,7 +298,7 @@ describe("informar una reparación", () => {
     })
     const cliente = clienteFalso()
 
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })).toEqual({
       success: false,
       error,
     })
@@ -300,11 +316,11 @@ describe("informar una reparación", () => {
     const cliente = clienteFalso()
 
     expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", {
-      comentario: "Bache tapado por la municipalidad",
+      frase: "limpiaron_la_basura_o_el_microbasural",
       image: foto(),
     })).toEqual({
       success: false,
-      error: "Esta reparación ya quedó informada con otro comentario. Reintentá con la misma foto y su comentario original, o esperá la revisión de la evidencia ya enviada.",
+      error: "Esta reparación ya quedó informada con otra frase. Reintentá con la misma foto y la frase original, o esperá la revisión de la evidencia ya enviada.",
     })
   })
 
@@ -319,7 +335,7 @@ describe("informar una reparación", () => {
       codigoRpc: "PRE03",
       mensajeRpc: "Esa fotografía ya fue registrada en este reporte",
     })
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })).toEqual({
       success: false,
       error: "Esa fotografía ya fue registrada en este reporte.",
     })
@@ -333,7 +349,7 @@ describe("informar una reparación", () => {
       codigoRpc: "PRE03",
       mensajeRpc: "El reporte ya tiene una evidencia de reparación activa",
     })
-    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { comentario: "Reparado", image: foto() })).toEqual({
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "autor", { frase: "repararon_el_problema_por_completo", image: foto() })).toEqual({
       success: false,
       error: "Este reporte ya tiene una reparación informada en verificación.",
     })
@@ -378,28 +394,34 @@ describe("confirmar o impugnar una reparación", () => {
     expect(mocks.notificarEstado).not.toHaveBeenCalled()
   })
 
-  it("registra la impugnación con su motivo recortado", async () => {
+  it("registra la impugnación con la etiqueta de la frase elegida (S17)", async () => {
     const cliente = clienteFalso({
       rpc: { data: { ...confirmacion, tipo: "impugnacion", impugnaciones: 1, impugnaciones_pendientes: 1 }, error: null },
     })
 
-    const resultado = await verificarReparacionWorkflow(cliente.supabase, "evidencia-1", "vecino", "impugnacion", "  El bache sigue  ")
+    const resultado = await verificarReparacionWorkflow(cliente.supabase, "evidencia-1", "vecino", "impugnacion", "  el_problema_sigue_igual  ")
 
     expect(resultado).toMatchObject({ success: true, data: { tipo: "impugnacion", impugnacionesPendientes: 1 } })
     expect(cliente.llamadas[0].argumentos).toEqual({
       p_evidencia_id: "evidencia-1",
       p_usuario_id: "vecino",
       p_tipo: "impugnacion",
-      p_motivo: "El bache sigue",
+      p_motivo: "El problema sigue igual",
     })
   })
 
-  it.each(["", "   ", "x".repeat(501)])("exige un motivo válido para impugnar: %j", async (motivo) => {
+  it.each([
+    ["", "vacío"],
+    ["   ", "solo espacios"],
+    ["sigue_roto", "clave inexistente"],
+    ["El problema sigue igual", "etiqueta en vez de clave"],
+    ["x".repeat(501), "texto libre largo"],
+  ])("exige una frase del catálogo para impugnar: %j (%s)", async (motivo) => {
     const cliente = clienteFalso()
 
     expect(await verificarReparacionWorkflow(cliente.supabase, "evidencia-1", "vecino", "impugnacion", motivo)).toEqual({
       success: false,
-      error: "Contá por qué impugnás la reparación, en hasta 500 caracteres.",
+      error: "Elegí por qué no está reparado de la lista.",
     })
     expect(cliente.llamadas).toHaveLength(0)
     expect(mocks.getUserRoleContext).not.toHaveBeenCalled()
@@ -441,9 +463,9 @@ describe("confirmar o impugnar una reparación", () => {
     const impugnado = clienteFalso({
       rpc: { data: { ...confirmacion, tipo: "impugnacion", impugnaciones: 1, impugnaciones_pendientes: 1 }, error: null },
     })
-    await expect(verificarReparacionWorkflow(impugnado.supabase, "evidencia-1", "admin-1", "impugnacion", "  Falta terminar  "))
+    await expect(verificarReparacionWorkflow(impugnado.supabase, "evidencia-1", "admin-1", "impugnacion", "  lo_arreglaron_solo_en_parte  "))
       .resolves.toMatchObject({ success: true, data: { tipo: "impugnacion" } })
-    expect(impugnado.llamadas[0].argumentos).toMatchObject({ p_usuario_id: "admin-1", p_motivo: "Falta terminar" })
+    expect(impugnado.llamadas[0].argumentos).toMatchObject({ p_usuario_id: "admin-1", p_motivo: "Lo arreglaron solo en parte" })
   })
 
   it.each([

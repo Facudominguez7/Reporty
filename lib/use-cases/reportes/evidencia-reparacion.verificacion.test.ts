@@ -358,14 +358,14 @@ describe("S2/S12 · el fallo de carga privada nunca se informa como éxito", () 
       crear: () => ({ data: { evidencia_id: "ev-1", moderacion_id: "mod-1", path_privado: "persona/mod-1" }, error: null }),
       cola: colaPendiente(await identidad(archivo)), fallaSubidaPrivada: true,
     })
-    const resultado = await informarReparacionWorkflow(d.supabase, 7, "persona", { comentario: "Bache tapado", image: archivo })
+    const resultado = await informarReparacionWorkflow(d.supabase, 7, "persona", { frase: "taparon_el_bache_con_asfalto_nuevo", image: archivo })
     expect(resultado).toEqual({ success: false, error: MENSAJE_FALLO_CARGA })
   })
 
   it("el rechazo genérico de la RPC no filtra el mensaje de la base ni el comentario guardado", async () => {
     const archivo = await foto()
     const d = doble({ crear: rechazoActivo, evidencia: evidencia(), cola: colaPendiente("0".repeat(64)) })
-    const resultado = await informarReparacionWorkflow(d.supabase, 7, "persona", { comentario: "Otro texto", image: archivo })
+    const resultado = await informarReparacionWorkflow(d.supabase, 7, "persona", { frase: "repararon_el_problema_por_completo", image: archivo })
     expect(resultado).toEqual({ success: false, error: "Este reporte ya tiene una reparación informada en verificación." })
     expect(JSON.stringify(resultado)).not.toContain("El reporte ya tiene una evidencia")
     expect(JSON.stringify(resultado)).not.toContain("Bache tapado")
@@ -374,7 +374,7 @@ describe("S2/S12 · el fallo de carga privada nunca se informa como éxito", () 
   it("el comentario distinto del caso de uso no publica y avisa que la evidencia ya existe", async () => {
     const archivo = await foto()
     const d = doble({ crear: rechazoActivo, evidencia: evidencia(), cola: colaPendiente(await identidad(archivo)) })
-    const resultado = await informarReparacionWorkflow(d.supabase, 7, "persona", { comentario: "Texto nuevo", image: archivo })
+    const resultado = await informarReparacionWorkflow(d.supabase, 7, "persona", { frase: "limpiaron_la_basura_o_el_microbasural", image: archivo })
     expect(resultado).toEqual({ success: false, error: MENSAJE_COMENTARIO_EVIDENCIA_DISTINTO })
     expect(d.mutaciones()).toEqual([])
   })
@@ -382,7 +382,7 @@ describe("S2/S12 · el fallo de carga privada nunca se informa como éxito", () 
 
 describe("S12/S15 · autorización del lado del servidor en cada acción", () => {
   it("sin sesión no se sube nada y no se verifica captcha", async () => {
-    const resultado = await informarReparacionAction(7, "Bache tapado", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
     expect(resultado).toEqual({ success: false, error: "Tenés que iniciar sesión para informar una reparación." })
     expect(piezas.captcha).not.toHaveBeenCalled()
     expect(piezas.createAdminClient).not.toHaveBeenCalled()
@@ -396,7 +396,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
   ])("rechaza informar con %s", async (_caso, usuario, rol) => {
     piezas.rol.actual = rol
     piezas.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: usuario } }) } })
-    const resultado = await informarReparacionAction(7, "Bache tapado", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
     expect(resultado).toEqual({ success: false, error: MENSAJE_CUENTA_REPARACION_REQUERIDA })
     expect(piezas.captcha).not.toHaveBeenCalled()
     expect(piezas.createAdminClient).not.toHaveBeenCalled()
@@ -412,7 +412,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
       cola: colaPendiente("0".repeat(64)),
     })
     piezas.createAdminClient.mockReturnValue(d.supabase)
-    const resultado = await informarReparacionAction(7, "Bache tapado", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
     expect(resultado).toEqual({ success: false, error: "El reporte ya está cerrado o no está disponible para informar una reparación." })
     expect(piezas.captcha).toHaveBeenCalled()
     const [nombre, parametros] = d.rpc.mock.calls[0] as [string, Fila]
@@ -427,7 +427,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     piezas.captcha.mockResolvedValue({ ok: false, tipo: "rechazada", motivo: "invalid", mensaje: "Captcha inválido." })
-    const resultado = await informarReparacionAction(7, "Bache tapado", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
     expect(resultado).toEqual({ success: false, error: "Captcha inválido." })
     expect(piezas.captcha).toHaveBeenCalledWith({ token: "token", expectedAction: "informar_reparacion" })
     expect(d.rpc).not.toHaveBeenCalled()
@@ -441,7 +441,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     const basura = new File([new TextEncoder().encode("no soy una imagen")], "falsa.png", { type: "image/png" })
-    const resultado = await informarReparacionAction(7, "Bache tapado", basura, "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", basura, "token")
     expect(resultado.success).toBe(false)
     expect(d.rpc).not.toHaveBeenCalled()
   })
@@ -453,7 +453,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     const gif = new File([new Uint8Array([0x47, 0x49, 0x46])], "a.gif", { type: "image/gif" })
-    const resultado = await informarReparacionAction(7, "Bache tapado", gif, "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", gif, "token")
     expect(resultado).toEqual({ success: false, error: "La imagen debe estar en formato JPG, PNG o WebP." })
     expect(d.rpc).not.toHaveBeenCalled()
   })
@@ -465,7 +465,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     const enorme = new File([new Uint8Array(200 * 1024)], "grande.png", { type: "image/png" })
-    const resultado = await informarReparacionAction(7, "Bache tapado", enorme, "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", enorme, "token")
     expect(resultado).toEqual({ success: false, error: "La imagen optimizada no puede superar los 100 KB." })
     expect(d.rpc).not.toHaveBeenCalled()
   })
@@ -474,7 +474,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     expect(await confirmarReparacionAction(7, "11111111-1111-4111-8111-111111111111")).toEqual({
       success: false, error: "Tenés que iniciar sesión para confirmar o impugnar una reparación.",
     })
-    expect(await impugnarReparacionAction(7, "11111111-1111-4111-8111-111111111111", "sigue roto")).toEqual({
+    expect(await impugnarReparacionAction(7, "11111111-1111-4111-8111-111111111111", "el_problema_sigue_igual")).toEqual({
       success: false, error: "Tenés que iniciar sesión para confirmar o impugnar una reparación.",
     })
     expect(piezas.createAdminClient).not.toHaveBeenCalled()
@@ -509,7 +509,7 @@ describe("S5/S6/S7 · verificación comunitaria traducida en el servidor", () =>
   it("una segunda verificación distinta se rechaza y la repetida no vuelve a cerrar", async () => {
     const d = doble({ crear: rechazoActivo })
     d.rpc.mockResolvedValueOnce({ data: null, error: { code: "PRE06", message: "x" } })
-    const distinta = await verificarReparacionWorkflow(d.supabase, "11111111-1111-4111-8111-111111111111", "otra", "impugnacion", "sigue roto")
+    const distinta = await verificarReparacionWorkflow(d.supabase, "11111111-1111-4111-8111-111111111111", "otra", "impugnacion", "el_problema_sigue_igual")
     expect(distinta).toEqual({ success: false, error: "Ya registraste una verificación distinta para esta evidencia." })
 
     d.rpc.mockResolvedValueOnce({
@@ -531,10 +531,12 @@ describe("S5/S6/S7 · verificación comunitaria traducida en el servidor", () =>
     expect(resultado).toMatchObject({ success: true, data: { cerrado: true, confirmaciones: 3 } })
   })
 
-  it("la impugnación exige motivo y lo recorta antes de la RPC", async () => {
+  it("la impugnación exige una frase del catálogo antes de la RPC", async () => {
     const d = doble({ crear: rechazoActivo })
     expect(await verificarReparacionWorkflow(d.supabase, "11111111-1111-4111-8111-111111111111", "otra", "impugnacion", "   "))
-      .toEqual({ success: false, error: "Contá por qué impugnás la reparación, en hasta 500 caracteres." })
+      .toEqual({ success: false, error: "Elegí por qué no está reparado de la lista." })
+    expect(await verificarReparacionWorkflow(d.supabase, "11111111-1111-4111-8111-111111111111", "otra", "impugnacion", "Sigue roto de nuevo"))
+      .toEqual({ success: false, error: "Elegí por qué no está reparado de la lista." })
     expect(d.rpc).not.toHaveBeenCalled()
   })
 })
@@ -579,11 +581,11 @@ describe("S12 · la identidad se toma de la sesión, no del cliente", () => {
     })
     const d = doble({ crear: () => ({ data: null, error: { code: "PRE04", message: "límite" } }), cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
-    const resultado = await informarReparacionAction(7, "  Bache tapado  ", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "  taparon_el_bache_con_asfalto_nuevo  ", await foto(), "token")
     expect(resultado).toEqual({ success: false, error: "Alcanzaste el límite de 3 evidencias de reparación por día." })
     const [nombre, parametros] = d.rpc.mock.calls[0] as [string, Fila]
     expect(nombre).toBe("crear_evidencia_reparacion")
-    expect(parametros).toMatchObject({ p_reporte_id: 7, p_autor_id: "persona", p_comentario: "Bache tapado" })
+    expect(parametros).toMatchObject({ p_reporte_id: 7, p_autor_id: "persona", p_comentario: "Taparon el bache con asfalto nuevo" })
     expect(String(parametros.p_hash_sha256)).toMatch(/^[0-9a-f]{64}$/)
     expect(piezas.revalidatePath).not.toHaveBeenCalled()
   })

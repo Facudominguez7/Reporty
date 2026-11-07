@@ -1,4 +1,4 @@
-import { createElement } from "react"
+import { createElement, forwardRef, Fragment } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -6,6 +6,23 @@ const mocks = vi.hoisted(() => ({ refresh: vi.fn() }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: mocks.refresh }),
   usePathname: () => "/reportes/9",
+}))
+// El diálogo real solo pinta su contenido en el navegador; el doble respeta `open`
+// para que una prueba pueda mirar el formulario de impugnación sin montar React.
+vi.mock("@radix-ui/react-dialog", () => ({
+  Root: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+    createElement(Fragment, null, open ? children : null),
+  Trigger: ({ children }: { children?: React.ReactNode }) => createElement(Fragment, null, children),
+  Portal: ({ children }: { children?: React.ReactNode }) => createElement(Fragment, null, children),
+  Overlay: forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function MockOverlay(props, ref) {
+    return createElement("div", { ...props, ref })
+  }),
+  Content: forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function MockContent(props, ref) {
+    return createElement("div", { ...props, ref })
+  }),
+  Close: ({ children }: { children?: React.ReactNode }) => createElement("button", null, children),
+  Title: ({ children }: { children?: React.ReactNode }) => createElement("h2", null, children),
+  Description: ({ children }: { children?: React.ReactNode }) => createElement("p", null, children),
 }))
 vi.mock("@/components/turnstile-widget", () => ({
   TURNSTILE_CONFIGURADO: true,
@@ -21,7 +38,7 @@ import type {
   EvidenciaReparacionVista,
   SeccionReparacionVista,
 } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server"
-import { EvidenciaReparacion, type AccionesEvidenciaReparacion } from "./evidencia-reparacion"
+import { EvidenciaReparacion, DialogoImpugnar, type AccionesEvidenciaReparacion } from "./evidencia-reparacion"
 
 const EVIDENCIA_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -60,6 +77,31 @@ function renderizar(extra: Partial<SeccionReparacionVista> = {}, antes: typeof f
     fotoAntes: antes,
     acciones,
   }))
+}
+
+/** Renderiza el formulario de evidencia tal como se ve cuando la ficha lo habilita. */
+function renderizarFormulario() {
+  return renderizar({ evidencia: null, puedeInformar: true })
+}
+
+/** Renderiza el diálogo de impugnación abierto, como lo ve quien va a impugnar. */
+function renderizarDialogoImpugnar() {
+  return renderToStaticMarkup(createElement(DialogoImpugnar, {
+    abierto: true,
+    cambiandoAbierto: () => {},
+    enviando: false,
+    motivo: "",
+    onMotivo: () => {},
+    onEnviar: () => {},
+  }))
+}
+
+/** Extrae la etiqueta de apertura del botón que contiene el texto indicado. */
+function botonConTexto(html: string, texto: string) {
+  const indice = html.indexOf(texto)
+  if (indice < 0) return ""
+  const desde = html.lastIndexOf("<button", indice)
+  return desde < 0 ? "" : html.slice(desde, html.indexOf(">", desde) + 1)
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -251,19 +293,80 @@ describe("impugnación pendiente", () => {
   })
 })
 
+describe("frases cerradas de la reparación (S16, S17)", () => {
+  it("pregunta «¿Qué se arregló?» y ofrece exactamente las frases aprobadas en orden", () => {
+    const html = renderizarFormulario()
+
+    expect(html).toContain("¿Qué se arregló?")
+    expect(html).toContain("Elegí qué se arregló…")
+    const opciones = [...html.matchAll(/<option value="[^"]*"[^>]*>([^<]*)<\/option>/g)].map(([, etiqueta]) => etiqueta)
+    expect(opciones).toEqual([
+      "Elegí qué se arregló…",
+      "Repararon el problema por completo",
+      "Taparon el bache con asfalto nuevo",
+      "Retiraron el árbol o las ramas caídas",
+      "Repararon o cambiaron la luminaria",
+      "Limpiaron la basura o el microbasural",
+      "Repararon la pérdida de agua o la cañería",
+      "Arreglaron la vereda o el cordón",
+      "Repusieron o arreglaron el cartel o semáforo",
+    ])
+  })
+
+  it("envía la clave de la frase en un select y no un texto libre", () => {
+    const html = renderizarFormulario()
+
+    expect(html).toContain("<select")
+    expect(html).not.toContain("<textarea")
+    expect(html).toContain('value="taparon_el_bache_con_asfalto_nuevo"')
+    expect(html).not.toContain("Una línea alcanza")
+    expect(html).not.toContain("caracteres")
+    expect(html).toContain("La foto pasa por la moderación de siempre antes de publicarse.")
+  })
+
+  it("mantiene deshabilitado el envío hasta elegir una frase", () => {
+    const html = renderizarFormulario()
+
+    expect(botonConTexto(html, "Enviar evidencia")).toContain("disabled")
+    expect(html).toContain("Enviar evidencia")
+  })
+
+  it("pregunta «¿Por qué no está reparado?» y ofrece exactamente las frases aprobadas en orden", () => {
+    const html = renderizarDialogoImpugnar()
+
+    expect(html).toContain("¿Por qué no está reparado?")
+    expect(html).toContain("Elegí por qué no está reparado…")
+    const opciones = [...html.matchAll(/<option value="[^"]*"[^>]*>([^<]*)<\/option>/g)].map(([, etiqueta]) => etiqueta)
+    expect(opciones).toEqual([
+      "Elegí por qué no está reparado…",
+      "El problema sigue igual",
+      "Lo arreglaron solo en parte",
+      "El arreglo ya se rompió de nuevo",
+      "La foto no corresponde a este lugar",
+      "La foto no muestra el arreglo con claridad",
+    ])
+  })
+
+  it("impugna con un select y sin texto libre, con el envío deshabilitado sin frase", () => {
+    const html = renderizarDialogoImpugnar()
+
+    expect(html).toContain("<select")
+    expect(html).not.toContain("<textarea")
+    expect(html).not.toContain("caracteres")
+    expect(botonConTexto(html, "Enviar impugnación")).toContain("disabled")
+    expect(html).toContain("Enviar impugnación")
+  })
+})
+
 describe("carga de evidencia", () => {
-  it("ofrece un formulario mínimo con cámara, comentario y verificación anti bots", () => {
-    const html = renderToStaticMarkup(createElement(EvidenciaReparacion, {
-      seccion: seccion({ evidencia: null, puedeInformar: true }),
-      fotoAntes,
-      acciones,
-    }))
+  it("ofrece un formulario mínimo con cámara, frase de la lista y verificación anti bots", () => {
+    const html = renderizarFormulario()
 
     expect(html).toContain("¿Ya lo arreglaron? Informá la reparación")
     expect(html).toContain('capture="environment"')
     expect(html).toContain('accept="image/jpeg,image/png,image/webp"')
-    expect(html).toContain("Comentario")
-    expect(html).toMatch(/maxlength="500"/i)
+    expect(html).toContain("¿Qué se arregló?")
+    expect(html).not.toMatch(/maxlength="500"/i)
     expect(html).toContain("Enviar evidencia")
     expect(html).toContain("moderación")
     expect(html).toContain('data-turnstile="informar_reparacion"')

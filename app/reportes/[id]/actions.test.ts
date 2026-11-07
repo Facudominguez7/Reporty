@@ -358,11 +358,11 @@ describe("acciones de voto sin CAPTCHA", () => {
 const EVIDENCIA_ID = "11111111-1111-4111-8111-111111111111"
 const IMPUGNACION_ID = "22222222-2222-4222-8222-222222222222"
 const TOKEN_DE_EVIDENCIA = "tok-evidencia-1234"
-const COMENTARIO = "  Bache tapado y señalizado  "
+const FRASE = "  taparon_el_bache_con_asfalto_nuevo  "
 const MENSAJE_SIN_SESION = "Tenés que iniciar sesión para informar una reparación."
 const MENSAJE_CUENTA_REPARACION =
   "Necesitás una cuenta registrada con el correo confirmado para informar y verificar reparaciones."
-const MENSAJE_COMENTARIO = "Contá en hasta 500 caracteres qué se reparó."
+const MENSAJE_FRASE = "Elegí qué se arregló de la lista."
 const MENSAJE_EVIDENCIA_INVALIDA = "No pudimos identificar la evidencia de reparación."
 
 /** Respuesta controlada de Siteverify para la action del formulario de evidencia. */
@@ -391,7 +391,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
     const llamada = siteverifyEvidencia()
 
-    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
       success: false,
       error: MENSAJE_SIN_SESION,
     })
@@ -408,7 +408,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     sesionConRol(rol as number, anonimo as boolean, "cuenta-1", correo as string | null)
     const llamada = siteverifyEvidencia()
 
-    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
       success: false,
       error: MENSAJE_CUENTA_REPARACION,
     })
@@ -419,10 +419,10 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
   it("permite que administración informe la reparación (L21)", async () => {
     sesionConRol(1, false, "admin-1")
 
-    await expect(informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA))
+    await expect(informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA))
       .resolves.toMatchObject({ success: true })
     expect(mocks.informarReparacion).toHaveBeenCalledWith({}, 7, "admin-1", {
-      comentario: "Bache tapado y señalizado",
+      frase: "taparon_el_bache_con_asfalto_nuevo",
       image: expect.any(File),
     })
   })
@@ -430,7 +430,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
   it("verifica el token con la action de la evidencia y después ejecuta el workflow", async () => {
     const llamada = siteverifyEvidencia()
 
-    const resultado = await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)
+    const resultado = await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)
 
     expect(resultado).toMatchObject({ success: true })
     expect(llamada).toHaveBeenCalledOnce()
@@ -439,7 +439,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     expect(opciones.body.get("response")).toBe(TOKEN_DE_EVIDENCIA)
     expect(mocks.informarReparacion).toHaveBeenCalledOnce()
     expect(mocks.informarReparacion).toHaveBeenCalledWith({}, 7, "ciudadano-1", {
-      comentario: "Bache tapado y señalizado",
+      frase: "taparon_el_bache_con_asfalto_nuevo",
       image: expect.any(File),
     })
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
@@ -448,7 +448,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
   it("rechaza un envío directo sin token sin moderar la foto", async () => {
     const llamada = siteverifyEvidencia()
 
-    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia())).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia())).toEqual({
       success: false,
       error: "La verificación falló o venció. Completá la verificación y volvé a intentarlo.",
     })
@@ -457,12 +457,12 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     expect(mocks.createAdminClient).not.toHaveBeenCalled()
   })
 
-  it("valida comentario y foto antes de abrir la sesión", async () => {
+  it("valida la frase elegida y la foto antes de abrir la sesión", async () => {
     expect(await informarReparacionAction(7, "   ", fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
       success: false,
-      error: MENSAJE_COMENTARIO,
+      error: MENSAJE_FRASE,
     })
-    expect(await informarReparacionAction(7, COMENTARIO, "no es un archivo" as unknown as File, TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, "no es un archivo" as unknown as File, TOKEN_DE_EVIDENCIA)).toEqual({
       success: false,
       error: "Adjuntá una fotografía de la reparación.",
     })
@@ -470,10 +470,26 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     expect(mocks.informarReparacion).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ["taparon_el_bache", "clave inexistente"],
+    ["Taparon el bache con asfalto nuevo", "etiqueta en vez de clave"],
+    ["Bache tapado y señalizado", "texto libre"],
+  ])("rechaza %j (%s) antes del CAPTCHA, la moderación y la RPC (S16)", async (frase) => {
+    const llamada = siteverifyEvidencia()
+
+    expect(await informarReparacionAction(7, frase, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+      success: false,
+      error: MENSAJE_FRASE,
+    })
+    expect(llamada).not.toHaveBeenCalled()
+    expect(mocks.informarReparacion).not.toHaveBeenCalled()
+    expect(mocks.createAdminClient).not.toHaveBeenCalled()
+  })
+
   it("informa el rechazo del workflow sin revalidar", async () => {
     mocks.informarReparacion.mockResolvedValue({ success: false, error: "Alcanzaste el límite de 3 evidencias de reparación por día." })
 
-    expect(await informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
       success: false,
       error: "Alcanzaste el límite de 3 evidencias de reparación por día.",
     })
@@ -505,7 +521,7 @@ describe("confirmarReparacionAction e impugnarReparacionAction", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
   })
 
-  it("envía el motivo de la impugnación al workflow", async () => {
+  it("envía la frase elegida al workflow, que resuelve la etiqueta (S17)", async () => {
     mocks.verificarReparacion.mockResolvedValue({
       success: true,
       data: {
@@ -514,9 +530,23 @@ describe("confirmarReparacionAction e impugnarReparacionAction", () => {
       },
     })
 
-    await expect(impugnarReparacionAction(7, EVIDENCIA_ID, "  El bache sigue  ")).resolves.toMatchObject({ success: true })
+    await expect(impugnarReparacionAction(7, EVIDENCIA_ID, "  el_problema_sigue_igual  ")).resolves.toMatchObject({ success: true })
 
-    expect(mocks.verificarReparacion).toHaveBeenCalledWith({}, EVIDENCIA_ID, "ciudadano-1", "impugnacion", "El bache sigue")
+    expect(mocks.verificarReparacion).toHaveBeenCalledWith({}, EVIDENCIA_ID, "ciudadano-1", "impugnacion", "el_problema_sigue_igual")
+  })
+
+  it.each([
+    ["", "vacío"],
+    ["sigue_roto", "clave inexistente"],
+    ["El problema sigue igual", "etiqueta en vez de clave"],
+    ["El bache sigue igual", "texto libre"],
+  ])("rechaza la impugnación %j (%s) sin abrir sesión ni llamar al workflow (S17)", async (motivo) => {
+    expect(await impugnarReparacionAction(7, EVIDENCIA_ID, motivo)).toEqual({
+      success: false,
+      error: "Elegí por qué no está reparado de la lista.",
+    })
+    expect(mocks.createClient).not.toHaveBeenCalled()
+    expect(mocks.verificarReparacion).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -537,8 +567,8 @@ describe("confirmarReparacionAction e impugnarReparacionAction", () => {
     await expect(confirmarReparacionAction(7, EVIDENCIA_ID)).resolves.toMatchObject({ success: true })
     expect(mocks.verificarReparacion).toHaveBeenCalledWith({}, EVIDENCIA_ID, "admin-1", "confirmacion", undefined)
 
-    await expect(impugnarReparacionAction(7, EVIDENCIA_ID, "  Falta terminar  ")).resolves.toMatchObject({ success: true })
-    expect(mocks.verificarReparacion).toHaveBeenLastCalledWith({}, EVIDENCIA_ID, "admin-1", "impugnacion", "Falta terminar")
+    await expect(impugnarReparacionAction(7, EVIDENCIA_ID, "  lo_arreglaron_solo_en_parte  ")).resolves.toMatchObject({ success: true })
+    expect(mocks.verificarReparacion).toHaveBeenLastCalledWith({}, EVIDENCIA_ID, "admin-1", "impugnacion", "lo_arreglaron_solo_en_parte")
   })
 
   it("exige sesión para confirmar o impugnar", async () => {

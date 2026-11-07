@@ -31,11 +31,8 @@ import {
   moderarYGuardarImagenEvidenciaReparacion,
 } from "@/lib/moderation/imagenes-reporte.server"
 import { sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
+import { parseFraseImpugnacion, parseFraseReparacion } from "@/lib/reportes/frases-reparacion"
 import { getReportContext } from "./detail-mutations"
-import {
-  COMENTARIO_REPARACION_MAX,
-  MOTIVO_IMPUGNACION_MAX,
-} from "./evidencia-reparacion-limites"
 
 /**
  * Confirmaciones independientes que validan una reparación («inicialmente tres», S5).
@@ -46,26 +43,25 @@ export const UMBRAL_CONFIRMACIONES_REPARACION = 3
 /** Límite diario de evidencias por cuenta, igual al cupo de `crear_evidencia_reparacion`. */
 export const EVIDENCIAS_REPARACION_POR_DIA = 3
 
-// Los límites de texto viven en un módulo sin `server-only` para que el formulario
-// de la ficha pueda mostrarlos; acá se reexportan para no duplicar literales.
-export { COMENTARIO_REPARACION_MAX, MOTIVO_IMPUGNACION_MAX }
+// Los límites de las columnas viven en un módulo sin `server-only`; el catálogo de
+// frases garantiza que cada etiqueta aceptada entra en esas columnas libres.
 
 /** Texto único para las cuentas que todavía no pueden informar ni verificar (S15). */
 export const MENSAJE_CUENTA_REPARACION_REQUERIDA =
   "Necesitás una cuenta registrada con el correo confirmado para informar y verificar reparaciones."
 
-/** Texto del comentario inválido; también lo usa la acción para no duplicar el literal. */
-export const MENSAJE_COMENTARIO_REPARACION_INVALIDO = "Contá en hasta 500 caracteres qué se reparó."
+/** Texto de la frase inválida: la evidencia solo acepta frases del catálogo (S16). */
+export const MENSAJE_FRASE_REPARACION_INVALIDA = "Elegí qué se arregló de la lista."
 
 /**
- * Texto cuando la misma fotografía se reintenta con otro comentario: la evidencia ya
- * guardada conserva su texto y publicarla no puede cambiar lo que la persona escribió.
+ * Texto cuando la misma fotografía se reintenta con otra frase: la evidencia ya
+ * guardada conserva su frase y publicarla no puede cambiar lo que la persona eligió.
  */
 export const MENSAJE_COMENTARIO_EVIDENCIA_DISTINTO =
-  "Esta reparación ya quedó informada con otro comentario. Reintentá con la misma foto y su comentario original, o esperá la revisión de la evidencia ya enviada."
+  "Esta reparación ya quedó informada con otra frase. Reintentá con la misma foto y la frase original, o esperá la revisión de la evidencia ya enviada."
 
-/** Texto del motivo de impugnación inválido. */
-export const MENSAJE_MOTIVO_IMPUGNACION_INVALIDO = "Contá por qué impugnás la reparación, en hasta 500 caracteres."
+/** Texto del motivo de impugnación inválido: también se elige de una lista (S17). */
+export const MENSAJE_MOTIVO_IMPUGNACION_INVALIDO = "Elegí por qué no está reparado de la lista."
 
 /** Texto compartido por todas las acciones administrativas de evidencia. */
 export const MENSAJE_SIN_PERMISO_ADMINISTRADOR = "No tenés permisos de administrador para esta acción."
@@ -99,8 +95,8 @@ export type DecisionImpugnacionReparacion = "aceptada" | "descartada"
 
 const ESTADOS_EVIDENCIA: readonly string[] = ["informada", "en_verificacion", "validada", "rechazada", "revertida"]
 
-/** Entrada del formulario mínimo para informar una reparación (S13). */
-export type EntradaInformeReparacion = { comentario: string; image: File }
+/** Entrada del formulario mínimo para informar una reparación (S13, S16). */
+export type EntradaInformeReparacion = { frase: string; image: File }
 
 /** Resultado visible de informar una reparación: nunca implica cambiar el estado del reporte. */
 export type ResultadoInformeReparacion = {
@@ -221,7 +217,7 @@ function mensajeDeCreacionFallida(resultado: ResultadoImagenEvidenciaReparacion)
     case "PRE05":
       return "El reporte ya está cerrado o no está disponible para informar una reparación."
     case "PRE11":
-      return "Revisá el comentario: debe tener entre 1 y 500 caracteres."
+      return MENSAJE_FRASE_REPARACION_INVALIDA
     default:
       return resultado.motivos[0] ?? "No pudimos registrar la evidencia de reparación."
   }
@@ -436,17 +432,18 @@ async function evidenciaDeImpugnacion(supabase: SupabaseClient, verificacionId: 
 }
 
 /**
- * Informa una reparación con su fotografía y comentario (S1). La foto entra en la
- * cola de moderación existente y el reporte no cambia de estado (S2): la evidencia
- * queda «informada» hasta que la foto se publica. Cuando los bytes privados no se
- * confirman, la respuesta es un error y reintentar la misma foto con el mismo
- * comentario reanuda la evidencia; el mismo reintento con otro comentario se rechaza
- * para no publicar un texto distinto al escrito.
+ * Informa una reparación con su fotografía y la frase elegida de la lista (S1, S16).
+ * La foto entra en la cola de moderación existente y el reporte no cambia de estado
+ * (S2): la evidencia queda «informada» hasta que la foto se publica. La clave se
+ * resuelve acá a su etiqueta, así la base guarda el texto aprobado y no el del
+ * cliente. Cuando los bytes privados no se confirman, la respuesta es un error y
+ * reintentar la misma foto con la misma frase reanuda la evidencia; el mismo reintento
+ * con otra frase se rechaza para no publicar un texto distinto al elegido.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
  * @param reporteId - Reporte que se está informando como reparado.
  * @param actorUserId - Cuenta autenticada que informa la reparación.
- * @param entrada - Comentario y archivo elegidos en el formulario.
+ * @param entrada - Frase del catálogo y archivo elegidos en el formulario.
  * @returns Evidencia creada con su estado visible, o el error en español.
  */
 export async function informarReparacionWorkflow(
@@ -455,9 +452,9 @@ export async function informarReparacionWorkflow(
   actorUserId: string,
   entrada: EntradaInformeReparacion,
 ): Promise<ResultadoReparacion<ResultadoInformeReparacion>> {
-  const comentario = (entrada.comentario ?? "").trim()
-  if (comentario.length === 0 || comentario.length > COMENTARIO_REPARACION_MAX) {
-    return { success: false, error: MENSAJE_COMENTARIO_REPARACION_INVALIDO }
+  const frase = parseFraseReparacion(entrada.frase)
+  if (!frase) {
+    return { success: false, error: MENSAJE_FRASE_REPARACION_INVALIDA }
   }
   if (!await rolHabilitado(supabase, actorUserId)) {
     return { success: false, error: MENSAJE_CUENTA_REPARACION_REQUERIDA }
@@ -474,12 +471,12 @@ export async function informarReparacionWorkflow(
   const resultado = await moderarYGuardarImagenEvidenciaReparacion(supabase, {
     reporteId,
     autorId: actorUserId,
-    comentario,
+    comentario: frase,
     image: entrada.image,
   })
   if (resultado.comentarioDistinto) {
-    // El comentario guardado no es el que la persona acaba de escribir: no se publica
-    // la evidencia ni se declara enviada (S1, S9).
+    // La frase guardada no es la que la persona acaba de elegir: no se publica la
+    // evidencia ni se declara enviada (S1, S9).
     return { success: false, error: MENSAJE_COMENTARIO_EVIDENCIA_DISTINTO }
   }
   if (!resultado.evidenciaId) {
@@ -505,13 +502,15 @@ export async function informarReparacionWorkflow(
 /**
  * Confirma o impugna una reparación informada (S4). Con tres confirmaciones y sin
  * impugnaciones pendientes la RPC cierra el reporte una sola vez (S5, S12); repetir
- * la misma verificación devuelve el estado actual sin contar de nuevo (S7).
+ * la misma verificación devuelve el estado actual sin contar de nuevo (S7). El motivo
+ * de una impugnación se elige del catálogo cerrado (S17) y se resuelve a su etiqueta
+ * antes de llegar a la base.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
  * @param evidenciaId - Evidencia en verificación.
  * @param actorUserId - Cuenta que confirma o impugna.
  * @param tipo - «confirmacion» o «impugnacion».
- * @param motivo - Motivo obligatorio cuando se impugna.
+ * @param fraseClave - Clave del catálogo, obligatoria cuando se impugna.
  * @returns Avance de la verificación, o el error en español.
  */
 export async function verificarReparacionWorkflow(
@@ -519,13 +518,13 @@ export async function verificarReparacionWorkflow(
   evidenciaId: string,
   actorUserId: string,
   tipo: TipoVerificacionReparacion,
-  motivo?: string,
+  fraseClave?: string,
 ): Promise<ResultadoReparacion<ResultadoVerificacionReparacion>> {
   if (tipo !== "confirmacion" && tipo !== "impugnacion") {
     return { success: false, error: "Elegí confirmar o impugnar la reparación." }
   }
-  const motivoLimpio = (motivo ?? "").trim()
-  if (tipo === "impugnacion" && (motivoLimpio.length === 0 || motivoLimpio.length > MOTIVO_IMPUGNACION_MAX)) {
+  const motivo = tipo === "impugnacion" ? parseFraseImpugnacion(fraseClave) : null
+  if (tipo === "impugnacion" && !motivo) {
     return { success: false, error: MENSAJE_MOTIVO_IMPUGNACION_INVALIDO }
   }
   if (!await rolHabilitado(supabase, actorUserId)) {
@@ -536,7 +535,7 @@ export async function verificarReparacionWorkflow(
     p_evidencia_id: evidenciaId,
     p_usuario_id: actorUserId,
     p_tipo: tipo,
-    p_motivo: tipo === "impugnacion" ? motivoLimpio : null,
+    p_motivo: motivo,
   })
   if (error) {
     return { success: false, error: mensajeDeVerificacion(error) }

@@ -314,23 +314,26 @@ export function ReporteDetalleClient({
     return confirmarReparacionAction(reporte.id, evidenciaId);
   };
 
-  /** Impugna la reparación; el motivo es obligatorio y lo valida el servidor (S4, S5). */
-  const impugnarEvidenciaReparacion = async (motivo: string): Promise<ResultadoAccionReparacion> => {
+  /** Impugna la reparación; el motivo se elige de la lista cerrada y lo valida el servidor (S4, S5, S17). */
+  const impugnarEvidenciaReparacion = async (motivoClave: string): Promise<ResultadoAccionReparacion> => {
     const evidenciaId = evidenciaReparacion?.evidencia?.evidenciaId;
     if (!reporte || !evidenciaId) {
       return { success: false, error: "No pudimos identificar la evidencia de reparación." };
     }
-    return impugnarReparacionAction(reporte.id, evidenciaId, motivo);
+    return impugnarReparacionAction(reporte.id, evidenciaId, motivoClave);
   };
 
-  /** Informa una reparación con su foto; el pipeline existente la manda a moderación (S2, S13). */
+  /**
+   * Informa una reparación con su foto y la frase elegida de la lista; el pipeline
+   * existente la manda a moderación (S2, S13, S16).
+   */
   const informarEvidenciaReparacion = async (
-    comentario: string,
+    fraseClave: string,
     imagen: File,
     captchaToken: string | null,
   ): Promise<ResultadoAccionReparacion> => {
     if (!reporte) return { success: false, error: "No pudimos informar la reparación." };
-    return informarReparacionAction(reporte.id, comentario, imagen, captchaToken);
+    return informarReparacionAction(reporte.id, fraseClave, imagen, captchaToken);
   };
 
   const accionesReparacion: AccionesEvidenciaReparacion = {

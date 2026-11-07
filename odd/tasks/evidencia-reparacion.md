@@ -27,6 +27,9 @@ User request (L1), quoted verbatim:
   - Participants are registered accounts with a confirmed email; guests/anonymous sessions are excluded; Operador does not vote; the report creator may confirm ("Cuentas registradas con email confirmado"). «admin si o si puede hacer todo» (L21).
   - Working state definitions: «Reparación informada» = evidence submitted, photo in moderation; «En verificación» = photo published, collecting confirmations; «Reparado» = validated by 3 confirmations or approved by an admin.
 
+- S16 (L26): the repair evidence comment is chosen from a closed list, like «Actualizaciones y Comentarios» (`lib/reportes/aportes.ts`); no free text; the server only accepts phrases from the catalog. Phrases, verbatim: "Repararon el problema por completo", "Taparon el bache con asfalto nuevo", "Retiraron el árbol o las ramas caídas", "Repararon o cambiaron la luminaria", "Limpiaron la basura o el microbasural", "Repararon la pérdida de agua o la cañería", "Arreglaron la vereda o el cordón", "Repusieron o arreglaron el cartel o semáforo". Prompt: «¿Qué se arregló?».
+- S17 (L26): the challenge reason is chosen from a closed list, same rules as S16. Phrases, verbatim: "El problema sigue igual", "Lo arreglaron solo en parte", "El arreglo ya se rompió de nuevo", "La foto no corresponde a este lugar", "La foto no muestra el arreglo con claridad". Prompt: «¿Por qué no está reparado?».
+
 ## Tasks
 
 - T1 — S14 — explore (gentle-ai-explore): DB schema, vote RPCs, audit, state history, moderation RPCs — done; map in L4.
@@ -39,6 +42,7 @@ User request (L1), quoted verbatim:
 - T8 — S1–S15 — independent verification (high risk: items 1 and 2) and native review — pending.
 
 - T9 — S1, S4, S6, S12, S15 — enable Admin participation across UI, server and database; preserve prohibition on self-confirmation — done; evidence in L22.
+- T10 — S16, S17 — closed phrase lists for the evidence comment and the challenge reason (UI select + server catalog validation, no migration) — done; evidence in L27.
 
 ## Log
 
@@ -82,3 +86,7 @@ User request (L1), quoted verbatim:
 - L24 — User decision on L23: «Permitirlo». «Admin puede hacer todo» includes approving their own evidence from moderation; S6 rewritten with the exception, code unchanged. Pinned by `supabase/tests/admin_reparacion.sql` (Admin author dismisses the challenge and approves: evidence `validada`, `resuelta_por` = admin, report `estado_id=2`) and by `lib/use-cases/reportes/evidencia-reparacion.participacion.test.ts` (TS/SQL role parity, 15 tests). Runner exit 0, tsc and eslint clean. Verifier advisory A1 (`sesionParaReparaciones` ignores the role-read error; workflow and RPC still reject) is pre-existing and left as is.
 
 - L25 — Independent verifier mw6gifo9-2-kxjt on `489c379` (Risk: item 2): no blockers. S6 met with the L24 exception (PRE02 assertions still run first; mutation `aprobar`→`rechazar` makes the runner fail), S15 met (TS/SQL parity, PRE01 for Operador, Invitado, anonymous and unconfirmed Admin). Both SQL runners exit 0 with `ROLLBACK`, `lib/use-cases/reportes` 7 files / 182 tests, tsc clean, no production code in the commit. Advisories: A1 the exception is pinned at the RPC layer only (no action-level Vitest case in `app/admin/moderacion/reparaciones-actions.ts`), left for T7; A2 stale S6 header in `admin_reparacion.sql` fixed.
+
+- L26 — User verbatim: «armemos frases para el comentario, asi como tiene [imagen de «Actualizaciones y Comentarios» con el desplegable «¿Qué novedad tenés?»]». Answers: «Solo lista, como comentarios (recomendado)»; «Informar e impugnar (recomendado)»; «Sí, usalas así» (the phrases in S16 and S17).
+
+- L27 — T10 done (worker mw6gn46q-3-7nj4, RED → GREEN: 50 failing → 260 passing on the five touched suites). New client-safe catalog `lib/reportes/frases-reparacion.ts` with the S16 and S17 phrases verbatim and in order, plus `parseFraseReparacion` / `parseFraseImpugnacion`. The browser sends the key; `informarReparacionAction` and `impugnarReparacionAction` reject anything outside the catalog before session, CAPTCHA, role read, upload and RPC; the use case resolves the label and passes it to moderation and the RPCs, so the DB keeps free text (no migration, legacy rows still display) and the "same photo, different phrase" retry protection compares labels. UI: both fields are native selects («¿Qué se arregló?», «¿Por qué no está reparado?») with the comments-select style; no textarea remains. Parent re-ran the authorized filter: 27 files / 537 tests green, `npx tsc --noEmit` clean, `npm run lint` 0 errors; in the browser `/reportes/74` shows the 8 phrases and no console errors after reload. `evidencia-reparacion-limites.ts` now only documents the 500-char columns (used by the catalog test).
