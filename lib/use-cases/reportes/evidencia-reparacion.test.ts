@@ -100,16 +100,18 @@ beforeEach(() => {
   mocks.notificarEstado.mockResolvedValue(undefined)
 })
 
-describe("participación en reparaciones (S15)", () => {
+describe("participación en reparaciones (S15, L21)", () => {
   it.each([
-    [2, true], [3, true], [null, true],
-    [1, false], [4, false], [5, false],
+    [2, true], [3, true], [null, true], [1, true],
+    [4, false], [5, false],
   ])("habilita el rol %s = %s", (rol, habilitado) => {
     expect(esRolHabilitadoParaReparacion(rol)).toBe(habilitado)
   })
 
   it.each([
     [{ is_anonymous: false, email_confirmed_at: "2026-01-01T00:00:00Z" }, 2, true],
+    [{ is_anonymous: false, email_confirmed_at: "2026-01-01T00:00:00Z" }, 1, true],
+    [{ is_anonymous: false, email_confirmed_at: null }, 1, false],
     [{ is_anonymous: false, email_confirmed_at: null }, 2, false],
     [{ is_anonymous: true, email_confirmed_at: "2026-01-01T00:00:00Z" }, 2, false],
     [{ is_anonymous: false, email_confirmed_at: "2026-01-01T00:00:00Z" }, 4, false],
@@ -211,7 +213,7 @@ describe("informar una reparación", () => {
     expect(cliente.llamadas).toHaveLength(0)
   })
 
-  it.each([1, 4, 5])("rechaza al rol %s antes de moderar la foto", async (rol) => {
+  it.each([4, 5])("rechaza al rol %s antes de moderar la foto", async (rol) => {
     mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: rol }, error: null })
     const cliente = clienteFalso()
 
@@ -220,6 +222,20 @@ describe("informar una reparación", () => {
       error: MENSAJE_CUENTA,
     })
     expect(mocks.moderarEvidencia).not.toHaveBeenCalled()
+  })
+
+  it("habilita a administración para informar una reparación (L21)", async () => {
+    mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: 1, roleName: "Admin" }, error: null })
+    const cliente = clienteFalso()
+
+    expect(await informarReparacionWorkflow(cliente.supabase, 9, "admin-1", { comentario: "Reparado", image: foto() }))
+      .toMatchObject({ success: true, data: { estado: "en_verificacion" } })
+    expect(mocks.moderarEvidencia).toHaveBeenCalledWith(cliente.supabase, {
+      reporteId: 9,
+      autorId: "admin-1",
+      comentario: "Reparado",
+      image: expect.any(File),
+    })
   })
 
   it("valida el archivo real antes de subirlo", async () => {
@@ -398,7 +414,7 @@ describe("confirmar o impugnar una reparación", () => {
     expect(cliente.llamadas).toHaveLength(0)
   })
 
-  it.each([1, 4, 5])("no permite verificar con el rol %s", async (rol) => {
+  it.each([4, 5])("no permite verificar con el rol %s", async (rol) => {
     mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: rol }, error: null })
     const cliente = clienteFalso({ rpc: { data: confirmacion, error: null } })
 
@@ -407,6 +423,27 @@ describe("confirmar o impugnar una reparación", () => {
       error: MENSAJE_CUENTA,
     })
     expect(cliente.llamadas).toHaveLength(0)
+  })
+
+  it("habilita a administración para confirmar e impugnar (L21)", async () => {
+    mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: 1, roleName: "Admin" }, error: null })
+    const cliente = clienteFalso({ rpc: { data: confirmacion, error: null } })
+
+    await expect(verificarReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "confirmacion"))
+      .resolves.toMatchObject({ success: true, data: { tipo: "confirmacion" } })
+    expect(cliente.llamadas[0].argumentos).toEqual({
+      p_evidencia_id: "evidencia-1",
+      p_usuario_id: "admin-1",
+      p_tipo: "confirmacion",
+      p_motivo: null,
+    })
+
+    const impugnado = clienteFalso({
+      rpc: { data: { ...confirmacion, tipo: "impugnacion", impugnaciones: 1, impugnaciones_pendientes: 1 }, error: null },
+    })
+    await expect(verificarReparacionWorkflow(impugnado.supabase, "evidencia-1", "admin-1", "impugnacion", "  Falta terminar  "))
+      .resolves.toMatchObject({ success: true, data: { tipo: "impugnacion" } })
+    expect(impugnado.llamadas[0].argumentos).toMatchObject({ p_usuario_id: "admin-1", p_motivo: "Falta terminar" })
   })
 
   it.each([

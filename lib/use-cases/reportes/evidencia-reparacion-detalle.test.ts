@@ -157,6 +157,17 @@ describe("obtenerSeccionReparacion", () => {
     })
   })
 
+  it("también ofrece el formulario a administración, que participa como cualquier cuenta (L21)", async () => {
+    mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador(), ROL.ADMIN))
+    mocks.servicio.mockReturnValue(crearServicio({}).servicio)
+
+    expect(await obtenerSeccionReparacion(9, 1)).toEqual({
+      umbral: UMBRAL_CONFIRMACIONES_REPARACION,
+      evidencia: null,
+      puedeInformar: true,
+    })
+  })
+
   it("no muestra nada a un visitante sin sesión ni a un reporte ya cerrado", async () => {
     mocks.sesion.mockResolvedValue(crearSesion(null))
     mocks.servicio.mockReturnValue(crearServicio({}).servicio)
@@ -245,12 +256,18 @@ describe("obtenerSeccionReparacion", () => {
 
     mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador(), ROL.ADMIN))
     expect((await obtenerSeccionReparacion(9, 1))?.evidencia?.participacion).toEqual({
-      puede: false, motivo: "administracion", yaVerifico: null,
+      puede: true, motivo: null, yaVerifico: null,
+    })
+
+    // Administración sin correo confirmado sigue fuera, como cualquier otra cuenta (S15).
+    mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador({ email_confirmed_at: null }), ROL.ADMIN))
+    expect((await obtenerSeccionReparacion(9, 1))?.evidencia?.participacion).toEqual({
+      puede: false, motivo: "cuenta", yaVerifico: null,
     })
 
     mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador(), ROL.OPERADOR))
     expect((await obtenerSeccionReparacion(9, 1))?.evidencia?.participacion).toEqual({
-      puede: false, motivo: "administracion", yaVerifico: null,
+      puede: false, motivo: "operador", yaVerifico: null,
     })
   })
 

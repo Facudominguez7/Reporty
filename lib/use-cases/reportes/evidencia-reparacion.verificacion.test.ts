@@ -391,7 +391,6 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
   it.each([
     ["correo sin confirmar", { is_anonymous: false, email_confirmed_at: null }, 2],
     ["rol invitado", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 5],
-    ["rol admin", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 1],
     ["rol operador", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 4],
     ["sesión anónima", { is_anonymous: true, email_confirmed_at: null }, null],
   ])("rechaza informar con %s", async (_caso, usuario, rol) => {
@@ -401,6 +400,24 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     expect(resultado).toEqual({ success: false, error: MENSAJE_CUENTA_REPARACION_REQUERIDA })
     expect(piezas.captcha).not.toHaveBeenCalled()
     expect(piezas.createAdminClient).not.toHaveBeenCalled()
+  })
+
+  it("administración informa como cualquier cuenta habilitada (L21)", async () => {
+    piezas.rol.actual = 1
+    piezas.createClient.mockResolvedValue({
+      auth: { getUser: async () => ({ data: { user: { id: "admin", is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" } } }) },
+    })
+    const d = doble({
+      crear: () => ({ data: null, error: { code: "PRE05", message: "El reporte ya está cerrado" } }),
+      cola: colaPendiente("0".repeat(64)),
+    })
+    piezas.createAdminClient.mockReturnValue(d.supabase)
+    const resultado = await informarReparacionAction(7, "Bache tapado", await foto(), "token")
+    expect(resultado).toEqual({ success: false, error: "El reporte ya está cerrado o no está disponible para informar una reparación." })
+    expect(piezas.captcha).toHaveBeenCalled()
+    const [nombre, parametros] = d.rpc.mock.calls[0] as [string, Fila]
+    expect(nombre).toBe("crear_evidencia_reparacion")
+    expect(parametros).toMatchObject({ p_autor_id: "admin" })
   })
 
   it("con sesión válida pero captcha rechazado no se escribe nada", async () => {
@@ -546,7 +563,8 @@ describe("S15 · participantes: cuenta registrada con correo confirmado", () => 
     ["sin rol asignado", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, null, true],
     ["sin correo confirmado", { is_anonymous: false, email_confirmed_at: null }, 2, false],
     ["invitado", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 5, false],
-    ["admin", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 1, false],
+    ["admin", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 1, true],
+    ["admin sin correo confirmado", { is_anonymous: false, email_confirmed_at: null }, 1, false],
     ["operador", { is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" }, 4, false],
     ["anónimo", { is_anonymous: true, email_confirmed_at: "2025-01-01T00:00:00Z" }, 2, false],
   ])("%s → %s (%i)", (_caso, usuario, rol, esperado) => {

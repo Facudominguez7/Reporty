@@ -1,6 +1,8 @@
 -- Contrato transaccional de evidencia y verificación de reparaciones.
--- El ejecutor abre una transacción, aplica la migración 20261106120000 completa,
--- ejecuta este archivo y revierte: nunca se aplica a la base local.
+-- El ejecutor abre una transacción, compone el esquema vigente (migración base más
+-- la incremental de administración en reparaciones) cuando hace falta, ejecuta este
+-- archivo y revierte: nunca se aplica a la base local.
+-- La participación de administración (L21) se prueba en admin_reparacion.sql.
 \set ON_ERROR_STOP on
 
 -- Exige una condición verdadera; falla con el mensaje indicado.
@@ -153,9 +155,6 @@ select pg_temp.rechazar($q$select public.crear_evidencia_reparacion(-92015,
   '30000000-0000-0000-0000-000000000009','Foto de un invitado',pg_temp.huella(15))$q$,
   'PRE01','Cuenta no habilitada: se requiere una cuenta registrada con email confirmado');
 select pg_temp.rechazar($q$select public.crear_evidencia_reparacion(-92015,
-  '30000000-0000-0000-0000-000000000007','Foto de un administrador',pg_temp.huella(15))$q$,
-  'PRE01','Cuenta no habilitada: se requiere una cuenta registrada con email confirmado');
-select pg_temp.rechazar($q$select public.crear_evidencia_reparacion(-92015,
   '30000000-0000-0000-0000-000000000008','Foto de un operador',pg_temp.huella(15))$q$,
   'PRE01','Cuenta no habilitada: se requiere una cuenta registrada con email confirmado');
 select pg_temp.rechazar($q$select public.crear_evidencia_reparacion(-92015,
@@ -265,9 +264,6 @@ select pg_temp.rechazar($q$select public.registrar_verificacion_reparacion(
   'PRE06','Ya registraste una verificación distinta para esta evidencia');
 select pg_temp.exigir((select count(*)=1 from public.verificaciones_reparacion
   where evidencia_id=pg_temp.evidencia(-92001)), 'La verificación contraria no agrega filas');
-select pg_temp.rechazar($q$select public.registrar_verificacion_reparacion(
-  pg_temp.evidencia(-92001),'30000000-0000-0000-0000-000000000007','confirmacion')$q$,
-  'PRE01','Cuenta no habilitada: se requiere una cuenta registrada con email confirmado');
 
 -- ---------------------------------------------------------------------------
 -- S5/S12: tres confirmaciones cierran el reporte una sola vez (estado, historial

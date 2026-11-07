@@ -403,7 +403,6 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     [2, true, "2026-01-01T00:00:00.000Z", "sesión anónima"],
     [2, false, null, "correo sin confirmar"],
     [5, false, "2026-01-01T00:00:00.000Z", "rol invitado"],
-    [1, false, "2026-01-01T00:00:00.000Z", "administrador"],
     [4, false, "2026-01-01T00:00:00.000Z", "operador"],
   ])("rechaza %s/%s/%s (%s) antes del CAPTCHA", async (rol, anonimo, correo, _caso) => {
     sesionConRol(rol as number, anonimo as boolean, "cuenta-1", correo as string | null)
@@ -415,6 +414,17 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     })
     expect(llamada).not.toHaveBeenCalled()
     expect(mocks.informarReparacion).not.toHaveBeenCalled()
+  })
+
+  it("permite que administración informe la reparación (L21)", async () => {
+    sesionConRol(1, false, "admin-1")
+
+    await expect(informarReparacionAction(7, COMENTARIO, fotoEvidencia(), TOKEN_DE_EVIDENCIA))
+      .resolves.toMatchObject({ success: true })
+    expect(mocks.informarReparacion).toHaveBeenCalledWith({}, 7, "admin-1", {
+      comentario: "Bache tapado y señalizado",
+      image: expect.any(File),
+    })
   })
 
   it("verifica el token con la action de la evidencia y después ejecuta el workflow", async () => {
@@ -513,13 +523,22 @@ describe("confirmarReparacionAction e impugnarReparacionAction", () => {
     [2, true, "2026-01-01T00:00:00.000Z"],
     [2, false, null],
     [5, false, "2026-01-01T00:00:00.000Z"],
-    [1, false, "2026-01-01T00:00:00.000Z"],
     [4, false, "2026-01-01T00:00:00.000Z"],
   ])("rechaza rol %s anónimo %s correo %s antes de verificar", async (rol, anonimo, correo) => {
     sesionConRol(rol as number, anonimo as boolean, "cuenta-1", correo as string | null)
 
     expect(await confirmarReparacionAction(7, EVIDENCIA_ID)).toEqual({ success: false, error: MENSAJE_CUENTA_REPARACION })
     expect(mocks.verificarReparacion).not.toHaveBeenCalled()
+  })
+
+  it("permite que administración confirme e impugne (L21)", async () => {
+    sesionConRol(1, false, "admin-1")
+
+    await expect(confirmarReparacionAction(7, EVIDENCIA_ID)).resolves.toMatchObject({ success: true })
+    expect(mocks.verificarReparacion).toHaveBeenCalledWith({}, EVIDENCIA_ID, "admin-1", "confirmacion", undefined)
+
+    await expect(impugnarReparacionAction(7, EVIDENCIA_ID, "  Falta terminar  ")).resolves.toMatchObject({ success: true })
+    expect(mocks.verificarReparacion).toHaveBeenLastCalledWith({}, EVIDENCIA_ID, "admin-1", "impugnacion", "Falta terminar")
   })
 
   it("exige sesión para confirmar o impugnar", async () => {

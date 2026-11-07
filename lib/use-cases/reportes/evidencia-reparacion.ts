@@ -3,16 +3,23 @@
  * reparaciones (issue #145).
  *
  * Toda la autoridad vive en las RPC `security definer` de la migración
- * `20261106120000_evidencia_reparacion.sql`: estas funciones validan la entrada,
- * autorizan a la persona con el catálogo de roles y traducen el resultado a datos y
- * mensajes en español. Ningún cliente escribe estados, votos ni puntos (S12).
+ * `20261106120000_evidencia_reparacion.sql`, con la elegibilidad de administración
+ * habilitada por `20261107120000_admin_participa_reparacion.sql`: estas funciones
+ * validan la entrada, autorizan a la persona con el catálogo de roles y traducen el
+ * resultado a datos y mensajes en español. Ningún cliente escribe estados, votos ni
+ * puntos (S12).
  */
 import "server-only"
 
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
 import { ROLE_IDS } from "@/lib/authz/catalog"
-import { getUserRoleContext, isAdminRole, puedeVotarReportes } from "@/lib/authz/roles"
+import {
+  canParticipateInCommunity,
+  esRolOperador,
+  getUserRoleContext,
+  isAdminRole,
+} from "@/lib/authz/roles"
 import {
   REPORT_IMAGE_MAX_BYTES,
   REPORT_IMAGE_MAX_BYTES_LABEL,
@@ -143,19 +150,21 @@ export type ResultadoResolucionImpugnacion = {
 }
 
 /**
- * Roles que pueden informar y verificar reparaciones: Admin y Operador cierran con sus
- * propias herramientas y el invitado no participa (S15). Un perfil sin rol sigue
- * habilitado, igual que en `private.usuario_habilitado_para_reparacion`.
+ * Roles que pueden informar y verificar reparaciones: administración participa como
+ * cualquier cuenta habilitada (L21) y el operador municipal cierra con sus propias
+ * herramientas; el invitado no participa (S15). Un perfil sin rol sigue habilitado,
+ * igual que en `private.usuario_habilitado_para_reparacion`.
  *
  * @param rolId - `rol_id` del perfil, tal como lo devuelve el catálogo.
  * @returns `true` cuando el rol puede participar del flujo de reparaciones.
  */
 export function esRolHabilitadoParaReparacion(rolId: number | null | undefined) {
-  return rolId !== ROLE_IDS.ADMIN && rolId !== ROLE_IDS.OPERADOR && rolId !== ROLE_IDS.INVITADO
+  return rolId !== ROLE_IDS.OPERADOR && rolId !== ROLE_IDS.INVITADO
 }
 
 /**
  * Participante habilitado: cuenta registrada, no anónima y con el correo confirmado.
+ * Administración queda habilitada (L21); el operador municipal y el invitado no (S15).
  *
  * @param usuario - Usuario devuelto por `auth.getUser()`; nunca datos del cliente.
  * @param rolId - `rol_id` del perfil en la base.
@@ -165,7 +174,9 @@ export function puedeInformarReparacion(
   usuario: Pick<User, "is_anonymous" | "email_confirmed_at"> | null | undefined,
   rolId: number | null | undefined,
 ) {
-  return puedeVotarReportes(usuario, rolId) && Boolean(usuario?.email_confirmed_at)
+  return canParticipateInCommunity(usuario, rolId)
+    && !esRolOperador(rolId)
+    && Boolean(usuario?.email_confirmed_at)
 }
 
 /** Rol del actor leído con el cliente de sesión; nunca confía en el rol enviado por el navegador. */

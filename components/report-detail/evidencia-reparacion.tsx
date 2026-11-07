@@ -261,11 +261,10 @@ function AvisoParticipacion({ motivo }: { motivo: NonNullable<EvidenciaReparacio
     )
   }
 
-  if (motivo === "administracion") {
+  if (motivo === "operador") {
     return (
       <p className="text-xs text-muted-foreground">
-        Administración y operadores no participan de la verificación comunitaria:
-        revisá la reparación desde Revisiones.
+        Las cuentas de operador municipal no participan de la verificación comunitaria.
       </p>
     )
   }
