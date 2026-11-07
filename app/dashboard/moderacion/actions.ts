@@ -4,6 +4,34 @@ import { revalidatePath } from "next/cache"
 import { autorizarAdministracion } from "@/lib/moderation/administracion.server"
 import { procesarAvisosMascota } from "@/lib/moderation/avisos-mascotas.server"
 import { conciliarAvisoMascotaAdministrativamente, editarMascotaAdministrativamente, ejecutarRevision, type EdicionMascotaAdmin, type OperacionRevision, type ResultadoRevision } from "@/lib/moderation/administracion.server"
+import { createClient } from "@/utils/supabase/server"
+
+export async function cambiarEstadoMascotaAdminAction(id: number, estado: string): Promise<ResultadoRevision> {
+  try {
+    if (!Number.isSafeInteger(id) || id <= 0 || !["perdida", "encontrada"].includes(estado)) return { exito: false, mensaje: "Publicación no disponible." }
+    const { servicio } = await autorizarAdministracion()
+    const { error } = await servicio.from("mascotas_perdidas").update({ estado }).eq("id", id).is("retirada_at", null)
+    if (error) return { exito: false, mensaje: "No se pudo actualizar el estado." }
+    revalidatePath("/admin/mascotas")
+    revalidatePath(`/mascotas/${id}`)
+    revalidatePath("/mapa")
+    return { exito: true, mascotaId: id, mensaje: "Estado actualizado." }
+  } catch { return { exito: false, mensaje: "No se pudo actualizar el estado. Verificá tus permisos." }
+  }
+}
+
+export async function retirarMascotaAdminAction(id: number): Promise<ResultadoRevision> {
+  try {
+    if (!Number.isSafeInteger(id) || id <= 0) return { exito: false, mensaje: "Publicación no disponible." }
+    await autorizarAdministracion()
+    const supabase = await createClient()
+    const { data, error } = await supabase.rpc("retirar_mascota_moderacion", { p_mascota_id: id })
+    if (error || !data) return { exito: false, mensaje: "No se pudo retirar la publicación." }
+    for (const path of ["/admin/mascotas", `/mascotas/${id}`, "/mapa", "/reportes", "/sitemap.xml"]) revalidatePath(path)
+    return { exito: true, mascotaId: id, mensaje: "Publicación retirada." }
+  } catch { return { exito: false, mensaje: "No se pudo retirar la publicación. Verificá tus permisos." }
+  }
+}
 
 export async function reintentarAvisosMascotaAction(mascotaId: number): Promise<ResultadoRevision> {
   try {

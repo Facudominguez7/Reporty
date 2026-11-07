@@ -10,7 +10,7 @@ vi.mock("react", async (original) => ({
   },
 }))
 vi.mock("next/dynamic", () => ({ default: () => () => null }))
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }))
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }), useSearchParams: () => new URLSearchParams() }))
 vi.mock("./actions", () => ({ marcarMascotaEncontradaAction: vi.fn(), retirarMascotaDetalleAction: vi.fn() }))
 vi.mock("@/app/dashboard/moderacion/actions", () => ({ editarMascotaAction: mocks.save }))
 
@@ -50,4 +50,13 @@ it("discards location changes on cancel and does not offer editing to non-admins
   find(render(), (node) => typeof node.props?.onCancel === "function")!.props!.onCancel()
   edit()
   expect(find(render(), (node) => typeof node.props?.onLocationSelect === "function")!.props!.initialLat).toBe(-27.3671)
+})
+
+it("shows admin retirement and keeps edit controls inside the pet card", () => {
+  edit()
+  const tree = render()
+  expect(find(tree, (node) => node.props?.["aria-label"] === "Retirar publicación")).toBeDefined()
+  expect(find(tree, (node) => node.props?.className?.includes("rounded-xl border border-border/70 bg-card p-4"))).toBeUndefined()
+  const card = find(tree, (node) => node.props?.className === "gap-0")!
+  expect(find(card, (node) => node.props?.value === "Collar rojo")).toBeDefined()
 })

@@ -16,6 +16,7 @@ import { shareReport } from "@/lib/share/share-report"
 import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation"
 import { marcarMascotaEncontradaAction, retirarMascotaDetalleAction } from "./actions"
+import { retirarMascotaAdminAction } from "./admin-actions"
 import type { MascotaDetail } from "@/database/queries/mascotas/detalle"
 import { editarMascotaAction } from "@/app/dashboard/moderacion/actions"
 import { AdminReportEditActions } from "@/app/reportes/[id]/admin-report-editor"
@@ -71,7 +72,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
   async function retire() {
     setPending(true); setError(""); setMessage("")
     try {
-      const result = await retirarMascotaDetalleAction(pet.id)
+      const result = isAdmin ? await retirarMascotaAdminAction(pet.id) : await retirarMascotaDetalleAction(pet.id)
       if (!result.success) { setError(result.error); return }
       router.push("/mapa")
     } catch { setError("No pudimos retirar la publicación. Intentá nuevamente.") }
@@ -91,40 +92,33 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
               <span>Publicada el día <time dateTime={pet.createdAt}>{new Date(pet.createdAt).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</time></span>
             </div>
             <div className="flex flex-wrap items-center gap-1">
-              <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span>{statusLabel}</span></Badge>
+              {editing ? <label className="grid gap-1 text-xs">Estado<select aria-label="Estado" className="min-h-10 rounded-md border bg-background px-3" value={draft.estado} onChange={(e) => setDraft({ ...draft, estado: e.target.value })} disabled={pending}><option value="perdida">Perdida</option><option value="encontrada">Encontrada</option></select></label> : <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span>{statusLabel}</span></Badge>}
             </div>
             <div className="flex min-w-0 items-start gap-3">
-              <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {statusLabel.toLowerCase()}</CardTitle>
+              {editing ? <label className="grid min-w-0 flex-1 gap-1 text-sm">Tipo de animal<select aria-label="Tipo de animal" className="min-h-10 rounded-md border bg-background px-3" value={draft.tipoAnimal} onChange={(e) => setDraft({ ...draft, tipoAnimal: e.target.value })} disabled={pending}><option value="perro">Perro</option><option value="gato">Gato</option><option value="otro">Otro</option></select></label> : <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {statusLabel.toLowerCase()}</CardTitle>}
               <Button type="button" variant="outline" size="icon" className="size-10 shrink-0" onClick={share} aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button>
-              {isOwner && pet.status === "Perdida" && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" size="icon" className="size-10 shrink-0" disabled={pending || editing} aria-label="Retirar publicación" title="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
+              {(isOwner && pet.status === "Perdida" || isAdmin) && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" size="icon" className="size-10 shrink-0" disabled={pending || editing} aria-label="Retirar publicación" title="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente y se conservará su historial.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
               {isAdmin && !editing && <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 text-muted-foreground" onClick={() => { setDraft(petDraft(pet)); setError(""); setEditing(true) }} aria-label="Editar publicación" title="Editar publicación"><Pencil className="size-4" /></Button>}
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <p className="mb-4 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">{pet.description}</p>
+            {editing ? <label className="mb-4 grid gap-1 text-sm">Descripción<Textarea value={draft.descripcion} maxLength={5000} onChange={(e) => setDraft({ ...draft, descripcion: e.target.value })} disabled={pending} /></label> : <p className="mb-4 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">{pet.description}</p>}
             <div className="mb-4 flex flex-col items-center gap-3 md:mb-6 lg:mb-8">
               <div className="relative aspect-video w-full max-w-2xl overflow-hidden rounded-md bg-[var(--surface-subtle)] md:rounded-lg lg:rounded-xl">
                 <Image src={pet.image} alt={`Foto de ${pet.species.toLowerCase()}`} fill sizes="(max-width: 1024px) 100vw, 60vw" className="object-contain" priority />
               </div>
             </div>
-            <p className="break-words text-sm">Teléfono público: <a className="font-medium underline" href={`tel:${pet.phone}`}>{pet.phone}</a></p>
+            {editing ? <label className="grid gap-1 text-sm">Teléfono público<Input type="tel" inputMode="numeric" maxLength={40} value={draft.telefono} onChange={(e) => setDraft({ ...draft, telefono: e.target.value.replace(/[^0-9]/g, "") })} disabled={pending} /></label> : <p className="break-words text-sm">Teléfono público: <a className="font-medium underline" href={`tel:${pet.phone}`}>{pet.phone}</a></p>}
             {pet.coordinates && <a href="#mascota-ubicacion" className="mx-auto mt-3 flex w-fit items-center gap-1 text-xs font-semibold underline lg:hidden"><MapPin className="size-3" aria-hidden="true" />Ver ubicación</a>}
             {isOwner && pet.status === "Perdida" && <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row">
               {pet.status === "Perdida" && <AlertDialog><AlertDialogTrigger asChild><Button disabled={pending}>Marcar encontrada</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Marcar como encontrada?</AlertDialogTitle><AlertDialogDescription>Este cambio es definitivo y no se puede deshacer.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={found}>Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
             </div>}
             {error && <Alert variant="destructive" className="mt-3"><AlertDescription role="alert">{error}</AlertDescription></Alert>}
             {message && <Alert className="mt-3"><AlertDescription role="status">{message}</AlertDescription></Alert>}
+            {isAdmin && editing && <AdminReportEditActions saving={pending} onSave={() => void saveAdmin()} onCancel={() => { setEditing(false); setError(""); setDraft(petDraft(pet)) }} errorMessage={error} />}
           </CardContent>
         </Card>
-        {isAdmin && editing && <div className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm">Tipo de animal<select aria-label="Tipo de animal" className="min-h-10 rounded-md border bg-background px-3" value={draft.tipoAnimal} onChange={(e) => setDraft({ ...draft, tipoAnimal: e.target.value })} disabled={pending}><option value="perro">Perro</option><option value="gato">Gato</option><option value="otro">Otro</option></select></label>
-            <label className="grid gap-1 text-sm">Estado<select aria-label="Estado" className="min-h-10 rounded-md border bg-background px-3" value={draft.estado} onChange={(e) => setDraft({ ...draft, estado: e.target.value })} disabled={pending}><option value="perdida">Perdida</option><option value="encontrada">Encontrada</option></select></label>
-            <label className="grid gap-1 text-sm sm:col-span-2">Descripción<Textarea value={draft.descripcion} maxLength={5000} onChange={(e) => setDraft({ ...draft, descripcion: e.target.value })} disabled={pending} /></label>
-            <label className="grid gap-1 text-sm sm:col-span-2">Teléfono público<Input type="tel" inputMode="numeric" maxLength={40} value={draft.telefono} onChange={(e) => setDraft({ ...draft, telefono: e.target.value.replace(/[^0-9]/g, "") })} disabled={pending} /></label>
-          </div>
-          <AdminReportEditActions saving={pending} onSave={() => void saveAdmin()} onCancel={() => { setEditing(false); setError("") }} />
-        </div>}
+
       </div>
       {(pet.coordinates || (isAdmin && editing)) && <div className="space-y-4 md:space-y-6 lg:col-span-4">
         <Card id="mascota-ubicacion" className="scroll-mt-4">

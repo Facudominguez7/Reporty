@@ -1,10 +1,11 @@
 /** Contratos de acciones: errores seguros y revalidación solo tras éxito. */
 import { beforeEach, expect, it, vi } from "vitest"
-const dobles = vi.hoisted(() => ({ ejecutar: vi.fn(), editar: vi.fn(), auth: vi.fn(), procesar: vi.fn(), conciliar: vi.fn(), revalidar: vi.fn() }))
+const dobles = vi.hoisted(() => ({ ejecutar: vi.fn(), editar: vi.fn(), auth: vi.fn(), procesar: vi.fn(), conciliar: vi.fn(), revalidar: vi.fn(), createClient: vi.fn() }))
 vi.mock("@/lib/moderation/administracion.server", () => ({ ejecutarRevision: dobles.ejecutar, editarMascotaAdministrativamente: dobles.editar, autorizarAdministracion: dobles.auth, conciliarAvisoMascotaAdministrativamente: dobles.conciliar }))
 vi.mock("@/lib/moderation/avisos-mascotas.server", () => ({ procesarAvisosMascota: dobles.procesar }))
 vi.mock("next/cache", () => ({ revalidatePath: dobles.revalidar }))
-import { conciliarAvisoMascotaAction, editarMascotaAction, reintentarAvisosMascotaAction, revisarImagenAction } from "./actions"
+vi.mock("@/utils/supabase/server", () => ({ createClient: dobles.createClient }))
+import { cambiarEstadoMascotaAdminAction, conciliarAvisoMascotaAction, editarMascotaAction, reintentarAvisosMascotaAction, retirarMascotaAdminAction, revisarImagenAction } from "./actions"
 beforeEach(() => { vi.clearAllMocks(); dobles.auth.mockResolvedValue({ servicio: {} }) })
 it("éxito revalida administración y lectores sin estado municipal", async () => {
   dobles.ejecutar.mockResolvedValue({ exito: true, mensaje: "Listo", reporteId: 7 })
@@ -32,4 +33,11 @@ it("conflicto o denegación no revalida ni filtra excepción", async () => {
   dobles.ejecutar.mockRejectedValueOnce(new Error("credencial secreta"))
   expect(await revisarImagenAction("id", "rechazar")).toEqual({ exito: false, mensaje: "No se pudo completar la operación. Verificá tus permisos y actualizá la cola." })
   expect(dobles.revalidar).not.toHaveBeenCalled()
+})
+it("rechaza estados inválidos y retira usando solo el RPC moderado", async () => {
+  expect((await cambiarEstadoMascotaAdminAction(1, "retirada")).exito).toBe(false)
+  const rpc = vi.fn().mockResolvedValue({ data: true, error: null }); dobles.createClient.mockResolvedValue({ rpc })
+  expect(await retirarMascotaAdminAction(12)).toMatchObject({ exito: true, mascotaId: 12 })
+  expect(dobles.auth).toHaveBeenCalled()
+  expect(rpc).toHaveBeenCalledWith("retirar_mascota_moderacion", { p_mascota_id: 12 })
 })

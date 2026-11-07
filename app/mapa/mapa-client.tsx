@@ -12,6 +12,8 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 import { ContactsDialog } from "@/components/contacts-dialog"
 import { FiltrosReportes } from "@/components/filtros-reportes"
+import { FiltrosMascotasMapa } from "@/components/filtros-mascotas-mapa"
+import { filtrarMascotasMapa } from "./filtros-mascotas-mapa"
 import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { MascotasOnboardingModal, OnboardingModal } from "@/components/onboarding-modal"
@@ -80,12 +82,14 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
   const [showPetOnboarding, setShowPetOnboarding] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const activeFilters = [
-    searchParams.get("search"),
-    searchParams.get("categoria"),
-    searchParams.get("estado"),
-    searchParams.get("prioridad"),
-  ].filter(Boolean).length
+  const activeFilters = layer === "mascotas"
+    ? [searchParams.get("searchMascota"), searchParams.get("tipoMascota"), searchParams.get("estadoMascota")].filter(Boolean).length
+    : [searchParams.get("search"), searchParams.get("categoria"), searchParams.get("estado"), searchParams.get("prioridad")].filter(Boolean).length
+  const mascotasFiltradas = filtrarMascotasMapa(mascotas, {
+    tipo: searchParams.get("tipoMascota") ?? "all",
+    estado: searchParams.get("estadoMascota") ?? "all",
+    search: searchParams.get("searchMascota") ?? "",
+  })
 
   const activeFiltersLabel = `${activeFilters} filtro${activeFilters === 1 ? "" : "s"} activo${activeFilters === 1 ? "" : "s"}`
 
@@ -132,7 +136,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
             </Alert>
           </div>
         ) : (
-          <MapContainer reports={reportes} mascotas={mascotas} layer={layer} showLegend />
+          <MapContainer reports={reportes} mascotas={mascotasFiltradas} layer={layer} showLegend />
         )}
       </div>
 
@@ -177,7 +181,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
         <DrawerContent className="max-h-[85dvh] bg-card md:inset-x-[15%]">
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <FiltrosReportes
+            {layer === "mascotas" ? <FiltrosMascotasMapa onApply={() => setShowFilters(false)} /> : <FiltrosReportes
               categorias={categorias}
               estados={estados}
               prioridades={prioridades}
@@ -186,7 +190,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
               externalStartTransition={startTransition}
               variant="sheet"
               onApply={() => setShowFilters(false)}
-            />
+            />}
           </div>
         </DrawerContent>
 

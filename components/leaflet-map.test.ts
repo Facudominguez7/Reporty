@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => {
   const calls: string[] = []
-  const icons: Array<{ className: string; html: string }> = []
+  const icons: Array<{ className: string; html: string; iconSize?: [number, number] }> = []
   const refs: Array<{ current: unknown }> = []
   const listeners = new Map<string, (event: unknown) => void>()
   const markerOptions: Array<{ title?: string; alt?: string }> = []
@@ -34,7 +34,7 @@ vi.mock("leaflet", () => ({
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
     marker: (_coordinates: unknown, options: { title?: string; alt?: string }) => { mocks.markerOptions.push(options); return mocks.marker },
-    divIcon: (icon: { className: string; html: string }) => { mocks.icons.push(icon); return {} },
+    divIcon: (icon: { className: string; html: string; iconSize?: [number, number] }) => { mocks.icons.push(icon); return {} },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
   },
 }))
@@ -149,6 +149,7 @@ describe("LeafletMap initial view", () => {
       expect.stringContaining("background:var(--primary)"),
     ])
     expect(petMarkers.every(({ html }) => !/#(?:[\da-f]{3}){1,2}\b/i.test(html))).toBe(true)
+    expect(petMarkers.every(({ iconSize, html }) => iconSize?.join(",") === "52,52" && html.includes("width:52px;height:52px"))).toBe(true)
   })
 
   it("uses a status adjective that agrees with the species in accessible marker labels", () => {
@@ -174,6 +175,7 @@ describe("LeafletMap initial view", () => {
     expect(markers[0].html).toContain('src="https://reporty.test/api/mascotas/9/foto?x=%22&amp;y=1"')
     expect(markers[0].html).toContain(">P<img")
     expect(markers[0].html).toContain("var(--map-marker-stroke)")
+    expect(markers[0].html).toContain('width:calc(100% - 6px);height:calc(100% - 6px)')
     expect(markers[0].html).not.toMatch(/onerror\s*=/i)
     expect(markers[1].html).not.toContain("<img")
     expect(markers[1].html).toContain(">E</span>")
