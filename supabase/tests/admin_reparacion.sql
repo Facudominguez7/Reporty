@@ -161,7 +161,7 @@ select pg_temp.exigir((select count(*) = 1 and bool_and(actor_id='40000000-0000-
   'La impugnación de administración queda auditada con su actor');
 
 -- ---------------------------------------------------------------------------
--- S6: administración tampoco valida su propia evidencia.
+-- S6: administración no confirma ni impugna su propia evidencia (excepción L24 abajo).
 -- ---------------------------------------------------------------------------
 select public.crear_evidencia_reparacion(-94004,'40000000-0000-0000-0000-000000000003',
   'Reparación informada por la misma administración',pg_temp.huella(44));
