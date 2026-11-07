@@ -199,13 +199,24 @@ describe("acciones de la comunidad", () => {
     expect(html).not.toContain("Confirmar reparación")
   })
 
-  it("explica que administración y operadores revisan desde Revisiones", () => {
+  it("explica que las cuentas de operador municipal no participan", () => {
     const html = renderizar({
-      evidencia: vista({ participacion: { puede: false, motivo: "administracion", yaVerifico: null } }),
+      evidencia: vista({ participacion: { puede: false, motivo: "operador", yaVerifico: null } }),
     })
 
-    expect(html).toContain("Revisiones")
+    expect(html).toContain("operador municipal")
+    expect(html).not.toContain("Administración y operadores")
     expect(html).not.toContain("Confirmar reparación")
+  })
+
+  it("deja que administración confirme e impugne como cualquier cuenta habilitada", () => {
+    const html = renderizar({
+      evidencia: vista({ participacion: { puede: true, motivo: null, yaVerifico: null } }),
+    })
+
+    expect(html).toContain("Confirmar reparación")
+    expect(html).toContain("Impugnar")
+    expect(html).not.toContain("operador municipal")
   })
 
   it("recuerda la verificación ya registrada y no ofrece repetirla", () => {

@@ -16,7 +16,6 @@ import { REPORT_STATE_IDS } from "@/lib/authz/catalog"
 import {
   esRolOperador,
   getUserRoleContext,
-  isAdminRole,
 } from "@/lib/authz/roles"
 import { getPublicProfile } from "@/database/queries/profiles"
 import { resolveReportImageThumbnailUrl, resolveReportImageUrl } from "@/lib/media/report-images"
@@ -33,10 +32,10 @@ export type EstadoVisibleReparacion = "informada" | "en_verificacion" | "reparad
 
 /**
  * Por qué una persona no puede confirmar ni impugnar: sin sesión, con una cuenta que
- * todavía no cumple los requisitos, por ser el autor de la foto o por ser
- * administración.
+ * todavía no cumple los requisitos, por ser el autor de la foto o por ser operador
+ * municipal (administración sí participa, L21).
  */
-export type MotivoSinParticipacion = "sesion" | "cuenta" | "autor" | "administracion"
+export type MotivoSinParticipacion = "sesion" | "cuenta" | "autor" | "operador"
 
 /** Foto pública de la reparación; solo existe cuando la moderación ya la publicó. */
 export type FotoEvidenciaReparacion = { src: string; miniatura: string | null }
@@ -121,8 +120,9 @@ function elegirEvidencia(filas: FilaEvidencia[]): FilaEvidencia | null {
 
 /**
  * Explica por qué la persona no participa de la verificación, si es el caso.
- * El autor de la foto no valida su propia evidencia (S6); administración y
- * operadores no votan y el invitado o la cuenta sin correo confirmado no participan (S15).
+ * El autor de la foto no valida su propia evidencia (S6); el operador municipal no
+ * vota y el invitado o la cuenta sin correo confirmado no participan (S15).
+ * Administración sí participa como cualquier cuenta habilitada (L21).
  */
 function motivoSinParticipacion(
   usuario: Pick<User, "id" | "is_anonymous" | "email_confirmed_at"> | null,
@@ -131,7 +131,7 @@ function motivoSinParticipacion(
 ): MotivoSinParticipacion | null {
   if (!usuario) return "sesion"
   if (usuario.id === autorId) return "autor"
-  if (isAdminRole(rolId) || esRolOperador(rolId)) return "administracion"
+  if (esRolOperador(rolId)) return "operador"
   if (!puedeInformarReparacion(usuario, rolId)) return "cuenta"
   return null
 }

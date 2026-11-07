@@ -14,7 +14,7 @@ emitir() { while IFS= read -r linea || [[ -n "$linea" ]]; do printf '%s\n' "$lin
   printf 'begin;\n'
   # Con la migración aplicada, el archivo y su tabla ya existen: solo se reemplaza la RPC.
   # Sin ella, se instala el bloque autosuficiente (archivo del voto retirado más la RPC).
-  if [[ "$(docker exec "$contenedor" psql -Atc "select to_regclass('public.votos_reparado_historial') is not null")" == "t" ]]; then
+  if [[ "$(docker exec "$contenedor" psql -U postgres -d postgres -Atc "select to_regclass('public.votos_reparado_historial') is not null")" == "t" ]]; then
     awk '/^create or replace function public\.registrar_voto_exclusivo\(/ { activo=1 } activo { print } activo && /^end \$\$;/ { exit }' "$migracion"
   else
     awk '/^-- BEGIN voto-exclusivo/ { activo=1; next } /^-- END voto-exclusivo/ { activo=0 } activo { print }' "$migracion"
