@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { parseAporteKey } from "@/lib/reportes/aportes"
+import { parseFraseImpugnacion, parseFraseReparacion } from "@/lib/reportes/frases-reparacion"
 
 import {
   actualizarDatosReporteAdminWorkflow,
@@ -18,9 +19,9 @@ import {
   votarNoExisteWorkflow,
 } from "@/lib/use-cases/reportes"
 import {
-  COMENTARIO_REPARACION_MAX,
-  MENSAJE_COMENTARIO_REPARACION_INVALIDO,
   MENSAJE_CUENTA_REPARACION_REQUERIDA,
+  MENSAJE_FRASE_REPARACION_INVALIDA,
+  MENSAJE_MOTIVO_IMPUGNACION_INVALIDO,
   informarReparacionWorkflow,
   puedeInformarReparacion,
   resolverEvidenciaReparacionWorkflow,
@@ -42,7 +43,9 @@ const contributionSchema = z.string().refine((value) => parseAporteKey(value) !=
 const stateIdSchema = reportIdSchema
 const photoIdSchema = reportIdSchema
 const evidenciaIdSchema = z.string().uuid()
-const comentarioReparacionSchema = z.string().trim().min(1).max(COMENTARIO_REPARACION_MAX)
+// La evidencia no acepta texto libre: solo la clave de una frase del catálogo (S16).
+const fraseReparacionSchema = z.string().trim()
+  .refine((value) => parseFraseReparacion(value) !== null, MENSAJE_FRASE_REPARACION_INVALIDA)
 const reportPhotoSchema = z.instanceof(File)
 const reportEditSchema = z.object({
   titulo: z.string().trim().min(3).max(120),
@@ -386,27 +389,29 @@ async function sesionParaReparaciones(mensajeSinSesion: string) {
 }
 
 /**
- * Informa una reparación con su fotografía y comentario (S1). La foto pasa por la
- * validación de archivo y por el sistema de moderación existente, con verificación
- * anti bots; el reporte no cambia de estado por subir la foto (S2).
+ * Informa una reparación con su fotografía y la frase elegida de la lista (S1, S16).
+ * La foto pasa por la validación de archivo y por el sistema de moderación existente,
+ * con verificación anti bots; el reporte no cambia de estado por subir la foto (S2).
+ * Una frase que no está en el catálogo se rechaza antes de la sesión, del CAPTCHA y de
+ * cualquier escritura.
  *
  * @param reporteId - Reporte que se informa como reparado.
- * @param comentario - Texto breve que acompaña la evidencia.
+ * @param frase - Clave de la frase del catálogo elegida en el formulario.
  * @param image - Fotografía ya optimizada en el navegador.
  * @param captchaToken - Token Turnstile del challenge resuelto para esta carga.
  * @returns Evidencia creada con su estado visible, o el error en español.
  */
 export async function informarReparacionAction(
   reporteId: number,
-  comentario: string,
+  frase: string,
   image: File,
   captchaToken?: string | null,
 ) {
   try {
     const parsedReportId = reportIdSchema.parse(reporteId)
-    const parsedComentario = comentarioReparacionSchema.safeParse(comentario)
-    if (!parsedComentario.success) {
-      return { success: false as const, error: MENSAJE_COMENTARIO_REPARACION_INVALIDO }
+    const parsedFrase = fraseReparacionSchema.safeParse(frase)
+    if (!parsedFrase.success) {
+      return { success: false as const, error: MENSAJE_FRASE_REPARACION_INVALIDA }
     }
     if (!(image instanceof File)) {
       return { success: false as const, error: "Adjuntá una fotografía de la reparación." }
@@ -422,7 +427,7 @@ export async function informarReparacionAction(
     if (!captcha.ok) return { success: false as const, error: captcha.mensaje }
 
     const resultado = await informarReparacionWorkflow(createAdminClient(), parsedReportId, sesion.usuario.id, {
-      comentario: parsedComentario.data,
+      frase: parsedFrase.data,
       image,
     })
     if (resultado.success) revalidatePath(`/reportes/${parsedReportId}`)
@@ -435,31 +440,36 @@ export async function informarReparacionAction(
 /**
  * Confirma o impugna una reparación informada (S4, S6, S7). La RPC exige autoría
  * distinta, una sola verificación por cuenta y tres confirmaciones sin impugnaciones
- * pendientes; la acción solo valida la sesión y los identificadores.
+ * pendientes; la acción solo valida la sesión, los identificadores y que el motivo sea
+ * una frase del catálogo cerrado (S17).
  *
  * @param reporteId - Reporte de la evidencia, usado para revalidar su ficha.
  * @param evidenciaId - Evidencia en verificación.
  * @param tipo - «confirmacion» o «impugnacion».
- * @param motivo - Motivo de la impugnación; lo valida el caso de uso.
+ * @param fraseClave - Clave de la frase del catálogo; obligatoria al impugnar.
  * @returns Avance de la verificación, o el error en español que se muestra en la ficha.
  */
 async function verificarReparacionAction(
   reporteId: number,
   evidenciaId: string,
   tipo: TipoVerificacionReparacion,
-  motivo?: string,
+  fraseClave?: string,
 ) {
   try {
     const parsedReportId = reportIdSchema.parse(reporteId)
     const parsedEvidenciaId = evidenciaIdSchema.safeParse(evidenciaId)
     if (!parsedEvidenciaId.success) return { success: false as const, error: MENSAJE_EVIDENCIA_INVALIDA }
 
+    const motivo = fraseClave === undefined ? undefined : fraseClave.trim()
+    if (tipo === "impugnacion" && parseFraseImpugnacion(motivo) === null) {
+      return { success: false as const, error: MENSAJE_MOTIVO_IMPUGNACION_INVALIDO }
+    }
+
     const sesion = await sesionParaReparaciones("Tenés que iniciar sesión para confirmar o impugnar una reparación.")
     if ("error" in sesion) return { success: false as const, error: sesion.error }
 
-    const motivoLimpio = motivo === undefined ? undefined : motivo.trim()
     const resultado = await verificarReparacionWorkflow(
-      createAdminClient(), parsedEvidenciaId.data, sesion.usuario.id, tipo, motivoLimpio,
+      createAdminClient(), parsedEvidenciaId.data, sesion.usuario.id, tipo, motivo,
     )
     if (resultado.success) revalidatePath(`/reportes/${parsedReportId}`)
     return resultado
@@ -479,11 +489,11 @@ export async function confirmarReparacionAction(reporteId: number, evidenciaId: 
 }
 
 /**
- * Impugna una reparación informada; el motivo es obligatorio (S4, S5).
+ * Impugna una reparación informada; el motivo es una frase obligatoria del catálogo (S4, S5, S17).
  *
  * @param reporteId - Reporte de la evidencia, usado para revalidar su ficha.
  * @param evidenciaId - Evidencia en verificación.
- * @param motivo - Explicación de por qué la reparación no está hecha.
+ * @param motivo - Clave de la frase que explica por qué la reparación no está hecha.
  */
 export async function impugnarReparacionAction(reporteId: number, evidenciaId: string, motivo: string) {
   return verificarReparacionAction(reporteId, evidenciaId, "impugnacion", motivo)

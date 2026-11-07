@@ -1,7 +1,10 @@
 /**
- * Límites compartidos por la validación del servidor y el formulario de la ficha del
- * reporte (S13). Viven fuera de los módulos `server-only` para que el cliente pueda
- * mostrar la misma longitud que después exige la RPC.
+ * Límites de las columnas que siguen siendo texto libre: `evidencias_reparacion.comentario`
+ * y `verificaciones_reparacion.motivo` (S16, S17). La aplicación solo escribe frases del
+ * catálogo cerrado de `lib/reportes/frases-reparacion.ts`, y su prueba verifica que cada
+ * etiqueta entre en estos límites, así el CHECK de la base nunca rechaza una frase válida.
+ *
+ * Vive fuera de los módulos `server-only` para que la prueba del catálogo pueda importarlo.
  */
 
 /** Longitud máxima del comentario de la evidencia (`evidencias_reparacion.comentario`). */
