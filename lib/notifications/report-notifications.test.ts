@@ -40,6 +40,7 @@ function supabaseWithAdmins(admins: Array<{ id: string; email: string | null; ro
 
 const expectNewStyle = (html: string) => {
   expect(html).toContain(`src="${LOGO}"`)
+  expect(html).not.toContain('<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">')
   expect(html).toContain(`url('${MAP}')`)
   expect(html).toContain("family=Geist:")
   expect(html).toContain("'Geist Mono'")

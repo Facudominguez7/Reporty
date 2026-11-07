@@ -20,7 +20,7 @@ import Link from "next/link"
 import { FiltrosMascotas } from "@/components/filtros-mascotas"
 import { EstadoMascotas } from "@/components/estado-mascotas"
 import { ListaMascotasClient } from "@/components/lista-mascotas-client"
-import { getMascotasListado } from "@/database/queries/mascotas/listado"
+import { getMascotasListado, getMascotasStatusCounts } from "@/database/queries/mascotas/listado"
 import { BuscadorMascotas } from "@/components/buscador-mascotas"
 
 export const dynamic = "force-dynamic"
@@ -58,6 +58,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
     { data: estados },
     { data: prioridades },
     statusCounts,
+    petStatusCounts,
   ] = await Promise.all([
     getReportCardData({
       search,
@@ -72,6 +73,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
     getEstados(),
     getPrioridades(),
     getReportStatusCounts({ search, categoria, prioridad }),
+    mascotas ? getMascotasStatusCounts({ tipo, search: searchMascota }) : Promise.resolve({ all: 0, lost: 0, found: 0 }),
   ])
 
   return (
@@ -98,7 +100,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
             actions={<FiltrosMascotas />}
           />
           <BuscadorMascotas key={searchMascota ?? ""} />
-          <EstadoMascotas search={new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => typeof entry[1] === "string")).toString()} />
+          <EstadoMascotas search={new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => typeof entry[1] === "string")).toString()} counts={petStatusCounts} />
           {petsError ? <Alert variant="destructive"><AlertTriangle className="size-4" /><AlertTitle>No se pudieron cargar las mascotas</AlertTitle><AlertDescription>Intenta nuevamente en unos minutos.</AlertDescription></Alert> : pets.length ? <ListaMascotasClient key={`${tipo ?? ""}:${estadoMascota ?? ""}:${searchMascota ?? ""}`} initialPets={pets} initialHasMore={petsHasMore} /> : <Card className="border-dashed"><CardContent className="space-y-2 p-4 text-center"><p className="text-lg font-semibold tracking-tight">No hay mascotas publicadas con esos criterios.</p><p className="text-sm text-muted-foreground">Probá cambiar los filtros.</p></CardContent></Card>}
           </> : <>
           <PageTitleBar

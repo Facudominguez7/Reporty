@@ -14,6 +14,7 @@ import "leaflet.markercluster"
 import { getCategoryColor, getPriorityColor, getStatusColor } from "@/components/report-card"
 import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/catalog"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
+import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
 import {
   INITIAL_MAP_VIEW_CONFIG,
@@ -445,7 +446,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     for (const pet of mascotas) {
       if (!Number.isSafeInteger(pet.id) || pet.id <= 0) continue
       const imageUrl = toSafeImageUrl(pet.image)
-      const label = `${pet.species} ${pet.status.toLowerCase()}`
+      const statusLabel = getPetStatusAdjective(pet.status)
+      const label = `${pet.species} ${statusLabel.toLowerCase()}`
       const marker = L.marker(pet.coordinates, { title: label, alt: label, icon: L.divIcon({ className: "pet-marker", html: `<span aria-hidden="true" style="position:relative;display:grid;place-items:center;width:38px;height:38px;overflow:hidden;border:3px solid var(--map-marker-stroke);border-radius:50%;background:${pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)"};color:var(--map-marker-foreground);font-weight:700;box-shadow:var(--elevation-soft)">${pet.status === "Perdida" ? "P" : "E"}${imageUrl ? `<img data-pet-marker-image src="${escapeHtml(imageUrl)}" alt="" style="position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:cover;border-radius:50%">` : ""}</span>`, iconSize: [38, 38], iconAnchor: [19, 19] }) })
       const description = pet.description ?? ""
       const popup = `
@@ -460,7 +462,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
           ${imageUrl ? `<div style="margin-bottom:10px;overflow:hidden;border-radius:10px;"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(pet.species)}" style="display:block;width:100%;height:124px;object-fit:cover;" /></div>` : ""}
           <p style="margin:0 0 10px;font-size:13px;color:var(--foreground);line-height:1.5;">${escapeHtml(description.length > 110 ? `${description.substring(0, 110)}...` : description)}</p>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-            ${createPopupChip(escapeHtml(pet.status), { background: pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)", border: "transparent", text: pet.status === "Perdida" ? "var(--destructive-foreground)" : "var(--primary-foreground)" }, popupIcons.status)}
+            ${createPopupChip(escapeHtml(statusLabel), { background: pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)", border: "transparent", text: pet.status === "Perdida" ? "var(--destructive-foreground)" : "var(--primary-foreground)" }, popupIcons.status)}
           </div>
           <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground);">
             <span style="display:inline-flex;">${popupIcons.date}</span><span>${escapeHtml(new Date(pet.createdAt).toLocaleDateString("es-AR"))}</span>

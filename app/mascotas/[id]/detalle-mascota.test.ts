@@ -2,7 +2,11 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
+const navigationMocks = vi.hoisted(() => ({ returnTo: null as string | null }))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(navigationMocks.returnTo ? { returnTo: navigationMocks.returnTo } : {}),
+}))
 vi.mock("./actions", () => ({ marcarMascotaEncontradaAction: vi.fn(), retirarMascotaDetalleAction: vi.fn() }))
 import { DetalleMascota } from "./detalle-mascota"
 import type { MascotaDetail } from "@/database/queries/mascotas/detalle"
@@ -12,8 +16,10 @@ const render = (isOwner: boolean, status: MascotaDetail["status"] = "Perdida") =
   renderToStaticMarkup(createElement(DetalleMascota, { pet: { ...pet, status }, isOwner }))
 
 describe("pet detail", () => {
-  it.each([["Perdida", "bg-destructive"], ["Encontrada", "bg-primary"]] as const)("styles %s status with its theme color", (status, color) => {
-    expect(render(false, status)).toMatch(new RegExp(`class="[^"]*${color}[^"]*"><span[^>]*>Estado</span><span>${status}</span>`))
+  it.each([["Perdida", "Perdido", "bg-destructive"], ["Encontrada", "Encontrado", "bg-primary"]] as const)("styles %s status consistently with its species", (status, label, color) => {
+    const html = render(false, status)
+    expect(html).toMatch(new RegExp(`class="[^"]*${color}[^"]*"><span[^>]*>Estado</span><span>${label}</span>`))
+    expect(html).toContain(`Perro ${label.toLowerCase()}`)
   })
 
   it("shows public pet information and sharing without owner controls", () => {
@@ -22,7 +28,7 @@ describe("pet detail", () => {
     expect(html).toContain('href="tel:123456"')
     expect(html).toContain("Compartir")
     expect(html).toContain("Detalle de la mascota")
-    expect(html).toContain('href="/reportes"')
+    expect(html).toContain('href="/reportes?vista=mascotas"')
     expect(html).toContain('alt="Foto de perro"')
     expect(html).not.toContain("Ubicación")
     expect(html).not.toContain("Prioridad")
@@ -30,6 +36,13 @@ describe("pet detail", () => {
     expect(html).toContain("1/11/2026")
     expect(html).not.toContain("Marcar encontrada")
     expect(html).not.toContain("Retirar publicación")
+  })
+
+  it("returns to the exact filtered pet list when its return URL is present", () => {
+    navigationMocks.returnTo = "/reportes?vista=mascotas&tipo=perro&estadoMascota=Perdida&searchMascota=collar"
+    const html = render(false)
+    navigationMocks.returnTo = null
+    expect(html).toContain('href="/reportes?vista=mascotas&amp;tipo=perro&amp;estadoMascota=Perdida&amp;searchMascota=collar"')
   })
 
   it("shows the location card only for actual coordinates", () => {

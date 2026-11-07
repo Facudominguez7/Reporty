@@ -10,15 +10,15 @@ export async function enviarAvisoEstadoMascota({
 }: { destinatario: string; mascotaId: number; estado: EstadoAvisoMascota; eventoId: string }) {
   if (!destinatario.trim()) throw new Error("Destinatario de notificación vacío")
   const encontrada = estado === "encontrada"
-  const titulo = encontrada ? "Tu mascota fue marcada como encontrada" : "Tu publicación de mascota fue retirada por administración"
+  const titulo = encontrada ? "La mascota que reportaste figura como encontrada" : "Tu publicación de mascota fue retirada por administración"
   const texto = encontrada
-    ? "La publicación de tu mascota ahora figura como encontrada."
+    ? "La publicación que reportaste ahora figura como encontrada."
     : "La publicación de tu mascota fue retirada por administración. Si necesitás más información, contactá al equipo de Reporty."
   const url = `${resolveSiteUrl(process.env.NEXT_PUBLIC_APP_URL)}/mascotas/${mascotaId}`
   const resend = new Resend(process.env.RESEND_API_KEY!)
   return resend.emails.send({
     from: "Reporty <team@notificaciones.reporty.com.ar>", to: [destinatario],
-    subject: encontrada ? "Actualización de tu mascota perdida" : "Aviso sobre tu publicación de mascota",
+    subject: encontrada ? "La mascota que reportaste figura como encontrada" : "Aviso sobre tu publicación de mascota",
     html: renderEmailLayout({
       assetBaseUrl: resolveSiteUrl(process.env.NEXT_PUBLIC_APP_URL), title: titulo,
       kicker: encontrada ? "Mascota encontrada" : "Moderación de mascotas", preheader: texto,

@@ -3,19 +3,19 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import ReportesPage from "./page"
 
-const calls = vi.hoisted(() => ({ reportes: vi.fn(), mascotas: vi.fn() }))
+const calls = vi.hoisted(() => ({ reportes: vi.fn(), mascotas: vi.fn(), petCounts: vi.fn() }))
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: unknown; children: React.ReactNode }) =>
   React.createElement("a", { href: typeof href === "string" ? href : JSON.stringify(href), ...props }, children) }))
 vi.mock("@/database/queries/reportes/get-reportes", () => ({
   getCategorias: async () => ({ data: [] }), getEstados: async () => ({ data: [] }), getPrioridades: async () => ({ data: [] }),
   getReportStatusCounts: async () => ({}), getReportCardData: calls.reportes,
 }))
-vi.mock("@/database/queries/mascotas/listado", () => ({ getMascotasListado: calls.mascotas }))
+vi.mock("@/database/queries/mascotas/listado", () => ({ getMascotasListado: calls.mascotas, getMascotasStatusCounts: calls.petCounts }))
 vi.mock("@/components/lista-reportes-client", () => ({ ListaReportesClient: () => React.createElement("div", { "data-testid": "incidents" }) }))
 vi.mock("@/components/lista-mascotas-client", () => ({ ListaMascotasClient: () => React.createElement("div", { "data-testid": "pets" }) }))
 vi.mock("@/components/filtros-mascotas", () => ({ FiltrosMascotas: () => React.createElement("div", { "data-testid": "pet-filters" }) }))
 vi.mock("@/components/buscador-mascotas", () => ({ BuscadorMascotas: () => React.createElement("input", { "data-testid": "pet-search" }) }))
-vi.mock("@/components/estado-mascotas", () => ({ EstadoMascotas: ({ search }: { search: string }) => React.createElement("nav", { "data-testid": "pet-status", "data-search": search }) }))
+vi.mock("@/components/estado-mascotas", () => ({ EstadoMascotas: ({ search, counts }: { search: string; counts: { all: number; lost: number; found: number } }) => React.createElement("nav", { "data-testid": "pet-status", "data-search": search, "data-counts": JSON.stringify(counts) }) }))
 vi.mock("@/components/reportes-search", () => ({ ReportesSearch: ({ search }: { search: string }) => React.createElement("input", { "data-search": search }) }))
 vi.mock("./estado-reportes", () => ({ EstadoReportes: ({ searchParams }: { searchParams: object }) => React.createElement("div", { "data-incident-filters": JSON.stringify(searchParams) }) }))
 vi.mock("./reportes-client", () => ({ ReportesClientWrapper: () => null }))
@@ -25,6 +25,7 @@ const incidentData = [{ id: 1, title: "Bache", description: "", category: "", pr
 beforeEach(() => {
   calls.reportes.mockReset().mockResolvedValue({ data: incidentData, error: null, hasMore: false })
   calls.mascotas.mockReset().mockResolvedValue({ data: [{ id: 8 }], error: null, hasMore: false })
+  calls.petCounts.mockReset().mockResolvedValue({ all: 18, lost: 12, found: 6 })
 })
 
 describe("/reportes publication tabs", () => {
@@ -45,6 +46,8 @@ describe("/reportes publication tabs", () => {
     expect(html).toContain("Mascotas perdidas")
     expect(html).toContain("data-testid=\"pets\"")
     expect(html).toContain("data-testid=\"pet-status\"")
+    expect(html).toContain("data-counts=\"{&quot;all&quot;:18,&quot;lost&quot;:12,&quot;found&quot;:6}\"")
+    expect(calls.petCounts).toHaveBeenCalledWith({ tipo: "gato", search: "collar azul" })
     expect(html.indexOf("data-testid=\"pet-filters\"")).toBeGreaterThan(html.indexOf("Mascotas perdidas"))
     expect(html.indexOf("data-testid=\"pet-filters\"")).toBeLessThan(html.indexOf("data-testid=\"pet-status\""))
     expect(html.indexOf("data-testid=\"pet-search\"")).toBeGreaterThan(html.indexOf("data-testid=\"pet-filters\""))

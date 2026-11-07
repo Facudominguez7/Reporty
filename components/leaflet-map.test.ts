@@ -7,12 +7,13 @@ const mocks = vi.hoisted(() => {
   const icons: Array<{ className: string; html: string }> = []
   const refs: Array<{ current: unknown }> = []
   const listeners = new Map<string, (event: unknown) => void>()
+  const markerOptions: Array<{ title?: string; alt?: string }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
   const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
   const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), getLayers: vi.fn(() => []) }
   const marker = { bindPopup: vi.fn(), on: vi.fn() }
-  return { calls, icons, refs, listeners, cleanups, container, map, cluster, marker, refIndex: 0 }
+  return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, marker, refIndex: 0 }
 })
 
 vi.mock("react", async (importOriginal) => {
@@ -32,7 +33,7 @@ vi.mock("leaflet", () => ({
     map: () => mocks.map,
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
-    marker: () => mocks.marker,
+    marker: (_coordinates: unknown, options: { title?: string; alt?: string }) => { mocks.markerOptions.push(options); return mocks.marker },
     divIcon: (icon: { className: string; html: string }) => { mocks.icons.push(icon); return {} },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
   },
@@ -59,6 +60,7 @@ describe("LeafletMap initial view", () => {
     mocks.refs.length = 0
     mocks.refIndex = 0
     mocks.listeners.clear()
+    mocks.markerOptions.length = 0
     mocks.cleanups.length = 0
     vi.clearAllMocks()
   })
@@ -83,7 +85,7 @@ describe("LeafletMap initial view", () => {
     expect(popup).not.toContain("data-share-pet")
     expect(popup).not.toContain("Ver ficha")
     expect(popup).not.toContain("Compartir")
-    expect(popup).toContain("Encontrada")
+    expect(popup).toContain("Encontrado")
     expect(popup).toContain("Gato &lt;script&gt;")
     expect(popup).toContain("Blanca &amp; &quot;curiosa&quot;")
     expect(popup).not.toContain("javascript:")
@@ -147,6 +149,15 @@ describe("LeafletMap initial view", () => {
       expect.stringContaining("background:var(--primary)"),
     ])
     expect(petMarkers.every(({ html }) => !/#(?:[\da-f]{3}){1,2}\b/i.test(html))).toBe(true)
+  })
+
+  it("uses a status adjective that agrees with the species in accessible marker labels", () => {
+    render([])
+    mocks.refIndex = 0
+    renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [
+      { id: 9, species: "Gato", description: "Blanca", status: "Perdida", createdAt: "2026-01-02", phone: "123", image: "", coordinates: [-27.36, -55.89] },
+    ] }))
+    expect(mocks.markerOptions.at(-1)).toMatchObject({ title: "Gato perdido", alt: "Gato perdido" })
   })
 
   it("safely embeds pet thumbnails and reveals the status fallback on image failure", () => {

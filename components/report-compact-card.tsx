@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { withReportesReturnTo } from "@/lib/reportes/navigation"
 
 type ReportCompactCardProps = {
   id: number
@@ -24,6 +25,7 @@ type ReportCompactCardProps = {
   /** Optional category label; rendered only when provided. */
   category?: string
   isReportListing?: boolean
+  returnTo?: string
 }
 
 export function ReportCompactCard({
@@ -36,9 +38,11 @@ export function ReportCompactCard({
   image,
   category,
   isReportListing = false,
+  returnTo,
 }: ReportCompactCardProps) {
+  const href = returnTo ? withReportesReturnTo(`/reportes/${id}`, returnTo) : `/reportes/${id}`
   return (
-    <Link href={`/reportes/${id}`} className="group block">
+    <Link href={href} className="group block">
       <Card className="incident-card overflow-hidden border-border/70 bg-card transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
         <CardContent className="px-3 py-0 sm:px-4">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">

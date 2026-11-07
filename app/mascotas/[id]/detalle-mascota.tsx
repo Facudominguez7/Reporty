@@ -4,7 +4,7 @@ import { useState } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Calendar, MapPin, PawPrint, Pencil, Share2, Trash2 } from "lucide-react"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { shareReport } from "@/lib/share/share-report"
+import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
+import { resolveReportesReturnTo } from "@/lib/reportes/navigation"
 import { marcarMascotaEncontradaAction, retirarMascotaDetalleAction } from "./actions"
 import type { MascotaDetail } from "@/database/queries/mascotas/detalle"
 import { editarMascotaAction } from "@/app/dashboard/moderacion/actions"
@@ -30,11 +32,14 @@ function petDraft(pet: MascotaDetail) {
 
 export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const backHref = resolveReportesReturnTo(searchParams.get("returnTo"), "/reportes?vista=mascotas")
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const [pending, setPending] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(() => petDraft(pet))
+  const statusLabel = getPetStatusAdjective(pet.status)
 
   async function saveAdmin() {
     if (JSON.stringify(draft) === JSON.stringify(petDraft(pet))) { setError("No hay cambios para guardar."); return }
@@ -50,7 +55,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
 
   async function share() {
     setError("")
-    const outcome = await shareReport({ title: `${pet.species} ${pet.status.toLowerCase()}`, text: `Mirá esta mascota en Reporty: ${pet.species} ${pet.status.toLowerCase()}`, url: window.location.href }, navigator)
+    const outcome = await shareReport({ title: `${pet.species} ${statusLabel.toLowerCase()}`, text: `Mirá esta mascota en Reporty: ${pet.species} ${statusLabel.toLowerCase()}`, url: window.location.href }, navigator)
     if (outcome === "failed") setError("No pudimos compartir el enlace.")
     if (outcome === "copied") setMessage("Enlace copiado.")
   }
@@ -75,7 +80,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
 
   return <main className="page-shell"><div className="page-container space-y-4 md:space-y-6 lg:space-y-8">
     <section className="space-y-3">
-      <PageTitleBar leading={<Button asChild variant="ghost" size="icon" aria-label="Volver a publicaciones"><Link href="/reportes"><ArrowLeft className="size-4" /></Link></Button>} icon={<PawPrint className="size-4" />} title="Detalle de la mascota" description="Consultá los datos de la publicación." />
+      <PageTitleBar leading={<Button asChild variant="ghost" size="icon" aria-label="Volver a publicaciones"><Link href={backHref}><ArrowLeft className="size-4" /></Link></Button>} icon={<PawPrint className="size-4" />} title="Detalle de la mascota" description="Consultá los datos de la publicación." />
     </section>
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
       <div className="space-y-4 lg:col-span-8">
@@ -86,10 +91,10 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
               <span>Publicada el día <time dateTime={pet.createdAt}>{new Date(pet.createdAt).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</time></span>
             </div>
             <div className="flex flex-wrap items-center gap-1">
-              <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span>{pet.status}</span></Badge>
+              <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span>{statusLabel}</span></Badge>
             </div>
             <div className="flex min-w-0 items-start gap-3">
-              <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {pet.status.toLowerCase()}</CardTitle>
+              <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {statusLabel.toLowerCase()}</CardTitle>
               <Button type="button" variant="outline" size="icon" className="size-10 shrink-0" onClick={share} aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button>
               {isOwner && pet.status === "Perdida" && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" size="icon" className="size-10 shrink-0" disabled={pending || editing} aria-label="Retirar publicación" title="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
               {isAdmin && !editing && <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 text-muted-foreground" onClick={() => { setDraft(petDraft(pet)); setError(""); setEditing(true) }} aria-label="Editar publicación" title="Editar publicación"><Pencil className="size-4" /></Button>}

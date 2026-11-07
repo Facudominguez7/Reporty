@@ -4,9 +4,12 @@ import { Calendar, ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import type { MascotaLista } from "@/database/queries/mascotas/listado"
+import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
+import { withReportesReturnTo } from "@/lib/reportes/navigation"
 
-export function MascotaCompactCard({ pet }: { pet: MascotaLista }) {
-  return <Link href={`/mascotas/${pet.id}`} className="group block">
+export function MascotaCompactCard({ pet, returnTo }: { pet: MascotaLista; returnTo?: string }) {
+  const href = returnTo ? withReportesReturnTo(`/mascotas/${pet.id}`, returnTo) : `/mascotas/${pet.id}`
+  return <Link href={href} className="group block">
     <Card className="incident-card overflow-hidden border-border/70 bg-card transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
       <CardContent className="px-3 py-0 sm:px-4"><div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <div className="size-20 flex-none overflow-hidden rounded-full bg-surface-subtle shadow-inner sm:size-24">
@@ -18,8 +21,8 @@ export function MascotaCompactCard({ pet }: { pet: MascotaLista }) {
           <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Calendar className="size-3.5" />{new Date(pet.createdAt).toLocaleDateString("es-AR")}</span>
         </div>
         <div className="flex min-w-0 flex-col items-end gap-1.5">
-          <Badge variant="secondary" className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{pet.type}</Badge>
-          <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{pet.status}</Badge>
+          <Badge variant="petType" className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{pet.type}</Badge>
+          <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="max-w-24 truncate px-1 py-0.5 text-[8px] sm:px-2 sm:py-1 sm:text-[10px]">{getPetStatusAdjective(pet.status)}</Badge>
         </div>
         <ChevronRight className="size-5 flex-none text-muted-foreground/70" aria-hidden="true" />
       </div></CardContent>

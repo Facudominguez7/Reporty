@@ -10,6 +10,8 @@ export type MascotaLista = {
   image: string
 }
 
+export type MascotasStatusCounts = { all: number; lost: number; found: number }
+
 type MascotaRow = {
   id?: number
   tipo_animal?: string
@@ -33,6 +35,22 @@ export function mapPetForListing(row: MascotaRow, image = ""): MascotaLista | nu
     status, createdAt: row.publicada_at,
     image,
   }
+}
+
+export async function getMascotasStatusCounts(filters: { tipo?: string; search?: string } = {}): Promise<MascotasStatusCounts> {
+  const supabase = createPublicClient()
+  const search = filters.search?.trim().slice(0, 100)
+  const buildQuery = (estado?: string) => {
+    let query = supabase.from("mascotas_perdidas_publicas").select("id", { count: "exact", head: true })
+    if (["perro", "gato", "otro"].includes(filters.tipo ?? "")) query = query.eq("tipo_animal", filters.tipo!)
+    if (search) query = query.ilike("descripcion", `%${search.replace(/[\\%_]/g, "\\$&")}%`)
+    if (estado) query = query.eq("estado", estado)
+    return query
+  }
+  const [{ count: all }, { count: lost }, { count: found }] = await Promise.all([
+    buildQuery(), buildQuery("perdida"), buildQuery("encontrada"),
+  ])
+  return { all: all ?? 0, lost: lost ?? 0, found: found ?? 0 }
 }
 
 export async function getMascotasListado(filters: { tipo?: string; estado?: string; search?: string; limite?: number; offset?: number } = {}) {
