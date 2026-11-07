@@ -9,6 +9,7 @@ it("renders a pet card with its stable detail link and pet-specific fields", () 
     createdAt: "2026-11-01T12:00:00Z", image: "/api/mascotas/12/foto",
   } }))
   expect(html).toContain('href="/mascotas/12"')
+  expect(html).toMatch(/class="[^"]*rounded-full[^"]*"/)
   expect(html).toContain("Perro perdido")
   expect(html).toContain("Collar rojo")
   expect(html).toContain("Perdida")

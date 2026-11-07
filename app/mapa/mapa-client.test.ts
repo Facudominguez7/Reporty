@@ -1,7 +1,21 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { PetLayerError } from "./mapa-client"
+import { MAP_LAYER_OPTIONS, PetLayerError, shouldShowMascotasOnboarding } from "./mapa-client"
+
+describe("map layer labels", () => {
+  it("calls the report layer Incidentes", () => {
+    expect(MAP_LAYER_OPTIONS[0]).toEqual(["reportes", "Incidentes"])
+  })
+})
+
+describe("shouldShowMascotasOnboarding", () => {
+  it("shows the guide only the first time the pet layer is selected", () => {
+    expect(shouldShowMascotasOnboarding("mascotas", false)).toBe(true)
+    expect(shouldShowMascotasOnboarding("mascotas", true)).toBe(false)
+    expect(shouldShowMascotasOnboarding("reportes", false)).toBe(false)
+  })
+})
 
 describe("PetLayerError", () => {
   it("shows pet query failures as a visible alert only when a failure exists", () => {

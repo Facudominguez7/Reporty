@@ -14,14 +14,23 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-const steps = [
-  ["Detectá", "un problema urbano en tu barrio."],
-  ["Reportá", "con ubicación y, si podés, una foto."],
-  ["Compartí", "para que la comunidad pueda verlo."],
-  ["Seguí", "el estado hasta que se resuelva."],
+const generalSteps = [
+  ["Explorá", "incidentes urbanos y mascotas perdidas en el mapa."],
+  ["Reportá", "un problema o publicá una mascota perdida con ubicación y foto."],
+  ["Compartí", "la publicación para que más personas puedan ayudar."],
+  ["Seguí", "el estado del incidente o las novedades de la mascota."],
 ] as const
 
-export function HowToUseDialog() {
+const petSteps = [
+  ["Buscá", "mascotas perdidas o encontradas en el mapa."],
+  ["Abrí", "un marcador para ver la foto y los datos de la publicación."],
+  ["Contactá", "a quien publicó la mascota con el teléfono disponible."],
+  ["Publicá", "una mascota perdida desde el botón +."],
+] as const
+
+export function HowToUseDialog({ layer }: { layer?: "reportes" | "mascotas" }) {
+  const isPetLayer = layer === "mascotas"
+  const steps = isPetLayer ? petSteps : generalSteps
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -33,14 +42,16 @@ export function HowToUseDialog() {
         >
           <CircleHelp className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Cómo usar</span>
-          <span className="sr-only sm:hidden">Cómo usar Reporty</span>
+          <span className="sr-only sm:hidden">{isPetLayer ? "Cómo usar el mapa de mascotas" : "Cómo usar Reporty"}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader className="pr-2">
-          <DialogTitle className="text-xl sm:text-2xl">¿Cómo usar Reporty?</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl">{isPetLayer ? "¿Cómo usar el mapa de mascotas?" : "¿Cómo usar Reporty?"}</DialogTitle>
           <DialogDescription>
-            Reporty conecta tus observaciones con la comunidad para ayudar a mejorar Posadas.
+            {isPetLayer
+              ? "Encontrá publicaciones de mascotas perdidas o encontradas y ayudá a que vuelvan a casa."
+              : "Reportá problemas urbanos, publicá mascotas perdidas y ayudá a la comunidad de Posadas."}
           </DialogDescription>
         </DialogHeader>
 

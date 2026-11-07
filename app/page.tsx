@@ -3,12 +3,12 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import { buttonVariants } from "@/components/ui/button";
-import { pageMetadata, SITE_DESCRIPTION } from "@/lib/seo/site";
+import { pageMetadata } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
-  ...pageMetadata({ title: "Reportá problemas urbanos en Posadas", description: SITE_DESCRIPTION, path: "/" }),
+  ...pageMetadata({ title: "Reportes urbanos y mascotas perdidas en Posadas", description: "Reportá problemas de la ciudad o ayudá a encontrar mascotas perdidas en Posadas.", path: "/" }),
   // The root layout's title template only reaches child segments, not this page.
-  title: { absolute: "Reporty · Reportá problemas urbanos en Posadas" },
+  title: { absolute: "Reporty · Reportes urbanos y mascotas perdidas en Posadas" },
 };
 
 export default function HomePage() {
@@ -28,7 +28,7 @@ export default function HomePage() {
             ¿Hay algo que habría que arreglar?
           </h1>
           <p className="section-copy mx-auto">
-            Encontrá problemas de la ciudad en el mapa o contá qué está pasando en tu barrio.
+            Encontrá problemas de la ciudad y mascotas perdidas en el mapa, o contá qué está pasando en tu barrio.
             Entre todos, es más fácil que se vea. <span className="text-primary">Es gratis.</span>
           </p>
         </div>

@@ -14,7 +14,7 @@ import { ContactsDialog } from "@/components/contacts-dialog"
 import { FiltrosReportes } from "@/components/filtros-reportes"
 import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
-import { OnboardingModal } from "@/components/onboarding-modal"
+import { MascotasOnboardingModal, OnboardingModal } from "@/components/onboarding-modal"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
@@ -45,6 +45,14 @@ type MapaClientProps = {
   mascotas: MascotaMapa[]
 }
 
+const MASCOTAS_ONBOARDING_STORAGE_KEY = "reporty_mascotas_onboarding_completed"
+
+export const MAP_LAYER_OPTIONS = [["reportes", "Incidentes"], ["mascotas", "Mascotas"]] as const
+
+export function shouldShowMascotasOnboarding(layer: "reportes" | "mascotas", completed: boolean) {
+  return layer === "mascotas" && !completed
+}
+
 export function PetLayerError({ error }: { error: string | null }) {
   if (!error) return null
   return <div role="alert" className="absolute left-1/2 top-20 z-30 w-[min(92vw,32rem)] -translate-x-1/2 rounded-lg border border-destructive/30 bg-card/95 p-3 text-sm text-destructive shadow-lg">No se pudieron cargar las mascotas: {error}</div>
@@ -69,6 +77,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
   const [showFilters, setShowFilters] = useState(false)
   const [showActions, setShowActions] = useState(false)
   const [layer, setLayer] = useState<"reportes" | "mascotas">("reportes")
+  const [showPetOnboarding, setShowPetOnboarding] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const activeFilters = [
@@ -79,6 +88,18 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
   ].filter(Boolean).length
 
   const activeFiltersLabel = `${activeFilters} filtro${activeFilters === 1 ? "" : "s"} activo${activeFilters === 1 ? "" : "s"}`
+
+  const handleLayerChange = (nextLayer: "reportes" | "mascotas") => {
+    setLayer(nextLayer)
+    if (shouldShowMascotasOnboarding(nextLayer, Boolean(window.localStorage.getItem(MASCOTAS_ONBOARDING_STORAGE_KEY)))) {
+      setShowPetOnboarding(true)
+    }
+  }
+
+  const handlePetOnboardingComplete = () => {
+    window.localStorage.setItem(MASCOTAS_ONBOARDING_STORAGE_KEY, "true")
+    setShowPetOnboarding(false)
+  }
 
   const handleFilterApplied = useCallback(() => {
     setShowFilters(false)
@@ -94,10 +115,11 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
     <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
       <div className="relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
       <OnboardingModal />
+      <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
         <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
           <ContactsDialog />
-          <HowToUseDialog />
+          <HowToUseDialog layer={layer} />
         </div>
       </div>
       <div className="absolute inset-0 z-0">
@@ -118,7 +140,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)]">
         <div className="pointer-events-auto flex rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur" role="group" aria-label="Capa del mapa">
-          {([['reportes', 'Reportes'], ['mascotas', 'Mascotas']] as const).map(([value, label]) => <Button key={value} type="button" size="sm" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => setLayer(value)}>{label}</Button>)}
+          {MAP_LAYER_OPTIONS.map(([value, label]) => <Button key={value} type="button" size="sm" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => handleLayerChange(value)}>{label}</Button>)}
         </div>
       </div>
 

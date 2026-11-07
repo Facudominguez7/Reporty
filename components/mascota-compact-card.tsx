@@ -9,7 +9,7 @@ export function MascotaCompactCard({ pet }: { pet: MascotaLista }) {
   return <Link href={`/mascotas/${pet.id}`} className="group block">
     <Card className="incident-card overflow-hidden border-border/70 bg-card transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg">
       <CardContent className="px-3 py-0 sm:px-4"><div className="flex min-w-0 items-center gap-3 sm:gap-4">
-        <div className="size-20 flex-none overflow-hidden rounded-[1.25rem] bg-surface-subtle shadow-inner sm:size-24">
+        <div className="size-20 flex-none overflow-hidden rounded-full bg-surface-subtle shadow-inner sm:size-24">
           <Image src={pet.image || "/placeholder.svg"} alt={pet.title} width={96} height={96} sizes="(min-width: 640px) 96px, 76px" className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0 flex-1 space-y-1.5">
