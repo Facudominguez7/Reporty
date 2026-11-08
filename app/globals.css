@@ -37,6 +37,8 @@
 
   --surface-subtle: oklch(94.007% 0.00011 271.152);
   --semantic-info: oklch(0.56 0.11 240);
+  --pet-type: oklch(0.48 0.17 330);
+  --pet-type-foreground: oklch(0.985 0 0);
 
   --semantic-success: oklch(0.57 0.12 157);
 

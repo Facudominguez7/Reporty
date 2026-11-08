@@ -7,6 +7,7 @@ import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { ZonaConReportes } from "@/database/queries/interesado"
 import { MapPin, ChevronDown, ChevronUp } from "lucide-react"
 import dynamic from "next/dynamic"
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map/initial-view"
 
 const getHeatColor = (cantidad: number) => {
   if (cantidad >= 10) return "var(--map-heat-high)"
@@ -59,8 +60,8 @@ function MapaCalorInterno({ zonas, height }: { zonas: ZonaConReportes[], height:
       }).setView([centerLat, centerLon], 12)
 
       // Agregar capa de tiles
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      L.tileLayer(MAP_TILE_URL, {
+        attribution: MAP_TILE_ATTRIBUTION,
         maxZoom: 19,
       }).addTo(map)
 

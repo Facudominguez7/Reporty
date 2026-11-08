@@ -13,6 +13,8 @@ describe("AdminNav pending reviews", () => {
   it("shows the count on desktop and mobile only when reviews are pending", () => {
     const html = renderToStaticMarkup(createElement(AdminNav, { email: "admin@example.com", roleId: ROLE_IDS.ADMIN, pendingReviews: 2 }))
     expect(html.match(/aria-label="2 revisiones pendientes"/g)).toHaveLength(2)
+    expect(html).not.toContain('href="/admin/mascotas"')
+    expect(html).toContain('href="/admin/reportes"')
 
     const empty = renderToStaticMarkup(createElement(AdminNav, { email: "admin@example.com", roleId: ROLE_IDS.ADMIN, pendingReviews: 0 }))
     expect(empty).not.toContain("revisiones pendientes")

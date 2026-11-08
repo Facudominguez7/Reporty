@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  ArrowLeft,
   MapPin,
   Pencil,
   Calendar,
@@ -86,6 +87,7 @@ import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
 import { ReportContactActions, ReportContactDialog, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
+import { resolveReportesReturnTo } from "@/lib/reportes/navigation";
 import {
   actualizarReporteAdminAction,
   cambiarEstadoAdminAction,
@@ -214,6 +216,8 @@ export function ReporteDetalleClient({
   evidenciaReparacion = null,
 }: ReporteDetalleInicial) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const backHref = resolveReportesReturnTo(searchParams.get("returnTo"), "/reportes");
   const [isAdminEditing, setIsAdminEditing] = useState(false);
   const [adminDraft, setAdminDraft] = useState<AdminReportDraft | null>(null);
   const [adminBase, setAdminBase] = useState<AdminReportDraft | null>(null);
@@ -587,7 +591,7 @@ export function ReporteDetalleClient({
         <div className="text-center">
           <p className="text-lg text-muted-foreground">Reporte no encontrado</p>
           <Button asChild className="mt-4">
-            <Link href="/reportes">Volver a Reportes</Link>
+            <Link href={backHref}>Volver a Reportes</Link>
           </Button>
         </div>
       </div>
@@ -664,6 +668,7 @@ export function ReporteDetalleClient({
       <div className="page-container space-y-4 md:space-y-6 lg:space-y-8">
         <section className="space-y-3">
           <PageTitleBar
+            leading={<Button asChild variant="ghost" size="icon" aria-label="Volver" title="Volver"><Link href={backHref}><ArrowLeft className="size-4" aria-hidden="true" /></Link></Button>}
             icon={<FileSearch2 className="size-4" />}
             title="Detalle del reporte"
             description="Consultá el estado y los avances del reporte."

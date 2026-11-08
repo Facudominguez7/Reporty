@@ -15,6 +15,7 @@ import { ReportCard } from "@/components/report-card"
 import { Loader2 } from "lucide-react"
 import type { EstadoOperativo } from "@/lib/authz/catalog"
 import { Button } from "@/components/ui/button"
+import { buildReportesReturnTo } from "@/lib/reportes/navigation"
 
 export type ReportCardData = {
     id: number
@@ -58,6 +59,7 @@ export function ListaReportesClient({
 
     // Resetear cuando cambian los filtros (ajuste de estado durante el render)
     const paramsKey = searchParams.toString()
+    const returnTo = buildReportesReturnTo(paramsKey)
     if (prevParamsKey !== paramsKey) {
         setPrevParamsKey(paramsKey)
         setReports(initialReports)
@@ -126,6 +128,7 @@ export function ListaReportesClient({
                                  image={report.thumbnailImage ?? report.image}
                                  category={report.category}
                                  isReportListing
+                                 returnTo={returnTo}
                              />
                         ) : (
                             <ReportCard

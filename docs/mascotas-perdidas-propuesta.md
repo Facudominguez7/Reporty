@@ -4,8 +4,10 @@ Agregar publicaciones de mascotas perdidas a Reporty reutilizando la experiencia
 
 ## Navegación y creación
 
-- En el encabezado, **Crear** abre una elección: **Reportar un incidente** lleva a `/reportes/nuevo`; **Reportar una mascota perdida** lleva al formulario propio de mascotas.
-- En `/mapa`, el selector **Reportes / Mascotas** cambia la capa visible. El botón de creación se adapta a la pestaña activa y abre el formulario correspondiente.
+- Al presionar **Crear** en la barra de navegación inferior, abrir una nueva página de selección con dos botones relativamente grandes, uno para **Crear reporte/incidencia** y otro para **Cargar mascota perdida**. En mobile, apilarlos verticalmente; en desktop, ubicarlos uno al lado del otro. El primero lleva al flujo existente para crear un reporte (`/reportes/nuevo`); el segundo lleva a una página nueva con el formulario de publicación de mascota.
+- El formulario de mascota debe ser similar al formulario de reportes existente y reutilizar sus patrones donde corresponda.
+- Mantener en las páginas nuevas el formato visual existente del sistema: estilos, espaciado, botones, títulos y componentes compartidos. Revisar como referencia las páginas `/reportes`, `/auth` y `/comunidad`, y reutilizar el componente `PageTitleBar`.
+- En `/mapa`, centrar en la parte superior el selector **Reportes / Mascotas**, que cambia la capa visible. El botón flotante **+** debe ofrecer dos acciones: crear reporte/incidencia o cargar mascota perdida, cada una con su flujo correspondiente.
 - En el listado de `/reportes`, sumar pestañas **Incidentes / Mascotas**. Incidentes conserva su listado y filtros actuales; Mascotas muestra publicaciones de mascotas con su consulta y filtros propios. No combinar ambos tipos en una misma lista.
 - Las cards compactas de mascotas reutilizan casi el diseño de las cards actuales: foto, encabezado corto, fecha de publicación, descripción resumida y tags de tipo de animal y estado. El encabezado se genera con tipo y estado —por ejemplo, **Perro perdido**—; no se pide el nombre de la mascota. No mostrar categoría ni prioridad de incidente.
 
@@ -34,9 +36,12 @@ No pedir nombre de la mascota ni una fecha separada de pérdida.
 
 - Mantener mascotas en datos propios, separados de `reportes`, prioridades, votos y cuadrillas. La pestaña de mascotas del listado tiene filtros propios —tipo de animal y estado— y no altera los filtros de incidentes.
 - La publicación es pública mientras no se retire. El teléfono también es público por decisión de quien publica.
-- Quien publicó puede cambiar el estado de **Perdida** a **Encontrada**; administración puede editar la publicación completa, cambiar el estado o retirarla, igual que gestiona los reportes.
+- Solo una persona con cuenta registrada puede publicar una mascota perdida. Después de publicar, la persona autora no puede editar sus datos; solo puede marcarla como **Encontrada** (con un modal de confirmación) o retirar la publicación. El cambio de **Perdida** a **Encontrada** es unidireccional para la autora; administración puede editar la publicación completa, corregir el estado o retirarla.
+- Las mascotas encontradas siguen visibles sin vencimiento automático hasta que quien la publicó o administración retire la publicación. El retiro de la autora debe seguir el comportamiento existente de retiro de reportes, sujeto a verificar cómo funciona actualmente.
 - No permitir que cualquier visitante cambie el estado. No reutilizar **Reparado** ni el voto **No existe**.
 - Mantener moderación y retiro administrativo, adaptando los controles y textos que hoy dependen de reportes.
+- La comunidad se mantiene compartida para reportes y mascotas; por ahora no diferenciar publicaciones de mascotas en una comunidad separada.
+- Publicar una mascota otorga los mismos puntos que crear un reporte. Marcarla como **Encontrada** no otorga puntos adicionales. Si administración retira una publicación por moderación, revertir los puntos de creación siguiendo la misma regla que los reportes.
 
 ## Interacciones y avisos
 
@@ -51,12 +56,6 @@ No pedir nombre de la mascota ni una fecha separada de pérdida.
 - Cuadrillas, prioridades y estados municipales.
 - Incluir búsquedas de mascotas en métricas de reparación o desempeño municipal.
 - Nombre de mascota y fecha de pérdida como campos separados.
-
-## Decisiones por cerrar antes de implementar
-
-1. **Publicación por invitados:** los reportes actuales admiten invitados, pero hay que definir cómo se demuestra la autoría para que solo quien publicó pueda marcar la mascota como encontrada. Administración siempre conserva su capacidad de gestión.
-2. **Correo para invitados:** si se permiten, definir si se pide correo además del teléfono o si las notificaciones quedan disponibles solo para cuentas con email.
-3. **Retiro de la publicación:** acordar el comportamiento de una mascota encontrada en el mapa a largo plazo. En la primera versión debe seguir visible, tal como se acordó.
 
 ## Límites técnicos a considerar
 

@@ -16,6 +16,12 @@ import {
 } from "@/database/queries/reportes/get-reportes"
 import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/seo/site"
+import Link from "next/link"
+import { FiltrosMascotas } from "@/components/filtros-mascotas"
+import { EstadoMascotas } from "@/components/estado-mascotas"
+import { ListaMascotasClient } from "@/components/lista-mascotas-client"
+import { getMascotasListado, getMascotasStatusCounts } from "@/database/queries/mascotas/listado"
+import { BuscadorMascotas } from "@/components/buscador-mascotas"
 
 export const dynamic = "force-dynamic"
 
@@ -32,20 +38,27 @@ type ReportesPageProps = {
     categoria?: string
     estado?: string
     prioridad?: string
+    vista?: string
+    tipo?: string
+    estadoMascota?: string
+    searchMascota?: string
   }>
 }
 
 export default async function ReportesPage({ searchParams }: ReportesPageProps) {
   const params = await searchParams
-  const { search, categoria, estado, prioridad } = params
+  const { search, categoria, estado, prioridad, vista, tipo, estadoMascota, searchMascota } = params
+  const mascotas = vista === "mascotas"
 
   // Reports and filter options don't depend on each other, so they load at the same time.
   const [
     { data: reports, error, hasMore },
+    { data: pets, hasMore: petsHasMore, error: petsError },
     { data: categorias },
     { data: estados },
     { data: prioridades },
     statusCounts,
+    petStatusCounts,
   ] = await Promise.all([
     getReportCardData({
       search,
@@ -55,16 +68,18 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
       limite: 12,
       offset: 0,
     }, { includeAuthors: false }),
+    getMascotasListado({ tipo, estado: estadoMascota, search: searchMascota, limite: 12, offset: 0 }),
     getCategorias(),
     getEstados(),
     getPrioridades(),
     getReportStatusCounts({ search, categoria, prioridad }),
+    mascotas ? getMascotasStatusCounts({ tipo, search: searchMascota }) : Promise.resolve({ all: 0, lost: 0, found: 0 }),
   ])
 
   return (
     <div className="page-shell">
       <div className="page-container page-stack">
-        {error && (
+        {!mascotas && error && (
           <Alert variant="destructive">
             <AlertTriangle className="size-4" />
             <AlertTitle>No se pudieron cargar los reportes</AlertTitle>
@@ -73,6 +88,21 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
         )}
 
         <section className="incident-shell space-y-4 sm:space-y-5">
+          <nav aria-label="Tipo de publicaciones" className="card-shadow mx-auto flex w-fit max-w-full rounded-[var(--radius-pill)] bg-input p-1 !text-foreground">
+            <Link href={{ pathname: "/reportes", query: { search, categoria, estado, prioridad } }} aria-current={!mascotas ? "page" : undefined} className={`inline-flex min-h-9 items-center justify-center rounded-[var(--radius-pill)] px-4 py-1.5 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${!mascotas ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-background"}`}>Incidentes</Link>
+            <Link href={{ pathname: "/reportes", query: { ...params, vista: "mascotas" } }} aria-current={mascotas ? "page" : undefined} className={`inline-flex min-h-9 items-center justify-center rounded-[var(--radius-pill)] px-4 py-1.5 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${mascotas ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-background"}`}>Mascotas</Link>
+          </nav>
+          {mascotas ? <>
+          <PageTitleBar
+            icon={<MapPin className="size-4" />}
+            title="Mascotas perdidas"
+            description="Publicaciones aprobadas de mascotas perdidas y encontradas."
+            actions={<FiltrosMascotas />}
+          />
+          <BuscadorMascotas key={searchMascota ?? ""} />
+          <EstadoMascotas search={new URLSearchParams(Object.entries(params).filter((entry): entry is [string, string] => typeof entry[1] === "string")).toString()} counts={petStatusCounts} />
+          {petsError ? <Alert variant="destructive"><AlertTriangle className="size-4" /><AlertTitle>No se pudieron cargar las mascotas</AlertTitle><AlertDescription>Intenta nuevamente en unos minutos.</AlertDescription></Alert> : pets.length ? <ListaMascotasClient key={`${tipo ?? ""}:${estadoMascota ?? ""}:${searchMascota ?? ""}`} initialPets={pets} initialHasMore={petsHasMore} /> : <Card className="border-dashed"><CardContent className="space-y-2 p-4 text-center"><p className="text-lg font-semibold tracking-tight">No hay mascotas publicadas con esos criterios.</p><p className="text-sm text-muted-foreground">Probá cambiar los filtros.</p></CardContent></Card>}
+          </> : <>
           <PageTitleBar
             icon={<MapPin className="size-4" />}
             title="Incidentes reportados"
@@ -100,6 +130,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
               </CardContent>
             </Card>
           ) : null}
+          </>}
         </section>
       </div>
     </div>

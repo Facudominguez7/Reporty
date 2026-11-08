@@ -49,6 +49,7 @@ describe("Supabase Auth email templates", () => {
     "%s uses the shared Reporty layout served from the site",
     (_file, html) => {
       expect(html).toContain('src="{{ .SiteURL }}/email/reporty-logo.png"')
+      expect(html).not.toContain('<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">')
       expect(html).toContain("url('{{ .SiteURL }}/email/posadas-mapa.jpg')")
       expect(html).toContain('<html lang="es">')
       expect(html).toContain("{{ if .Data.name }}")

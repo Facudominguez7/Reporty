@@ -28,7 +28,7 @@ export default async function PaginaModeracion({ searchParams }: { searchParams:
       <Link href="/dashboard" className="text-sm underline">Volver al dashboard</Link>
       <p className="text-sm text-muted-foreground">Administración · Evidencia privada</p>
       <h1 className="text-3xl font-semibold tracking-tight">Moderación de fotografías</h1>
-      <p className="text-muted-foreground">Revisá el contexto antes de publicar. Rechazar retira el reporte, revierte su premio de creación registrado y genera una advertencia privada al autor.</p>
+      <p className="text-muted-foreground">Revisá el contexto antes de publicar fotos de reportes y mascotas. Rechazar una foto de mascota impide su creación; retirar una publicación existente revierte su premio una sola vez.</p>
     </header>
     <nav aria-label="Vistas de moderación" className="flex flex-wrap gap-4">
       <Link className="underline" aria-current={!terminales ? "page" : undefined} href="/dashboard/moderacion">Revisión y publicación pendientes</Link>
@@ -38,7 +38,7 @@ export default async function PaginaModeracion({ searchParams }: { searchParams:
     <nav aria-label="Páginas de moderación" className="flex items-center gap-4">
       {pagina > 0 ? <Link className="underline" href={`?pagina=${pagina - 1}${sufijo}`}>Anterior</Link> : null}
       <span>Página {pagina + 1}</span>
-      {imagenes.length === 20 && pagina < 500 ? <Link className="underline" href={`?pagina=${pagina + 1}${sufijo}`}>Siguiente</Link> : null}
+      {imagenes.length >= 20 && pagina < 500 ? <Link className="underline" href={`?pagina=${pagina + 1}${sufijo}`}>Siguiente</Link> : null}
     </nav>
   </div></main>
 }

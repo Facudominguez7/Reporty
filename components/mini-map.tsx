@@ -2,6 +2,7 @@
 
 import { MapContainer as RLMapContainer, TileLayer, CircleMarker } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map/initial-view"
 
 type MiniMapProps = {
   lat: number
@@ -32,8 +33,8 @@ export function MiniMap({ lat, lon }: MiniMapProps) {
         touchZoom={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={MAP_TILE_ATTRIBUTION}
+          url={MAP_TILE_URL}
         />
         <CircleMarker
           center={center}

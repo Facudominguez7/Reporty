@@ -28,7 +28,15 @@ export type InitialMapView = {
   centerTile: [x: number, y: number]
 }
 
-export const MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+export const MAP_TILE_URL = process.env.NEXT_PUBLIC_CARTO_API_KEY
+  ? `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_CARTO_API_KEY}`
+  : "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+export const MAP_TILE_ATTRIBUTION = process.env.NEXT_PUBLIC_CARTO_API_KEY
+  ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://www.carto.com/attributions">CARTO</a>'
+  : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+export const MAP_TILE_ORIGIN = process.env.NEXT_PUBLIC_CARTO_API_KEY
+  ? "https://basemaps.cartocdn.com"
+  : "https://tile.openstreetmap.org"
 
 /** Panning bounds for the reports map, extended east to include Candelaria. */
 export const POSADAS_BOUNDS: MapBounds = [-27.59, -56.06, -27.32, -55.6]

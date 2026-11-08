@@ -128,7 +128,7 @@ export async function limpiarImagenModerada(supabase: SupabaseClient, id: string
 }
 
 /** Reconoce únicamente ausencia inequívoca; limita a 4 KiB y 500 ms el cuerpo original del SDK. */
-async function esObjetoAusente(error: unknown): Promise<boolean> {
+export async function esObjetoAusente(error: unknown): Promise<boolean> {
   if (!error || typeof error !== "object") return false
   const detalle = error as { statusCode?: unknown; status?: unknown; name?: unknown; originalError?: unknown }
   const codigo = detalle.statusCode ?? detalle.status

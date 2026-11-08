@@ -18,6 +18,7 @@ import { MousePointer2 } from "lucide-react"
 
 import { getPriorityColor } from "@/components/report-card"
 import type { EstadoOperativo } from "@/lib/authz/catalog"
+import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 
 /**
  * Interfaz que representa un reporte con sus datos para visualizar en el mapa
@@ -46,6 +47,8 @@ interface MapContainerProps {
   showLegend?: boolean
   /** Modo selección: se propaga a `LeafletMap` para avisar qué reporte se eligió al hacer click. */
   onSeleccionarReporte?: (reporteId: number) => void
+  mascotas?: MascotaMapa[]
+  layer?: "reportes" | "mascotas"
 }
 
 /**
@@ -55,14 +58,14 @@ interface MapContainerProps {
  * @param showLegend - Indica si se debe mostrar la leyenda de colores; por defecto `true`
  * @returns El elemento JSX que contiene el mapa y sus superposiciones (leyenda e instrucciones)
  */
-export function MapContainer({ reports, showLegend = true, onSeleccionarReporte }: MapContainerProps) {
+export function MapContainer({ reports, mascotas = [], layer = "reportes", showLegend = true, onSeleccionarReporte }: MapContainerProps) {
   return (
     <div className="relative w-full h-full">
       {/* Componente principal del mapa de Leaflet */}
-      <LeafletMap reports={reports} onSeleccionarReporte={onSeleccionarReporte} />
+      <LeafletMap reports={layer === "reportes" ? reports : []} mascotas={layer === "mascotas" ? mascotas : []} onSeleccionarReporte={onSeleccionarReporte} />
 
       {/* Leyenda de colores flotante - Ajustada para mobile */}
-      {showLegend && (
+      {showLegend && layer === "reportes" && (
         <div className="map-legend-card absolute bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 z-10 max-w-[140px] sm:left-5 md:max-w-[160px]">
           <h4 className="font-semibold text-xs md:text-sm mb-2 md:mb-3">Prioridad</h4>
           <div className="space-y-1.5 md:space-y-2">

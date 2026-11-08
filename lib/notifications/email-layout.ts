@@ -193,13 +193,7 @@ export function renderEmailLayout({ assetBaseUrl, title, preheader, kicker, head
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
             <tr>
               <td align="center" background="${mapUrl}" class="rp-rise" style="height:168px;padding:0 16px;vertical-align:middle;border-radius:32px 32px 0 0;background-color:${EMAIL_COLORS.background};background-image:url('${mapUrl}');background-position:center top;background-size:cover;background-repeat:no-repeat;">
-                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
-                  <tr>
-                    <td style="padding:12px 22px;border-radius:999px;background:${EMAIL_COLORS.card};border:1px solid ${EMAIL_COLORS.border};">
-                      <img src="${logoUrl}" width="128" height="32" alt="Reporty" style="display:block;width:128px;height:32px;border:0;">
-                    </td>
-                  </tr>
-                </table>
+                <img src="${logoUrl}" width="128" height="32" alt="Reporty" style="display:block;width:128px;height:32px;margin:0 auto;border:0;">
                 ${monoLabel("p", "Posadas · Misiones", EMAIL_COLORS.accentForeground, "margin:12px 0 0 0;")}
               </td>
             </tr>

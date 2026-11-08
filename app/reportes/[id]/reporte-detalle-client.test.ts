@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
   usePathname: () => "/reportes/9",
+  // La ficha lee `returnTo` para el botón «Volver» (main): sin parámetros vuelve a /reportes.
+  useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) =>

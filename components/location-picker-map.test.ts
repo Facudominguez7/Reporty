@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 
 const mapMocks = vi.hoisted(() => ({
   setView: vi.fn(),
+  click: null as null | ((event: { latlng: { lat: number; lng: number }; originalEvent: { target: null } }) => void),
 }))
 
 vi.mock("react", async (importOriginal) => {
@@ -17,7 +18,7 @@ vi.mock("react-leaflet", async () => {
     MapContainer: ({ children }: { children?: ReactNode }) => createElement("div", null, children),
     TileLayer: () => null,
     Marker: () => null,
-    useMapEvents: () => ({ setView: mapMocks.setView, getZoom: () => 16 }),
+    useMapEvents: (events: { click: typeof mapMocks.click }) => { mapMocks.click = events.click; return { setView: mapMocks.setView, getZoom: () => 16 } },
   }
 })
 vi.mock("leaflet/dist/leaflet.css", () => ({}))
@@ -62,5 +63,21 @@ describe("LocationPickerMap", () => {
     }))
 
     expect(mapMocks.setView).toHaveBeenCalledWith([location.lat, location.lon], 13)
+  })
+
+  it("exposes a keyboard-operable center selection only when requested", () => {
+    expect(renderToStaticMarkup(createElement(LocationPickerMap, { onLocationSelect: vi.fn() }))).not.toContain("Seleccionar centro del mapa")
+    expect(renderToStaticMarkup(createElement(LocationPickerMap, { onLocationSelect: vi.fn(), keyboardSelection: true }))).toContain("Seleccionar centro del mapa")
+  })
+
+  it("selects map clicks inside coverage and rejects points outside it", () => {
+    const onLocationSelect = vi.fn()
+    renderToStaticMarkup(createElement(LocationPickerMap, { onLocationSelect }))
+    vi.stubGlobal("Element", class {})
+    mapMocks.click?.({ latlng: { lat: -27.3671, lng: -55.8961 }, originalEvent: { target: null } })
+    mapMocks.click?.({ latlng: { lat: 0, lng: 0 }, originalEvent: { target: null } })
+    vi.unstubAllGlobals()
+    expect(onLocationSelect).toHaveBeenCalledTimes(1)
+    expect(onLocationSelect).toHaveBeenCalledWith(-27.3671, -55.8961)
   })
 })

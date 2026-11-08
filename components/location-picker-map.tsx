@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet"
 import L from "leaflet"
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map/initial-view"
 import "leaflet/dist/leaflet.css"
 import { toast } from "sonner"
 import { useMounted } from "@/hooks/use-mounted"
@@ -29,6 +30,7 @@ interface LocationPickerMapProps {
   initialLon?: number | null
   heightClassName?: string
   preserveZoomOnSelection?: boolean
+  keyboardSelection?: boolean
 }
 
 /**
@@ -41,7 +43,7 @@ interface LocationPickerMapProps {
  * @param initialLon - Longitud inicial del marcador; se usa junto con `initialLat` para posicionar el marcador inicial
  * @returns El componente `Marker` posicionado en las coordenadas seleccionadas, o `null` si no hay posición definida
  */
-function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoomOnSelection }: LocationPickerMapProps) {
+function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoomOnSelection, keyboardSelection }: LocationPickerMapProps) {
   const [position, setPosition] = useState<[number, number] | null>(
     initialLat != null && initialLon != null ? [initialLat, initialLon] : null
   )
@@ -54,9 +56,7 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoom
     }
   }
 
-  const map = useMapEvents({
-    click(e) {
-      const { lat, lng } = e.latlng
+  function selectLocation(lat: number, lng: number) {
       
       if (!isWithinReportCoverage(lat, lng)) {
         toast.error("Ubicación fuera del área de cobertura", {
@@ -72,6 +72,12 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoom
       toast.success("Ubicación seleccionada", {
         description: `Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`
       })
+  }
+
+  const map = useMapEvents({
+    click(e) {
+      if (e.originalEvent.target instanceof Element && e.originalEvent.target.closest("button")) return
+      selectLocation(e.latlng.lat, e.latlng.lng)
     },
   })
 
@@ -81,7 +87,10 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoom
     }
   }, [initialLat, initialLon, map, preserveZoomOnSelection])
 
-  return position ? <Marker position={position} icon={markerIcon} /> : null
+  return <>
+    {position && <Marker position={position} icon={markerIcon} />}
+    {keyboardSelection && <button type="button" className="absolute bottom-2 left-2 z-[1000] rounded-md border bg-background px-3 py-2 text-xs font-medium shadow" onClick={(event) => { event.stopPropagation(); const center = map.getCenter(); selectLocation(center.lat, center.lng) }}>Seleccionar centro del mapa</button>}
+  </>
 }
 
 /**
@@ -96,7 +105,7 @@ function LocationMarker({ onLocationSelect, initialLat, initialLon, preserveZoom
  * @param heightClassName - Altura opcional; por defecto conserva los 400px existentes
  * @returns El elemento React que renderiza el mapa y su interfaz de selección de ubicación
  */
-export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, heightClassName = "h-[400px]", preserveZoomOnSelection = false }: LocationPickerMapProps) {
+export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, heightClassName = "h-[400px]", preserveZoomOnSelection = false, keyboardSelection = false }: LocationPickerMapProps) {
   const mounted = useMounted()
 
   if (!mounted) {
@@ -115,6 +124,7 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, he
   return (
     <div className={cn("w-full rounded-lg overflow-hidden border-2 border-muted relative z-0", heightClassName)}>
       <MapContainer
+        aria-label={keyboardSelection ? "Mapa de ubicación; usá las flechas para moverlo" : undefined}
         center={defaultCenter}
         zoom={13}
         style={{ height: "100%", width: "100%", zIndex: 0 }}
@@ -126,14 +136,15 @@ export function LocationPickerMap({ onLocationSelect, initialLat, initialLon, he
         maxZoom={MAP_MAX_ZOOM}
       >
         <TileLayer
-          attribution={`&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="${REPORT_COVERAGE_SOURCE.url}">${REPORT_COVERAGE_SOURCE.attribution}</a>`}
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={`${MAP_TILE_ATTRIBUTION} · <a href="${REPORT_COVERAGE_SOURCE.url}">${REPORT_COVERAGE_SOURCE.attribution}</a>`}
+          url={MAP_TILE_URL}
         />
         <LocationMarker
           onLocationSelect={onLocationSelect}
           initialLat={initialLat}
           initialLon={initialLon}
           preserveZoomOnSelection={preserveZoomOnSelection}
+          keyboardSelection={keyboardSelection}
         />
       </MapContainer>
     </div>

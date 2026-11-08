@@ -1,14 +1,15 @@
 /** Pruebas de autorización DB, lectura privada y decisiones administrativas CAS. */
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createHash } from "node:crypto"
-const dobles = vi.hoisted(() => ({ sesion: vi.fn(), servicio: vi.fn(), rol: vi.fn(), publicar: vi.fn(), limpiar: vi.fn(), avisar: vi.fn() }))
+const dobles = vi.hoisted(() => ({ sesion: vi.fn(), servicio: vi.fn(), rol: vi.fn(), publicar: vi.fn(), limpiar: vi.fn(), avisar: vi.fn(), preparar: vi.fn() }))
 vi.mock("./avisos-retiro.server", () => ({ enviarAvisoRetiro: dobles.avisar, VENTANA_REINTENTO_MS: (24 * 60 - 5) * 60000 }))
 vi.mock("server-only", () => ({}))
 vi.mock("@/utils/supabase/server", () => ({ createClient: dobles.sesion }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: dobles.servicio }))
+vi.mock("@/lib/media/preparar-imagen-reporte.server", () => ({ prepararImagenReporte: dobles.preparar }))
 vi.mock("@/lib/authz/roles", async (original) => ({ ...await original<object>(), getUserRoleContext: dobles.rol }))
 vi.mock("./imagenes-reporte.server", () => ({ publicarImagenModerada: dobles.publicar, limpiarImagenModerada: dobles.limpiar }))
-import { autorizarAdministracion, listarImagenesAdministrativas, obtenerImagenPrivada, ejecutarRevision } from "./administracion.server"
+import { autorizarAdministracion, listarImagenesAdministrativas, obtenerImagenPrivada, ejecutarRevision, editarMascotaAdministrativamente } from "./administracion.server"
 const id = "e1a3f644-9c40-4a40-9000-000000000001"
 const bytes = Buffer.from("RIFF0000WEBPimagen")
 let fila: Record<string, unknown>
@@ -18,21 +19,43 @@ let descarga: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.clearAllMocks()
   fila = { id, reporte_id: 7, decision: "REVIEW", estado_publicacion: "pendiente", motivos: [], token: "token-original", path_privado: "privado", hash_sha256: createHash("sha256").update(bytes).digest("hex"), reemplaza_foto_id: null }
-  consulta = Object.fromEntries(["select", "eq", "in", "order", "range"].map((clave) => [clave, vi.fn()]))
+  consulta = Object.fromEntries(["select", "eq", "in", "is", "or", "limit", "order", "range"].map((clave) => [clave, vi.fn()]))
   for (const metodo of Object.values(consulta)) metodo.mockReturnValue(consulta)
   consulta.single = vi.fn(async () => ({ data: fila, error: null }))
   consulta.maybeSingle = vi.fn(async () => ({ data: fila, error: null }))
   consulta.range.mockImplementation(async () => ({ data: [fila], error: null }))
   rpc = vi.fn(async () => ({ data: true, error: null }))
   descarga = vi.fn(async () => ({ data: new Blob([bytes]), error: null }))
-  dobles.sesion.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-verificado", user_metadata: { rol_id: 1 } } }, error: null }) } })
+  dobles.preparar.mockResolvedValue({ original: bytes, miniatura: bytes })
+  dobles.sesion.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: { id: "admin-verificado", user_metadata: { rol_id: 1 } } }, error: null }) }, rpc })
   dobles.rol.mockResolvedValue({ data: { roleId: 1 }, error: null })
-  dobles.servicio.mockReturnValue({ from: vi.fn(() => consulta), rpc, storage: { from: vi.fn(() => ({ download: descarga })) } })
+  dobles.servicio.mockReturnValue({ from: vi.fn(() => consulta), rpc, storage: { from: vi.fn(() => ({ download: descarga, upload: vi.fn(async () => ({ error: null })), remove: vi.fn(async () => ({ error: null })), getPublicUrl: vi.fn(() => ({ data: { publicUrl: "https://example.invalid/photo" } })) })) } })
   dobles.publicar.mockResolvedValue({ publicada: true, advertencias: [] })
   dobles.limpiar.mockResolvedValue([])
   dobles.avisar.mockResolvedValue("pendiente")
 })
+afterEach(() => vi.unstubAllGlobals())
+
 describe("frontera administrativa", () => {
+  it.each(["12a3", "+123", "12 3", "123-4"])("rejects invalid phone %s before DB access", async (telefono) => {
+    await expect(editarMascotaAdministrativamente({ id: 9, tipoAnimal: "perro", descripcion: "Edit", lat: 0, lon: 0, telefono, estado: "perdida" })).rejects.toMatchObject({ estado: 400 })
+    expect(rpc).not.toHaveBeenCalled()
+  })
+  it("admin edits allowed fields via authenticated RPC, not service-role writes", async () => {
+    const input = { id: 9, tipoAnimal: "gato" as const, descripcion: "Revisada", lat: -34, lon: -56, telefono: "555123", estado: "perdida" as const }
+    expect(await editarMascotaAdministrativamente(input)).toMatchObject({ exito: true, mascotaId: 9 })
+    expect(rpc).toHaveBeenCalledWith("editar_mascota_moderacion", {
+      p_mascota_id: 9, p_tipo_animal: "gato", p_descripcion: "Revisada", p_lat: -34, p_lon: -56, p_telefono: "555123", p_estado: "perdida",
+    })
+    expect(dobles.servicio.mock.results[0].value.from).not.toHaveBeenCalled()
+  })
+  it("non-admin cannot edit and invalid required fields never reach DB", async () => {
+    dobles.rol.mockResolvedValue({ data: { roleId: 2 }, error: null })
+    await expect(editarMascotaAdministrativamente({ id: 9, tipoAnimal: "perro", descripcion: "Edit", lat: 0, lon: 0, telefono: "555", estado: "encontrada" })).rejects.toMatchObject({ estado: 403 })
+    dobles.rol.mockResolvedValue({ data: { roleId: 1 }, error: null })
+    await expect(editarMascotaAdministrativamente({ id: 9, tipoAnimal: "perro", descripcion: "  ", lat: 0, lon: 0, telefono: "555", estado: "perdida" })).rejects.toMatchObject({ estado: 400 })
+    expect(rpc).not.toHaveBeenCalled()
+  })
   it.each([2, 3, 4, 5, null])("niega rol DB %s aunque metadata diga Admin antes del servicio", async (roleId) => {
     dobles.rol.mockResolvedValue({ data: { roleId }, error: null })
     await expect(autorizarAdministracion()).rejects.toMatchObject({ estado: 403 })
@@ -61,7 +84,8 @@ describe("frontera administrativa", () => {
   it("lista acotada ordenada no serializa secretos ni rutas", async () => {
     const lista = await listarImagenesAdministrativas(2)
     expect(consulta.range).toHaveBeenCalledWith(40, 59)
-    expect(consulta.order.mock.calls).toEqual([["creado_at", { ascending: true }], ["id", { ascending: true }]])
+    expect(consulta.order.mock.calls).toContainEqual(["creado_at", { ascending: true }])
+    expect(consulta.order.mock.calls).toContainEqual(["id", { ascending: true }])
     expect(consulta.select.mock.calls[0][0]).not.toContain("*")
     expect(JSON.stringify(lista)).not.toMatch(/privado|token|sha256/)
   })
