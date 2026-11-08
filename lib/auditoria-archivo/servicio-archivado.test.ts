@@ -338,6 +338,42 @@ describe("ejecutarArchivado en modo real", () => {
     expect(datos.eliminarOrigen).not.toHaveBeenCalled()
   })
 
+  it("falla el lote sin subir nada si mezcla eventos de dos meses", async () => {
+    const { cliente, send } = s3Falso()
+    const mezclados: EventoAuditoria[] = [
+      { ...eventos[0], occurred_at: "2025-10-31T23:59:59+00:00" },
+      { ...eventos[1], occurred_at: "2025-11-01T00:00:00+00:00" },
+    ]
+    const { datos, estado } = datosFalsos({
+      eventosDelLote: mezclados,
+      reclamar: { ...lote, primeraFecha: mezclados[0].occurred_at, ultimaFecha: mezclados[1].occurred_at },
+    })
+
+    const resumen = await ejecutarArchivado(real, dependencias(cliente, datos))
+
+    expect(resumen.ok).toBe(false)
+    expect(resumen.error).toMatch(/mes/i)
+    expect(estado.estado).toBe("fallido")
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it("acepta un lote que termina en el último instante del mes en UTC", async () => {
+    const { cliente } = s3Falso()
+    const mismoMes: EventoAuditoria[] = [
+      { ...eventos[0], occurred_at: "2025-10-01T00:00:00+00:00" },
+      { ...eventos[1], occurred_at: "2025-10-31T23:59:59.999+00:00" },
+    ]
+    const { datos } = datosFalsos({
+      eventosDelLote: mismoMes,
+      reclamar: { ...lote, primeraFecha: mismoMes[0].occurred_at, ultimaFecha: mismoMes[1].occurred_at },
+    })
+
+    const resumen = await ejecutarArchivado(real, dependencias(cliente, datos))
+
+    expect(resumen.ok).toBe(true)
+    expect(resumen.archivo?.ruta).toMatch(/^audit\/v1\/2025\/10\//)
+  })
+
   it("falla el lote sin subir nada cuando los eventos reclamados ya no coinciden", async () => {
     const { cliente, send } = s3Falso()
     const { datos, estado } = datosFalsos({ eventosDelLote: [eventos[0]] })

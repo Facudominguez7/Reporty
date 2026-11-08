@@ -26,7 +26,7 @@ panel `/admin/auditoria`.
 | Servicio de recuperación | `lib/auditoria-archivo/servicio-recuperacion.ts` |
 | Ejecución programada y manual | `app/api/cron/auditoria-archivo/route.ts` |
 | Descarga autorizada | `app/api/admin/auditoria/archivo/[id]/descarga/route.ts` |
-| Migraciones | `supabase/migrations/20261110120000_auditoria_archivo_r2.sql`, `20261110120100_auditoria_archivo_api.sql`, `20261110120200_auditoria_archivo_recuperacion.sql` |
+| Migraciones | `supabase/migrations/20261110120000_auditoria_archivo_r2.sql`, `20261110120100_auditoria_archivo_api.sql`, `20261110120200_auditoria_archivo_recuperacion.sql`, `20261110120300_auditoria_archivo_lote_mensual.sql` |
 | Contrato SQL | `supabase/tests/auditoria_archivo_r2.sql` (`scripts/local-supabase/test-auditoria-archivo.sh`) |
 
 Tablas:
@@ -52,6 +52,12 @@ reporty-audit-archive/
   audit/v1/2026/11/audit-{primer_id}-{ultimo_id}-{hash}.jsonl.gz
 ```
 
+- `AAAA/MM` es el **mes de los eventos** (UTC), no la fecha en que se archivó.
+  Cada lote contiene eventos de un único mes calendario: el reclamo se corta en el
+  límite de mes, y el servicio rechaza cualquier lote que mezcle meses antes de
+  subir nada. Con 180 días de retención, una corrida de noviembre de 2026 escribe
+  en `2026/05`. La fecha de archivado queda en `audit_archives.ejecutado_en` y
+  `verificado_en`.
 - `{hash}` son los primeros 16 caracteres hexadecimales del SHA-256 del archivo
   comprimido: el nombre es content-addressed, así que reintentar la misma subida
   produce la misma ruta y **no** crea objetos duplicados.
@@ -315,6 +321,11 @@ de esos límites. El plan de Supabase no cambia: el archivado reduce filas.
   `audit_archives` y en las acciones `audit_archive_*`.
 - El máximo por lote (5000) acota memoria y tiempo: un volumen mayor necesita más
   corridas, no lotes más grandes.
+- Cada corrida archiva **un lote** (un mes, o una parte de un mes muy grande). Con
+  el cron semanal eso alcanza para el volumen actual (~1 mes nuevo cada 4 semanas),
+  pero un atraso de varios meses —por ejemplo, la primera vez que se active en una
+  base con historia— se recupera de a un mes por corrida: se puede acelerar
+  llamando el `POST` varias veces seguidas a mano.
 - La descarga administrativa exige rol Admin verificado en el servidor; un ID de
   lote inválido o ajeno se rechaza antes de consultar R2 (anti-IDOR).
 - La primera ejecución real sobre una tabla reciente no archiva nada: es correcto.

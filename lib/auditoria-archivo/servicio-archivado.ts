@@ -147,6 +147,21 @@ function mensajeOperativo(error: unknown): string {
   return `${nombre}: ${detalle}`.replace(/\s+/g, " ").slice(0, LONGITUD_ERROR_MAXIMA)
 }
 
+/**
+ * Indica si todas las fechas caen en el mismo mes calendario UTC.
+ *
+ * @param fechas fechas ISO 8601 de los eventos del lote.
+ */
+export function mismoMesUtc(fechas: string[]): boolean {
+  const meses = new Set(
+    fechas.map((fecha) => {
+      const valor = new Date(fecha)
+      return Number.isNaN(valor.getTime()) ? "invalida" : `${valor.getUTCFullYear()}-${valor.getUTCMonth()}`
+    }),
+  )
+  return meses.size <= 1 && !meses.has("invalida")
+}
+
 function acotarLimite(valor: number | undefined, porDefecto: number): number {
   const pedido = Number.isSafeInteger(valor) && (valor as number) > 0 ? (valor as number) : porDefecto
   return Math.min(Math.max(pedido, 1), LIMITE_LOTE_MAXIMO)
@@ -262,6 +277,12 @@ export async function ejecutarArchivado(
       throw new Error(
         `El lote reclamó ${lote.cantidadRegistros} eventos y se leyeron ${eventos.length}`,
       )
+    }
+    // La ruta del objeto usa el año y el mes del primer evento: un lote que
+    // mezcle meses dejaría eventos en la carpeta equivocada. La base ya corta por
+    // mes; esta guarda impide subir nada si alguna vez no lo hiciera.
+    if (!mismoMesUtc(eventos.map((evento) => evento.occurred_at))) {
+      throw new Error("El lote mezcla eventos de más de un mes calendario (UTC)")
     }
 
     // 5. JSON Lines, GZIP y hash de integridad sobre los bytes comprimidos.
