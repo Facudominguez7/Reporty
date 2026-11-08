@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const autorizar = vi.hoisted(() => vi.fn())
 vi.mock("server-only", () => ({}))
@@ -60,9 +60,57 @@ const IMPUGNACION_ID = "11111111-1111-4111-8111-111111111111"
 const EVIDENCIA_ID = "22222222-2222-4222-8222-222222222222"
 const OTRA_EVIDENCIA_ID = "33333333-3333-4333-8333-333333333333"
 
-type FilaReporte = { id: number; titulo: string; estado_id: number; deleted_at: string | null }
+type FilaFoto = {
+  url: string | null
+  bucket: string | null
+  path: string | null
+  thumbnail_url: string | null
+  thumbnail_bucket: string | null
+  thumbnail_path: string | null
+}
 
-const reporte: FilaReporte = { id: 9, titulo: "Bache en Av. Uruguay y Bolívar", estado_id: 1, deleted_at: null }
+type FilaReporte = {
+  id: number
+  titulo: string
+  estado_id: number
+  deleted_at: string | null
+  fotos_reporte?: FilaFoto[]
+}
+
+const URL_SUPABASE = "https://proyecto.supabase.co"
+const BUCKET = `${URL_SUPABASE}/storage/v1/object/public/reportes`
+
+/** Fila canónica: guarda bucket y path, con la URL legacy vacía. */
+function fotoCanonica(prefijo: string): FilaFoto {
+  return {
+    url: null,
+    bucket: "reportes",
+    path: `${prefijo}.webp`,
+    thumbnail_url: null,
+    thumbnail_bucket: "reportes",
+    thumbnail_path: `${prefijo}-miniatura.webp`,
+  }
+}
+
+/** Fila legacy: guarda solo la URL pública del objeto. */
+function fotoLegacy(prefijo: string): FilaFoto {
+  return {
+    url: `${BUCKET}/${prefijo}.jpg`,
+    bucket: null,
+    path: null,
+    thumbnail_url: null,
+    thumbnail_bucket: null,
+    thumbnail_path: null,
+  }
+}
+
+const reporte: FilaReporte = {
+  id: 9,
+  titulo: "Bache en Av. Uruguay y Bolívar",
+  estado_id: 1,
+  deleted_at: null,
+  fotos_reporte: [fotoCanonica("original")],
+}
 
 function impugnacionPendiente(extra: { estadoEvidencia?: string; reporte?: FilaReporte } = {}) {
   return {
@@ -89,18 +137,24 @@ function contadores() {
   ]
 }
 
-function evidenciaFila(estado: string) {
+function evidenciaFila(estado: string, foto: FilaFoto | null = fotoCanonica("evidencias/reparado")) {
   return {
     id: EVIDENCIA_ID,
     reporte_id: 9,
     comentario: "Ya lo arreglaron",
     estado,
     publicada_at: "2026-11-02T10:00:00Z",
+    ...(foto ?? {}),
     reportes: reporte,
   }
 }
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", URL_SUPABASE)
+})
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe("cola administrativa de reparaciones: impugnaciones pendientes", () => {
   it("lista solo impugnaciones pendientes de evidencias en verificación, de la más antigua a la más reciente", async () => {
@@ -179,6 +233,10 @@ describe("cola administrativa de reparaciones: evidencias", () => {
       titulo: "Bache en Av. Uruguay y Bolívar",
       comentario: "Ya lo arreglaron",
       publicadaAt: "2026-11-02T10:00:00Z",
+      fotoEvidencia: `${BUCKET}/evidencias/reparado.webp`,
+      miniaturaEvidencia: `${BUCKET}/evidencias/reparado-miniatura.webp`,
+      fotoReporte: `${BUCKET}/original.webp`,
+      miniaturaReporte: `${BUCKET}/original-miniatura.webp`,
       confirmaciones: 2,
       impugnaciones: 2,
       impugnacionesPendientes: 1,
@@ -227,6 +285,70 @@ describe("cola administrativa de reparaciones: acceso", () => {
     await expect(listarImpugnacionesPendientes(0)).rejects.toMatchObject({ estado: 403 })
     await expect(listarEvidenciasEnVerificacion(0)).rejects.toMatchObject({ estado: 403 })
     await expect(listarEvidenciasValidadas(0)).rejects.toMatchObject({ estado: 403 })
+  })
+
+  it("resuelve la foto de la evidencia y la foto original del reporte para que se juzgue la irregularidad en la cola", async () => {
+    const { servicio, registros } = crearServicio([
+      { contiene: "publicada_at", datos: [evidenciaFila("en_verificacion")] },
+      { contiene: "tipo,estado", datos: [] },
+    ])
+    autorizar.mockResolvedValue({ servicio })
+
+    const [fila] = await listarEvidenciasEnVerificacion(0)
+    expect(fila.fotoEvidencia).toBe(`${BUCKET}/evidencias/reparado.webp`)
+    expect(fila.miniaturaEvidencia).toBe(`${BUCKET}/evidencias/reparado-miniatura.webp`)
+    expect(fila.fotoReporte).toBe(`${BUCKET}/original.webp`)
+    expect(fila.miniaturaReporte).toBe(`${BUCKET}/original-miniatura.webp`)
+    expect(registroCon(registros, "publicada_at").seleccion).toContain("fotos_reporte(")
+  })
+
+  it("acepta filas legacy que solo guardan la URL y evidencia publicada sin fotos", async () => {
+    const legacy = { ...reporte, fotos_reporte: [fotoLegacy("original")] }
+    const { servicio } = crearServicio([
+      {
+        contiene: "publicada_at",
+        datos: [
+          { ...evidenciaFila("en_verificacion", fotoLegacy("evidencias/reparado")), reportes: legacy },
+          { ...evidenciaFila("validada", null), id: OTRA_EVIDENCIA_ID, reportes: { ...legacy, fotos_reporte: [] } },
+        ],
+      },
+      { contiene: "tipo,estado", datos: [] },
+    ])
+    autorizar.mockResolvedValue({ servicio })
+
+    const [conFoto, sinFoto] = await listarEvidenciasEnVerificacion(0)
+    expect(conFoto).toMatchObject({
+      fotoEvidencia: `${BUCKET}/evidencias/reparado.jpg`,
+      miniaturaEvidencia: null,
+      fotoReporte: `${BUCKET}/original.jpg`,
+      miniaturaReporte: null,
+    })
+    expect(sinFoto).toMatchObject({
+      fotoEvidencia: null,
+      miniaturaEvidencia: null,
+      fotoReporte: null,
+      miniaturaReporte: null,
+    })
+  })
+
+  it("reintenta con la selección legacy cuando la base todavía no tiene bucket, path y miniaturas", async () => {
+    const { servicio, registros } = crearServicio([
+      { contiene: "thumbnail_path", datos: null, error: { message: "column fotos_reporte.thumbnail_path does not exist" } },
+      {
+        contiene: "publicada_at",
+        datos: [{ ...evidenciaFila("en_verificacion", fotoLegacy("evidencias/reparado")), reportes: { ...reporte, fotos_reporte: [fotoLegacy("original")] } }],
+      },
+      { contiene: "tipo,estado", datos: [] },
+    ])
+    autorizar.mockResolvedValue({ servicio })
+
+    const [fila] = await listarEvidenciasEnVerificacion(0)
+    expect(fila.fotoEvidencia).toBe(`${BUCKET}/evidencias/reparado.jpg`)
+
+    const selecciones = registros.filter((registro) => registro.seleccion.includes("publicada_at"))
+    expect(selecciones).toHaveLength(2)
+    expect(selecciones[0].seleccion).toContain("thumbnail_path")
+    expect(selecciones[1].seleccion).not.toContain("thumbnail_path")
   })
 
   it("falla explícitamente cuando la consulta de contadores devuelve error", async () => {

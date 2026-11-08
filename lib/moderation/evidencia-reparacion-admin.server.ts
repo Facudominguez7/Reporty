@@ -3,21 +3,43 @@
  *
  * Tres vistas separadas para no mezclar tipos de decisión: impugnaciones
  * pendientes, evidencias en verificación y reparaciones validadas que todavía se
- * pueden revertir. Solo devuelve datos agregados: nunca identidades de quienes
- * confirmaron o impugnaron, ni correos, ni rutas internas.
+ * pueden revertir. Devuelve datos agregados y las URLs públicas de las fotos
+ * necesarias para juzgar la evidencia: nunca identidades de quienes confirmaron o
+ * impugnaron, ni correos, ni rutas internas.
  */
 import "server-only"
 
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog"
+import {
+  isMissingReportImageColumnsError,
+  resolveReportImageRows,
+  resolveReportImageThumbnailUrl,
+  resolveReportImageUrl,
+  type ReportImageRow,
+} from "@/lib/media/report-images"
 import { autorizarAdministracion } from "./administracion.server"
 
 const TAMANO_PAGINA = 20
 /** Tope de filas de verificación que se agregan por página; el umbral es tres (S5). */
 const LIMITE_CONTADORES = 1000
+/** Columnas canónicas de una foto: bucket y path conviven con la URL legacy. */
+const COLUMNAS_FOTO_CANONICA = "url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path"
+/** Columnas de la foto en una base que todavía no adoptó bucket, path ni miniaturas. */
+const COLUMNAS_FOTO_LEGACY = "url"
 
 type Relacion<T> = T | T[] | null
 
 type ServicioAdministrativo = Awaited<ReturnType<typeof autorizarAdministracion>>["servicio"]
+
+type ErrorDeConsulta = { message?: string; details?: string } | null
+
+type FilaReporte = {
+  id: number
+  titulo: string
+  estado_id: number
+  deleted_at: string | null
+  fotos_reporte?: ReportImageRow[] | null
+}
 
 type FilaImpugnacion = {
   id: string
@@ -28,17 +50,17 @@ type FilaImpugnacion = {
     reporte_id: number
     comentario: string
     estado: string
-    reportes: Relacion<{ id: number; titulo: string; estado_id: number; deleted_at: string | null }>
+    reportes: Relacion<FilaReporte>
   }>
 }
 
-type FilaEvidencia = {
+type FilaEvidencia = ReportImageRow & {
   id: string
   reporte_id: number
   comentario: string
   estado: string
   publicada_at: string | null
-  reportes: Relacion<{ id: number; titulo: string; estado_id: number; deleted_at: string | null }>
+  reportes: Relacion<FilaReporte>
 }
 
 type FilaContador = { evidencia_id: string; tipo: string; estado: string }
@@ -68,6 +90,12 @@ export type EvidenciaEnDecision = ContadoresVerificacion & {
   titulo: string
   comentario: string
   publicadaAt: string | null
+  /** Foto subida como reparación («después») y su miniatura; `null` si no hay. */
+  fotoEvidencia: string | null
+  miniaturaEvidencia: string | null
+  /** Primera foto del reporte («antes») y su miniatura; la misma que ve el ciudadano. */
+  fotoReporte: string | null
+  miniaturaReporte: string | null
 }
 
 /** Normaliza la relación embebida de PostgREST a un único objeto o `null`. */
@@ -84,6 +112,45 @@ function numeroDePagina(pagina: number) {
 function rangoDePagina(pagina: number): [number, number] {
   const inicio = numeroDePagina(pagina) * TAMANO_PAGINA
   return [inicio, inicio + TAMANO_PAGINA - 1]
+}
+
+/**
+ * Arma la selección de evidencias con la foto de la evidencia y la primera foto del reporte.
+ *
+ * @param canonica - `true` pide bucket, path y miniaturas; `false` se queda con la URL legacy.
+ * @returns Columnas de la consulta, con los campos de foto y el reporte embebido.
+ */
+function seleccionDeEvidencias(canonica: boolean): string {
+  const fotos = canonica ? COLUMNAS_FOTO_CANONICA : COLUMNAS_FOTO_LEGACY
+  return `id,reporte_id,comentario,estado,publicada_at,${fotos},reportes!inner(id,titulo,estado_id,deleted_at,fotos_reporte(${fotos}))`
+}
+
+/**
+ * Ejecuta la consulta de evidencias y reintenta con la forma legacy cuando la base
+ * todavía no tiene las columnas canónicas de foto, igual que el detalle del reporte.
+ *
+ * @param consulta - Consulta completa para la selección recibida.
+ * @param mensajeDeFalla - Error en español cuando la consulta sigue fallando.
+ * @returns Filas de la página o un arreglo vacío cuando no hay evidencias. */
+async function consultarEvidencias(
+  consulta: (columnas: string) => PromiseLike<{ data: unknown; error: ErrorDeConsulta }>,
+  mensajeDeFalla: string,
+): Promise<FilaEvidencia[]> {
+  let resultado = await consulta(seleccionDeEvidencias(true))
+  if (resultado.error && isMissingReportImageColumnsError(resultado.error)) {
+    resultado = await consulta(seleccionDeEvidencias(false))
+  }
+  if (resultado.error) throw new Error(mensajeDeFalla)
+  return (resultado.data ?? []) as FilaEvidencia[]
+}
+
+/** Foto principal del reporte y su miniatura, igual que la primera foto del detalle. */
+function fotoPrincipalDelReporte(fotos: ReportImageRow[] | null | undefined) {
+  const [primera] = resolveReportImageRows(fotos ?? [])
+  return {
+    foto: primera?.publicUrl ?? null,
+    miniatura: primera?.thumbnailPublicUrl ?? null,
+  }
 }
 
 /** Tope al dominio de una lista ya normalizada. */
@@ -181,17 +248,18 @@ export async function listarImpugnacionesPendientes(pagina: number): Promise<Imp
  */
 export async function listarEvidenciasEnVerificacion(pagina: number): Promise<EvidenciaEnDecision[]> {
   const { servicio } = await autorizarAdministracion()
-  const { data, error } = await servicio.from("evidencias_reparacion")
-    .select("id,reporte_id,comentario,estado,publicada_at,reportes!inner(id,titulo,estado_id,deleted_at)")
-    .in("estado", ["en_verificacion"])
-    .eq("reportes.estado_id", REPORT_STATE_IDS.PENDIENTE)
-    .is("reportes.deleted_at", null)
-    .order("publicada_at", { ascending: true })
-    .order("id", { ascending: true })
-    .range(...rangoDePagina(pagina))
-
-  if (error) throw new Error("No se pudieron consultar las evidencias en verificación.")
-  return armarEvidencias(servicio, (data ?? []) as FilaEvidencia[])
+  const filas = await consultarEvidencias(
+    (columnas) => servicio.from("evidencias_reparacion")
+      .select(columnas)
+      .in("estado", ["en_verificacion"])
+      .eq("reportes.estado_id", REPORT_STATE_IDS.PENDIENTE)
+      .is("reportes.deleted_at", null)
+      .order("publicada_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(...rangoDePagina(pagina)),
+    "No se pudieron consultar las evidencias en verificación.",
+  )
+  return armarEvidencias(servicio, filas)
 }
 
 /**
@@ -203,16 +271,17 @@ export async function listarEvidenciasEnVerificacion(pagina: number): Promise<Ev
  */
 export async function listarEvidenciasValidadas(pagina: number): Promise<EvidenciaEnDecision[]> {
   const { servicio } = await autorizarAdministracion()
-  const { data, error } = await servicio.from("evidencias_reparacion")
-    .select("id,reporte_id,comentario,estado,publicada_at,reportes!inner(id,titulo,estado_id,deleted_at)")
-    .in("estado", ["validada"])
-    .is("reportes.deleted_at", null)
-    .order("publicada_at", { ascending: true })
-    .order("id", { ascending: true })
-    .range(...rangoDePagina(pagina))
-
-  if (error) throw new Error("No se pudieron consultar las reparaciones validadas.")
-  return armarEvidencias(servicio, (data ?? []) as FilaEvidencia[])
+  const filas = await consultarEvidencias(
+    (columnas) => servicio.from("evidencias_reparacion")
+      .select(columnas)
+      .in("estado", ["validada"])
+      .is("reportes.deleted_at", null)
+      .order("publicada_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(...rangoDePagina(pagina)),
+    "No se pudieron consultar las reparaciones validadas.",
+  )
+  return armarEvidencias(servicio, filas)
 }
 
 /**
@@ -231,12 +300,19 @@ async function armarEvidencias(
     return reporte ? [{ fila, reporte }] : []
   })
   const contadores = await contarVerificaciones(servicio, [...new Set(visibles.map(({ fila }) => fila.id))])
-  return visibles.map(({ fila, reporte }) => ({
-    evidenciaId: fila.id,
-    reporteId: reporte.id,
-    titulo: reporte.titulo,
-    comentario: fila.comentario,
-    publicadaAt: fila.publicada_at,
-    ...contadoresDe(contadores, fila.id),
-  }))
+  return visibles.map(({ fila, reporte }) => {
+    const fotoReporte = fotoPrincipalDelReporte(reporte.fotos_reporte)
+    return {
+      evidenciaId: fila.id,
+      reporteId: reporte.id,
+      titulo: reporte.titulo,
+      comentario: fila.comentario,
+      publicadaAt: fila.publicada_at,
+      fotoEvidencia: resolveReportImageUrl(fila),
+      miniaturaEvidencia: resolveReportImageThumbnailUrl(fila),
+      fotoReporte: fotoReporte.foto,
+      miniaturaReporte: fotoReporte.miniatura,
+      ...contadoresDe(contadores, fila.id),
+    }
+  })
 }
