@@ -1,3 +1,4 @@
+/** Catálogo de aportes y composición cronológica de la actividad del reporte. */
 export const APORTES_COMUNITARIOS = [
   { key: "problema_sigue_igual", label: "El problema sigue igual" },
   { key: "problema_empeoro", label: "El problema empeoró" },
@@ -29,6 +30,8 @@ export type ActivityComment = {
 type StatusHistory = {
   id: number
   reporte_id: number
+  // Algunos consumidores históricos no incluyen el estado anterior en sus datos.
+  estado_anterior_id?: number | null
   estado_nuevo_id: number
   created_at: string
   comentario: string | null
@@ -36,6 +39,7 @@ type StatusHistory = {
   usuario?: { username: string | null } | null
 }
 
+/** Mezcla aportes y estados sin presentar las actualizaciones administrativas como transiciones. */
 export function mergeReportActivity(comments: ActivityComment[], history: StatusHistory[]) {
   const entries = [
     ...comments.map((comment) => ({
@@ -47,15 +51,27 @@ export function mergeReportActivity(comments: ActivityComment[], history: Status
       legacy: !comment.tipo_aporte,
     })),
     ...history.map((event) => {
-      const state = Array.isArray(event.estado_nuevo) ? event.estado_nuevo[0] : event.estado_nuevo
-      return {
+      const datosComunes = {
         kind: "status" as const,
         id: `status-${event.id}`,
         createdAt: event.created_at,
-        content: `El reporte cambió a ${state?.nombre ?? "un nuevo estado"}`,
-        detail: event.comentario,
         username: event.usuario?.username ?? "Sistema",
         legacy: false,
+      }
+      if (event.estado_anterior_id != null && event.estado_anterior_id === event.estado_nuevo_id) {
+        return {
+          ...datosComunes,
+          content: event.comentario?.trim() ? event.comentario : "Actualización realizada por administración.",
+          // Sin transición no hay estado anterior que mostrar como detalle.
+          detail: null,
+        }
+      }
+
+      const state = Array.isArray(event.estado_nuevo) ? event.estado_nuevo[0] : event.estado_nuevo
+      return {
+        ...datosComunes,
+        content: `El reporte cambió a ${state?.nombre ?? "un nuevo estado"}`,
+        detail: event.comentario,
       }
     }),
   ]

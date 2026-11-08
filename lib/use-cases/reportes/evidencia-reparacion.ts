@@ -13,6 +13,7 @@ import "server-only"
 
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
+import { registrarCambioEstado } from "@/database/queries/reportes/[id]/historial-estados"
 import { ROLE_IDS } from "@/lib/authz/catalog"
 import {
   canParticipateInCommunity,
@@ -30,7 +31,7 @@ import {
   type ResultadoImagenEvidenciaReparacion,
   moderarYGuardarImagenEvidenciaReparacion,
 } from "@/lib/moderation/imagenes-reporte.server"
-import { sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
+import { sendRepairReviewCancelledEmail, sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
 import { parseFraseImpugnacion, parseFraseReparacion } from "@/lib/reportes/frases-reparacion"
 import { getReportContext } from "./detail-mutations"
 
@@ -416,6 +417,87 @@ async function notificarReparacionValidada(
   }
 }
 
+/** Registra la cancelación y avisa al autor de la evidencia, ambos de mejor esfuerzo. */
+async function registrarYNotificarCancelacionReparacion(
+  supabase: SupabaseClient,
+  evidenciaId: string,
+  administradorId: string,
+  reporteEstadoId: number | null,
+  motivo: string,
+) {
+  let evidencia: { reporte_id?: number; autor_id?: string } | null
+  try {
+    const { data, error } = await supabase
+      .from("evidencias_reparacion")
+      .select("reporte_id, autor_id")
+      .eq("id", evidenciaId)
+      .maybeSingle()
+    if (error || !data) {
+      console.error("No pudimos leer la evidencia para registrar la cancelación:", error)
+      return
+    }
+    evidencia = data as { reporte_id?: number; autor_id?: string }
+  } catch (error) {
+    console.error("No pudimos leer la evidencia para registrar la cancelación:", error)
+    return
+  }
+
+  const reporteId = Number(evidencia.reporte_id)
+  if (!Number.isSafeInteger(reporteId) || reporteId <= 0) {
+    console.error("No pudimos registrar la cancelación: el reporte de la evidencia no es válido.")
+    return
+  }
+
+  if (reporteEstadoId === null) {
+    console.error("No pudimos registrar la cancelación: el reporte no tiene estado.")
+  } else {
+    try {
+      await registrarCambioEstado(
+        supabase,
+        reporteId,
+        reporteEstadoId,
+        reporteEstadoId,
+        administradorId,
+        motivo || "Administración canceló la revisión de reparado.",
+      )
+    } catch (error) {
+      console.error("No pudimos registrar la cancelación en el historial:", error)
+    }
+  }
+
+  if (!evidencia.autor_id) return
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("username, email")
+      .eq("id", evidencia.autor_id)
+      .maybeSingle()
+    if (error) {
+      console.error("No pudimos leer el perfil del autor de la evidencia:", error)
+      return
+    }
+    const autor = data as PerfilAutor | null
+    const correo = autor?.email?.trim()
+    if (!correo) return
+
+    const contexto = await getReportContext(supabase, reporteId)
+    if (!contexto.success) {
+      console.error("No pudimos leer el reporte para avisar la cancelación:", contexto.error)
+      return
+    }
+    const envio = await sendRepairReviewCancelledEmail({
+      autorEmail: correo,
+      autorUsername: autor?.username ?? null,
+      reporteId,
+      reporteTitulo: contexto.data.titulo,
+      motivo: motivo || null,
+    })
+    if (envio?.error) console.error("No pudimos enviar el aviso de cancelación:", envio.error)
+  } catch (error) {
+    console.error("No pudimos enviar el aviso de cancelación:", error)
+  }
+}
+
 /** Lee la evidencia de una impugnación para poder avisar el cierre del reporte. */
 async function evidenciaDeImpugnacion(supabase: SupabaseClient, verificacionId: string) {
   try {
@@ -557,7 +639,8 @@ export async function verificarReparacionWorkflow(
 /**
  * Aprueba, rechaza o revierte una evidencia (S8). Aprobar exige la foto publicada,
  * resuelve las impugnaciones pendientes y cierra el reporte como Reparado; revertir
- * devuelve el reporte a Pendiente.
+ * devuelve el reporte a Pendiente. Rechazar registra la cancelación y avisa al autor
+ * de la evidencia sin deshacer la resolución si falla el historial o el correo.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
  * @param evidenciaId - Evidencia que se resuelve.
@@ -598,6 +681,15 @@ export async function resolverEvidenciaReparacionWorkflow(
       supabase,
       evidenciaId,
       motivoLimpio || "Reparación aprobada por administración",
+    )
+  }
+  if (accion === "rechazar" && !resolucion.repetida) {
+    await registrarYNotificarCancelacionReparacion(
+      supabase,
+      evidenciaId,
+      administradorId,
+      resolucion.reporteEstadoId,
+      motivoLimpio,
     )
   }
   return { success: true, data: resolucion }

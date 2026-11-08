@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { sendAdminReviewNotificationEmail, sendCommentNotificationEmail, sendCrewAssignedEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail } from "./report-notifications"
+import { sendAdminReviewNotificationEmail, sendCommentNotificationEmail, sendCrewAssignedEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail, sendRepairReviewCancelledEmail } from "./report-notifications"
 import { ROLE_IDS } from "@/lib/authz/catalog"
 
 const mocks = vi.hoisted(() => ({ send: vi.fn() }))
@@ -138,6 +138,51 @@ describe("report notification emails", () => {
     expect(email.html).toContain("Revisado por el equipo")
     expect(email.html).toContain('href="https://reporty.com.ar/reportes/7"')
     expect(email.text).toContain(headline)
+  })
+
+  it("avisa la cancelación de la revisión, con motivo escapado y reporte pendiente", async () => {
+    await sendRepairReviewCancelledEmail({
+      autorEmail: "vecino@example.invalid",
+      autorUsername: "Vecino <b>",
+      reporteId: 42,
+      reporteTitulo: "Bache <script>",
+      motivo: "La foto <no> corresponde",
+    })
+
+    const email = sentEmail()
+    expect(email.to).toEqual(["vecino@example.invalid"])
+    expect(email.subject).toBe('Cancelamos la revisión de reparado del reporte "Bache <script>"')
+    expectNewStyle(email.html)
+    expect(email.html).toContain("Vecino &lt;b&gt;")
+    expect(email.html).toContain("Bache &lt;script&gt;")
+    expect(email.html).toContain("La foto &lt;no&gt; corresponde")
+    expect(email.html).not.toContain("<script>")
+    expect(email.html).toContain("MOTIVO")
+    expect(email.html).toContain("La foto de reparado que enviaste fue cancelada por administración.")
+    expect(email.html).toContain("El reporte sigue pendiente.")
+    expect(email.html).toContain("Podés volver a informar una reparación con fotos del lugar y del arreglo.")
+    expect(email.html).toContain('href="https://reporty.com.ar/reportes/42"')
+    expect(email.text).toContain("Motivo: La foto <no> corresponde")
+    expect(email.text).toContain("El reporte sigue pendiente.")
+    expect(email.text).toContain("Podés volver a informar una reparación con fotos del lugar y del arreglo.")
+    expect(email.html.toLowerCase()).not.toContain("reporte rechazado")
+    expect(email.text.toLowerCase()).not.toContain("reporte rechazado")
+  })
+
+  it("omite el motivo si la cancelación no lo tiene", async () => {
+    await sendRepairReviewCancelledEmail({
+      autorEmail: "vecino@example.invalid",
+      autorUsername: null,
+      reporteId: 42,
+      reporteTitulo: "Bache",
+      motivo: null,
+    })
+
+    const email = sentEmail()
+    expect(email.html).toContain("Hola Usuario")
+    expect(email.html).not.toContain("MOTIVO")
+    expect(email.text).not.toContain("Motivo:")
+    expect(email.text).toContain("El reporte sigue pendiente.")
   })
 
   it("sends a separate idempotent review email only to admin profiles with an address", async () => {
