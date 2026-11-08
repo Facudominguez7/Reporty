@@ -26,7 +26,7 @@ panel `/admin/auditoria`.
 | Servicio de recuperación | `lib/auditoria-archivo/servicio-recuperacion.ts` |
 | Ejecución programada y manual | `app/api/cron/auditoria-archivo/route.ts` |
 | Descarga autorizada | `app/api/admin/auditoria/archivo/[id]/descarga/route.ts` |
-| Migraciones | `supabase/migrations/20261110120000_auditoria_archivo_r2.sql`, `20261110120100_auditoria_archivo_api.sql` |
+| Migraciones | `supabase/migrations/20261110120000_auditoria_archivo_r2.sql`, `20261110120100_auditoria_archivo_api.sql`, `20261110120200_auditoria_archivo_recuperacion.sql` |
 | Contrato SQL | `supabase/tests/auditoria_archivo_r2.sql` (`scripts/local-supabase/test-auditoria-archivo.sh`) |
 
 Tablas:
@@ -42,7 +42,7 @@ RPC `security definer` reservadas a `service_role` (envoltorios públicos en
 `auditoria_*`): `auditoria_reclamar_lote`, `auditoria_previsualizar_lote`,
 `auditoria_confirmar_subida`, `auditoria_verificar_lote`,
 `auditoria_eliminar_origen`, `auditoria_fallar_lote`, `auditoria_metricas`,
-`auditoria_registrar_evento`. Los triggers de captura de `audit_events` no se
+`auditoria_registrar_evento`, `auditoria_recuperar_estancados`. Los triggers de captura de `audit_events` no se
 modifican.
 
 ## Formato del archivo
@@ -58,6 +58,12 @@ reporty-audit-archive/
 - Cada línea es un evento con `version` (1), `id`, `occurred_at` (UTC), `actor_id`,
   `report_id`, `report_title` y `action`. El orden de claves es fijo para que los
   bytes sean determinísticos.
+- La purga **diferida** (lote verificado en una corrida anterior y purgado
+  después) vuelve a descargar y revalidar hash y cantidad antes de borrar: si el
+  objeto desapareció o cambió, no se elimina nada y el lote queda como está.
+- Una corrida interrumpida deja el lote en `reclamado` o `subido`; la corrida
+  siguiente recupera los lotes sin avanzar hace más de 12 horas
+  (`auditoria_recuperar_estancados`), los marca `fallido` y libera sus reclamos.
 - La integridad se comprueba con el SHA-256 del archivo comprimido. **El ETag de
   R2 no se usa como checksum**: en cargas multiparte ni siquiera es el MD5 del
   contenido. Después de subir, el servicio descarga el objeto, recalcula el hash y
@@ -220,6 +226,8 @@ Cada descarga agrega una fila `audit_archive_downloaded` en `audit_events`.
 | Lote en `fallido` con `integridad` | el objeto descargado no coincide | **no** se borró nada; revisar el bucket y reintentar. Si el objeto está corrupto, eliminarlo a mano en R2 y volver a ejecutar |
 | Lote en `verificado` sin purgar | `AUDIT_ARCHIVE_PURGE_ENABLED=false` o la purga falló | habilitar la variable; la corrida siguiente purga sin volver a subir |
 | `No hay eventos elegibles o hay otra ejecución en curso` | lock de reclamo tomado o nada vencido | normal; esperar la próxima corrida |
+| Lote en `fallido` con `Lote estancado` | una corrida se cortó entre la subida y la purga | la recuperación automática ya liberó los eventos; la corrida siguiente los retoma |
+| Lote verificado que no se purga y error `purga previa` | el objeto cambió o no se puede leer | **no se borró nada**; revisar el objeto y su hash en R2, corregir y volver a ejecutar |
 | Error de `GZIP` al recuperar | objeto manipulado o truncado | el lote no se muestra: revisar el objeto en R2 y el hash registrado |
 
 Reanudación: cualquier corrida siguiente retoma el trabajo. Un lote `fallido`

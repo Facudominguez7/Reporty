@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { ClienteR2 } from "./cliente-r2"
 import type { ConfiguracionArchivoAuditoria } from "./configuracion"
-import type { EventoAuditoria } from "./serializacion"
+import { calcularHashSha256, comprimirGzip, serializarJsonl, type EventoAuditoria } from "./serializacion"
 import {
   type AccionArchivoAuditoria,
   type DatosArchivado,
@@ -94,6 +94,7 @@ type EstadoFalso = {
   fallos: string[]
   eventos: number[]
   acciones: Array<{ accion: AccionArchivoAuditoria; detalle: string }>
+  estancados: number
 }
 
 function datosFalsos(opciones: {
@@ -101,6 +102,8 @@ function datosFalsos(opciones: {
   pendientesPurga?: LoteArchivado[]
   eventosDelLote?: EventoAuditoria[]
   fallarPurgaPrevia?: boolean
+  estancados?: number
+  fallarRecuperacion?: boolean
 } = {}) {
   const estado: EstadoFalso = {
     lote: null,
@@ -110,6 +113,7 @@ function datosFalsos(opciones: {
     fallos: [],
     eventos: (opciones.eventosDelLote ?? eventos).map((evento) => evento.id),
     acciones: [],
+    estancados: 0,
   }
 
   const datos = {
@@ -149,6 +153,7 @@ function datosFalsos(opciones: {
       return true
     }),
     lotesPendientesDePurga: vi.fn(async () => opciones.pendientesPurga ?? []),
+    recuperarEstancados: vi.fn(async () => opciones.estancados ?? 0),
     registrarEvento: vi.fn(async (accion: AccionArchivoAuditoria, detalle: string) => {
       estado.acciones.push({ accion, detalle })
     }),
@@ -163,6 +168,21 @@ function dependencias(
   extra: Partial<ConfiguracionArchivoAuditoria> = {},
 ): DependenciasArchivado {
   return { configuracion: { ...configuracion, ...extra }, cliente, datos }
+}
+
+/** Siembra en el almacén falso un lote verificado con su objeto y hash reales. */
+async function loteVerificadoEnAlmacen(almacen: ReturnType<typeof s3Falso>): Promise<LoteArchivado> {
+  const comprimido = await comprimirGzip(Buffer.from(serializarJsonl(eventos), "utf8"))
+  const ruta = "audit/v1/2025/11/audit-41-42-ffffffffffffffff.jsonl.gz"
+  almacen.objetos.set(ruta, comprimido)
+  return {
+    ...lote,
+    estado: "verificado",
+    rutaObjeto: ruta,
+    tamanoComprimido: comprimido.length,
+    hashSha256: calcularHashSha256(comprimido),
+    verificadoEn: "2025-12-01T00:00:00+00:00",
+  }
 }
 
 const real = { modo: "real" as const, ejecutor: "cron" }
@@ -257,17 +277,18 @@ describe("ejecutarArchivado en modo real", () => {
   })
 
   it("deja el lote verificado sin purgar cuando la purga está apagada y lo purga en la corrida siguiente", async () => {
-    const primera = s3Falso()
+    const almacen = s3Falso()
     const primeraDatos = datosFalsos()
 
-    const primerResumen = await ejecutarArchivado(real, dependencias(primera.cliente, primeraDatos.datos))
+    const primerResumen = await ejecutarArchivado(real, dependencias(almacen.cliente, primeraDatos.datos))
 
     expect(primerResumen).toMatchObject({ ok: true, verificado: true, purgado: 0 })
     expect(primeraDatos.datos.eliminarOrigen).not.toHaveBeenCalled()
     expect(primeraDatos.estado.estado).toBe("verificado")
     expect(primeraDatos.estado.eventos).toEqual([41, 42])
 
-    // Segunda corrida: el lote ya verificado se purga sin volver a subir nada.
+    // Segunda corrida: el almacén conserva el objeto verificado, así que la purga
+    // diferida lo revalida y recién entonces borra; no se vuelve a subir nada.
     const verificados: LoteArchivado[] = [{
       ...lote,
       estado: "verificado",
@@ -276,11 +297,10 @@ describe("ejecutarArchivado en modo real", () => {
       hashSha256: primerResumen.archivo!.hash,
       verificadoEn: "2025-12-01T00:00:00+00:00",
     }]
-    const segunda = s3Falso({ alterarDescarga: true })
     const segundaDatos = datosFalsos({ pendientesPurga: verificados, reclamar: null })
     segundaDatos.estado.lote = verificados[0]
 
-    const segundoResumen = await ejecutarArchivado(real, dependencias(segunda.cliente, segundaDatos.datos, {
+    const segundoResumen = await ejecutarArchivado(real, dependencias(almacen.cliente, segundaDatos.datos, {
       purgaHabilitada: true,
     }))
 
@@ -331,24 +351,70 @@ describe("ejecutarArchivado en modo real", () => {
   })
 
   it("un fallo al purgar lotes anteriores no impide archivar el lote nuevo", async () => {
-    const { cliente } = s3Falso()
-    const verificados: LoteArchivado[] = [{
-      ...lote,
-      id: "22222222-2222-4222-8222-222222222222",
-      estado: "verificado",
-      rutaObjeto: "audit/v1/2025/11/audit-41-42-bbbbbbbbbbbbbbbb.jsonl.gz",
-      tamanoComprimido: 100,
-      hashSha256: "b".repeat(64),
-      verificadoEn: "2025-12-01T00:00:00+00:00",
-    }]
-    const { datos } = datosFalsos({ pendientesPurga: verificados, fallarPurgaPrevia: true })
+    const almacen = s3Falso()
+    const previo = await loteVerificadoEnAlmacen(almacen)
+    const { datos } = datosFalsos({ pendientesPurga: [previo], fallarPurgaPrevia: true })
 
-    const resumen = await ejecutarArchivado(real, dependencias(cliente, datos, { purgaHabilitada: true }))
+    const resumen = await ejecutarArchivado(real, dependencias(almacen.cliente, datos, { purgaHabilitada: true }))
 
     expect(resumen.ok).toBe(true)
     expect(resumen.purgasPrevias).toBe(0)
     expect(resumen.errores[0]).toMatch(/R2 no responde/)
     expect(resumen.archivo).not.toBeNull()
+  })
+
+  it("no purga un lote anterior si el objeto remoto ya no existe", async () => {
+    const almacen = s3Falso()
+    const previo: LoteArchivado = {
+      ...lote,
+      estado: "verificado",
+      rutaObjeto: "audit/v1/2025/11/audit-41-42-ffffffffffffffff.jsonl.gz",
+      tamanoComprimido: 100,
+      hashSha256: "a".repeat(64),
+      verificadoEn: "2025-12-01T00:00:00+00:00",
+    }
+    const { datos } = datosFalsos({ pendientesPurga: [previo], reclamar: null })
+
+    const resumen = await ejecutarArchivado(real, dependencias(almacen.cliente, datos, { purgaHabilitada: true }))
+
+    expect(datos.eliminarOrigen).not.toHaveBeenCalled()
+    expect(resumen.purgasPrevias).toBe(0)
+    expect(resumen.errores.length).toBeGreaterThan(0)
+    expect(resumen.errores[0]).toMatch(/purga previa/)
+  })
+
+  it("purga un lote anterior solo después de revalidar su archivo en R2", async () => {
+    const almacen = s3Falso()
+    const previo = await loteVerificadoEnAlmacen(almacen)
+    const { datos } = datosFalsos({ pendientesPurga: [previo], reclamar: null })
+
+    const resumen = await ejecutarArchivado(real, dependencias(almacen.cliente, datos, { purgaHabilitada: true }))
+
+    expect(resumen.purgasPrevias).toBe(1)
+    expect(datos.eliminarOrigen).toHaveBeenCalledWith(previo.id, previo.hashSha256)
+  })
+
+  it("recupera los lotes estancados antes de reclamar y lo informa", async () => {
+    const { cliente } = s3Falso()
+    const { datos } = datosFalsos({ estancados: 2 })
+
+    const resumen = await ejecutarArchivado(real, dependencias(cliente, datos))
+
+    expect(datos.recuperarEstancados).toHaveBeenCalledWith(12)
+    expect(resumen.recuperados).toBe(2)
+    expect(datos.reclamar).toHaveBeenCalled()
+  })
+
+  it("un fallo al recuperar lotes estancados no impide archivar", async () => {
+    const { cliente } = s3Falso()
+    const { datos } = datosFalsos()
+    datos.recuperarEstancados.mockRejectedValueOnce(new Error("sin permiso"))
+
+    const resumen = await ejecutarArchivado(real, dependencias(cliente, datos))
+
+    expect(resumen.ok).toBe(true)
+    expect(resumen.recuperados).toBe(0)
+    expect(resumen.errores[0]).toMatch(/estancados/i)
   })
 
   it("pasa la retención y el límite configurados al reclamo de la base", async () => {

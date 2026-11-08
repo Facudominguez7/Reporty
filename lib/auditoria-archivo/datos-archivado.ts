@@ -188,6 +188,12 @@ export function crearDatosArchivado(supabase?: SupabaseClient): DatosArchivado {
       return (data ?? []).map((fila) => mapearLote(fila as Fila))
     },
 
+    async recuperarEstancados(horas) {
+      const { data, error } = await cliente().rpc("auditoria_recuperar_estancados", { p_horas: horas })
+      if (error) fallar("recuperar los lotes estancados", error)
+      return numero(data)
+    },
+
     async registrarEvento(accion: AccionArchivoAuditoria, detalle, actorId) {
       const { error } = await cliente().rpc("auditoria_registrar_evento", {
         p_accion: accion,

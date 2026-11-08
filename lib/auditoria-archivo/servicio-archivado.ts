@@ -75,6 +75,11 @@ export type DatosArchivado = {
   eliminarOrigen(id: string, hash: string): Promise<number>
   fallarLote(id: string, error: string): Promise<boolean>
   lotesPendientesDePurga(limite: number): Promise<LoteArchivado[]>
+  /**
+   * Marca fallidos los lotes interrumpidos más viejos que esas horas y libera sus
+   * reclamos, para que la corrida actual pueda retomarlos.
+   */
+  recuperarEstancados(horas: number): Promise<number>
   registrarEvento(accion: AccionArchivoAuditoria, detalle: string, actorId: string | null): Promise<void>
 }
 
@@ -110,6 +115,8 @@ export type ResumenArchivado = {
   verificado: boolean
   purgado: number
   purgasPrevias: number
+  /** Lotes interrumpidos que se liberaron al comienzo de la corrida. */
+  recuperados: number
   duracionMs: number
   mensaje: string
   error: string | null
@@ -118,6 +125,12 @@ export type ResumenArchivado = {
 
 /** Cantidad máxima de lotes ya verificados que se purgan por corrida. */
 export const PURGAS_POR_CORRIDA = 5
+/**
+ * Antigüedad a partir de la cual un lote en curso se considera interrumpido.
+ *
+ * Es holgada a propósito: una corrida real tarda segundos o minutos, nunca horas.
+ */
+export const HORAS_LOTE_ESTANCADO = 12
 /** Longitud máxima del mensaje de error que se guarda en la tabla de control. */
 const LONGITUD_ERROR_MAXIMA = 300
 
@@ -170,6 +183,7 @@ export async function ejecutarArchivado(
     verificado: false,
     purgado: 0,
     purgasPrevias: 0,
+    recuperados: 0,
     error: null,
     errores: [] as string[],
   }
@@ -191,14 +205,33 @@ export async function ejecutarArchivado(
 
   const errores: string[] = []
 
-  // 1. Purga de lotes ya verificados en corridas anteriores: es lo que habilita
-  //    liberar espacio sin volver a subir el archivo.
+  // 1. Recuperación de lotes interrumpidos: una corrida que muere entre la subida
+  //    y la purga deja el lote en `reclamado` o `subido` con los reclamos tomados.
+  //    Marcarlos fallidos libera los eventos para que esta corrida los retome.
+  let recuperados = 0
+  try {
+    recuperados = await datos.recuperarEstancados(HORAS_LOTE_ESTANCADO)
+  } catch (error) {
+    errores.push(`recuperación de lotes estancados: ${mensajeOperativo(error)}`)
+  }
+
+  // 2. Purga de lotes ya verificados en corridas anteriores: es lo que habilita
+  //    liberar espacio sin volver a subir el archivo. Se revalida el objeto remoto
+  //    antes de borrar: el archivo pudo desaparecer o cambiar desde la corrida que
+  //    lo verificó, y la regla es no eliminar sin un archivo verificado.
   let purgasPrevias = 0
   if (configuracion.purgaHabilitada) {
     const pendientes = await datos.lotesPendientesDePurga(PURGAS_POR_CORRIDA)
     for (const pendiente of pendientes) {
       try {
-        if (!pendiente.hashSha256) throw new Error("El lote verificado no tiene hash registrado")
+        if (!pendiente.hashSha256 || !pendiente.rutaObjeto) {
+          throw new Error("El lote verificado no tiene archivo remoto registrado")
+        }
+        await verificarArchivo(cliente, configuracion, {
+          ruta: pendiente.rutaObjeto,
+          hashEsperado: pendiente.hashSha256,
+          cantidadEsperada: pendiente.cantidadRegistros,
+        })
         await datos.eliminarOrigen(pendiente.id, pendiente.hashSha256)
         purgasPrevias += 1
         errores.push(...await registrarSeguro(datos, "audit_archive_purged", `lote ${pendiente.id}`, actorId))
@@ -208,13 +241,14 @@ export async function ejecutarArchivado(
     }
   }
 
-  // 2. Reclamo de un lote nuevo.
+  // 3. Reclamo de un lote nuevo.
   const lote = await datos.reclamar(limite, diasRetencion, opciones.ejecutor)
   if (!lote) {
     return {
       ...base,
       ok: true,
       purgasPrevias,
+      recuperados,
       errores,
       duracionMs: Date.now() - inicio,
       mensaje: "No hay eventos elegibles o hay otra ejecución en curso; no se archivó nada.",
@@ -222,7 +256,7 @@ export async function ejecutarArchivado(
   }
 
   try {
-    // 3. Lectura por identificadores exactos y verificación de la cantidad reclamada.
+    // 4. Lectura por identificadores exactos y verificación de la cantidad reclamada.
     const eventos = await datos.eventosDelLote(lote)
     if (eventos.length !== lote.cantidadRegistros) {
       throw new Error(
@@ -230,7 +264,7 @@ export async function ejecutarArchivado(
       )
     }
 
-    // 4. JSON Lines, GZIP y hash de integridad sobre los bytes comprimidos.
+    // 5. JSON Lines, GZIP y hash de integridad sobre los bytes comprimidos.
     const comprimido = await comprimirGzip(Buffer.from(serializarJsonl(eventos), "utf8"))
     const hash = calcularHashSha256(comprimido)
     const ruta = construirRutaArchivo({
@@ -240,13 +274,13 @@ export async function ejecutarArchivado(
       hash,
     })
 
-    // 5. Subida idempotente: el mismo contenido produce la misma ruta.
+    // 6. Subida idempotente: el mismo contenido produce la misma ruta.
     const subida = await subirArchivo(cliente, configuracion, { ruta, contenido: comprimido, hash })
     const confirmado = await datos.confirmarSubida(lote, { ruta, tamano: comprimido.length, hash })
     if (!confirmado) throw new Error("No se pudo registrar la subida del lote")
     errores.push(...await registrarSeguro(datos, "audit_archive_uploaded", `lote ${lote.id}`, actorId))
 
-    // 6. Verificación: se descarga el objeto y se recalcula el hash. El ETag de R2
+    // 7. Verificación: se descarga el objeto y se recalcula el hash. El ETag de R2
     //    no sirve como checksum, así que no se consulta.
     await verificarArchivo(cliente, configuracion, {
       ruta,
@@ -257,7 +291,7 @@ export async function ejecutarArchivado(
     if (!verificado) throw new Error("No se pudo marcar el lote como verificado")
     errores.push(...await registrarSeguro(datos, "audit_archive_verified", `lote ${lote.id}`, actorId))
 
-    // 7. Purga del origen: solo con la verificación hecha y solo si el dueño la
+    // 8. Purga del origen: solo con la verificación hecha y solo si el dueño la
     //    habilitó explícitamente.
     //    Si la purga falla, el archivo ya está a salvo: el lote queda verificado y
     //    una corrida posterior lo purga, sin volver a subir nada.
@@ -280,6 +314,7 @@ export async function ejecutarArchivado(
       verificado: true,
       purgado,
       purgasPrevias,
+      recuperados,
       errores,
       duracionMs: Date.now() - inicio,
       mensaje: purgado > 0
@@ -288,7 +323,7 @@ export async function ejecutarArchivado(
     }
   } catch (error) {
     const mensaje = mensajeOperativo(error)
-    // 8. Ante cualquier fallo se liberan los reclamos: PostgreSQL conserva los
+    // 9. Ante cualquier fallo se liberan los reclamos: PostgreSQL conserva los
     //    eventos y la corrida siguiente los retoma.
     try {
       await datos.fallarLote(lote.id, mensaje)
@@ -301,6 +336,7 @@ export async function ejecutarArchivado(
       ok: false,
       lote,
       purgasPrevias,
+      recuperados,
       errores: [mensaje, ...errores],
       duracionMs: Date.now() - inicio,
       mensaje: "La corrida no pudo completarse: los eventos quedaron en PostgreSQL.",

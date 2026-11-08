@@ -214,9 +214,92 @@ select pg_temp.exigir(
   (select count(*) from public.audit_archive_claims where archive_id = (select id from lote_dos)) = 0,
   'Un lote fallido libera sus reclamos'
 );
+create temporary table lote_tres on commit drop as
+  select * from private.reclamar_lote_auditoria(10, 180, 'reintento');
 select pg_temp.exigir(
-  (select cantidad_registros from private.reclamar_lote_auditoria(10, 180, 'reintento')) = 2,
+  (select cantidad_registros from lote_tres) = 2,
   'La corrida siguiente debe poder retomar los eventos liberados'
+);
+
+-- ---------------------------------------------------------------------------
+-- Endurecimiento: un lote verificado no se reescribe; un lote interrumpido se
+-- recupera liberando sus reclamos y conservando los eventos.
+-- ---------------------------------------------------------------------------
+select pg_temp.exigir(
+  private.confirmar_subida_auditoria(
+    (select id from lote_tres), 'audit/v1/2025/11/audit-1-2-0123456789abcdef.jsonl.gz', 4096, repeat('c', 64), 'cron'),
+  'La primera confirmación de subida debe aceptarse'
+);
+select pg_temp.exigir(private.verificar_archive_auditoria((select id from lote_tres)),
+  'El lote debe poder verificarse');
+select pg_temp.exigir(
+  private.confirmar_subida_auditoria(
+    (select id from lote_tres), 'audit/v1/2025/11/audit-1-2-fedcba9876543210.jsonl.gz', 8192, repeat('d', 64), 'cron') = false,
+  'Un lote verificado no puede reescribirse con otra ruta ni otro hash'
+);
+select pg_temp.exigir(
+  (select hash_sha256 from public.audit_archives where id = (select id from lote_tres)) = repeat('c', 64)
+  and (select estado from public.audit_archives where id = (select id from lote_tres)) = 'verificado',
+  'La confirmación rechazada no debe alterar el lote verificado'
+);
+
+-- Una corrida interrumpida deja el lote tomado con sus reclamos: se recupera solo.
+update public.audit_archives
+  set estado = 'reclamado', verificado_en = null,
+      actualizado_en = now() - interval '20 hours'
+  where id = (select id from lote_tres);
+
+select pg_temp.exigir(
+  private.recuperar_lotes_estancados(12) >= 1,
+  'Los lotes interrumpidos deben recuperarse'
+);
+select pg_temp.exigir(
+  (select estado from public.audit_archives where id = (select id from lote_tres)) = 'fallido',
+  'Un lote estancado queda fallido'
+);
+select pg_temp.exigir(
+  (select count(*) from public.audit_archive_claims where archive_id = (select id from lote_tres)) = 0,
+  'La recuperación de un lote estancado libera sus reclamos'
+);
+select pg_temp.exigir(
+  (select count(*) from public.audit_events where report_title in ('archivo-viejo-4', 'archivo-viejo-5')) = 2,
+  'La recuperación nunca elimina eventos de PostgreSQL'
+);
+select pg_temp.exigir(
+  (public.auditoria_recuperar_estancados(12)) = 0,
+  'Un lote recién reclamado no debe considerarse estancado'
+);
+
+-- Purga con cantidad inesperada: revierte el borrado y no marca el lote.
+create temporary table lote_descuadrado on commit drop as
+  select * from private.reclamar_lote_auditoria(10, 180, 'descuadrado');
+select pg_temp.exigir((select cantidad_registros from lote_descuadrado) = 2,
+  'Deben quedar dos eventos libres para la prueba de cantidad inesperada');
+select pg_temp.exigir(
+  private.confirmar_subida_auditoria(
+    (select id from lote_descuadrado), 'audit/v1/2025/11/audit-1-2-1111111111111111.jsonl.gz', 1024, repeat('e', 64), 'cron'),
+  'La confirmación del lote descuadrado debe aceptarse'
+);
+select pg_temp.exigir(private.verificar_archive_auditoria((select id from lote_descuadrado)),
+  'El lote descuadrado debe poder verificarse');
+with objetivo as (
+  select event_id from public.audit_archive_claims
+  where archive_id = (select id from lote_descuadrado) order by event_id limit 1
+)
+delete from public.audit_archive_claims c using objetivo o
+where c.event_id = o.event_id and c.archive_id = (select id from lote_descuadrado);
+
+select pg_temp.rechazar(
+  format($q$select private.eliminar_origen_auditoria(%L, %L)$q$,
+    (select id from lote_descuadrado), repeat('e', 64))
+);
+select pg_temp.exigir(
+  (select estado from public.audit_archives where id = (select id from lote_descuadrado)) = 'verificado',
+  'Una purga con cantidad inesperada no debe marcar el lote como purgado'
+);
+select pg_temp.exigir(
+  (select count(*) from public.audit_events where report_title in ('archivo-viejo-4', 'archivo-viejo-5')) >= 1,
+  'Una purga con cantidad inesperada debe revertir el borrado de los eventos coincidentes'
 );
 
 -- ---------------------------------------------------------------------------
