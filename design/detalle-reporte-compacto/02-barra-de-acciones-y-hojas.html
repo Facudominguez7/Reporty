@@ -509,47 +509,91 @@
                 <h4 id="rep-titulo" class="tarjeta-titulo" style="font-size:1.375rem;font-weight:700">Árbol caído en Av. Costanera y Chacra 214</h4>
                 <p class="copy-fuerte">El temporal de la semana pasada tiró un árbol sobre la bicisenda, a media cuadra de la parada. Las ramas tapan media calzada y los colectivos ya no paran en el lugar.</p>
 
-                <div class="foto-marco foto-reporte">
-                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del reporte: un árbol caído atraviesa la bicisenda y parte de la calzada, junto a la parada de colectivos">
-                    <rect class="cielo" width="720" height="300"/>
-                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
-                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
-                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
-                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
-                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
-                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
-                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
-                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
-                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
-                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
-                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
-                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
-                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
-                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
-                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
-                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
-                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
-                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
-                    <rect class="bici" x="0" y="166" width="720" height="48"/>
-                    <path class="bici-linea" d="M0 190h720"/>
-                    <rect class="calle" x="0" y="214" width="720" height="86"/>
-                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
-                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
-                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
-                    <path class="tierra" d="M26 216c-6-24 6-42 28-46 22-4 44 6 48 24 4 14-4 22-18 24-20 3-52 2-58-2Z"/>
-                    <path class="tronco" d="M62 212c70-8 150-20 234-42 34-9 70-14 104-14l3 20c-32 0-66 5-98 14-84 22-166 32-240 36Z"/>
-                    <path class="tronco-claro" d="M252 188c22-24 46-42 74-54l11 16c-26 10-48 26-68 46Z"/>
-                    <ellipse class="follaje" cx="432" cy="126" rx="62" ry="40"/>
-                    <ellipse class="follaje-oscuro" cx="472" cy="152" rx="44" ry="27"/>
-                    <ellipse class="follaje" cx="386" cy="142" rx="40" ry="29"/>
-                    <ellipse class="follaje" cx="502" cy="116" rx="38" ry="26"/>
-                    <ellipse class="follaje-oscuro" cx="440" cy="100" rx="30" ry="22"/>
-                    <ellipse class="follaje" cx="150" cy="228" rx="13" ry="5"/>
-                    <ellipse class="follaje" cx="198" cy="240" rx="10" ry="4"/>
-                    <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
-                    <path class="cono" d="M602 200h20l-3 30h-14Z"/>
-                    <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+                <!-- Escritorio: foto del reporte con el deslizador Antes/Después -->
+                <div class="comparacion">
+                  <div class="comparacion-capa comparacion-antes">
+                      <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 27 de octubre: el árbol caído sobre la bicisenda">
+                        <rect class="cielo" width="720" height="300"/>
+                        <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                        <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                        <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                        <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                        <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                        <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                        <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                        <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                        <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                        <rect class="bici" x="0" y="166" width="720" height="48"/>
+                        <path class="bici-linea" d="M0 190h720"/>
+                        <rect class="calle" x="0" y="214" width="720" height="86"/>
+                        <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                        <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                        <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                        <path class="tierra" d="M26 216c-6-24 6-42 28-46 22-4 44 6 48 24 4 14-4 22-18 24-20 3-52 2-58-2Z"/>
+                        <path class="tronco" d="M62 212c70-8 150-20 234-42 34-9 70-14 104-14l3 20c-32 0-66 5-98 14-84 22-166 32-240 36Z"/>
+                        <path class="tronco-claro" d="M252 188c22-24 46-42 74-54l11 16c-26 10-48 26-68 46Z"/>
+                        <ellipse class="follaje" cx="432" cy="126" rx="62" ry="40"/>
+                        <ellipse class="follaje-oscuro" cx="472" cy="152" rx="44" ry="27"/>
+                        <ellipse class="follaje" cx="386" cy="142" rx="40" ry="29"/>
+                        <ellipse class="follaje" cx="502" cy="116" rx="38" ry="26"/>
+                        <ellipse class="follaje-oscuro" cx="440" cy="100" rx="30" ry="22"/>
+                        <ellipse class="follaje" cx="150" cy="228" rx="13" ry="5"/>
+                        <ellipse class="follaje" cx="198" cy="240" rx="10" ry="4"/>
+                        <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
+                        <path class="cono" d="M602 200h20l-3 30h-14Z"/>
+                        <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+                  </div>
+                  <div class="comparacion-capa comparacion-despues">
+                      <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 6 de noviembre: la bicisenda despejada y el tocón del árbol retirado">
+                        <rect class="cielo" width="720" height="300"/>
+                        <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                        <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                        <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                        <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                        <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                        <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                        <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                        <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                        <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                        <ellipse class="tierra" cx="70" cy="158" rx="28" ry="9"/>
+                        <rect class="tronco" x="62" y="138" width="15" height="21" rx="2"/>
+                        <rect class="tronco-claro" x="62" y="138" width="15" height="4" rx="1"/>
+                        <rect class="bici" x="0" y="166" width="720" height="48"/>
+                        <path class="bici-linea" d="M0 190h720"/>
+                        <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                        <rect class="calle" x="0" y="219" width="720" height="81"/>
+                        <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                        <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                        <ellipse class="arbol-sano" cx="640" cy="130" rx="30" ry="26"/>
+                        <rect class="tronco" x="637" y="152" width="6" height="16"/></svg>
+                  </div>
+                  <span class="comparacion-marca comparacion-marca-antes">Antes · 27 oct</span>
+                  <span class="comparacion-marca comparacion-marca-despues">Después · 6 nov</span>
+                  <span class="comparacion-linea" aria-hidden="true"></span>
+                  <span class="comparacion-manija" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+                  </span>
+                  <input type="range" min="0" max="100" value="50" aria-label="Comparar fotos: antes a la izquierda y después a la derecha" aria-valuetext="Corte al 50 por ciento. Antes a la izquierda y después a la derecha.">
                 </div>
+                <p class="ayuda">Deslizá para comparar el antes y el después.</p>
 
                 <div class="autor">
                   <span class="avatar" aria-hidden="true">OD</span>
@@ -983,8 +1027,10 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
               Creado el 27 de oct de 2026 <strong style="color:var(--foreground)">(hace 11 días)</strong>
             </p>
-            <div class="foto-marco">
-              <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" style="height:104px" role="img" aria-label="Foto del reporte: un árbol caído atraviesa la bicisenda y parte de la calzada">
+            <!-- Móvil: foto del reporte con el deslizador Antes/Después -->
+            <div class="comparacion">
+              <div class="comparacion-capa comparacion-antes">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 27 de octubre: el árbol caído sobre la bicisenda">
                     <rect class="cielo" width="720" height="300"/>
                     <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
                     <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
@@ -1023,7 +1069,49 @@
                     <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
                     <path class="cono" d="M602 200h20l-3 30h-14Z"/>
                     <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+              </div>
+              <div class="comparacion-capa comparacion-despues">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 6 de noviembre: la bicisenda despejada y el tocón del árbol retirado">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <ellipse class="tierra" cx="70" cy="158" rx="28" ry="9"/>
+                    <rect class="tronco" x="62" y="138" width="15" height="21" rx="2"/>
+                    <rect class="tronco-claro" x="62" y="138" width="15" height="4" rx="1"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="calle" x="0" y="219" width="720" height="81"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <ellipse class="arbol-sano" cx="640" cy="130" rx="30" ry="26"/>
+                    <rect class="tronco" x="637" y="152" width="6" height="16"/></svg>
+              </div>
+              <span class="comparacion-marca comparacion-marca-antes">Antes · 27 oct</span>
+              <span class="comparacion-marca comparacion-marca-despues">Después · 6 nov</span>
+              <span class="comparacion-linea" aria-hidden="true"></span>
+              <span class="comparacion-manija" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+              </span>
+              <input type="range" min="0" max="100" value="50" aria-label="Comparar fotos: antes a la izquierda y después a la derecha" aria-valuetext="Corte al 50 por ciento. Antes a la izquierda y después a la derecha.">
             </div>
+            <p class="ayuda">Deslizá para comparar el antes y el después.</p>
             <div class="autor">
               <span class="avatar" aria-hidden="true">OD</span>
               <span>Reportado por octiduarte</span>
