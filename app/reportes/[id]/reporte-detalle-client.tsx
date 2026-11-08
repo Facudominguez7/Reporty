@@ -617,7 +617,7 @@ export function ReporteDetalleClient({
     if (diasDesdeCreacion >= 1) return `hace ${diasDesdeCreacion} ${diasDesdeCreacion === 1 ? "día" : "días"}`;
     const horas = Math.max(0, dayjs().tz(ZONA_HORARIA).diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA), "hour"));
     if (horas >= 1) return `hace ${horas} ${horas === 1 ? "hora" : "horas"}`;
-    return "hace menos de una hora";
+    return "hace minutos";
   })();
   const adminDraftForRender = adminDraft ?? createAdminReportDraft(reporte);
   const adminBaseForRender = adminBase ?? adminDraftForRender;
@@ -748,9 +748,9 @@ export function ReporteDetalleClient({
             {/* Encabezado del Reporte */}
             <Card className="gap-0">
               <CardHeader className="pb-3">
-                <div className="col-span-full mb-1 flex items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
+                <div className="col-span-full mb-1 flex flex-wrap items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
                   <Calendar className="size-3.5 shrink-0" />
-                  <span className="whitespace-nowrap">
+                  <span className="min-w-0">
                     Creado el día{" "}
                     {parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", {
                       year: "numeric",

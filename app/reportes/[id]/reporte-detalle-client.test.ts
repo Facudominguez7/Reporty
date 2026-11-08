@@ -240,7 +240,7 @@ describe("comparación «Antes / Después» sobre la foto de la tarjeta (S10, S1
     const html = renderizar({ reporte: { ...reporte, created_at: ahora } })
 
     expect(html).not.toContain("hace 0 días")
-    expect(html).toMatch(/hace (menos de una hora|\d+ horas?)/)
+    expect(html).toMatch(/hace (minutos|\d+ horas?)/)
   })
 
   it("deja el deslizador solo bajo la foto comparada", () => {
