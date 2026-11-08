@@ -11,7 +11,7 @@
  * decorativas, y el control conserva el nombre accesible y el texto del corte.
  */
 
-import { useId, useState } from "react"
+import { useState } from "react"
 import dayjs from "dayjs"
 import utc from "dayjs/plugin/utc"
 import timezone from "dayjs/plugin/timezone"
@@ -69,9 +69,10 @@ const ESTILO_ROTULO =
   "pointer-events-none absolute top-2 rounded-[var(--radius-pill)] bg-secondary px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-secondary-foreground"
 
 /**
- * Comparación accesible: dos fotos superpuestas, un control de rango transparente
- * encima (arrastre con el dedo, flechas, Inicio y Fin) y una ayuda que explica el
- * gesto. No usa animaciones, así respeta a quien prefiere menos movimiento.
+ * Comparación accesible: dos fotos superpuestas y un control de rango transparente
+ * encima (arrastre con el dedo, flechas, Inicio y Fin). No usa animaciones, así
+ * respeta a quien prefiere menos movimiento, y el bloque queda fuera del arrastre de
+ * la hoja (`data-vaul-no-drag`): mover el deslizador nunca desplaza el Drawer.
  *
  * El alto se limita a `min(48vh, 22rem)`: en escritorio la comparación ya no ocupa
  * casi toda la pantalla y la hoja necesita menos desplazamiento, mientras que en
@@ -79,7 +80,6 @@ const ESTILO_ROTULO =
  */
 export function ComparadorFotos({ antes, despues }: ComparadorFotosProps) {
   const [corte, setCorte] = useState(50)
-  const ayudaId = useId()
 
   if (!antes) {
     return (
@@ -92,8 +92,7 @@ export function ComparadorFotos({ antes, despues }: ComparadorFotosProps) {
   }
 
   return (
-    <>
-      <div className="relative aspect-[16/10] max-h-[min(48vh,22rem)] w-full overflow-hidden rounded-[var(--radius)] border bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+    <div data-vaul-no-drag className="relative aspect-[16/10] max-h-[min(48vh,22rem)] w-full overflow-hidden rounded-[var(--radius)] border bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
         <img
           src={antes.src}
           alt={antes.alt}
@@ -128,14 +127,9 @@ export function ComparadorFotos({ antes, despues }: ComparadorFotosProps) {
           value={corte}
           onChange={(event) => setCorte(Number(event.target.value))}
           aria-label="Comparar la foto original con la foto de la reparación"
-          aria-describedby={ayudaId}
           aria-valuetext={`Mostrando el ${corte} % de la foto original`}
           className="absolute inset-0 size-full cursor-ew-resize touch-pan-y appearance-none bg-transparent opacity-0"
         />
-      </div>
-      <p id={ayudaId} className="text-xs text-muted-foreground">
-        Deslizá para comparar el antes y el después.
-      </p>
-    </>
+    </div>
   )
 }

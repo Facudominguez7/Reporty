@@ -609,6 +609,16 @@ export function ReporteDetalleClient({
   }
 
   const diasDesdeCreacion = Math.max(0, dayjs().tz(ZONA_HORARIA).startOf("day").diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA).startOf("day"), "day"));
+  /**
+   * Antigüedad legible del reporte: los días de calendario sirven para ayer y antes,
+   * pero un reporte de hoy se describe en horas (nunca «hace 0 días»).
+   */
+  const antiguedadReporte = (() => {
+    if (diasDesdeCreacion >= 1) return `hace ${diasDesdeCreacion} ${diasDesdeCreacion === 1 ? "día" : "días"}`;
+    const horas = Math.max(0, dayjs().tz(ZONA_HORARIA).diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA), "hour"));
+    if (horas >= 1) return `hace ${horas} ${horas === 1 ? "hora" : "horas"}`;
+    return "hace menos de una hora";
+  })();
   const adminDraftForRender = adminDraft ?? createAdminReportDraft(reporte);
   const adminBaseForRender = adminBase ?? adminDraftForRender;
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
@@ -749,7 +759,7 @@ export function ReporteDetalleClient({
                       timeZone: ZONA_HORARIA,
                     })}
                     {" "}<span className="font-bold">
-                      (hace {diasDesdeCreacion} {diasDesdeCreacion === 1 ? "día" : "días"})
+                      ({antiguedadReporte})
                     </span>
                   </span>
                 </div>
@@ -763,7 +773,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("prioridadId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>}
+                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Prioridad del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir prioridad" /></SelectTrigger>
@@ -772,7 +782,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>
+                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -783,7 +793,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => setAdminDraft((current) => current ? { ...current, estadoId: value.estadoId, comentarioEstado: value.comentario } : current)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>}
+                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>}
                       editor={(draft, onChange) => (
                         <div className="min-w-0 space-y-2">
                           <Select value={draft.estadoId.toString()} disabled={isAdminSaving} onValueChange={(id) => {
@@ -798,7 +808,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>
+                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -809,7 +819,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("categoriaId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant="category" className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>}
+                      display={() => <Badge variant="category" className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Categoría del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir categoría" /></SelectTrigger>
@@ -818,7 +828,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant="category" className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>
+                    <Badge variant="category" className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>
                   )}
                 </div>
                 <div className="flex min-w-0 items-start gap-3">
@@ -904,31 +914,7 @@ export function ReporteDetalleClient({
                       return (
                         <div key={foto.id} className="relative w-full max-w-2xl">
                           {conComparacion && comparaFotos ? (
-                            <>
-                              <ComparadorFotos antes={comparaFotos.antes} despues={comparaFotos.despues} />
-                              {/* La comparación no reemplaza la galería: cada foto sigue
-                                  abriéndose en grande en el diálogo de siempre (S9). */}
-                              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setSelectedPhoto({ src: comparaFotos.antes.src, alt: comparaFotos.antes.alt })}
-                                >
-                                  <ZoomIn className="mr-2 size-4" aria-hidden="true" />
-                                  Ver la foto original en grande
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setSelectedPhoto({ src: comparaFotos.despues.src, alt: comparaFotos.despues.alt })}
-                                >
-                                  <ZoomIn className="mr-2 size-4" aria-hidden="true" />
-                                  Ver la foto de la reparación en grande
-                                </Button>
-                              </div>
-                            </>
+                            <ComparadorFotos antes={comparaFotos.antes} despues={comparaFotos.despues} />
                           ) : (
                             <button
                               type="button"

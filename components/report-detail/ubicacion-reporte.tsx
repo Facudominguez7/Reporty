@@ -57,7 +57,7 @@ export function FranjaUbicacion({
           aria-hidden="true"
           // `inert` saca del Tab los enlaces que Leaflet inserta (atribución, zoom).
           inert
-          className="pointer-events-none relative h-14 w-20 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-border bg-[var(--surface-subtle)] sm:h-20 sm:w-32"
+          className="pointer-events-none relative h-14 w-20 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-border bg-[var(--surface-subtle)] [&_.leaflet-control-attribution]:hidden sm:h-20 sm:w-32"
         >
           <MiniMap lat={lat} lon={lon} />
         </div>

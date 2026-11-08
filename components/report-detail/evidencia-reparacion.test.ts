@@ -120,7 +120,6 @@ describe("comparación «Antes / Después»", () => {
     expect(html).toContain("https://ejemplo.test/despues.webp")
     expect(html).toMatch(/alt="Foto original del reporte[^"]*"/)
     expect(html).toMatch(/alt="Foto de la reparación informada por Marisa Bogado[^"]*"/)
-    expect(html).toContain("Deslizá para comparar el antes y el después.")
   })
 
   it("no anima la comparación para quien prefiere menos movimiento", () => {

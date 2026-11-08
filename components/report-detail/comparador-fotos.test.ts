@@ -62,13 +62,13 @@ describe("comparador horizontal «Antes / Después»", () => {
     expect(html).toMatch(/class="[^"]*focus-within:ring-2/)
   })
 
-  it("explica cómo comparar y asocia esa ayuda con el control", () => {
+  it("no agrega texto de ayuda ni rompe el arrastre de la hoja", () => {
     const html = renderizar()
-    const ayuda = /<p id="([^"]+)" class="[^"]*text-xs text-muted-foreground">Deslizá para comparar el antes y el después\.<\/p>/.exec(html)
 
-    expect(html).toContain("Deslizá para comparar el antes y el después.")
-    expect(ayuda).not.toBeNull()
-    expect(html).toContain(`aria-describedby="${ayuda?.[1]}"`)
+    // El pie con «Deslizá para comparar…» tapaba la foto y se quitó por pedido del dueño.
+    expect(html).not.toContain("Deslizá para comparar")
+    // Vaul no debe arrastrar el Drawer mientras se mueve el deslizador.
+    expect(html).toContain("data-vaul-no-drag")
   })
 
   it("no anima la comparación para quien prefiere menos movimiento", () => {

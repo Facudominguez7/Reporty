@@ -203,7 +203,6 @@ describe("comparación «Antes / Después» sobre la foto de la tarjeta (S10, S1
     expect(html).toContain("Antes · 12 nov")
     expect(html).toContain("Después · 28 nov")
     expect(html).toContain('aria-valuetext="Mostrando el 50 % de la foto original"')
-    expect(html).toContain("Deslizá para comparar el antes y el después.")
     // Cada foto conserva un nombre accesible con su autor y su fecha.
     expect(html).toContain('alt="Foto original del reporte, publicada por Usuario el 12/11/2026"')
     expect(html).toContain('alt="Foto de la reparación informada por Marisa Bogado el 28/11/2026"')
@@ -236,12 +235,21 @@ describe("comparación «Antes / Después» sobre la foto de la tarjeta (S10, S1
     expect(html).toContain("Ver imagen 1 del reporte en grande")
   })
 
-  it("mantiene la foto original y la de la reparación ampliables con la comparación", () => {
+  it("describe en horas un reporte creado hoy, nunca como «hace 0 días»", () => {
+    const ahora = new Date().toISOString()
+    const html = renderizar({ reporte: { ...reporte, created_at: ahora } })
+
+    expect(html).not.toContain("hace 0 días")
+    expect(html).toMatch(/hace (menos de una hora|\d+ horas?)/)
+  })
+
+  it("deja el deslizador solo bajo la foto comparada", () => {
     const html = renderizar()
 
-    // La comparación no encierra el control de rango dentro de un botón; cada foto
-    // conserva su propia entrada al diálogo de siempre (S9).
-    expect(html).toContain("Ver la foto original en grande")
-    expect(html).toContain("Ver la foto de la reparación en grande")
+    // La comparación no encierra el control de rango dentro de un botón ni agrega
+    // botones extra: se desliza sobre la foto, como pidió el diseño.
+    expect(html).toContain('type="range"')
+    expect(html).not.toContain("Ver la foto original en grande")
+    expect(html).not.toContain("Ver la foto de la reparación en grande")
   })
 })

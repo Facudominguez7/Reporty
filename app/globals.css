@@ -365,6 +365,12 @@ body:not(:has(.admin-workspace)),
     box-shadow: none !important;
     border: 1px solid var(--border) !important;
   }
+
+  /* Miniatura decorativa de la franja: sus créditos no entran en 80 px y el mapa
+     real con atribución vive en la hoja de ubicación y en el mapa completo. */
+  [data-vista-previa-ubicacion] .leaflet-control-attribution {
+    display: none;
+  }
 }
 
 .custom-cluster-icon,
