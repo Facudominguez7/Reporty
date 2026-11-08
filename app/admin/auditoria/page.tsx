@@ -4,23 +4,17 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { AuditFiltersForm } from "@/components/admin/auditoria/audit-filters"
 import { Card, CardContent } from "@/components/ui/card"
-import { getAdminAudit, type AuditEvent, type AuditFilters } from "@/database/queries/admin/admin-audit"
+import { getAdminAudit, type AuditFilters } from "@/database/queries/admin/admin-audit"
+import { esAccionAuditoria, fraseAccion } from "@/lib/auditoria/acciones"
 import { createClient } from "@/utils/supabase/server"
 
 export const metadata = { title: "Auditoría · Administración", robots: { index: false, follow: false } }
-
-const descriptions: Record<AuditEvent["action"], string> = {
-  report_created: "creó un reporte",
-  comment_created: "comentó un reporte",
-  vote_repaired: "votó que un reporte está reparado",
-  vote_not_exists: "votó que un reporte no existe",
-}
 
 export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{ page?: string; usuario?: string; accion?: string; periodo?: string }> }) {
   const params = await searchParams
   const parsed = Number(params.page)
   const page = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
-  const action = Object.hasOwn(descriptions, params.accion ?? "") ? params.accion as AuditEvent["action"] : undefined
+  const action = esAccionAuditoria(params.accion) ? params.accion : undefined
   const days = params.periodo === "7" || params.periodo === "30" ? Number(params.periodo) as 7 | 30 : undefined
   const filters: AuditFilters = { user: params.usuario?.trim().slice(0, 100) ?? "", action, days }
   const pagination = new URLSearchParams()
@@ -49,7 +43,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
             {events.map((event) => (
               <li key={event.id}>
                 <Card><CardContent className="space-y-1 p-3 sm:p-4">
-                  <p className="text-sm"><strong>{event.actor}</strong> {descriptions[event.action]}{event.report_id ? " en " : ""}{event.report_id && <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/reportes/${event.report_id}`}>#{event.report_id}{event.report_title ? ` · ${event.report_title}` : ""}</Link>}.</p>
+                  <p className="text-sm"><strong>{event.actor}</strong> {fraseAccion(event.action)}{event.report_id ? " en " : ""}{event.report_id && <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/reportes/${event.report_id}`}>#{event.report_id}{event.report_title ? ` · ${event.report_title}` : ""}</Link>}.</p>
                   <time dateTime={event.occurred_at} className="block text-xs text-muted-foreground">{new Date(event.occurred_at).toLocaleString("es-AR")}</time>
                 </CardContent></Card>
               </li>

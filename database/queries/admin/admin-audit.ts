@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { verificarEsAdmin } from "@/database/queries/admin/verificar-admin"
+import type { AccionAuditoria } from "@/lib/auditoria/acciones"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 export type AuditEvent = {
@@ -12,7 +13,7 @@ export type AuditEvent = {
   actor: string
   report_id: number | null
   report_title: string | null
-  action: "report_created" | "comment_created" | "vote_repaired" | "vote_not_exists"
+  action: AccionAuditoria
 }
 
 const PAGE_SIZE = 20
