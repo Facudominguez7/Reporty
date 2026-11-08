@@ -31,8 +31,13 @@ import {
  * - los errores no incluyen contenido de los eventos, credenciales ni rutas ajenas.
  */
 
-/** Estados de un lote que se pueden consultar y descargar. */
-const ESTADOS_ARCHIVABLES = ["subido", "verificado", "origen_eliminado"] as const
+/**
+ * Estados que ve el panel.
+ *
+ * `fallido` se incluye a propósito: el Admin necesita ver que un lote no se pudo
+ * archivar. La descarga y la recuperación siguen limitadas a lotes con archivo.
+ */
+const ESTADOS_ARCHIVABLES = ["subido", "verificado", "origen_eliminado", "fallido"] as const
 /** Tope de lotes que devuelve el listado del panel. */
 const LIMITE_LOTES = 50
 const PATRON_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

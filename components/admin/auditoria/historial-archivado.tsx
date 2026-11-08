@@ -1,11 +1,18 @@
 import Link from "next/link"
-import { Download, FileClock, Lock } from "lucide-react"
 
 import { simularArchivadoAction } from "@/app/admin/auditoria/acciones"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { formatearCantidad, formatearTamano, hashVisible, periodoArchivado } from "@/lib/auditoria/formato"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  estimarEspacioLiberable,
+  formatearCantidad,
+  formatearTamano,
+  hashVisible,
+  periodoArchivado,
+} from "@/lib/auditoria/formato"
 
 /** Lote archivado tal como lo muestra el panel, desacoplado del módulo de datos. */
 export type ArchivoListado = {
@@ -48,116 +55,179 @@ const ETIQUETAS_ESTADO: Record<string, { etiqueta: string; variante: "reparado" 
 }
 
 /**
+ * Estados con archivo remoto confirmado.
+ *
+ * `subido` todavía no tiene la integridad verificada y `fallido` no tiene
+ * archivo: en ambos casos el panel muestra las acciones deshabilitadas con la
+ * explicación, en lugar de ofrecer una descarga que fallaría.
+ */
+const ESTADOS_CON_ARCHIVO = new Set(["verificado", "origen_eliminado"])
+
+const AYUDA_CON_ARCHIVO = "Disponible después de verificar la integridad del archivo."
+const AYUDA_FALLIDO = "El archivado falló; el archivo no está disponible."
+
+/**
  * Sección administrativa con el historial de auditoría archivado en R2.
  *
  * No expone URLs del bucket: la descarga y la recuperación pasan por rutas del
  * servidor que vuelven a validar la sesión y el rol Admin.
  */
 export function HistorialArchivado({ archivos, metricas, filtros, simulacion, hayError = false }: Props) {
-  const disponible = archivos.filter((archivo) => archivo.estado !== "fallido" && archivo.rutaObjeto)
+  const eventosArchivados = metricas?.eventosArchivados ?? 0
+  const bytesEnR2 = metricas?.bytesEnR2 ?? 0
+  const espacioLiberable = estimarEspacioLiberable(metricas)
 
   return (
-    <section className="space-y-4" aria-labelledby="historial-archivado">
+    <section className="space-y-6" aria-labelledby="historial-archivado">
       <header>
-        <h2 id="historial-archivado" className="text-xl font-semibold tracking-tight">Historial archivado</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Lotes de auditoría con más de 180 días, guardados como JSON Lines comprimido en un bucket privado.
+        <h2 id="historial-archivado" className="text-2xl font-semibold leading-8 tracking-tight">Historial archivado</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Consultá los períodos archivados y recuperá eventos sin restaurarlos en la tabla principal.
         </p>
       </header>
 
       {simulacion && (
-        <p role="status" className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+        <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm">
           {simulacion === "error"
             ? "No pudimos simular el archivado: revisá la configuración de Cloudflare R2."
             : `Simulación: se archivarían ${formatearCantidad(Number(simulacion) || 0)} eventos. No se modificó ni se eliminó nada.`}
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card><CardContent className="p-4">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Eventos archivados</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatearCantidad(metricas?.eventosArchivados ?? 0)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{formatearCantidad(metricas?.lotes ?? 0)} lotes en R2</p>
+      <div className="grid gap-4 sm:grid-cols-3" aria-label="Métricas del historial archivado">
+        <Card><CardContent className="grid gap-2">
+          <h3 className="text-xs font-semibold uppercase leading-5 tracking-[0.14em] text-muted-foreground">Eventos archivados</h3>
+          <p className="text-3xl font-semibold leading-9 tracking-tight tabular-nums">{formatearCantidad(eventosArchivados)}</p>
         </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Tamaño en R2</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatearTamano(metricas?.bytesEnR2 ?? 0)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Comprimido con GZIP</p>
+        <Card><CardContent className="grid gap-2">
+          <h3 className="text-xs font-semibold uppercase leading-5 tracking-[0.14em] text-muted-foreground">Tamaño en R2</h3>
+          <p className="text-3xl font-semibold leading-9 tracking-tight tabular-nums">{formatearTamano(bytesEnR2)}</p>
         </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Espacio liberable en PostgreSQL</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{formatearCantidad(metricas?.elegibles ?? 0)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">eventos fuera de la ventana caliente</p>
+        <Card><CardContent className="grid gap-2">
+          <h3 className="text-xs font-semibold uppercase leading-5 tracking-[0.14em] text-muted-foreground">Espacio liberable en PostgreSQL</h3>
+          <p className="text-3xl font-semibold leading-9 tracking-tight tabular-nums">{formatearTamano(espacioLiberable)}</p>
+          <p className="text-xs text-muted-foreground">Estimación; no implica que ya se haya liberado.</p>
         </CardContent></Card>
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-        <form method="get" action="/admin/auditoria" className="contents">
-          <label className="grid gap-1 text-sm">Desde
-            <input type="date" name="desde" defaultValue={filtros.desde} className="min-h-10 rounded-md border border-input bg-background px-3" />
-          </label>
-          <label className="grid gap-1 text-sm">Hasta
-            <input type="date" name="hasta" defaultValue={filtros.hasta} className="min-h-10 rounded-md border border-input bg-background px-3" />
-          </label>
-          <Button type="submit" variant="outline">Aplicar</Button>
-        </form>
-        <form action={simularArchivadoAction} className="md:col-span-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" variant="neutral">
-              <FileClock aria-hidden="true" />
+      <div className="grid gap-3 rounded-xl border border-border bg-card p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end">
+          <form method="get" action="/admin/auditoria" aria-label="Filtrar historial archivado" className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="grid min-w-0 flex-1 gap-1.5">
+              <Label htmlFor="archivo-desde">Desde</Label>
+              <Input id="archivo-desde" name="desde" type="date" defaultValue={filtros.desde} />
+            </div>
+            <div className="grid min-w-0 flex-1 gap-1.5">
+              <Label htmlFor="archivo-hasta">Hasta</Label>
+              <Input id="archivo-hasta" name="hasta" type="date" defaultValue={filtros.hasta} />
+            </div>
+            <Button type="submit">Aplicar</Button>
+          </form>
+          <form action={simularArchivadoAction} className="md:pb-0">
+            <Button type="submit" variant="outline" aria-describedby="ayuda-dry-run">
               Ejecutar archivado (dry-run)
             </Button>
-            <span className="text-xs text-muted-foreground">
-              La simulación no modifica ni elimina datos.
-            </span>
-          </div>
-        </form>
+          </form>
+        </div>
+        <p id="ayuda-dry-run" className="text-xs text-muted-foreground">El dry-run no modifica ni elimina datos.</p>
       </div>
 
       {hayError ? (
         <p role="alert" className="text-sm text-destructive">No pudimos cargar el historial archivado.</p>
-      ) : disponible.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Todavía no hay lotes archivados.</p>
       ) : (
-        <ol className="space-y-2" aria-label="Lotes de auditoría archivados">
-          {disponible.map((archivo) => {
-            const estado = ETIQUETAS_ESTADO[archivo.estado] ?? ETIQUETAS_ESTADO.subido
-            return (
-              <li key={archivo.id}>
-                <Card><CardContent className="flex flex-col gap-3 p-3 sm:p-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{periodoArchivado(archivo.primeraFecha, archivo.ultimaFecha)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatearCantidad(archivo.cantidadRegistros)} eventos · {formatearTamano(archivo.tamanoComprimido ?? 0)} comprimidos
-                    </p>
-                    <p className="font-mono text-xs text-muted-foreground" title={archivo.hashSha256 ?? undefined}>
-                      SHA-256 {hashVisible(archivo.hashSha256)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={estado.variante} className="gap-1.5 px-3 py-1 text-[0.7rem] tracking-[0.04em]">
-                      <span aria-hidden="true" className="size-[7px] rounded-full bg-current opacity-75" />
-                      {estado.etiqueta}
-                    </Badge>
-                    <Link href={`/admin/auditoria/archivo/${archivo.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-                      Ver eventos
-                    </Link>
-                    <a href={`/api/admin/auditoria/archivo/${archivo.id}/descarga`} className={buttonVariants({ variant: "neutral", size: "sm" })}>
-                      <Download aria-hidden="true" />
-                      Descargar .jsonl.gz
-                    </a>
-                  </div>
-                </CardContent></Card>
-              </li>
-            )
-          })}
-        </ol>
+        <div className="space-y-2">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-base font-semibold">Lotes archivados</h3>
+            <p className="text-xs text-muted-foreground">
+              {archivos.length === 1 ? "1 lote" : `${formatearCantidad(archivos.length)} lotes`}
+            </p>
+          </div>
+
+          {archivos.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <p className="text-sm font-semibold">Todavía no hay lotes archivados</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Los períodos archivados van a aparecer acá cuando haya lotes disponibles.
+              </p>
+            </div>
+          ) : (
+            <ol className="space-y-2" aria-label="Lotes archivados">
+              {archivos.map((archivo) => {
+                const estado = ETIQUETAS_ESTADO[archivo.estado] ?? ETIQUETAS_ESTADO.subido
+                const periodo = periodoArchivado(archivo.primeraFecha, archivo.ultimaFecha)
+                const conArchivo = ESTADOS_CON_ARCHIVO.has(archivo.estado) && Boolean(archivo.rutaObjeto)
+                const ayudaId = `ayuda-lote-${archivo.id}`
+
+                return (
+                  <li key={archivo.id}>
+                    <Card><CardContent className="grid gap-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-base font-semibold leading-5 tabular-nums">{periodo}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {formatearCantidad(archivo.cantidadRegistros)} eventos ·{" "}
+                            {formatearTamano(archivo.tamanoComprimido ?? 0)} comprimidos
+                          </p>
+                        </div>
+                        <Badge variant={estado.variante} className="gap-1.5 px-3 py-1 text-[0.7rem] tracking-[0.04em]">
+                          <span aria-hidden="true" className="size-[7px] rounded-full bg-current opacity-75" />
+                          {estado.etiqueta}
+                        </Badge>
+                      </div>
+
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          SHA-256 <code className="font-mono text-foreground">{hashVisible(archivo.hashSha256)}</code>
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {conArchivo ? (
+                            <>
+                              <Link
+                                href={`/admin/auditoria/archivo/${archivo.id}`}
+                                className={buttonVariants({ variant: "outline", size: "sm" })}
+                                aria-label={`Ver eventos del lote del ${periodo}`}
+                              >
+                                Ver eventos
+                              </Link>
+                              <a
+                                href={`/api/admin/auditoria/archivo/${archivo.id}/descarga`}
+                                className={buttonVariants({ variant: "outline", size: "sm" })}
+                                aria-label={`Descargar el lote del ${periodo} como .jsonl.gz`}
+                              >
+                                Descargar .jsonl.gz
+                              </a>
+                            </>
+                          ) : (
+                            <>
+                              <Button type="button" variant="outline" size="sm" disabled aria-describedby={ayudaId}>
+                                Ver eventos
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" disabled aria-describedby={ayudaId}>
+                                Descargar .jsonl.gz
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {!conArchivo && (
+                        <p id={ayudaId} className="text-xs text-muted-foreground">
+                          {archivo.estado === "fallido" ? AYUDA_FALLIDO : AYUDA_CON_ARCHIVO}
+                        </p>
+                      )}
+                    </CardContent></Card>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </div>
       )}
 
-      <p className="flex items-start gap-2 text-xs text-muted-foreground">
-        <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-        Los archivos son privados y viven en un bucket privado: solo un Admin los descarga a través del servidor, y
-        ninguna consulta ni descarga se autoriza en el navegador. Ningún archivo histórico se elimina automáticamente.
+      <p className="text-sm leading-6 text-muted-foreground">
+        Los archivos son privados y se guardan en un bucket privado. Solo los administradores pueden descargarlos a
+        través del servidor; toda consulta y descarga se autoriza en el servidor. Ningún archivo histórico se elimina
+        automáticamente.
       </p>
     </section>
   )

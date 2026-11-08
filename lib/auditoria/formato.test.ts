@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  estimarEspacioLiberable,
   formatearCantidad,
   formatearFechaCorta,
   formatearFechaLegible,
@@ -49,5 +50,20 @@ describe("formato de cantidades y tamaños", () => {
     expect(hashVisible("0123456789abcdef".padEnd(64, "f"))).toBe("0123456789ab…")
     expect(hashVisible("0123456789abcdef", 4)).toBe("0123…")
     expect(hashVisible(null)).toBe("—")
+  })
+})
+
+describe("estimación de espacio liberable", () => {
+  it("prorratea el tamaño de la tabla por los eventos elegibles", () => {
+    expect(estimarEspacioLiberable({ espacioTablaBytes: 100_000, eventosEnPostgres: 100, elegibles: 25 })).toBe(25_000)
+    expect(formatearTamano(estimarEspacioLiberable({ espacioTablaBytes: 15 * 1024 * 1024, eventosEnPostgres: 5000, elegibles: 400 })))
+      .toBe("1,2 MB")
+  })
+
+  it("no estima nada sin eventos, sin elegibles o sin métricas", () => {
+    expect(estimarEspacioLiberable(null)).toBe(0)
+    expect(estimarEspacioLiberable({ espacioTablaBytes: 1000, eventosEnPostgres: 0, elegibles: 10 })).toBe(0)
+    expect(estimarEspacioLiberable({ espacioTablaBytes: 1000, eventosEnPostgres: 10, elegibles: 0 })).toBe(0)
+    expect(estimarEspacioLiberable({ espacioTablaBytes: 0, eventosEnPostgres: 10, elegibles: 5 })).toBe(0)
   })
 })

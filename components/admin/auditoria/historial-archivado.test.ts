@@ -21,8 +21,9 @@ const archivo = {
 const metricas = {
   eventosArchivados: 1234,
   bytesEnR2: Math.round(1.8 * 1024 * 1024),
-  elegibles: 7,
-  espacioTablaBytes: 48 * 1024,
+  elegibles: 400,
+  eventosEnPostgres: 5000,
+  espacioTablaBytes: 15 * 1024 * 1024,
   lotes: 1,
   lotesFallidos: 0,
   lotesPendientesPurga: 0,
@@ -42,12 +43,20 @@ describe("HistorialArchivado", () => {
     const html = renderizar()
 
     expect(html).toContain("Historial archivado")
+    expect(html).toContain("Consultá los períodos archivados y recuperá eventos sin restaurarlos")
     expect(html).toContain("Eventos archivados")
     expect(html).toContain("1.234")
+    expect(html).toContain("Tamaño en R2")
     expect(html).toContain("1,8 MB")
+    expect(html).toContain("Espacio liberable en PostgreSQL")
+    expect(html).toContain("1,2 MB")
+    expect(html).toContain("Estimación; no implica que ya se haya liberado.")
     expect(html).toContain("01/11/2025 – 30/04/2026")
-    expect(html).toContain("SHA-256 aaaaaaaaaaaa…")
+    expect(html).toContain("1.234 eventos")
+    expect(html).toContain("SHA-256")
+    expect(html).toContain("aaaaaaaaaaaa")
     expect(html).toContain("Verificado")
+    expect(html).toContain("1 lote")
     // El estado se lee sin esfuerzo: texto más grande que el badge por defecto y un punto de color.
     expect(html).toMatch(/text-\[0\.7rem\][^"]*tracking-\[0\.04em\][^"]*">\s*<span aria-hidden="true" class="size-\[7px\] rounded-full bg-current/)
   })
@@ -65,8 +74,10 @@ describe("HistorialArchivado", () => {
     const html = renderizar()
 
     expect(html).toContain("Ejecutar archivado (dry-run)")
-    expect(html).toContain("no modifica ni elimina datos")
+    expect(html).toContain("El dry-run no modifica ni elimina datos.")
     expect(html).not.toMatch(/solo admin/i)
+    expect(html).toContain('id="archivo-desde"')
+    expect(html).toContain('id="archivo-hasta"')
     expect(html).toContain('name="desde"')
     expect(html).toContain('name="hasta"')
     expect(html).toContain('type="date"')
@@ -77,17 +88,28 @@ describe("HistorialArchivado", () => {
     expect(renderizar({ simulacion: "error" })).toContain("revisá la configuración de Cloudflare R2")
   })
 
-  it("muestra el estado vacío y descarta lotes fallidos o sin objeto", () => {
-    expect(renderizar({ archivos: [] })).toContain("Todavía no hay lotes archivados")
+  it("muestra el estado vacío", () => {
+    const html = renderizar({ archivos: [] })
 
-    const html = renderizar({
-      archivos: [
-        { ...archivo, id: "fallido", estado: "fallido" },
-        { ...archivo, id: "sin-objeto", rutaObjeto: null },
-      ],
-    })
     expect(html).toContain("Todavía no hay lotes archivados")
-    expect(html).not.toContain("/archivo/fallido")
+    expect(html).toContain("Los períodos archivados van a aparecer acá cuando haya lotes disponibles.")
+    expect(html).toContain("0 lotes")
+  })
+
+  it("muestra los lotes sin archivo con las acciones deshabilitadas y su explicación", () => {
+    const fallido = renderizar({ archivos: [{ ...archivo, id: "fallido", estado: "fallido", rutaObjeto: null }] })
+
+    expect(fallido).toContain("Fallido")
+    expect(fallido).toContain("El archivado falló; el archivo no está disponible.")
+    expect(fallido).toContain("disabled")
+    expect(fallido).not.toContain("/archivo/fallido")
+    expect(fallido).not.toContain("/descarga")
+
+    const subido = renderizar({ archivos: [{ ...archivo, id: "subido", estado: "subido" }] })
+
+    expect(subido).toContain("Subido")
+    expect(subido).toContain("Disponible después de verificar la integridad del archivo.")
+    expect(subido).not.toContain("/archivo/subido")
   })
 
   it("informa el error de carga y aclara que los archivos son privados", () => {
@@ -95,6 +117,7 @@ describe("HistorialArchivado", () => {
 
     expect(html).toContain("No pudimos cargar el historial archivado.")
     expect(html).toContain("bucket privado")
+    expect(html).toContain("toda consulta y descarga se autoriza en el servidor")
     expect(html).toContain("Ningún archivo histórico se elimina automáticamente")
   })
 })

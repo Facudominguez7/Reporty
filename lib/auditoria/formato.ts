@@ -85,3 +85,21 @@ export function hashVisible(hash: string | null, longitud = 12): string {
   if (!hash) return "—"
   return hash.length <= longitud ? hash : `${hash.slice(0, longitud)}…`
 }
+
+/**
+ * Estima cuánto espacio liberaría purgar los eventos ya elegibles.
+ *
+ * Es una regla de tres sobre el tamaño total de la tabla: sirve como orden de
+ * magnitud, no como medición. Sin eventos en PostgreSQL la estimación es cero.
+ *
+ * @param metricas métricas del archivo, tal como las devuelve el panel.
+ */
+export function estimarEspacioLiberable(
+  metricas: { espacioTablaBytes?: number; eventosEnPostgres?: number; elegibles?: number } | null | undefined,
+): number {
+  const total = metricas?.espacioTablaBytes ?? 0
+  const eventos = metricas?.eventosEnPostgres ?? 0
+  const elegibles = metricas?.elegibles ?? 0
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(eventos) || eventos <= 0 || elegibles <= 0) return 0
+  return Math.round((total / eventos) * elegibles)
+}

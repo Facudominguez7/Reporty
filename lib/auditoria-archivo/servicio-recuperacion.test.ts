@@ -168,7 +168,7 @@ describe("listarArchivosArchivados", () => {
 
     const resultado = await listarArchivosArchivados(cliente, usuarioId)
 
-    expect(registro).toContain("in:estado=subido,verificado,origen_eliminado")
+    expect(registro).toContain("in:estado=subido,verificado,origen_eliminado,fallido")
     expect(registro).toContain("order:primera_fecha:desc")
     expect(registro).toContain("limit:50")
     expect(resultado.archivos).toEqual([{
