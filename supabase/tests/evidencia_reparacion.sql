@@ -1,7 +1,7 @@
 -- Contrato transaccional de evidencia y verificación de reparaciones.
--- El ejecutor abre una transacción, compone el esquema vigente (migración base más
--- la incremental de administración en reparaciones) cuando hace falta, ejecuta este
--- archivo y revierte: nunca se aplica a la base local.
+-- El ejecutor abre una transacción, compone el esquema vigente (migración base y
+-- las incrementales de administración y cancelación), ejecuta este archivo y
+-- revierte: nada queda aplicado a la base local.
 -- La participación de administración (L21) se prueba en admin_reparacion.sql.
 \set ON_ERROR_STOP on
 
@@ -484,17 +484,28 @@ select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
 select public.crear_evidencia_reparacion(-92005,'30000000-0000-0000-0000-000000000012',
   'Reparación rechazada por administración',pg_temp.huella(5));
 select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92005),
-  '30000000-0000-0000-0000-000000000007','rechazar','La foto no muestra la reparación')
+  '30000000-0000-0000-0000-000000000007','rechazar','  La foto no muestra la reparación  ')
   ->> 'evidencia_estado') = 'rechazada', 'Rechazar la evidencia la descarta');
 select pg_temp.exigir((select estado='rechazada' and motivo_resolucion='La foto no muestra la reparación'
   from public.evidencias_reparacion where reporte_id=-92005), 'La evidencia rechazada conserva su motivo');
 select pg_temp.exigir((select estado_id=1 from public.reportes where id=-92005),
   'Rechazar la evidencia deja el reporte pendiente');
-select pg_temp.exigir(not exists (select 1 from public.historial_estados where reporte_id=-92005),
-  'Rechazar la evidencia no registra historial');
+select pg_temp.exigir((select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+  and usuario_id='30000000-0000-0000-0000-000000000007'
+  and comentario='La foto no muestra la reparación')
+  from public.historial_estados where reporte_id=-92005),
+  'Cancelar registra una sola actividad con el estado actual y el motivo limpio');
 select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92005),
-  '30000000-0000-0000-0000-000000000007','rechazar') ->> 'repetida') = 'true',
+  '30000000-0000-0000-0000-000000000007','rechazar','Otro motivo') ->> 'repetida') = 'true',
   'Rechazar dos veces es idempotente');
+select pg_temp.exigir((select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+  and usuario_id='30000000-0000-0000-0000-000000000007'
+  and comentario='La foto no muestra la reparación')
+  from public.historial_estados where reporte_id=-92005),
+  'La repetición no duplica ni cambia la actividad original');
+select pg_temp.exigir((select motivo_resolucion='La foto no muestra la reparación'
+  from public.evidencias_reparacion where reporte_id=-92005),
+  'La repetición no cambia el motivo de la evidencia');
 select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
   pg_temp.evidencia(-92005),'30000000-0000-0000-0000-000000000007','revertir')$q$,
   'PRE09','Solo se puede revertir una evidencia validada');
@@ -549,6 +560,24 @@ select pg_temp.exigir((public.crear_evidencia_reparacion(-92008,
   ->> 'estado') = 'informada', 'Tras el rechazo se puede volver a informar');
 select pg_temp.exigir((select count(*)=2 from public.evidencias_reparacion where reporte_id=-92008),
   'El rechazo conserva el historial de evidencias');
+-- Sin motivo, la evidencia conserva el texto previo y la actividad usa uno propio.
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92008),
+  '30000000-0000-0000-0000-000000000007','rechazar') ->> 'repetida') = 'false',
+  'Cancelar sin motivo resuelve la nueva evidencia');
+select pg_temp.exigir((select estado='rechazada' and motivo_resolucion='Rechazada por administración'
+  from public.evidencias_reparacion where id=pg_temp.evidencia(-92008)),
+  'Sin motivo la evidencia conserva el texto por defecto del RPC');
+select pg_temp.exigir((select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+  and usuario_id='30000000-0000-0000-0000-000000000007'
+  and comentario='Un administrador canceló la revisión de reparado.')
+  from public.historial_estados where reporte_id=-92008),
+  'Sin motivo queda exactamente una actividad administrativa por defecto');
+select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92008),
+  '30000000-0000-0000-0000-000000000007','rechazar','   ') ->> 'repetida') = 'true',
+  'La cancelación sin motivo también es idempotente');
+select pg_temp.exigir((select count(*)=1 and bool_and(comentario='Un administrador canceló la revisión de reparado.')
+  from public.historial_estados where reporte_id=-92008),
+  'Repetir la cancelación sin motivo no agrega actividad');
 
 -- ---------------------------------------------------------------------------
 -- Regresión: el destino «reporte» de la moderación sigue insertando en fotos_reporte.
@@ -724,6 +753,38 @@ select pg_temp.rechazar($q$select public.registrar_verificacion_reparacion(
   'PRE02','No podés validar tu propia evidencia');
 select pg_temp.exigir((select count(*)=2 from public.verificaciones_reparacion
   where evidencia_id=pg_temp.evidencia(-92019)), 'P7: el autor no deja verificación propia');
+-- Si falla el historial, la evidencia, la impugnación y la auditoría se revierten juntas.
+reset role;
+create function pg_temp.interrumpir_historial_cancelacion() returns trigger language plpgsql as $$
+begin
+  if new.reporte_id=-92019 and current_setting('prueba.fallar_historial', true)='si' then
+    raise exception 'Falla simulada del historial';
+  end if;
+  return new;
+end $$;
+create trigger sonda_historial_cancelacion before insert on public.historial_estados
+  for each row execute function pg_temp.interrumpir_historial_cancelacion();
+set local role service_role;
+set local prueba.fallar_historial='si';
+select pg_temp.rechazar($q$select public.resolver_evidencia_reparacion_admin(
+  pg_temp.evidencia(-92019),'30000000-0000-0000-0000-000000000007','rechazar',
+  'La foto no muestra la reparación')$q$, 'P0001', 'Falla simulada del historial');
+select pg_temp.exigir((select estado='en_verificacion' and resuelta_at is null
+  and resuelta_por is null and motivo_resolucion is null
+  from public.evidencias_reparacion where reporte_id=-92019),
+  'El fallo del historial revierte la resolución de la evidencia');
+select pg_temp.exigir((select estado='pendiente' and resuelta_at is null and resuelta_por is null
+  from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92019) and tipo='impugnacion'),
+  'El fallo del historial deja pendiente la impugnación');
+select pg_temp.exigir((select count(*)=2 from public.verificaciones_reparacion
+  where evidencia_id=pg_temp.evidencia(-92019))
+  and (select estado_id=1 from public.reportes where id=-92019)
+  and (select puntos=0 from public.profiles where id='30000000-0000-0000-0000-000000000001')
+  and not exists (select 1 from public.historial_estados where reporte_id=-92019)
+  and not exists (select 1 from public.audit_events where report_id=-92019 and action='evidence_rejected'),
+  'El fallo no cambia verificaciones, reporte ni puntos y no deja historial ni auditoría');
+set local prueba.fallar_historial='no';
 select pg_temp.exigir((public.resolver_evidencia_reparacion_admin(pg_temp.evidencia(-92019),
   '30000000-0000-0000-0000-000000000007','rechazar','La foto no muestra la reparación')
   ->> 'impugnaciones_pendientes')::integer = 0, 'P2: rechazar deja cero impugnaciones pendientes');
@@ -746,6 +807,11 @@ select pg_temp.exigir((select estado='aceptada' and resuelta_por='30000000-0000-
   from public.verificaciones_reparacion
   where evidencia_id=pg_temp.evidencia(-92019) and tipo='impugnacion'),
   'P2: la repetición conserva la impugnación aceptada');
+select pg_temp.exigir((select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+  and usuario_id='30000000-0000-0000-0000-000000000007'
+  and comentario='La foto no muestra la reparación')
+  from public.historial_estados where reporte_id=-92019),
+  'La cancelación recuperada y su repetición dejan una sola actividad');
 
 -- ---------------------------------------------------------------------------
 -- S5/S12 (P4): repetir la misma verificación es idempotente y no premia de nuevo.

@@ -13,7 +13,6 @@ import "server-only"
 
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
-import { registrarCambioEstado } from "@/database/queries/reportes/[id]/historial-estados"
 import { ROLE_IDS } from "@/lib/authz/catalog"
 import {
   canParticipateInCommunity,
@@ -417,12 +416,10 @@ async function notificarReparacionValidada(
   }
 }
 
-/** Registra la cancelación y avisa al autor de la evidencia, ambos de mejor esfuerzo. */
-async function registrarYNotificarCancelacionReparacion(
+/** Avisa al autor de la evidencia de mejor esfuerzo; la RPC ya registró la cancelación. */
+async function notificarCancelacionReparacion(
   supabase: SupabaseClient,
   evidenciaId: string,
-  administradorId: string,
-  reporteEstadoId: number | null,
   motivo: string,
 ) {
   let evidencia: { reporte_id?: number; autor_id?: string } | null
@@ -433,36 +430,19 @@ async function registrarYNotificarCancelacionReparacion(
       .eq("id", evidenciaId)
       .maybeSingle()
     if (error || !data) {
-      console.error("No pudimos leer la evidencia para registrar la cancelación:", error)
+      console.error("No pudimos leer la evidencia para avisar la cancelación:", error)
       return
     }
     evidencia = data as { reporte_id?: number; autor_id?: string }
   } catch (error) {
-    console.error("No pudimos leer la evidencia para registrar la cancelación:", error)
+    console.error("No pudimos leer la evidencia para avisar la cancelación:", error)
     return
   }
 
   const reporteId = Number(evidencia.reporte_id)
   if (!Number.isSafeInteger(reporteId) || reporteId <= 0) {
-    console.error("No pudimos registrar la cancelación: el reporte de la evidencia no es válido.")
+    console.error("No pudimos avisar la cancelación: el reporte de la evidencia no es válido.")
     return
-  }
-
-  if (reporteEstadoId === null) {
-    console.error("No pudimos registrar la cancelación: el reporte no tiene estado.")
-  } else {
-    try {
-      await registrarCambioEstado(
-        supabase,
-        reporteId,
-        reporteEstadoId,
-        reporteEstadoId,
-        administradorId,
-        motivo || "Administración canceló la revisión de reparado.",
-      )
-    } catch (error) {
-      console.error("No pudimos registrar la cancelación en el historial:", error)
-    }
   }
 
   if (!evidencia.autor_id) return
@@ -639,8 +619,8 @@ export async function verificarReparacionWorkflow(
 /**
  * Aprueba, rechaza o revierte una evidencia (S8). Aprobar exige la foto publicada,
  * resuelve las impugnaciones pendientes y cierra el reporte como Reparado; revertir
- * devuelve el reporte a Pendiente. Rechazar registra la cancelación y avisa al autor
- * de la evidencia sin deshacer la resolución si falla el historial o el correo.
+ * devuelve el reporte a Pendiente. Al rechazar, la RPC registra la cancelación en
+ * la misma transacción y el correo al autor es de mejor esfuerzo.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
  * @param evidenciaId - Evidencia que se resuelve.
@@ -684,13 +664,7 @@ export async function resolverEvidenciaReparacionWorkflow(
     )
   }
   if (accion === "rechazar" && !resolucion.repetida) {
-    await registrarYNotificarCancelacionReparacion(
-      supabase,
-      evidenciaId,
-      administradorId,
-      resolucion.reporteEstadoId,
-      motivoLimpio,
-    )
+    await notificarCancelacionReparacion(supabase, evidenciaId, motivoLimpio)
   }
   return { success: true, data: resolucion }
 }

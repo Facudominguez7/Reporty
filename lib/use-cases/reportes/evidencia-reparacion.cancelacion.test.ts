@@ -58,17 +58,16 @@ const RESULTADO = {
   },
 }
 
-/** Cliente sintético: identifica el perfil consultado y registra la inserción de historial. */
+/** Cliente sintético: identifica el perfil consultado y detecta escrituras fuera de la RPC. */
 function clienteFalso(opciones: {
   repetida?: boolean
   correoAutor?: string | null
-  errorHistorial?: "respuesta" | "excepcion"
+  errorRpc?: boolean
 } = {}) {
-  const rpc = vi.fn(async () => ({ data: { ...RESOLUCION, repetida: opciones.repetida ?? false }, error: null }))
-  const insertar = vi.fn(async () => {
-    if (opciones.errorHistorial === "excepcion") throw new Error("historial no disponible")
-    return { error: opciones.errorHistorial === "respuesta" ? { message: "historial no disponible" } : null }
-  })
+  const rpc = vi.fn(async () => opciones.errorRpc
+    ? { data: null, error: { code: "XX000", message: "historial no disponible" } }
+    : { data: { ...RESOLUCION, repetida: opciones.repetida ?? false }, error: null })
+  const insertar = vi.fn(async () => ({ error: null }))
   const filtros: Array<{ tabla: string; columna: string; valor: unknown }> = []
   const from = vi.fn((tabla: string) => {
     let id: unknown
@@ -118,7 +117,7 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe("cancelar la revisión de reparado", () => {
-  it("registra el motivo limpio como historial sin cambiar el estado ni los contadores", async () => {
+  it("envía el motivo limpio a la RPC sin insertar historial desde el caso de uso", async () => {
     const cliente = clienteFalso()
 
     const resultado = await resolverEvidenciaReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "rechazar", "  La foto no corresponde  ")
@@ -127,21 +126,17 @@ describe("cancelar la revisión de reparado", () => {
     expect(cliente.rpc).toHaveBeenCalledWith("resolver_evidencia_reparacion_admin", {
       p_evidencia_id: "evidencia-1", p_administrador_id: "admin-1", p_accion: "rechazar", p_motivo: "La foto no corresponde",
     })
-    expect(cliente.insertar).toHaveBeenCalledExactlyOnceWith({
-      reporte_id: 9, estado_anterior_id: 1, estado_nuevo_id: 1,
-      usuario_id: "admin-1", comentario: "La foto no corresponde",
-    })
+    expect(cliente.from).not.toHaveBeenCalledWith("historial_estados")
+    expect(cliente.insertar).not.toHaveBeenCalled()
   })
 
-  it("registra un texto administrativo por defecto si no hay motivo", async () => {
+  it("delega a la RPC el motivo por defecto y avisa sin motivo si está vacío", async () => {
     const cliente = clienteFalso()
 
     expect(await resolverEvidenciaReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "rechazar", "  ")).toEqual(RESULTADO)
     expect(cliente.rpc).toHaveBeenCalledWith("resolver_evidencia_reparacion_admin", expect.objectContaining({ p_motivo: null }))
-    expect(cliente.insertar).toHaveBeenCalledExactlyOnceWith({
-      reporte_id: 9, estado_anterior_id: 1, estado_nuevo_id: 1,
-      usuario_id: "admin-1", comentario: "Administración canceló la revisión de reparado.",
-    })
+    expect(cliente.from).not.toHaveBeenCalledWith("historial_estados")
+    expect(cliente.insertar).not.toHaveBeenCalled()
     expect(mocks.avisoCancelacion).toHaveBeenCalledWith(expect.objectContaining({ motivo: null }))
   })
 
@@ -164,7 +159,8 @@ describe("cancelar la revisión de reparado", () => {
     const cliente = clienteFalso({ correoAutor })
 
     expect(await resolverEvidenciaReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "rechazar")).toEqual(RESULTADO)
-    expect(cliente.insertar).toHaveBeenCalledOnce()
+    expect(cliente.from).not.toHaveBeenCalledWith("historial_estados")
+    expect(cliente.insertar).not.toHaveBeenCalled()
     expect(mocks.avisoCancelacion).not.toHaveBeenCalled()
   })
 
@@ -178,21 +174,31 @@ describe("cancelar la revisión de reparado", () => {
     expect(mocks.avisoCancelacion).not.toHaveBeenCalled()
   })
 
-  it.each(["respuesta", "excepcion"] as const)("si falla el historial por %s, conserva el éxito e intenta el correo", async (errorHistorial) => {
-    const cliente = clienteFalso({ errorHistorial })
+  it("si falla la RPC, devuelve error sin insertar historial ni intentar el correo", async () => {
+    const cliente = clienteFalso({ errorRpc: true })
 
-    expect(await resolverEvidenciaReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "rechazar")).toEqual(RESULTADO)
-    expect(cliente.insertar).toHaveBeenCalledOnce()
-    expect(console.error).toHaveBeenCalled()
-    expect(mocks.avisoCancelacion).toHaveBeenCalledOnce()
+    expect(await resolverEvidenciaReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "rechazar")).toEqual({
+      success: false, error: "No pudimos resolver la evidencia. Recargá la revisión e intentá nuevamente.",
+    })
+    expect(cliente.from).not.toHaveBeenCalled()
+    expect(cliente.insertar).not.toHaveBeenCalled()
+    expect(mocks.avisoCancelacion).not.toHaveBeenCalled()
   })
 
-  it("si falla el proveedor, conserva el éxito y el historial", async () => {
+  it.each(["respuesta", "excepción"] as const)("si falla el correo por %s, conserva el resultado de la RPC", async (tipoFalla) => {
     const cliente = clienteFalso()
-    mocks.avisoCancelacion.mockRejectedValue(new Error("correo no disponible"))
+    if (tipoFalla === "respuesta") {
+      mocks.avisoCancelacion.mockResolvedValue({ data: null, error: { message: "correo no disponible" } })
+    } else {
+      mocks.avisoCancelacion.mockRejectedValue(new Error("correo no disponible"))
+    }
 
     expect(await resolverEvidenciaReparacionWorkflow(cliente.supabase, "evidencia-1", "admin-1", "rechazar")).toEqual(RESULTADO)
-    expect(cliente.insertar).toHaveBeenCalledOnce()
+    expect(cliente.from).not.toHaveBeenCalledWith("historial_estados")
+    expect(cliente.insertar).not.toHaveBeenCalled()
+    expect(mocks.avisoCancelacion).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      autorEmail: "vecino@example.invalid", motivo: null,
+    }))
     expect(console.error).toHaveBeenCalled()
   })
 
