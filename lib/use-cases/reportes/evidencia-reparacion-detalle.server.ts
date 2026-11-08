@@ -195,16 +195,17 @@ async function leerSeccion(
     && puedeInformarReparacion(entrada.usuario, entrada.rolId),
   )
 
+  // Sin evidencia visible la franja igual se devuelve: quien no puede informar
+  // (invitado, sesión anónima, operador o reporte cerrado) ve la invitación a
+  // ingresar en vez de que la sección desaparezca.
   if (!fila) {
-    return puedeInformar
-      ? { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar }
-      : null
+    return { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar }
   }
 
   const estado = estadoVisibleEvidencia(fila.estado)
-  if (!estado) return puedeInformar
-    ? { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar }
-    : null
+  if (!estado) {
+    return { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar }
+  }
 
   const [{ data: filasVerificacion, error: errorVerificaciones }, perfilResult] = await Promise.all([
     servicio

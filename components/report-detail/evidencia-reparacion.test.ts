@@ -107,6 +107,19 @@ function botonConTexto(html: string, texto: string) {
 
 beforeEach(() => vi.clearAllMocks())
 
+describe("franja de reparación para quien no puede informar", () => {
+  it("invita a ingresar en vez de esconder la franja", () => {
+    const html = renderToStaticMarkup(
+      createElement(ResumenReparacion, { seccion: { umbral: 3, evidencia: null, puedeInformar: false }, onVer: () => {} }),
+    )
+
+    expect(html).toContain("¿Ya lo arreglaron?")
+    expect(html).toContain("Iniciá sesión con tu cuenta para informar la reparación.")
+    expect(html).toContain('href="/auth"')
+    expect(html).not.toContain("Informar la reparación")
+  })
+})
+
 describe("comparación «Antes / Después»", () => {
   it("muestra las dos fotos con nombres accesibles y un control de teclado", () => {
     const html = renderizar()
@@ -412,8 +425,12 @@ describe("resumen de la reparación sobre el contenido", () => {
     expect(html).not.toContain("Reparado")
   })
 
-  it("no muestra nada cuando el reporte no ofrece reparación", () => {
-    expect(renderizarResumen({ evidencia: null, puedeInformar: false })).toBe("")
+  it("invita a ingresar cuando el reporte no ofrece reparación a esta cuenta", () => {
+    const html = renderizarResumen({ evidencia: null, puedeInformar: false })
+
+    // Antes no se mostraba nada; el dueño pidió que la franja exista también sin cuenta.
+    expect(html).toContain("¿Ya lo arreglaron?")
+    expect(html).toContain('href="/auth"')
   })
 })
 
