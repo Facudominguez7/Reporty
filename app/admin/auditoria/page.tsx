@@ -13,7 +13,11 @@ import { createClient } from "@/utils/supabase/server"
 
 export const metadata = { title: "Auditoría · Administración", robots: { index: false, follow: false } }
 
-export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{ page?: string; usuario?: string; accion?: string; periodo?: string; desde?: string; hasta?: string; simulacion?: string }> }) {
+export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{
+    page?: string; usuario?: string; accion?: string; periodo?: string
+    desde?: string; hasta?: string; simulacion?: string
+    r2?: string; detalle?: string; archivado?: string; eventos?: string; purgado?: string
+  }> }) {
   const params = await searchParams
   const parsed = Number(params.page)
   const page = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
@@ -74,6 +78,11 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
         metricas={metricas}
         filtros={rango}
         simulacion={params.simulacion}
+        r2={params.r2}
+        r2Detalle={params.detalle}
+        archivado={params.archivado}
+        archivadoEventos={params.eventos}
+        archivadoPurgado={params.purgado}
         hayError={Boolean(historial?.error)}
       />
     </div>

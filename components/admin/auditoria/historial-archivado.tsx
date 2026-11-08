@@ -1,11 +1,16 @@
 import Link from "next/link"
 
-import { simularArchivadoAction } from "@/app/admin/auditoria/acciones"
+import {
+  diagnosticarConexionR2Action,
+  ejecutarArchivadoManualAction,
+  simularArchivadoAction,
+} from "@/app/admin/auditoria/acciones"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { LIMITE_CORRIDA_MANUAL } from "@/lib/auditoria-archivo/configuracion"
 import {
   estimarEspacioLiberable,
   formatearCantidad,
@@ -43,6 +48,14 @@ type Props = {
   filtros: { desde?: string; hasta?: string }
   /** Resultado de la última simulación: cantidad de eventos o `error`. */
   simulacion?: string
+  /** Resultado del diagnóstico de R2: `ok`, `error` o ausente. */
+  r2?: string
+  /** Detalle operativo del diagnóstico; nunca incluye credenciales. */
+  r2Detalle?: string
+  /** Resultado de la última corrida real manual: `ok`, `error` o ausente. */
+  archivado?: string
+  archivadoEventos?: string
+  archivadoPurgado?: string
   hayError?: boolean
 }
 
@@ -72,7 +85,18 @@ const AYUDA_FALLIDO = "El archivado falló; el archivo no está disponible."
  * No expone URLs del bucket: la descarga y la recuperación pasan por rutas del
  * servidor que vuelven a validar la sesión y el rol Admin.
  */
-export function HistorialArchivado({ archivos, metricas, filtros, simulacion, hayError = false }: Props) {
+export function HistorialArchivado({
+  archivos,
+  metricas,
+  filtros,
+  simulacion,
+  r2,
+  r2Detalle,
+  archivado,
+  archivadoEventos,
+  archivadoPurgado,
+  hayError = false,
+}: Props) {
   const eventosArchivados = metricas?.eventosArchivados ?? 0
   const bytesEnR2 = metricas?.bytesEnR2 ?? 0
   const espacioLiberable = estimarEspacioLiberable(metricas)
@@ -93,6 +117,44 @@ export function HistorialArchivado({ archivos, metricas, filtros, simulacion, ha
             : `Simulación: se archivarían ${formatearCantidad(Number(simulacion) || 0)} eventos. No se modificó ni se eliminó nada.`}
         </p>
       )}
+
+      {r2 && (
+        <p
+          role="status"
+          className={r2 === "ok" ? "rounded-xl border border-border bg-card p-4 text-sm" : "rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive"}
+        >
+          {r2 === "ok" ? "Conexión con R2 verificada: lectura, escritura e integridad del objeto de prueba." : "No pudimos verificar la conexión con R2."}
+          {r2Detalle ? ` ${r2Detalle}` : ""}
+        </p>
+      )}
+
+      {archivado && (
+        <p role="status" className={archivado === "ok" ? "rounded-xl border border-border bg-card p-4 text-sm" : "rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive"}>
+          {archivado === "ok"
+            ? `Corrida real: ${formatearCantidad(Number(archivadoEventos) || 0)} eventos archivados y ${formatearCantidad(Number(archivadoPurgado) || 0)} eliminados de PostgreSQL.`
+            : "La corrida real no pudo completarse: los eventos quedaron en PostgreSQL."}
+        </p>
+      )}
+
+      <details className="rounded-xl border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-medium">Probar antes de producción</summary>
+        <div className="mt-3 grid gap-3">
+          <p className="text-xs text-muted-foreground">
+            Estas acciones escriben en el bucket configurado. En producción la corrida real la dispara el cron; acá
+            servís para validar el ciclo completo en local.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <form action={diagnosticarConexionR2Action}>
+              <Button type="submit" variant="outline" size="sm">Probar conexión con R2</Button>
+            </form>
+            <form action={ejecutarArchivadoManualAction}>
+              <Button type="submit" variant="neutral" size="sm">
+                Ejecutar corrida real (máx. {LIMITE_CORRIDA_MANUAL})
+              </Button>
+            </form>
+          </div>
+        </div>
+      </details>
 
       <div className="grid gap-4 sm:grid-cols-3" aria-label="Métricas del historial archivado">
         <Card><CardContent className="grid gap-2">

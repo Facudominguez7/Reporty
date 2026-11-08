@@ -18,6 +18,8 @@ export const DIAS_RETENCION_MAXIMO = 3650
 export const LIMITE_LOTE_POR_DEFECTO = 1000
 /** Tope duro por lote: acota memoria, tiempo de request y tamaño del objeto. */
 export const LIMITE_LOTE_MAXIMO = 5000
+/** Eventos máximos que puede archivar una corrida disparada desde el panel. */
+export const LIMITE_CORRIDA_MANUAL = 200
 /** Longitud mínima del secreto que autentica la ejecución programada. */
 export const LONGITUD_MINIMA_SECRETO_CRON = 32
 
