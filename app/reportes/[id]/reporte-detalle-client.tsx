@@ -29,7 +29,6 @@ import {
   Pencil,
   Calendar,
   Flag,
-  ThumbsUp,
   ThumbsDown,
   Trash2,
   CheckCircle2,
@@ -39,6 +38,7 @@ import {
   Users,
   FileSearch2,
   X,
+  ZoomIn,
 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -69,14 +69,34 @@ import { getNameFromRelation, getUserInitials, getUsernameFromRelation } from "@
 import { ChipEstadoOperativo } from "@/components/cuadrillas/chip-estado-operativo";
 import { LineaTiempoOperativa } from "@/components/cuadrillas/linea-tiempo-operativa";
 import { CommentsSection } from "@/components/report-detail/comments-section";
+import {
+  ResumenReparacion,
+  EvidenciaReparacion,
+  type AccionesEvidenciaReparacion,
+  type ResultadoAccionReparacion,
+} from "@/components/report-detail/evidencia-reparacion";
+import { ComparadorFotos, type FotoComparada } from "@/components/report-detail/comparador-fotos";
+import {
+  AccionesFlotantes,
+  accionesDisponibles,
+  construirAccionesFlotantes,
+  type ClaveAccionFlotante,
+  type ContextoAccionesFlotantes,
+} from "@/components/report-detail/acciones-flotantes";
+import { HojaReporte } from "@/components/report-detail/hojas-reporte";
+import { ContenidoUbicacion, FranjaUbicacion } from "@/components/report-detail/ubicacion-reporte";
+import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
-import { ReportContactDialog } from "@/components/report-contact-actions";
+import { ReportContactActions, ReportContactDialog, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation";
 import {
   actualizarReporteAdminAction,
   cambiarEstadoAdminAction,
+  confirmarReparacionAction,
   crearComentarioAction,
+  impugnarReparacionAction,
+  informarReparacionAction,
   quitarFotoReporteAdminAction,
   reemplazarFotoReporteAdminAction,
   eliminarComentarioAdminAction,
@@ -84,7 +104,6 @@ import {
   eliminarReporteAdminAction,
   eliminarReportePropioAction,
   votarNoExisteAction,
-  votarReparadoAction,
 } from "./actions";
 
 dayjs.extend(utc);
@@ -146,6 +165,14 @@ function formatRepairDuration(createdAt: string, repairedAt: string) {
   return days > 0 ? `${days} ${days === 1 ? "día" : "días"}` : "menos de 1 día";
 }
 
+/**
+ * Fecha de la evidencia de reparación en hora argentina, como el resto de la ficha.
+ * La comparación de la tarjeta la usa en el rótulo y en el texto alternativo.
+ */
+function formatearFechaEvidencia(fecha: string) {
+  return dayjs.utc(fecha).tz(ZONA_HORARIA).format("DD/MM/YYYY");
+}
+
 /** Datos del detalle que la página carga en el servidor antes de renderizar. */
 export type ReporteDetalleInicial = {
   reporte: ReporteDetalle | null;
@@ -170,6 +197,11 @@ export type ReporteDetalleInicial = {
   gestionOperativa: GestionOperativaDetalle | null;
   /** Computed on the server from the visitor's role; the vote actions check it again. */
   puedeVotar: boolean;
+  /**
+   * Evidencia de reparación con su estado visible y lo que puede hacer esta persona.
+   * Se calcula en el servidor; `null` cuando no hay nada que mostrar (S10, S11).
+   */
+  evidenciaReparacion?: SeccionReparacionVista | null;
 };
 
 /**
@@ -191,6 +223,7 @@ export function ReporteDetalleClient({
   fechaCambioEstado,
   gestionOperativa,
   puedeVotar,
+  evidenciaReparacion = null,
 }: ReporteDetalleInicial) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -204,18 +237,23 @@ export function ReporteDetalleClient({
   const [votosCount, setVotosCount] = useState(reporte?.votos.noExiste.count ?? 0);
   const [hasVoted, setHasVoted] = useState(reporte?.votos.noExiste.hasVoted ?? false);
   const [isVoting, setIsVoting] = useState(false);
+  // Los votos históricos «reparado» se siguen mostrando: el flujo nuevo no los borra (S15).
   const [votosReparadoCount, setVotosReparadoCount] = useState(reporte?.votos.reparado.count ?? 0);
-  const [hasVotedReparado, setHasVotedReparado] = useState(reporte?.votos.reparado.hasVoted ?? false);
-  const [isVotingReparado, setIsVotingReparado] = useState(false);
-  const [cerradoPorVoto, setCerradoPorVoto] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{ src: string; alt: string } | null>(null);
+  // Hoja inferior abierta desde el botón flotante: una sola a la vez (S13, S18).
+  const [hojaAbierta, setHojaAbierta] = useState<ClaveAccionFlotante | null>(null);
+  // El menú flotante lo controla la ficha para poder cerrarlo antes de abrir una hoja.
+  const [menuFlotanteAbierto, setMenuFlotanteAbierto] = useState(false);
+  // Botón que abrió la hoja: recibe el foco cuando el Drawer se cierra.
+  const [disparadorHoja, setDisparadorHoja] = useState<HTMLElement | null>(null);
+  // Enlace del reporte para los mensajes de contacto; se arma al abrir la hoja, ya en el navegador.
+  const [urlReporte, setUrlReporte] = useState("");
 
   // Estados para controlar los AlertDialogs
   const [showDeleteReporteDialog, setShowDeleteReporteDialog] = useState(false);
   const [showVoteLoginDialog, setShowVoteLoginDialog] = useState(false);
   const [showVoteNoExisteDialog, setShowVoteNoExisteDialog] = useState(false);
-  const [showVoteReparadoDialog, setShowVoteReparadoDialog] = useState(false);
 
   const startAdminEditing = () => {
     if (!isAdmin || !reporte) return;
@@ -251,9 +289,8 @@ export function ReporteDetalleClient({
 
   // IDs de estados según la base de datos: 1 = Pendiente, 2 = Reparado, 3 = Rechazado
   // Verificar si el reporte está cerrado (Reparado o Rechazado) usando IDs
-  const isReporteCerrado = reporte && (
-    cerradoPorVoto || reporte.estado_id === REPORT_STATE_IDS.REPARADO ||
-    reporte.estado_id === REPORT_STATE_IDS.RECHAZADO
+  const isReporteCerrado = Boolean(
+    reporte && (reporte.estado_id === REPORT_STATE_IDS.REPARADO || reporte.estado_id === REPORT_STATE_IDS.RECHAZADO),
   );
 
   const handleVoteNoExiste = async () => {
@@ -284,7 +321,6 @@ export function ReporteDetalleClient({
       setVotosCount(result.data.votosNoExiste);
       setVotosReparadoCount(result.data.votosReparado);
       setHasVoted(true);
-      setHasVotedReparado(false);
       toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_NO_EXISTE} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
 
     } catch (error) {
@@ -298,51 +334,44 @@ export function ReporteDetalleClient({
     }
   };
 
-  const handleVoteReparado = async () => {
-    if (!reporte) return;
-    if (currentUser?.is_anonymous) {
-      setShowVoteLoginDialog(true);
-      return;
+  /**
+   * Confirma la reparación informada. El servidor valida autoría, elegibilidad,
+   * duplicados y umbral: acá solo se envía la evidencia que la ficha muestra.
+   */
+  const confirmarEvidenciaReparacion = async (): Promise<ResultadoAccionReparacion> => {
+    const evidenciaId = evidenciaReparacion?.evidencia?.evidenciaId;
+    if (!reporte || !evidenciaId) {
+      return { success: false, error: "No pudimos identificar la evidencia de reparación." };
     }
-    if (!currentUser) {
-      router.push(`/auth?next=/reportes/${reporte.id}`);
-      return;
-    }
-    setShowVoteReparadoDialog(true);
+    return confirmarReparacionAction(reporte.id, evidenciaId);
   };
 
-  const confirmVoteReparado = async () => {
-    if (!currentUser || !reporte) return;
-
-    setIsVotingReparado(true);
-    try {
-      const result = await votarReparadoAction(reporte.id);
-
-      if (!result.success) {
-        toast.error(result.error || "Error al registrar el voto");
-        return;
-      }
-
-      setVotosCount(result.data.votosNoExiste);
-      setVotosReparadoCount(result.data.votosReparado);
-      setHasVoted(false);
-      setHasVotedReparado(true);
-      toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_REPARADO} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
-
-      if (result.data.stateChangedTo) {
-        setCerradoPorVoto(true);
-        toast.success("¡Reporte marcado como reparado!");
-        setTimeout(() => window.location.reload(), 1500);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al procesar el voto", {
-        description: "Por favor, intenta nuevamente"
-      });
-    } finally {
-      setIsVotingReparado(false);
-      setShowVoteReparadoDialog(false);
+  /** Impugna la reparación; el motivo se elige de la lista cerrada y lo valida el servidor (S4, S5, S17). */
+  const impugnarEvidenciaReparacion = async (motivoClave: string): Promise<ResultadoAccionReparacion> => {
+    const evidenciaId = evidenciaReparacion?.evidencia?.evidenciaId;
+    if (!reporte || !evidenciaId) {
+      return { success: false, error: "No pudimos identificar la evidencia de reparación." };
     }
+    return impugnarReparacionAction(reporte.id, evidenciaId, motivoClave);
+  };
+
+  /**
+   * Informa una reparación con su foto y la frase elegida de la lista; el pipeline
+   * existente la manda a moderación (S2, S13, S16).
+   */
+  const informarEvidenciaReparacion = async (
+    fraseClave: string,
+    imagen: File,
+    captchaToken: string | null,
+  ): Promise<ResultadoAccionReparacion> => {
+    if (!reporte) return { success: false, error: "No pudimos informar la reparación." };
+    return informarReparacionAction(reporte.id, fraseClave, imagen, captchaToken);
+  };
+
+  const accionesReparacion: AccionesEvidenciaReparacion = {
+    onConfirmar: confirmarEvidenciaReparacion,
+    onImpugnar: impugnarEvidenciaReparacion,
+    onInformar: informarEvidenciaReparacion,
   };
 
   const handleShareReport = async () => {
@@ -580,11 +609,106 @@ export function ReporteDetalleClient({
   }
 
   const diasDesdeCreacion = Math.max(0, dayjs().tz(ZONA_HORARIA).startOf("day").diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA).startOf("day"), "day"));
+  /**
+   * Antigüedad legible del reporte: los días de calendario sirven para ayer y antes,
+   * pero un reporte de hoy se describe en horas (nunca «hace 0 días»).
+   */
+  const antiguedadReporte = (() => {
+    if (diasDesdeCreacion >= 1) return `hace ${diasDesdeCreacion} ${diasDesdeCreacion === 1 ? "día" : "días"}`;
+    const horas = Math.max(0, dayjs().tz(ZONA_HORARIA).diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA), "hour"));
+    if (horas >= 1) return `hace ${horas} ${horas === 1 ? "hora" : "horas"}`;
+    return "hace minutos";
+  })();
   const adminDraftForRender = adminDraft ?? createAdminReportDraft(reporte);
   const adminBaseForRender = adminBase ?? adminDraftForRender;
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
     ? formatRepairDuration(reporte.created_at, fechaCambioEstado)
     : null;
+  const fotoOriginalDelReporte = reporte.fotos_reporte?.find((foto) => Boolean(foto.publicUrl ?? foto.url));
+  const fotoAntesComparacion = fotoOriginalDelReporte
+    ? { src: (fotoOriginalDelReporte.publicUrl ?? fotoOriginalDelReporte.url) as string, fecha: reporte.created_at }
+    : null;
+
+  // ===== Comparación «Antes / Después» sobre la foto de la tarjeta (S10, S11, S18) =====
+  /**
+   * La comparación solo existe cuando hay dos fotos reales: la original del reporte y
+   * la que la moderación ya publicó para la evidencia. Nunca se inventa un después ni
+   * se reemplaza la foto original, que sigue ampliable desde el diálogo de siempre (S9).
+   */
+  const evidenciaVisible = evidenciaReparacion?.evidencia ?? null;
+  const fotoPublicadaEvidencia =
+    evidenciaVisible && evidenciaVisible.estado !== "informada" ? evidenciaVisible.foto : null;
+  const autorDelReporte = getUsernameFromRelation(reporte.profiles);
+  const fechaDelReporte = parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", {
+    timeZone: ZONA_HORARIA,
+  });
+  const fechaEvidenciaVisible = evidenciaVisible
+    ? formatearFechaEvidencia(evidenciaVisible.publicadaAt ?? evidenciaVisible.informadaAt)
+    : null;
+  const comparaFotos: { idFotoAntes: number; antes: FotoComparada; despues: FotoComparada } | null =
+    fotoOriginalDelReporte && fotoAntesComparacion && fotoPublicadaEvidencia && evidenciaVisible && fechaEvidenciaVisible
+      ? {
+        idFotoAntes: fotoOriginalDelReporte.id,
+        antes: {
+          src: fotoAntesComparacion.src,
+          alt: `Foto original del reporte, publicada por ${autorDelReporte} el ${fechaDelReporte}`,
+          fecha: fotoAntesComparacion.fecha,
+        },
+        despues: {
+          src: fotoPublicadaEvidencia.src,
+          alt: `Foto de la reparación informada por ${evidenciaVisible.autor ?? "una cuenta de la comunidad"} el ${fechaEvidenciaVisible}`,
+          fecha: evidenciaVisible.publicadaAt ?? evidenciaVisible.informadaAt,
+        },
+      }
+      : null;
+
+  // ===== Acciones flotantes y hojas del detalle (S13, S18) =====
+  /**
+   * Abre una hoja recordando el botón que la originó y cerrando antes el menú flotante:
+   * nunca queda un menú desplegado detrás del velo y el foco vuelve a un control real.
+   */
+  const abrirHoja = (hoja: ClaveAccionFlotante, disparador: HTMLElement | null) => {
+    setDisparadorHoja(disparador);
+    setMenuFlotanteAbierto(false);
+    setHojaAbierta(hoja);
+  };
+
+  /**
+   * Arma el enlace del reporte recién al abrir los contactos: `window` sólo existe en el
+   * navegador y el mensaje de los organismos lo usa para citar la publicación real.
+   */
+  const manejadoresAccionesFlotantes: Record<ClaveAccionFlotante, (disparador: HTMLElement | null) => void> = {
+    contactos: (disparador) => {
+      setUrlReporte(new URL(`/reportes/${reporte.id}`, window.location.origin).toString());
+      abrirHoja("contactos", disparador);
+    },
+    ubicacion: (disparador) => abrirHoja("ubicacion", disparador),
+    reparacion: (disparador) => abrirHoja("reparacion", disparador),
+    comentar: (disparador) => abrirHoja("comentar", disparador),
+  };
+
+  const contextoAccionesFlotantes: ContextoAccionesFlotantes = {
+    sesion: { haySesion: Boolean(currentUser), esAnonimo: Boolean(currentUser?.is_anonymous) },
+    reporteCerrado: Boolean(isReporteCerrado),
+    tieneUbicacion: reporte.lat !== null && reporte.lon !== null,
+    puedeContactar,
+    reparacion: evidenciaReparacion
+      ? { hayEvidencia: evidenciaReparacion.evidencia !== null, puedeInformar: evidenciaReparacion.puedeInformar }
+      : null,
+  };
+  const accionesFlotantes = construirAccionesFlotantes(
+    accionesDisponibles(contextoAccionesFlotantes),
+    manejadoresAccionesFlotantes,
+  );
+
+  /** Descripción honesta de la hoja de reparación: depende del estado real de la evidencia. */
+  const descripcionReparacion = !evidenciaReparacion?.evidencia
+    ? "Subí una foto y elegí qué se arregló. La foto pasa por moderación antes de publicarse."
+    : evidenciaReparacion.evidencia.estado === "reparado"
+      ? "La reparación quedó validada y el reporte está Reparado."
+      : evidenciaReparacion.evidencia.estado === "informada"
+        ? "La foto está en moderación. El reporte sigue Pendiente hasta que la comunidad confirme."
+        : `La comunidad está confirmando la reparación. Con ${evidenciaReparacion?.umbral ?? 3} confirmaciones el reporte pasa a Reparado.`;
   const showVoteButtons = (!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado;
   const showVoteFooter = Boolean(
     isReporteCerrado ||
@@ -604,15 +728,29 @@ export function ReporteDetalleClient({
           />
         </section>
 
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FranjaUbicacion
+            lat={reporte.lat}
+            lon={reporte.lon}
+            onVerUbicacion={(disparador) => abrirHoja("ubicacion", disparador)}
+          />
+          {evidenciaReparacion && (
+            <ResumenReparacion
+              seccion={evidenciaReparacion}
+              onVer={(disparador) => abrirHoja("reparacion", disparador)}
+            />
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           {/* Contenido Principal */}
-          <div className="space-y-4 lg:col-span-8">
+          <div className="space-y-4 lg:col-span-7">
             {/* Encabezado del Reporte */}
             <Card className="gap-0">
               <CardHeader className="pb-3">
-                <div className="col-span-full mb-1 flex items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
+                <div className="col-span-full mb-1 flex flex-wrap items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
                   <Calendar className="size-3.5 shrink-0" />
-                  <span className="whitespace-nowrap">
+                  <span className="min-w-0">
                     Creado el día{" "}
                     {parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", {
                       year: "numeric",
@@ -621,7 +759,7 @@ export function ReporteDetalleClient({
                       timeZone: ZONA_HORARIA,
                     })}
                     {" "}<span className="font-bold">
-                      (hace {diasDesdeCreacion} {diasDesdeCreacion === 1 ? "día" : "días"})
+                      ({antiguedadReporte})
                     </span>
                   </span>
                 </div>
@@ -635,7 +773,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("prioridadId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>}
+                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Prioridad del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir prioridad" /></SelectTrigger>
@@ -644,7 +782,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>
+                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -655,7 +793,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => setAdminDraft((current) => current ? { ...current, estadoId: value.estadoId, comentarioEstado: value.comentario } : current)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>}
+                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>}
                       editor={(draft, onChange) => (
                         <div className="min-w-0 space-y-2">
                           <Select value={draft.estadoId.toString()} disabled={isAdminSaving} onValueChange={(id) => {
@@ -670,7 +808,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>
+                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -681,7 +819,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("categoriaId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant="category" className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>}
+                      display={() => <Badge variant="category" className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Categoría del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir categoría" /></SelectTrigger>
@@ -690,7 +828,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant="category" className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="pl-4 text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>
+                    <Badge variant="category" className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>
                   )}
                 </div>
                 <div className="flex min-w-0 items-start gap-3">
@@ -767,32 +905,43 @@ export function ReporteDetalleClient({
                 {/* Imágenes */}
                 {reporte.fotos_reporte && reporte.fotos_reporte.length > 0 && (
                   <div className="mb-4 flex flex-col items-center gap-3 md:mb-6 lg:mb-8">
-                    {reporte.fotos_reporte.map((foto, index) => (
-                      <div key={foto.id} className="relative w-full max-w-2xl">
-                        <button
-                          type="button"
-                          aria-label={`Ver imagen ${index + 1} del reporte en grande`}
-                          onClick={() => setSelectedPhoto({ src: foto.publicUrl || foto.url || "/placeholder.svg", alt: `Imagen ${index + 1} del reporte` })}
-                          className="flex aspect-video w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-md bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:rounded-lg lg:rounded-xl"
-                        >
-                          <img
-                            src={foto.publicUrl || foto.url || "/placeholder.svg"}
-                            alt={`Imagen ${index + 1} del reporte`}
-                            loading={index === 0 ? undefined : "lazy"}
-                            className="h-full w-full object-contain"
-                          />
-                        </button>
-                        {isAdmin && isAdminEditing && (
-                          <AdminReportPhotoControls
-                            fotoId={foto.id}
-                            index={index}
-                            draft={adminPhotoDrafts[foto.id] ?? { file: null, remove: false, version: 0 }}
-                            onChange={(draft) => updateAdminPhotoDraft(foto.id, draft)}
-                            disabled={isAdminSaving}
-                          />
-                        )}
-                      </div>
-                    ))}
+                    {reporte.fotos_reporte.map((foto, index) => {
+                      // Solo la foto que se compara con la evidencia deja de ser un botón:
+                      // el control de rango no puede vivir dentro de otro control.
+                      const conComparacion = comparaFotos !== null && comparaFotos.idFotoAntes === foto.id;
+                      const altFoto = `Foto ${index + 1} del reporte, publicada por ${autorDelReporte} el ${fechaDelReporte}`;
+
+                      return (
+                        <div key={foto.id} className="relative w-full max-w-2xl">
+                          {conComparacion && comparaFotos ? (
+                            <ComparadorFotos antes={comparaFotos.antes} despues={comparaFotos.despues} />
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={`Ver imagen ${index + 1} del reporte en grande`}
+                              onClick={() => setSelectedPhoto({ src: foto.publicUrl || foto.url || "/placeholder.svg", alt: altFoto })}
+                              className="flex aspect-video w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-md bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:rounded-lg lg:rounded-xl"
+                            >
+                              <img
+                                src={foto.publicUrl || foto.url || "/placeholder.svg"}
+                                alt={altFoto}
+                                loading={index === 0 ? undefined : "lazy"}
+                                className="h-full w-full object-contain"
+                              />
+                            </button>
+                          )}
+                          {isAdmin && isAdminEditing && (
+                            <AdminReportPhotoControls
+                              fotoId={foto.id}
+                              index={index}
+                              draft={adminPhotoDrafts[foto.id] ?? { file: null, remove: false, version: 0 }}
+                              onChange={(draft) => updateAdminPhotoDraft(foto.id, draft)}
+                              disabled={isAdminSaving}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                     <Dialog open={selectedPhoto !== null} onOpenChange={(open) => { if (!open) setSelectedPhoto(null) }}>
                       <DialogContent showClose={false} className="w-auto max-w-[95vw] gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:p-0">
                         <DialogClose asChild>
@@ -852,33 +1001,12 @@ export function ReporteDetalleClient({
                     />
                   </div>
                 )}
-                {reporte.lat !== null && reporte.lon !== null && (
-                  <button
-                    type="button"
-                    className="mx-auto mt-1 flex w-fit items-center justify-center gap-1 bg-transparent p-0 text-center text-xs font-semibold text-foreground underline md:hidden"
-                    onClick={() => document.getElementById("reporte-ubicacion-map")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  >
-                    <MapPin className="size-3" aria-hidden="true" />
-                    Ver ubicación
-                  </button>
-                )}
                 {showVoteFooter && (
                   <div className="mt-3">
                     <hr className="mb-2 border-border" />
                     <div className="flex flex-wrap items-center gap-1.5">
                       {showVoteButtons && (
-                        <div role="group" aria-label="Votar sobre el reporte" className="mx-auto grid w-full max-w-72 grid-cols-3 justify-items-center gap-4">
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-primary hover:bg-primary/10"
-                            onClick={handleVoteReparado}
-                            disabled={hasVotedReparado || isVotingReparado || isVoting}
-                            aria-pressed={hasVotedReparado}
-                          >
-                            <ThumbsUp className="size-4" />
-                            Reparado{hasVotedReparado ? " · Tu voto" : ""}
-                          </Button>
+                        <div role="group" aria-label="Acciones sobre el reporte" className="mx-auto grid w-full max-w-56 grid-cols-2 justify-items-center gap-4">
                           <Button
                             variant="ghost"
                             size="xs"
@@ -895,7 +1023,7 @@ export function ReporteDetalleClient({
                               size="xs"
                               className="aspect-square h-auto min-h-11 w-full max-w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-destructive hover:bg-destructive/10"
                               onClick={handleVoteNoExiste}
-                              disabled={hasVoted || isVoting || isVotingReparado}
+                              disabled={hasVoted || isVoting}
                               aria-pressed={hasVoted}
                             >
                               <ThumbsDown className="size-4" />
@@ -903,11 +1031,6 @@ export function ReporteDetalleClient({
                             </Button>
                           )}
                         </div>
-                      )}
-                      {currentUser && hasVoted && hasVotedReparado && (
-                        <p role="status" className="text-xs text-muted-foreground">
-                          Tus votos históricos son contradictorios y requieren revisión. No se modificaron.
-                        </p>
                       )}
                       {isReporteCerrado && (
                         <span className="text-xs text-muted-foreground">
@@ -920,23 +1043,6 @@ export function ReporteDetalleClient({
               </CardContent>
             </Card>
 
-            <CommentsSection
-              comments={comentarios}
-              statusHistory={historialEstados}
-              currentUser={currentUser}
-              reportOwnerId={reporte.usuario_id}
-              isAdmin={isAdmin}
-              isClosed={Boolean(isReporteCerrado)}
-              onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
-              onDeleteComment={async (commentId) => {
-                const result = await eliminarComentarioPropioAction(commentId)
-                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
-              }}
-              onAdminDeleteComment={async (commentId) => {
-                const result = await eliminarComentarioAdminAction(commentId)
-                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
-              }}
-            />
             {isAdmin && isAdminEditing && (
               <AdminReportEditActions
                 saving={isAdminSaving}
@@ -947,8 +1053,29 @@ export function ReporteDetalleClient({
             )}
           </div>
 
-          {/* Barra Lateral */}
-          <div className="lg:col-span-4 space-y-4 md:space-y-6">
+          {/* Actividad y barra lateral: la línea de tiempo queda junto al reporte (S13, S18) */}
+          <div className="lg:col-span-5 space-y-4 md:space-y-6">
+
+            <CommentsSection
+              comments={comentarios}
+              statusHistory={historialEstados}
+              currentUser={currentUser}
+              reportOwnerId={reporte.usuario_id}
+              isAdmin={isAdmin}
+              isClosed={Boolean(isReporteCerrado)}
+              compositorAbierto={hojaAbierta === "comentar"}
+              onCambiarCompositor={(abierta) => setHojaAbierta(abierta ? "comentar" : null)}
+              disparadorCompositor={disparadorHoja}
+              onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
+              onDeleteComment={async (commentId) => {
+                const result = await eliminarComentarioPropioAction(commentId)
+                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
+              }}
+              onAdminDeleteComment={async (commentId) => {
+                const result = await eliminarComentarioAdminAction(commentId)
+                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
+              }}
+            />
 
             {/* Seguimiento de la cuadrilla (cuadrillas) - solo lectura; la gestión vive en /dashboard/cuadrillas */}
             {gestionOperativa &&
@@ -991,7 +1118,9 @@ export function ReporteDetalleClient({
                 </Card>
               )}
 
-            {/* Marcador de Posición del Mapa */}
+            {/* Ubicación: sólo el editor de coordenadas de administración, y sólo al
+                editar; la franja superior y su hoja ya cubren la consulta. */}
+            {isAdmin && isAdminEditing && (
             <Card id="reporte-ubicacion-map" className="scroll-mt-4">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base md:text-lg">Ubicación</CardTitle>
@@ -1062,6 +1191,7 @@ export function ReporteDetalleClient({
                 )}
               </CardContent>
             </Card>
+            )}
           </div>
         </div>
 
@@ -1138,7 +1268,7 @@ export function ReporteDetalleClient({
               </span>
               ¿Confirmar voto «No existe»?
             </AlertDialogTitle>
-            <AlertDialogDescription>{hasVotedReparado ? "Cambiar tu voto no suma puntos adicionales." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
+            <AlertDialogDescription>{hasVoted ? "Tu voto ya está registrado." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isVoting}>Cancelar</AlertDialogCancel>
@@ -1155,40 +1285,6 @@ export function ReporteDetalleClient({
               ) : (
                 <>
                   <ThumbsDown className="w-4 h-4 mr-2" />
-                  Confirmar Voto
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* AlertDialog - Votar Reparado */}
-      <AlertDialog open={showVoteReparadoDialog} onOpenChange={setShowVoteReparadoDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-              </span>
-              ¿Confirmar que está reparado?
-            </AlertDialogTitle>
-            <AlertDialogDescription>{hasVoted ? "Cambiar tu voto no suma puntos adicionales." : "Tu primer voto sumará 1 punto."}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isVotingReparado}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmVoteReparado}
-              disabled={isVotingReparado}
-            >
-              {isVotingReparado ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Votando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
                   Confirmar Voto
                 </>
               )}
@@ -1241,6 +1337,62 @@ export function ReporteDetalleClient({
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Hojas inferiores del botón flotante: el mismo Drawer del filtro del mapa (S18) */}
+      <HojaReporte
+        abierta={hojaAbierta === "reparacion"}
+        disparador={disparadorHoja}
+        cambiandoAbierta={(abierta) => setHojaAbierta(abierta ? "reparacion" : null)}
+        titulo="¿Ya lo arreglaron?"
+        descripcion={descripcionReparacion}
+        etiquetaCerrar="Cerrar la hoja de reparación"
+      >
+        {evidenciaReparacion ? (
+          <EvidenciaReparacion
+            seccion={evidenciaReparacion}
+            fotoAntes={fotoAntesComparacion}
+            acciones={accionesReparacion}
+          />
+        ) : null}
+      </HojaReporte>
+
+      <HojaReporte
+        abierta={hojaAbierta === "ubicacion"}
+        disparador={disparadorHoja}
+        cambiandoAbierta={(abierta) => setHojaAbierta(abierta ? "ubicacion" : null)}
+        titulo="Ubicación"
+        descripcion="El mapa del reporte y el acceso al mapa completo de la ciudad."
+        etiquetaCerrar="Cerrar la ubicación"
+      >
+        <ContenidoUbicacion lat={reporte.lat} lon={reporte.lon} />
+      </HojaReporte>
+
+      <HojaReporte
+        abierta={hojaAbierta === "contactos"}
+        disparador={disparadorHoja}
+        cambiandoAbierta={(abierta) => setHojaAbierta(abierta ? "contactos" : null)}
+        titulo="Contactar a organismos"
+        descripcion={CONTACT_DISCLAIMER}
+        etiquetaCerrar="Cerrar los contactos"
+      >
+        {reporte.lat !== null && reporte.lon !== null && (
+          <ReportContactActions
+            title={reporte.titulo}
+            category={getNameFromRelation(reporte.categorias)}
+            description={reporte.descripcion ?? ""}
+            latitude={reporte.lat}
+            longitude={reporte.lon}
+            date={parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", { timeZone: ZONA_HORARIA })}
+            reportUrl={urlReporte}
+            showHeading={false}
+          />
+        )}
+      </HojaReporte>
+
+      <AccionesFlotantes
+        acciones={accionesFlotantes}
+        abierta={menuFlotanteAbierto}
+        onCambiarAbierta={setMenuFlotanteAbierto}
+      />
     </div>
   );
 }

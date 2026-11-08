@@ -9,7 +9,8 @@ import { createClient } from "@/utils/supabase/client"
 
 type Props = { title: string; category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string; showHeading?: boolean }
 type DialogProps = Omit<Props, "reportUrl" | "showHeading"> & { reportId: number }
-const CONTACT_DISCLAIMER = "Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta."
+/** Aviso compartido por el diálogo y por la hoja de contactos del detalle del reporte. */
+export const CONTACT_DISCLAIMER = "Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta."
 
 export function ReportContactDialog({ reportId, ...props }: DialogProps) {
   const [open, setOpen] = useState(false)

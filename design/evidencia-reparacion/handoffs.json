@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-deslizador-antes-despues.html",
+  "handoffs": {
+    "01-deslizador-antes-despues.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-06T13:40:35.335Z",
+      "startedAt": "2026-11-06T13:40:35.425Z",
+      "implementedAt": "2026-11-06T18:09:18.704Z",
+      "feature": "odd/tasks/evidencia-reparacion.md",
+      "note": "Implementado en el PR #213: comparación Antes/Después accesible, tres estados, confirmar/impugnar y carga mobile-first. Sin barra inferior fija (ya existe la navegación móvil de la app)."
+    }
+  }
+}

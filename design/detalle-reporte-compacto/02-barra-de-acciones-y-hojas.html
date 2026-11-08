@@ -1,0 +1,1613 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Botón de acciones flotante — Detalle del reporte sin tanto scroll</title>
+<style>
+  /* Tokens de design/system.md. Sin recursos externos: CSS, JS y SVG en línea, pila del sistema. */
+  :root{
+    --background:oklch(94.463% 0.00213 14.416);
+    --foreground:oklch(0.19 0.01 95);
+    --card:oklch(1 0 0);
+    --card-foreground:oklch(0.19 0.01 95);
+    --primary:oklch(0.57 0.12 157);
+    --primary-foreground:oklch(0.985 0 0);
+    /* El verde del sistema con texto blanco mide 4.04:1; al 90% + 10% foreground sube a ~4.75:1 (AA). */
+    --primary-fuerte:color-mix(in oklab, var(--primary) 90%, var(--foreground));
+    --secondary:#000000;
+    --secondary-foreground:#ffffff;
+    --muted:oklch(96.115% 0.00011 271.152);
+    --muted-foreground:oklch(0.45 0.028 157);
+    --accent:oklch(0.93 0.03 157);
+    --accent-foreground:oklch(0.3 0.05 157);
+    --destructive:oklch(0.57 0.18 25);
+    --destructive-foreground:oklch(0.985 0 0);
+    --border:oklch(78.892% 0.00009 271.152);
+    --input:oklch(96.416% 0.00011 271.152);
+    --ring:oklch(0.62 0.08 230);
+    --radius:0.75rem;
+    --radius-sm:var(--radius);
+    --radius-md:var(--radius);
+    --radius-lg:var(--radius);
+    --radius-xl:var(--radius);
+    --radius-pill:999px;
+    --surface-subtle:oklch(94.007% 0.00011 271.152);
+    --semantic-info:oklch(0.56 0.11 240);
+    --semantic-success:oklch(0.57 0.12 157);
+    --semantic-warning:oklch(0.72 0.13 85);
+    --semantic-danger:oklch(0.57 0.18 25);
+    --semantic-admin:oklch(0.5 0.1 285);
+    --priority-medium:oklch(0.72 0.16 55);
+    --card-shadow:7px 7px 12px color-mix(in oklab, var(--foreground) 20%, transparent);
+    --elevation-soft:0 10px 30px color-mix(in oklab, var(--foreground) 12%, transparent);
+    --bottom-nav-space:calc(4rem + env(safe-area-inset-bottom));
+    --fuente:"Geist","Geist Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--background)}
+  body{
+    margin:0;padding:40px 40px 56px;min-width:1800px;background:var(--background);color:var(--foreground);
+    font-family:var(--fuente);font-feature-settings:"cv02","cv03","cv04","cv11";-webkit-font-smoothing:antialiased;
+    font-size:.9375rem;line-height:1.45;
+  }
+  p{margin:0}
+  h1,h2,h3,h4{margin:0;letter-spacing:-.01em}
+  a{color:var(--primary-fuerte)}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .salto{position:absolute;left:-9999px;top:0;z-index:99;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;font-size:.875rem}
+  .salto:focus{left:12px;top:12px}
+  :focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
+
+  /* ---------- Lienzo ---------- */
+  .cabecera-lienzo{display:flex;flex-direction:column;gap:10px;max-width:1120px;margin:0 0 30px}
+  .cabecera-lienzo .direccion{font-size:.7rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-foreground)}
+  .cabecera-lienzo h1{font-size:2rem;line-height:1.15;font-weight:600;letter-spacing:-.02em}
+  .cabecera-lienzo p{font-size:.9375rem;line-height:1.55;color:var(--muted-foreground);max-width:84ch}
+  .leyenda{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+  .leyenda span{font-size:.6875rem;line-height:1.3;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);color:var(--muted-foreground)}
+  .lienzo{display:flex;align-items:flex-start;gap:48px}
+  .marco{display:flex;flex-direction:column;gap:8px}
+  .marco-rotulo{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .marco-rotulo h2{font-size:.75rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-foreground)}
+  .marco-rotulo .medida{font-size:.6875rem;color:var(--muted-foreground);border:1px solid var(--border);border-radius:var(--radius-pill);padding:2px 8px;background:var(--card)}
+  .marco-pie{font-size:.75rem;line-height:1.5;color:var(--muted-foreground);max-width:1280px}
+  .pantalla{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card);display:flex;flex-direction:column;position:relative}
+  .pantalla-escritorio{width:1280px;height:880px}
+  .pantalla-movil{width:390px;height:844px;border-radius:28px}
+  .area-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+
+  /* ---------- Sistema ---------- */
+  /* Card (components/ui/card.tsx): flex flex-col gap-4 rounded-[var(--radius)] border border-border
+     py-4 shadow-[var(--card-shadow)]; CardHeader/CardContent usan px-5 */
+  .tarjeta{
+    display:flex;flex-direction:column;gap:16px;padding:16px 20px;background:var(--card);color:var(--card-foreground);
+    border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+  .tarjeta-titulo{font-size:1.0625rem;font-weight:600;line-height:1.2}
+  .titulo-seccion{font-size:.9375rem;font-weight:600;line-height:1.3}
+  .copy{font-size:.8125rem;line-height:1.55;color:var(--muted-foreground)}
+  .copy-fuerte{font-size:.8125rem;line-height:1.55}
+  .meta{display:flex;align-items:center;gap:6px;font-size:.6875rem;color:var(--muted-foreground)}
+  .meta svg{width:13px;height:13px;flex:0 0 auto}
+  .ayuda{font-size:.75rem;line-height:1.5;color:var(--muted-foreground)}
+  .chip-fila{display:flex;flex-wrap:wrap;gap:6px}
+  /* Badge (components/ui/badge.tsx): rounded-[var(--radius-pill)] border px-1.5 py-0
+     text-[0.55rem] font-semibold uppercase tracking-[0.06em] [&>svg]:size-2
+     Desvío de AA: el proyecto pinta «media» y «pendiente» con primary-foreground (2,6:1);
+     acá van con --foreground (7,3:1). */
+  .chip{
+    display:inline-flex;align-items:center;justify-content:center;gap:2px;padding:1px 6px;border:1px solid transparent;
+    border-radius:var(--radius-pill);font-size:.55rem;font-weight:600;line-height:1.5;
+    text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;
+  }
+  .chip svg{width:11px;height:11px}
+  .chip-prioridad{background:var(--priority-medium);color:var(--foreground)}
+  .chip-estado{background:var(--semantic-warning);color:var(--foreground)}
+  .chip-categoria{background:var(--semantic-admin);color:var(--card)}
+  .chip-verificacion{background:var(--semantic-info);color:var(--card)}
+  .autor{display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted-foreground)}
+  /* Avatar (components/ui/avatar.tsx): size-8 rounded-full + AvatarFallback bg-muted */
+  .avatar{
+    display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:0 0 auto;
+    border-radius:var(--radius-pill);background:var(--muted);color:var(--foreground);
+    font-size:.6875rem;font-weight:600;
+  }
+  /* Button (components/ui/button.tsx), size default: min-h-10 px-4 py-2 text-sm font-medium rounded-full */
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;
+    border:1px solid transparent;border-radius:var(--radius-pill);background:var(--card);color:var(--foreground);
+    font-family:inherit;font-size:.875rem;font-weight:500;line-height:1;text-decoration:none;white-space:nowrap;cursor:pointer;
+  }
+  .btn svg{width:15px;height:15px;flex:0 0 auto}
+  .btn-primario{background:var(--primary-fuerte);color:var(--primary-foreground)}
+  .btn-negro{background:var(--secondary);color:var(--secondary-foreground)}
+  .btn-contorno{background:var(--card);border-color:var(--border)}
+  .btn-impugnar{background:var(--card);border-color:color-mix(in oklab, var(--destructive) 45%, var(--border));color:var(--destructive)}
+  .btn-full{width:100%}
+  .btn-chico{min-height:36px;padding:0 14px;font-size:.75rem;gap:6px}
+  .icono-btn{
+    display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;flex:0 0 auto;
+    border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--card);color:var(--foreground);text-decoration:none;cursor:pointer;
+  }
+  .icono-btn svg{width:16px;height:16px}
+  .icono-btn-cerrada{width:32px;height:32px}
+  .icono-btn-cerrada svg{width:16px;height:16px}
+  .banda-acciones{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--border);padding-top:12px}
+
+  /* ---------- Botón de acciones flotante ---------- */
+  .dial{
+    position:absolute;right:12px;bottom:calc(4rem + env(safe-area-inset-bottom) + 14px);z-index:9;
+    display:flex;flex-direction:column;align-items:flex-end;gap:10px;
+  }
+  .dial-escritorio{right:20px;bottom:20px}
+  .dial-menu{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .dial-menu[hidden]{display:none}
+  /* Button (components/ui/button.tsx), size icon-lg (3.25rem) con color de acento:
+     el proyecto no tiene speed-dial; se compone con Button + Button secondary icon-sm. */
+  .dial-boton{
+    display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;flex:0 0 auto;
+    border-radius:var(--radius-pill);background:var(--semantic-warning);color:var(--foreground);
+    border:1px solid color-mix(in oklab, var(--foreground) 28%, var(--semantic-warning));
+    box-shadow:var(--elevation-soft);font-family:inherit;cursor:pointer;
+  }
+  .dial-boton svg{width:22px;height:22px}
+  .dial-boton .icono-cruz{display:none}
+  .dial-boton[aria-expanded="true"] .icono-pluma{display:none}
+  .dial-boton[aria-expanded="true"] .icono-cruz{display:block}
+  .dial-accion{
+    display:inline-flex;align-items:center;gap:8px;padding:0;border:0;background:transparent;
+    font-family:inherit;cursor:pointer;border-radius:var(--radius-pill);
+  }
+  /* Button variant="secondary" size="sm" (min-h-9 px-3.5 text-xs) para la etiqueta;
+     size="icon-sm" (size-8) para el botón redondo */
+  .dial-etiqueta{
+    display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:var(--radius-pill);
+    background:var(--secondary);color:var(--secondary-foreground);font-size:.75rem;font-weight:500;line-height:1;white-space:nowrap;
+  }
+  .dial-mini{
+    display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:0 0 auto;
+    border-radius:var(--radius-pill);background:var(--secondary);color:var(--secondary-foreground);
+    border:1px solid color-mix(in oklab, var(--secondary-foreground) 20%, var(--secondary));
+  }
+  .dial-mini svg{width:16px;height:16px}
+  .dial-accion:hover .dial-mini{border-color:var(--secondary-foreground)}
+  .dial-accion:hover .dial-etiqueta{background:color-mix(in oklab, var(--secondary) 82%, var(--secondary-foreground))}
+
+  /* ---------- Escritorio ---------- */
+  .shell{padding:16px;background:var(--background);min-height:100%}
+  .contenedor-pagina{
+    display:flex;flex-direction:column;gap:14px;padding:20px;border-radius:36px;
+    background:color-mix(in oklab, var(--card) 88%, transparent);
+    border:1px solid color-mix(in oklab, var(--card) 70%, transparent);
+    box-shadow:0 22px 70px -32px color-mix(in oklab, var(--foreground) 45%, transparent);
+  }
+  .barra-pagina{display:flex;align-items:center;gap:10px}
+  .barra-pagina .icono{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:var(--radius-pill);background:var(--accent);color:var(--accent-foreground)}
+  .barra-pagina .icono svg{width:15px;height:15px}
+  .barra-pagina h3{font-size:.9375rem;font-weight:600}
+  .barra-pagina p{font-size:.75rem;color:var(--muted-foreground)}
+  .rejilla{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;align-items:start}
+  .col-7{grid-column:span 7}
+  .col-5{grid-column:span 5}
+  .pegajoso{position:sticky;top:0}
+  .foto-marco{width:100%;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-subtle)}
+  .foto-marco svg{display:block;width:100%;height:auto}
+  .foto-reporte svg{height:180px}
+
+  /* Franja de ubicación + reparación */
+  .franja{
+    display:flex;align-items:center;gap:14px;padding:12px;background:var(--card);color:var(--card-foreground);
+    border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+  .franja-mapa{width:132px;height:84px;flex:0 0 auto;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border)}
+  .franja-mapa svg{display:block;width:100%;height:100%}
+  .franja-dato{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+  .franja-dato strong{font-size:.875rem;font-weight:600}
+  .franja-dato span{font-size:.75rem;color:var(--muted-foreground)}
+  .franja-separador{width:1px;align-self:stretch;background:var(--border)}
+  .franja-reparacion{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+  .franja-reparacion .texto{display:flex;flex-direction:column;gap:2px}
+  .franja-reparacion strong{font-size:.875rem;font-weight:600}
+  .franja-reparacion span{font-size:.75rem;color:var(--muted-foreground)}
+
+  /* ---------- Drawer (components/ui/drawer.tsx, vaul) ----------
+     overlay bg-[var(--secondary)]/45 · content fixed inset-x-0 bottom-0 rounded-t-[1.75rem]
+     border border-border bg-card text-foreground shadow-2xl · max-h-[85dvh] · md:inset-x-[15%]
+     handle mt-3 bg-muted-foreground/35 · header px-3 pb-3 border-b · body px-3 */
+  .velo{
+    position:absolute;inset:0;z-index:20;display:flex;align-items:flex-end;
+    background:color-mix(in oklab, var(--secondary) 45%, transparent);
+  }
+  .velo[hidden]{display:none}
+  .hoja{
+    width:100%;max-height:85%;display:flex;flex-direction:column;overflow:hidden;
+    background:var(--card);color:var(--foreground);
+    border:1px solid var(--border);border-bottom:0;border-radius:1.75rem 1.75rem 0 0;
+    box-shadow:0 25px 50px -12px color-mix(in oklab, var(--foreground) 28%, transparent);
+  }
+  .hoja[hidden]{display:none}
+  .hoja-escritorio{margin:0 15%}
+  .hoja-asa{display:flex;justify-content:center;margin-top:12px}
+  .hoja-asa span{width:40px;height:5px;border-radius:var(--radius-pill);background:color-mix(in oklab, var(--muted-foreground) 35%, transparent)}
+  .hoja-cabecera{display:flex;align-items:flex-start;gap:12px;padding:8px 12px 12px;border-bottom:1px solid var(--border)}
+  .hoja-cabecera h4{font-size:.875rem;font-weight:600;letter-spacing:-.01em}
+  .hoja-cabecera p{font-size:.75rem;line-height:1.5;color:var(--muted-foreground);margin-top:2px}
+  .hoja-escritorio .hoja-cabecera h4{font-size:1rem}
+  .hoja-escritorio .hoja-cabecera p{font-size:.875rem}
+  .hoja-cerrar{
+    display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:0 0 auto;
+    border:1px solid transparent;border-radius:var(--radius-pill);background:var(--secondary);color:var(--secondary-foreground);
+    font-family:inherit;cursor:pointer;
+  }
+  .hoja-cerrar svg{width:15px;height:15px}
+  .hoja-cuerpo{padding:12px;display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0}
+  .hoja-pie{
+    display:flex;gap:8px;border-top:1px solid var(--border);background:var(--card);
+    padding:12px 12px calc(max(env(safe-area-inset-bottom), 1rem));
+    box-shadow:0 -10px 30px color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+  .hoja-pie .btn{width:100%}
+  .hoja-escritorio .hoja-pie{justify-content:flex-end;padding-bottom:12px}
+  .hoja-escritorio .hoja-pie .btn{width:auto}
+
+  /* ---------- Evidencia ---------- */
+  .comparacion{--corte:50%;position:relative;aspect-ratio:12/5;max-height:352px;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-subtle)}
+  .comparacion:has(input:focus-visible){outline:2px solid var(--ring);outline-offset:2px}
+  .comparacion-capa{position:absolute;inset:0}
+  .comparacion-capa svg{display:block;width:100%;height:100%}
+  .comparacion-despues{clip-path:inset(0 0 0 var(--corte))}
+  .comparacion-marca{position:absolute;top:8px;z-index:1;padding:3px 8px;border-radius:999px;background:var(--secondary);color:var(--secondary-foreground);font-size:.625rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;pointer-events:none}
+  .comparacion-marca-antes{left:8px}
+  .comparacion-marca-despues{right:8px}
+  .comparacion-linea{position:absolute;top:0;bottom:0;left:var(--corte);width:2px;background:var(--card);transform:translateX(-50%);pointer-events:none}
+  .comparacion-manija{position:absolute;top:50%;left:clamp(20px,var(--corte),calc(100% - 20px));display:grid;width:40px;height:40px;place-items:center;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--foreground);transform:translate(-50%,-50%);pointer-events:none}
+  .comparacion-manija svg{width:20px;height:20px}
+  .comparacion input[type="range"]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize;touch-action:pan-x}
+  .progreso-texto{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .progreso-cifra{font-size:.875rem;font-weight:600}
+  /* Progress (a instalar: npx shadcn@latest add progress): h-2 rounded-full bg-primary/20 + indicador bg-primary */
+  .progreso{position:relative;height:8px;width:100%;overflow:hidden;border-radius:var(--radius-pill);background:color-mix(in oklab, var(--primary) 20%, var(--card))}
+  .progreso-indicador{display:block;height:100%;border-radius:var(--radius-pill);background:var(--primary);width:66.6%}
+  .subida{
+    display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 12px;cursor:pointer;text-align:center;
+    border:1px dashed color-mix(in oklab, var(--primary) 55%, var(--border));border-radius:var(--radius);
+    background:color-mix(in oklab, var(--primary) 6%, var(--card));
+  }
+  .subida svg{width:22px;height:22px;color:var(--primary)}
+  .subida-titulo{font-size:.8125rem;font-weight:600}
+  .subida-ayuda{font-size:.6875rem;color:var(--muted-foreground)}
+  .campo-etiqueta{font-size:.8125rem;font-weight:500}
+  .selector{position:relative;display:flex;align-items:center}
+  /* Select (components/ui/select.tsx) SelectTrigger default: min-h-11 rounded-[var(--radius-md)]
+     border border-border bg-card px-3.5 py-2 text-sm; chevron size-4 opacity-50 */
+  .selector select{
+    width:100%;min-height:44px;padding:8px 36px 8px 14px;border-radius:var(--radius);border:1px solid var(--border);
+    background:var(--card);color:var(--foreground);font-family:inherit;font-size:.875rem;line-height:1.3;appearance:none;
+  }
+  .selector svg{position:absolute;right:12px;width:16px;height:16px;color:var(--muted-foreground);opacity:.5;pointer-events:none}
+
+  /* ---------- Actividad ---------- */
+  .formulario{
+    display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:var(--radius);
+    border:1px solid color-mix(in oklab, var(--border) 70%, transparent);
+    background:color-mix(in oklab, var(--muted) 55%, var(--card));
+  }
+  .linea{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .linea-item{display:flex;gap:10px}
+  .linea-cuerpo{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .linea-meta{font-size:.6875rem;color:var(--muted-foreground)}
+  .linea-meta strong{color:var(--foreground);font-weight:600}
+  .linea-aporte{font-size:.8125rem;font-weight:600}
+  .linea-texto{font-size:.8125rem;line-height:1.5;color:var(--foreground)}
+  .linea-cambio{
+    display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:var(--radius);
+    border:1px solid color-mix(in oklab, var(--primary) 22%, var(--border));
+    background:color-mix(in oklab, var(--primary) 6%, var(--card));
+  }
+  .linea-cambio svg{width:14px;height:14px;flex:0 0 auto;margin-top:2px;color:var(--primary)}
+  .linea-cambio p{font-size:.8125rem;font-weight:500;line-height:1.4}
+  .linea-cambio small{display:block;font-size:.6875rem;color:var(--muted-foreground);margin-top:2px}
+
+  /* ---------- Mapa ---------- */
+  .mapa-marco{overflow:hidden;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-subtle)}
+  .mapa-marco svg{display:block;width:100%;height:auto}
+  .mapa-dato{display:flex;align-items:flex-start;gap:8px}
+  .mapa-dato svg{width:15px;height:15px;flex:0 0 auto;margin-top:1px;color:var(--primary)}
+  .mapa-dato strong{display:block;font-size:.8125rem;font-weight:600}
+  .mapa-dato span{display:block;font-size:.75rem;color:var(--muted-foreground)}
+
+  /* ---------- Organismos ---------- */
+  .organismos{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .organismos li{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;
+    border:1px solid var(--border);border-radius:var(--radius);background:var(--card);
+  }
+  .organismos .texto{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .organismos strong{font-size:.8125rem;font-weight:600}
+  .organismos span{font-size:.6875rem;color:var(--muted-foreground)}
+
+  /* ---------- Móvil ---------- */
+  .movil-contenido{display:flex;flex-direction:column;gap:10px;padding:10px 12px 96px}
+  .franja-movil{
+    display:flex;align-items:center;gap:10px;padding:8px;text-align:left;width:100%;
+    background:var(--card);color:var(--card-foreground);font-family:inherit;cursor:pointer;
+    border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+  .franja-movil .franja-mapa{width:64px;height:56px}
+  .franja-movil .franja-dato strong{font-size:.8125rem}
+  .franja-movil .franja-dato span{font-size:.6875rem}
+  .fila-reparacion{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);color:var(--card-foreground);
+    border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--card-shadow);
+  }
+  .fila-reparacion .texto{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .fila-reparacion strong{font-size:.8125rem;font-weight:600}
+  .fila-reparacion span{font-size:.6875rem;color:var(--muted-foreground)}
+  .barra-inferior{
+    display:grid;grid-template-columns:repeat(5,1fr);align-items:center;height:4rem;flex:0 0 auto;
+    background:var(--secondary);color:var(--secondary-foreground);padding:0 2px;
+  }
+  .barra-inferior a{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:100%;
+    font-size:.625rem;line-height:1;text-decoration:none;
+    color:color-mix(in oklab, var(--secondary-foreground) 76%, transparent);
+  }
+  .barra-inferior a[aria-current="page"]{color:var(--secondary-foreground)}
+  .barra-inferior svg{width:20px;height:20px}
+  .barra-inferior .crear{justify-content:flex-end;padding-bottom:4px}
+  .barra-inferior .crear span{
+    display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin-top:-18px;
+    border-radius:var(--radius-pill);background:var(--primary-fuerte);color:var(--primary-foreground);
+    border:2px solid var(--secondary);
+  }
+  .barra-inferior .crear svg{width:22px;height:22px}
+
+  /* Anotación de piezas: shadcn/ui instalado vs a instalar (shadcn@latest add) */
+  .piezas{list-style:none;margin:2px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:4px 10px;max-width:1280px}
+  .piezas li{display:inline-flex;align-items:center;gap:6px;font-size:.6875rem;line-height:1.4;color:var(--muted-foreground)}
+  .etq{
+    display:inline-flex;align-items:center;padding:1px 7px;border-radius:var(--radius-pill);
+    border:1px solid var(--border);background:var(--card);color:var(--foreground);
+    font-size:.625rem;font-weight:600;line-height:1.5;white-space:nowrap;
+  }
+  .etq-instalar{
+    border-style:dashed;border-color:color-mix(in oklab, var(--semantic-warning) 60%, var(--border));
+    background:color-mix(in oklab, var(--semantic-warning) 14%, var(--card));
+  }
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+  /* ---------- Ilustraciones ---------- */
+  .cielo{fill:color-mix(in oklab, var(--semantic-info) 14%, var(--card))}
+  .edificio-a{fill:color-mix(in oklab, var(--foreground) 18%, var(--card))}
+  .edificio-b{fill:color-mix(in oklab, var(--foreground) 28%, var(--card))}
+  .ventana{fill:color-mix(in oklab, var(--card) 72%, var(--semantic-info))}
+  .vereda{fill:color-mix(in oklab, var(--foreground) 12%, var(--card))}
+  .bici{fill:color-mix(in oklab, var(--foreground) 20%, var(--card))}
+  .bici-linea{stroke:color-mix(in oklab, var(--card) 80%, transparent);stroke-width:3;stroke-dasharray:18 14;fill:none}
+  .calle{fill:color-mix(in oklab, var(--foreground) 34%, var(--card))}
+  .calle-clara{fill:color-mix(in oklab, var(--foreground) 26%, var(--card))}
+  .pintura{fill:color-mix(in oklab, var(--card) 68%, var(--semantic-warning))}
+  .tronco{fill:color-mix(in oklab, var(--foreground) 54%, var(--card))}
+  .tronco-claro{fill:color-mix(in oklab, var(--foreground) 40%, var(--card))}
+  .follaje{fill:color-mix(in oklab, var(--primary) 46%, var(--card))}
+  .follaje-oscuro{fill:color-mix(in oklab, var(--primary) 62%, var(--foreground))}
+  .cono{fill:var(--semantic-warning)}
+  .cono-base{fill:color-mix(in oklab, var(--foreground) 60%, var(--card))}
+  .arbol-sano{fill:color-mix(in oklab, var(--primary) 40%, var(--card))}
+  .tierra{fill:color-mix(in oklab, var(--foreground) 30%, var(--card))}
+
+  .mapa-fondo{fill:var(--surface-subtle)}
+  .mapa-manzana{fill:color-mix(in oklab, var(--card) 76%, var(--surface-subtle))}
+  .mapa-calle{stroke:var(--card);stroke-width:12;fill:none}
+  .mapa-avenida{stroke:var(--card);stroke-width:18;fill:none}
+  .mapa-eje{stroke:var(--border);stroke-width:1;stroke-dasharray:5 7;fill:none}
+  .mapa-rio{fill:color-mix(in oklab, var(--semantic-info) 30%, var(--card))}
+  .mapa-parque{fill:color-mix(in oklab, var(--primary) 20%, var(--card))}
+  .mapa-pin{fill:var(--primary);stroke:var(--card);stroke-width:2.5}
+  .mapa-pin-punto{fill:var(--card)}
+</style>
+</head>
+<body>
+<a class="salto" href="#lienzo">Saltar al contenido</a>
+
+<header class="cabecera-lienzo">
+  <p class="direccion">Detalle del reporte sin tanto scroll · dirección 02</p>
+  <h1>Botón de acciones flotante</h1>
+  <p>Las acciones del reporte, reunidas en un botón flotante.</p>
+  <div class="leyenda">
+    <span>Probá el botón flotante en cada vista.</span>
+  </div>
+</header>
+
+<main id="lienzo" class="lienzo">
+
+  <!-- ================= ESCRITORIO ================= -->
+  <section class="marco" aria-labelledby="rot-escritorio">
+    <div class="marco-rotulo">
+      <h2 id="rot-escritorio">Escritorio</h2>
+      <span class="medida">1280 × 880 · acciones desplegadas</span>
+    </div>
+    <div class="pantalla pantalla-escritorio">
+      <div class="area-scroll" tabindex="0" role="group" aria-label="Vista de escritorio del detalle del reporte, desplazable">
+        <div class="shell">
+          <div class="contenedor-pagina">
+
+            <header class="barra-pagina">
+              <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><circle cx="9" cy="11" r="4"/><path d="m12 14 4 4"/></svg></span>
+              <div>
+                <h3>Detalle del reporte</h3>
+              </div>
+            </header>
+
+            <!-- Franja: ubicación + reparación -->
+            <section class="franja" aria-label="Ubicación y estado de la reparación">
+              <div class="franja-mapa">
+                <svg viewBox="0 0 200 130" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mini mapa del cruce de Av. Costanera y Chacra 214 con el pin del reporte">
+                  <rect class="mapa-fondo" width="200" height="130"/>
+                  <rect class="mapa-manzana" x="8" y="8" width="54" height="36" rx="3"/>
+                  <rect class="mapa-manzana" x="8" y="60" width="54" height="30" rx="3"/>
+                  <rect class="mapa-manzana" x="8" y="104" width="54" height="20" rx="3"/>
+                  <rect class="mapa-manzana" x="76" y="8" width="46" height="36" rx="3"/>
+                  <rect class="mapa-manzana" x="76" y="60" width="46" height="30" rx="3"/>
+                  <rect class="mapa-manzana" x="76" y="104" width="46" height="20" rx="3"/>
+                  <rect class="mapa-parque" x="134" y="52" width="30" height="34" rx="4"/>
+                  <path class="mapa-rio" d="M168 0h32v130h-26c8-19 6-43-1-63-5-17-7-37-5-67Z"/>
+                  <path class="mapa-avenida" d="M0 54h170"/>
+                  <path class="mapa-calle" d="M68 0v130M128 0v130M0 46h170M0 96h170"/>
+                  <path class="mapa-eje" d="M0 54h170"/>
+                  <circle class="mapa-pin" cx="98" cy="54" r="7"/>
+                  <circle class="mapa-pin-punto" cx="98" cy="54" r="2.6"/>
+                </svg>
+              </div>
+              <div class="franja-dato">
+                <strong>Av. Costanera y Chacra 214</strong>
+                <span>Costanera · a 40 m de la parada de la línea 34</span>
+              </div>
+              <button class="btn btn-contorno btn-chico" type="button" data-abrir="d-ubicacion">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                Ver en mapa completo
+              </button>
+
+              <span class="franja-separador" aria-hidden="true"></span>
+
+              <div class="franja-reparacion">
+                <div class="texto">
+                  <strong>¿Ya lo arreglaron?</strong>
+                  <span>En verificación · 2 de 3 confirmaciones</span>
+                </div>
+                <button class="btn btn-primario btn-chico" type="button" data-abrir="d-reparacion">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  Ver la evidencia
+                </button>
+              </div>
+            </section>
+
+            <div class="rejilla">
+
+              <!-- Reporte -->
+              <section class="col-7 tarjeta" aria-labelledby="rep-titulo">
+                <p class="meta">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+                  Creado el día 27 de oct de 2026 <strong style="color:var(--foreground)">(hace 11 días)</strong>
+                </p>
+                <div class="chip-fila">
+                  <span class="chip chip-prioridad">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                    Prioridad media
+                  </span>
+                  <span class="chip chip-estado">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    Pendiente
+                  </span>
+                  <span class="chip chip-categoria">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 20v-6M8 20h8"/><path d="M12 14c0-4 3-5 5-8 1 4 0 7-5 8Z"/><path d="M12 14c0-3-2-4-4-6-1 3 0 5 4 6Z"/></svg>
+                    Árbol caído
+                  </span>
+                </div>
+                <h4 id="rep-titulo" class="tarjeta-titulo" style="font-size:1.375rem;font-weight:700">Árbol caído en Av. Costanera y Chacra 214</h4>
+                <p class="copy-fuerte">El temporal de la semana pasada tiró un árbol sobre la bicisenda, a media cuadra de la parada. Las ramas tapan media calzada y los colectivos ya no paran en el lugar.</p>
+
+                <!-- Escritorio: foto del reporte con el deslizador Antes/Después -->
+                <div class="comparacion">
+                  <div class="comparacion-capa comparacion-antes">
+                      <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 27 de octubre: el árbol caído sobre la bicisenda">
+                        <rect class="cielo" width="720" height="300"/>
+                        <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                        <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                        <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                        <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                        <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                        <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                        <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                        <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                        <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                        <rect class="bici" x="0" y="166" width="720" height="48"/>
+                        <path class="bici-linea" d="M0 190h720"/>
+                        <rect class="calle" x="0" y="214" width="720" height="86"/>
+                        <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                        <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                        <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                        <path class="tierra" d="M26 216c-6-24 6-42 28-46 22-4 44 6 48 24 4 14-4 22-18 24-20 3-52 2-58-2Z"/>
+                        <path class="tronco" d="M62 212c70-8 150-20 234-42 34-9 70-14 104-14l3 20c-32 0-66 5-98 14-84 22-166 32-240 36Z"/>
+                        <path class="tronco-claro" d="M252 188c22-24 46-42 74-54l11 16c-26 10-48 26-68 46Z"/>
+                        <ellipse class="follaje" cx="432" cy="126" rx="62" ry="40"/>
+                        <ellipse class="follaje-oscuro" cx="472" cy="152" rx="44" ry="27"/>
+                        <ellipse class="follaje" cx="386" cy="142" rx="40" ry="29"/>
+                        <ellipse class="follaje" cx="502" cy="116" rx="38" ry="26"/>
+                        <ellipse class="follaje-oscuro" cx="440" cy="100" rx="30" ry="22"/>
+                        <ellipse class="follaje" cx="150" cy="228" rx="13" ry="5"/>
+                        <ellipse class="follaje" cx="198" cy="240" rx="10" ry="4"/>
+                        <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
+                        <path class="cono" d="M602 200h20l-3 30h-14Z"/>
+                        <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+                  </div>
+                  <div class="comparacion-capa comparacion-despues">
+                      <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 6 de noviembre: la bicisenda despejada y el tocón del árbol retirado">
+                        <rect class="cielo" width="720" height="300"/>
+                        <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                        <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                        <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                        <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                        <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                        <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                        <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                        <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                        <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                        <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                        <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                        <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                        <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                        <ellipse class="tierra" cx="70" cy="158" rx="28" ry="9"/>
+                        <rect class="tronco" x="62" y="138" width="15" height="21" rx="2"/>
+                        <rect class="tronco-claro" x="62" y="138" width="15" height="4" rx="1"/>
+                        <rect class="bici" x="0" y="166" width="720" height="48"/>
+                        <path class="bici-linea" d="M0 190h720"/>
+                        <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                        <rect class="calle" x="0" y="219" width="720" height="81"/>
+                        <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                        <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                        <ellipse class="arbol-sano" cx="640" cy="130" rx="30" ry="26"/>
+                        <rect class="tronco" x="637" y="152" width="6" height="16"/></svg>
+                  </div>
+                  <span class="comparacion-marca comparacion-marca-antes">Antes · 27 oct</span>
+                  <span class="comparacion-marca comparacion-marca-despues">Después · 6 nov</span>
+                  <span class="comparacion-linea" aria-hidden="true"></span>
+                  <span class="comparacion-manija" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+                  </span>
+                  <input type="range" min="0" max="100" value="50" aria-label="Comparar fotos: antes a la izquierda y después a la derecha" aria-valuetext="Corte al 50 por ciento. Antes a la izquierda y después a la derecha.">
+                </div>
+                <p class="ayuda">Deslizá para comparar el antes y el después.</p>
+
+                <div class="autor">
+                  <span class="avatar" aria-hidden="true">OD</span>
+                  <span>Reportado por octiduarte</span>
+                </div>
+
+                <div class="banda-acciones">
+                  <button class="btn btn-negro" type="button" data-abrir="d-organismos">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V6l16-2v14"/><path d="M8 20v-6h6v6"/></svg>
+                    Avisar a un organismo
+                  </button>
+                  <span style="flex:1"></span>
+                  <button class="icono-btn" type="button" aria-label="Compartir reporte">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/></svg>
+                  </button>
+                  <button class="icono-btn" type="button" aria-label="Editar reporte">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  </button>
+                  <button class="icono-btn" type="button" aria-label="Eliminar reporte">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+                  </button>
+                </div>
+              </section>
+
+              <!-- Actividad, pegada a la derecha -->
+              <div class="col-5 pegajoso">
+                <section class="tarjeta" aria-labelledby="act-titulo">
+                  <div>
+                    <h4 id="act-titulo" class="titulo-seccion">Actualizaciones y Comentarios</h4>
+                  </div>
+                  <ol class="linea">
+                    <li class="linea-item">
+                      <span class="avatar" aria-hidden="true">VR</span>
+                      <div class="linea-cuerpo">
+                        <p class="linea-meta"><strong>vecina_rosa</strong> · hace 2 días</p>
+                        <p class="linea-aporte">El problema sigue igual</p>
+                        <p class="linea-texto">Pasé esta mañana: el árbol sigue cruzado sobre la bicisenda y los colectivos no paran más en la esquina.</p>
+                      </div>
+                    </li>
+                    <li>
+                      <div class="linea-cambio">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></svg>
+                        <div>
+                          <p>La reparación está en verificación</p>
+                          <small>por Equipo Reporty · hace 5 días</small>
+                        </div>
+                      </div>
+                    </li>
+                    <li class="linea-item">
+                      <span class="avatar" aria-hidden="true">MF</span>
+                      <div class="linea-cuerpo">
+                        <p class="linea-meta"><strong>marcos.ferreyra</strong> · hace 6 horas</p>
+                        <p class="linea-aporte">Me comuniqué con el área responsable</p>
+                        <p class="linea-texto">Llamé a Defensa Civil y me dijeron que la cuadrilla tiene la orden cargada para esta semana.</p>
+                      </div>
+                    </li>
+                  </ol>
+                </section>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acciones flotantes de escritorio, desplegadas -->
+      <div class="dial dial-escritorio" data-dial>
+        <div class="dial-menu" id="menu-dial-escritorio">
+          <button class="dial-accion" type="button" data-abrir="d-organismos">
+            <span class="dial-etiqueta">Avisar a un organismo</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V6l16-2v14"/><path d="M8 20v-6h6v6"/></svg></span>
+          </button>
+          <button class="dial-accion" type="button" data-abrir="d-ubicacion">
+            <span class="dial-etiqueta">Ver ubicación</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          </button>
+          <button class="dial-accion" type="button" data-abrir="d-reparacion">
+            <span class="dial-etiqueta">¿Ya lo arreglaron?</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+          </button>
+          <button class="dial-accion" type="button" data-abrir="d-comentar">
+            <span class="dial-etiqueta">Comentar</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12Z"/></svg></span>
+          </button>
+        </div>
+        <button class="dial-boton" type="button" aria-expanded="true" aria-controls="menu-dial-escritorio" aria-label="Acciones rápidas del reporte">
+          <svg class="icono-pluma" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <svg class="icono-cruz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <!-- Hojas inferiores de escritorio: el mismo Drawer que el filtro del mapa -->
+      <div class="velo" id="velo-escritorio" hidden>
+
+        <div class="hoja hoja-escritorio" id="d-reparacion" role="dialog" aria-modal="true" aria-labelledby="d-reparacion-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="d-reparacion-titulo">¿Ya lo arreglaron? Informá la reparación</h4>
+              <p>El reporte pasa a Reparado cuando se valida la evidencia.</p>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar la hoja de reparación">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <div class="comparacion">
+              <div class="comparacion-capa comparacion-antes">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 27 de octubre: el árbol caído sobre la bicisenda">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle" x="0" y="214" width="720" height="86"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <path class="tierra" d="M26 216c-6-24 6-42 28-46 22-4 44 6 48 24 4 14-4 22-18 24-20 3-52 2-58-2Z"/>
+                    <path class="tronco" d="M62 212c70-8 150-20 234-42 34-9 70-14 104-14l3 20c-32 0-66 5-98 14-84 22-166 32-240 36Z"/>
+                    <path class="tronco-claro" d="M252 188c22-24 46-42 74-54l11 16c-26 10-48 26-68 46Z"/>
+                    <ellipse class="follaje" cx="432" cy="126" rx="62" ry="40"/>
+                    <ellipse class="follaje-oscuro" cx="472" cy="152" rx="44" ry="27"/>
+                    <ellipse class="follaje" cx="386" cy="142" rx="40" ry="29"/>
+                    <ellipse class="follaje" cx="502" cy="116" rx="38" ry="26"/>
+                    <ellipse class="follaje-oscuro" cx="440" cy="100" rx="30" ry="22"/>
+                    <ellipse class="follaje" cx="150" cy="228" rx="13" ry="5"/>
+                    <ellipse class="follaje" cx="198" cy="240" rx="10" ry="4"/>
+                    <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
+                    <path class="cono" d="M602 200h20l-3 30h-14Z"/>
+                    <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+              </div>
+              <div class="comparacion-capa comparacion-despues">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 6 de noviembre: la bicisenda despejada y el tocón del árbol retirado">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <ellipse class="tierra" cx="70" cy="158" rx="28" ry="9"/>
+                    <rect class="tronco" x="62" y="138" width="15" height="21" rx="2"/>
+                    <rect class="tronco-claro" x="62" y="138" width="15" height="4" rx="1"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="calle" x="0" y="219" width="720" height="81"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <ellipse class="arbol-sano" cx="640" cy="130" rx="30" ry="26"/>
+                    <rect class="tronco" x="637" y="152" width="6" height="16"/></svg>
+              </div>
+              <span class="comparacion-marca comparacion-marca-antes">Antes · 27 oct</span>
+              <span class="comparacion-marca comparacion-marca-despues">Después · 6 nov</span>
+              <span class="comparacion-linea" aria-hidden="true"></span>
+              <span class="comparacion-manija" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+              </span>
+              <input type="range" min="0" max="100" value="50" aria-label="Comparar fotos: antes a la izquierda y después a la derecha" aria-valuetext="Corte al 50 por ciento. Antes a la izquierda y después a la derecha.">
+            </div>
+            <p class="ayuda">Deslizá para comparar el antes y el después.</p>
+
+            <div class="progreso-texto">
+              <p class="progreso-cifra">2 de 3 confirmaciones</p>
+              <p class="ayuda">Falta 1</p>
+            </div>
+            <div class="progreso" role="progressbar" aria-label="Confirmaciones de la reparación" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-valuetext="2 de 3 confirmaciones">
+                <span class="progreso-indicador"></span>
+            </div>
+            <p class="ayuda">«Ya retiraron el árbol y limpiaron la bicisenda. Quedó el tocón al lado de la parada.» — Marisa Bogado, 6 nov.</p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button class="btn btn-primario" type="button">Confirmar</button>
+              <button class="btn btn-impugnar" type="button">Impugnar</button>
+            </div>
+
+            <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:10px">
+              <p class="campo-etiqueta">¿La viste reparada y hay otra foto?</p>
+              <input class="sr-only" id="foto-camara-escritorio" type="file" accept="image/*" capture="environment">
+              <label class="subida" for="foto-camara-escritorio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                <span class="subida-titulo">Sacar la foto ahora</span>
+                <span class="subida-ayuda">JPG, PNG o WebP · hasta 15 MB</span>
+              </label>
+              <label class="btn btn-contorno btn-full" for="foto-camara-escritorio" style="cursor:pointer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5.5-5.5L7 19"/></svg>
+                Elegir de la galería
+              </label>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label class="campo-etiqueta" for="que-se-arreglo-escritorio">¿Qué se arregló?</label>
+                <div class="selector">
+                  <select id="que-se-arreglo-escritorio">
+                    <option>Repararon el problema por completo</option>
+                    <option>Retiraron el árbol o las ramas caídas</option>
+                    <option>Taparon el bache con asfalto nuevo</option>
+                    <option>Repararon o cambiaron la luminaria</option>
+                    <option>Limpiaron la basura o el microbasural</option>
+                    <option>Repararon la pérdida de agua o la cañería</option>
+                    <option>Arreglaron la vereda o el cordón</option>
+                    <option>Repusieron o arreglaron el cartel o semáforo</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+              </div>
+              <p class="ayuda">La foto se revisa antes de publicarse.</p>
+            </div>
+          </div>
+          <div class="hoja-pie">
+            <button class="btn btn-primario" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 3-9 18-2-7-7-2Z"/></svg>
+              Enviar evidencia
+            </button>
+          </div>
+        </div>
+
+        <div class="hoja hoja-escritorio" id="d-comentar" role="dialog" aria-modal="true" aria-labelledby="d-comentar-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="d-comentar-titulo">¿Qué novedad tenés?</h4>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar el compositor">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <div class="formulario">
+              <label class="campo-etiqueta" for="novedad-escritorio">¿Qué novedad tenés?</label>
+              <div class="selector">
+                <select id="novedad-escritorio">
+                  <option value="">Elegí una actualización…</option>
+                  <option>El problema sigue igual</option>
+                  <option>El problema empeoró</option>
+                  <option>El problema mejoró, pero continúa</option>
+                  <option>Ya no veo el problema</option>
+                  <option>Me comuniqué con el área responsable</option>
+                  <option>Vi que comenzaron los trabajos</option>
+                  <option>Los trabajos parecen estar detenidos</option>
+                </select>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
+          </div>
+          <div class="hoja-pie">
+            <button class="btn btn-primario" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 3-9 18-2-7-7-2Z"/></svg>
+              Publicar
+            </button>
+          </div>
+        </div>
+
+        <div class="hoja hoja-escritorio" id="d-ubicacion" role="dialog" aria-modal="true" aria-labelledby="d-ubicacion-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="d-ubicacion-titulo">Ubicación</h4>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar el mapa">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <div class="mapa-marco">
+              <svg viewBox="0 0 520 260" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mapa del cruce de Av. Costanera y Chacra 214, con la parada de colectivos y el río al este">
+                <rect class="mapa-fondo" width="520" height="260"/>
+                <rect class="mapa-manzana" x="16" y="16" width="140" height="80" rx="5"/>
+                <rect class="mapa-manzana" x="16" y="122" width="140" height="60" rx="5"/>
+                <rect class="mapa-manzana" x="16" y="208" width="140" height="40" rx="5"/>
+                <rect class="mapa-manzana" x="182" y="16" width="120" height="80" rx="5"/>
+                <rect class="mapa-manzana" x="182" y="122" width="120" height="60" rx="5"/>
+                <rect class="mapa-manzana" x="182" y="208" width="120" height="40" rx="5"/>
+                <rect class="mapa-parque" x="330" y="112" width="70" height="80" rx="7"/>
+                <path class="mapa-rio" d="M420 0h100v260h-84c18-38 12-86-2-126-12-34-16-74-14-134Z"/>
+                <path class="mapa-avenida" d="M0 112h420"/>
+                <path class="mapa-calle" d="M168 0v260M318 0v260M0 96h420M0 198h420"/>
+                <path class="mapa-eje" d="M0 112h420"/>
+                <circle class="mapa-pin" cx="240" cy="112" r="12"/>
+                <circle class="mapa-pin-punto" cx="240" cy="112" r="4.5"/>
+              </svg>
+            </div>
+            <div class="mapa-dato">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              <div>
+                <strong>Av. Costanera y Chacra 214</strong>
+                <span>Costanera · a 40 m de la parada de la línea 34</span>
+              </div>
+            </div>
+          </div>
+          <div class="hoja-pie">
+            <a class="btn btn-primario" href="#">Ver en mapa completo</a>
+          </div>
+        </div>
+
+        <div class="hoja hoja-escritorio" id="d-organismos" role="dialog" aria-modal="true" aria-labelledby="d-organismos-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="d-organismos-titulo">Contactar a organismos</h4>
+              <p>Contactá directamente al organismo. Reporty no envía mensajes ni garantiza respuestas.</p>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar los contactos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <ul class="organismos" aria-label="Lista de organismos">
+              <li>
+                <span class="texto"><strong>Subsecretaría de Espacios Verdes</strong><span>Teléfono · 0800 555 0142</span></span>
+                <a class="btn btn-primario btn-chico" href="#" aria-label="Llamar: Subsecretaría de Espacios Verdes">Llamar</a>
+              </li>
+              <li>
+                <span class="texto"><strong>Defensa Civil Municipal</strong><span>WhatsApp · +54 9 362 400 1122</span></span>
+                <a class="btn btn-primario btn-chico" href="#" aria-label="Abrir WhatsApp: Defensa Civil Municipal">Abrir WhatsApp</a>
+              </li>
+              <li>
+                <span class="texto"><strong>Guardia Urbana Costanera</strong><span>Correo · guardia@costanera.gob.ar</span></span>
+                <a class="btn btn-primario btn-chico" href="#" aria-label="Redactar correo: Guardia Urbana Costanera">Redactar correo</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <p class="marco-pie">Las acciones están a mano; la hoja cubre el reporte mientras está abierta.</p>
+    <ul class="piezas" aria-label="Componentes shadcn/ui de este marco">
+      <li><span class="etq">Button</span> FAB (icon-lg) y acciones del menú (secondary + icon-sm)</li>
+      <li><span class="etq">Drawer (vaul)</span> las cuatro hojas inferiores del botón flotante</li>
+      <li><span class="etq">Card</span> tarjeta del reporte y de actividad</li>
+      <li><span class="etq">Badge</span> prioridad, estado y categoría</li>
+      <li><span class="etq">Select</span> «¿Qué novedad tenés?» y «¿Qué se arregló?»</li>
+      <li><span class="etq">Avatar</span> firma de cada novedad</li>
+      <li><span class="etq etq-instalar">a instalar: npx shadcn@latest add progress</span> «2 de 3 confirmaciones»</li>
+    </ul>
+  </section>
+
+  <!-- ================= MÓVIL ================= -->
+  <section class="marco" aria-labelledby="rot-movil">
+    <div class="marco-rotulo">
+      <h2 id="rot-movil">Móvil</h2>
+      <span class="medida">390 × 844 · acciones cerradas</span>
+    </div>
+    <div class="pantalla pantalla-movil">
+      <div class="area-scroll" tabindex="0" role="group" aria-label="Vista de móvil del detalle del reporte, desplazable">
+        <div class="movil-contenido">
+
+          <!-- Encabezado como el actual de la app (PageTitleBar con «Volver») -->
+          <header class="barra-pagina">
+            <a class="icono-btn" href="#" aria-label="Volver">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            </a>
+            <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><circle cx="9" cy="11" r="4"/><path d="m12 14 4 4"/></svg></span>
+            <div>
+              <h3>Detalle del reporte</h3>
+              <p>Consultá el estado y los avances del reporte.</p>
+            </div>
+          </header>
+
+          <!-- Franja de ubicación, cerca del inicio -->
+          <button class="franja-movil" type="button" data-abrir="h-ubicacion">
+            <span class="franja-mapa">
+              <svg viewBox="0 0 200 130" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mini mapa del cruce de Av. Costanera y Chacra 214 con el pin del reporte">
+                <rect class="mapa-fondo" width="200" height="130"/>
+                <rect class="mapa-manzana" x="8" y="8" width="54" height="36" rx="3"/>
+                <rect class="mapa-manzana" x="8" y="60" width="54" height="30" rx="3"/>
+                <rect class="mapa-manzana" x="76" y="8" width="46" height="36" rx="3"/>
+                <rect class="mapa-manzana" x="76" y="60" width="46" height="30" rx="3"/>
+                <rect class="mapa-parque" x="134" y="52" width="30" height="34" rx="4"/>
+                <path class="mapa-rio" d="M168 0h32v130h-26c8-19 6-43-1-63-5-17-7-37-5-67Z"/>
+                <path class="mapa-avenida" d="M0 54h170"/>
+                <path class="mapa-calle" d="M68 0v130M128 0v130M0 46h170M0 96h170"/>
+                <path class="mapa-eje" d="M0 54h170"/>
+                <circle class="mapa-pin" cx="98" cy="54" r="8"/>
+                <circle class="mapa-pin-punto" cx="98" cy="54" r="3"/>
+              </svg>
+            </span>
+            <span class="franja-dato">
+              <strong>Av. Costanera y Chacra 214</strong>
+              <span>Costanera · a 40 m de la parada</span>
+            </span>
+            <span class="btn btn-contorno btn-chico">Ver en mapa</span>
+          </button>
+
+          <!-- Reporte compactado -->
+          <section class="tarjeta" aria-labelledby="rep-titulo-m">
+            <div class="chip-fila">
+              <span class="chip chip-prioridad">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                Prioridad media
+              </span>
+              <span class="chip chip-estado">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                Pendiente
+              </span>
+              <span class="chip chip-categoria">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M12 20v-6M8 20h8"/><path d="M12 14c0-4 3-5 5-8 1 4 0 7-5 8Z"/><path d="M12 14c0-3-2-4-4-6-1 3 0 5 4 6Z"/></svg>
+                Árbol caído
+              </span>
+            </div>
+            <h4 id="rep-titulo-m" class="tarjeta-titulo" style="font-size:1.125rem;font-weight:700">Árbol caído en Av. Costanera y Chacra 214</h4>
+            <p class="meta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+              Creado el 27 de oct de 2026 <strong style="color:var(--foreground)">(hace 11 días)</strong>
+            </p>
+            <!-- Móvil: foto del reporte con el deslizador Antes/Después -->
+            <div class="comparacion">
+              <div class="comparacion-capa comparacion-antes">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 27 de octubre: el árbol caído sobre la bicisenda">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle" x="0" y="214" width="720" height="86"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <path class="tierra" d="M26 216c-6-24 6-42 28-46 22-4 44 6 48 24 4 14-4 22-18 24-20 3-52 2-58-2Z"/>
+                    <path class="tronco" d="M62 212c70-8 150-20 234-42 34-9 70-14 104-14l3 20c-32 0-66 5-98 14-84 22-166 32-240 36Z"/>
+                    <path class="tronco-claro" d="M252 188c22-24 46-42 74-54l11 16c-26 10-48 26-68 46Z"/>
+                    <ellipse class="follaje" cx="432" cy="126" rx="62" ry="40"/>
+                    <ellipse class="follaje-oscuro" cx="472" cy="152" rx="44" ry="27"/>
+                    <ellipse class="follaje" cx="386" cy="142" rx="40" ry="29"/>
+                    <ellipse class="follaje" cx="502" cy="116" rx="38" ry="26"/>
+                    <ellipse class="follaje-oscuro" cx="440" cy="100" rx="30" ry="22"/>
+                    <ellipse class="follaje" cx="150" cy="228" rx="13" ry="5"/>
+                    <ellipse class="follaje" cx="198" cy="240" rx="10" ry="4"/>
+                    <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
+                    <path class="cono" d="M602 200h20l-3 30h-14Z"/>
+                    <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+              </div>
+              <div class="comparacion-capa comparacion-despues">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 6 de noviembre: la bicisenda despejada y el tocón del árbol retirado">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <ellipse class="tierra" cx="70" cy="158" rx="28" ry="9"/>
+                    <rect class="tronco" x="62" y="138" width="15" height="21" rx="2"/>
+                    <rect class="tronco-claro" x="62" y="138" width="15" height="4" rx="1"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="calle" x="0" y="219" width="720" height="81"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <ellipse class="arbol-sano" cx="640" cy="130" rx="30" ry="26"/>
+                    <rect class="tronco" x="637" y="152" width="6" height="16"/></svg>
+              </div>
+              <span class="comparacion-marca comparacion-marca-antes">Antes · 27 oct</span>
+              <span class="comparacion-marca comparacion-marca-despues">Después · 6 nov</span>
+              <span class="comparacion-linea" aria-hidden="true"></span>
+              <span class="comparacion-manija" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+              </span>
+              <input type="range" min="0" max="100" value="50" aria-label="Comparar fotos: antes a la izquierda y después a la derecha" aria-valuetext="Corte al 50 por ciento. Antes a la izquierda y después a la derecha.">
+            </div>
+            <p class="ayuda">Deslizá para comparar el antes y el después.</p>
+            <div class="autor">
+              <span class="avatar" aria-hidden="true">OD</span>
+              <span>Reportado por octiduarte</span>
+            </div>
+            <div class="banda-acciones" style="gap:6px;padding-top:10px">
+              <button class="btn btn-negro btn-chico" type="button" data-abrir="h-organismos">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V6l16-2v14"/><path d="M8 20v-6h6v6"/></svg>
+                Avisar a un organismo
+              </button>
+              <span style="flex:1"></span>
+              <button class="icono-btn icono-btn-cerrada" type="button" aria-label="Compartir reporte">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/></svg>
+              </button>
+              <button class="icono-btn icono-btn-cerrada" type="button" aria-label="Editar reporte">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+              <button class="icono-btn icono-btn-cerrada" type="button" aria-label="Eliminar reporte">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+              </button>
+            </div>
+          </section>
+
+          <!-- Reparación resumida en una fila -->
+          <div class="fila-reparacion">
+            <span class="texto">
+              <strong>¿Ya lo arreglaron?</strong>
+              <span>En verificación · 2 de 3 confirmaciones</span>
+            </span>
+            <button class="btn btn-primario btn-chico" type="button" data-abrir="h-reparacion">Ver</button>
+          </div>
+
+          <!-- Actividad -->
+          <section class="tarjeta" aria-labelledby="act-titulo-m">
+            <div>
+              <h4 id="act-titulo-m" class="titulo-seccion">Actualizaciones y Comentarios</h4>
+            </div>
+            <ol class="linea">
+              <li class="linea-item">
+                <span class="avatar" aria-hidden="true">VR</span>
+                <div class="linea-cuerpo">
+                  <p class="linea-meta"><strong>vecina_rosa</strong> · hace 2 días</p>
+                  <p class="linea-aporte">El problema sigue igual</p>
+                  <p class="linea-texto">Pasé esta mañana: el árbol sigue cruzado sobre la bicisenda y los colectivos no paran más en la esquina.</p>
+                </div>
+              </li>
+              <li>
+                <div class="linea-cambio">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></svg>
+                  <div>
+                    <p>La reparación está en verificación</p>
+                    <small>por Equipo Reporty · hace 5 días</small>
+                  </div>
+                </div>
+              </li>
+              <li class="linea-item">
+                <span class="avatar" aria-hidden="true">MF</span>
+                <div class="linea-cuerpo">
+                  <p class="linea-meta"><strong>marcos.ferreyra</strong> · hace 6 horas</p>
+                  <p class="linea-aporte">Me comuniqué con el área responsable</p>
+                  <p class="linea-texto">Llamé a Defensa Civil y me dijeron que la cuadrilla tiene la orden cargada para esta semana.</p>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- Acciones flotantes de móvil, cerradas -->
+      <div class="dial" data-dial>
+        <div class="dial-menu" id="menu-dial-movil" hidden>
+          <button class="dial-accion" type="button" data-abrir="h-organismos">
+            <span class="dial-etiqueta">Avisar a un organismo</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V6l16-2v14"/><path d="M8 20v-6h6v6"/></svg></span>
+          </button>
+          <button class="dial-accion" type="button" data-abrir="h-ubicacion">
+            <span class="dial-etiqueta">Ver ubicación</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          </button>
+          <button class="dial-accion" type="button" data-abrir="h-reparacion">
+            <span class="dial-etiqueta">¿Ya lo arreglaron?</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+          </button>
+          <button class="dial-accion" type="button" data-abrir="h-comentar">
+            <span class="dial-etiqueta">Comentar</span>
+            <span class="dial-mini" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12Z"/></svg></span>
+          </button>
+        </div>
+        <button class="dial-boton" type="button" aria-expanded="false" aria-controls="menu-dial-movil" aria-label="Acciones rápidas del reporte">
+          <svg class="icono-pluma" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <svg class="icono-cruz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <nav class="barra-inferior" aria-label="Navegación principal">
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 4-5 2v14l5-2 6 2 5-2V4l-5 2Z"/><path d="M9 4v14M15 6v14"/></svg>Mapa</a>
+        <a href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v14H4Z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>Reportes</a>
+        <a class="crear" href="#" aria-label="Crear reporte"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span></a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM16 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 6 2 6 5"/></svg>Comunidad</a>
+        <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c0-4 3.4-6 7.5-6s7.5 2 7.5 6"/></svg>Cuenta</a>
+      </nav>
+
+      <!-- Hojas inferiores de móvil: el mismo Drawer que el filtro del mapa -->
+      <div class="velo" id="velo-movil" hidden>
+
+        <div class="hoja" id="h-comentar" role="dialog" aria-modal="true" aria-labelledby="h-comentar-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="h-comentar-titulo">¿Qué novedad tenés?</h4>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar el compositor">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <div class="formulario">
+              <label class="campo-etiqueta" for="novedad-movil">¿Qué novedad tenés?</label>
+              <div class="selector">
+                <select id="novedad-movil">
+                  <option value="">Elegí una actualización…</option>
+                  <option>El problema sigue igual</option>
+                  <option>El problema empeoró</option>
+                  <option>El problema mejoró, pero continúa</option>
+                  <option>Ya no veo el problema</option>
+                  <option>Me comuniqué con el área responsable</option>
+                  <option>Vi que comenzaron los trabajos</option>
+                  <option>Los trabajos parecen estar detenidos</option>
+                </select>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
+          </div>
+          <div class="hoja-pie">
+            <button class="btn btn-primario" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 3-9 18-2-7-7-2Z"/></svg>
+              Publicar
+            </button>
+          </div>
+        </div>
+
+        <div class="hoja" id="h-reparacion" role="dialog" aria-modal="true" aria-labelledby="h-reparacion-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="h-reparacion-titulo">¿Ya lo arreglaron?</h4>
+              <p>El reporte pasa a Reparado cuando se valida la evidencia.</p>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar la hoja de reparación">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <div class="comparacion">
+              <div class="comparacion-capa comparacion-antes">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 27 de octubre: el árbol caído sobre la bicisenda">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle" x="0" y="214" width="720" height="86"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <path class="tierra" d="M26 216c-6-24 6-42 28-46 22-4 44 6 48 24 4 14-4 22-18 24-20 3-52 2-58-2Z"/>
+                    <path class="tronco" d="M62 212c70-8 150-20 234-42 34-9 70-14 104-14l3 20c-32 0-66 5-98 14-84 22-166 32-240 36Z"/>
+                    <path class="tronco-claro" d="M252 188c22-24 46-42 74-54l11 16c-26 10-48 26-68 46Z"/>
+                    <ellipse class="follaje" cx="432" cy="126" rx="62" ry="40"/>
+                    <ellipse class="follaje-oscuro" cx="472" cy="152" rx="44" ry="27"/>
+                    <ellipse class="follaje" cx="386" cy="142" rx="40" ry="29"/>
+                    <ellipse class="follaje" cx="502" cy="116" rx="38" ry="26"/>
+                    <ellipse class="follaje-oscuro" cx="440" cy="100" rx="30" ry="22"/>
+                    <ellipse class="follaje" cx="150" cy="228" rx="13" ry="5"/>
+                    <ellipse class="follaje" cx="198" cy="240" rx="10" ry="4"/>
+                    <ellipse class="follaje" cx="306" cy="232" rx="13" ry="5"/>
+                    <path class="cono" d="M602 200h20l-3 30h-14Z"/>
+                    <rect class="cono-base" x="594" y="230" width="36" height="6" rx="3"/></svg>
+              </div>
+              <div class="comparacion-capa comparacion-despues">
+                  <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Foto del 6 de noviembre: la bicisenda despejada y el tocón del árbol retirado">
+                    <rect class="cielo" width="720" height="300"/>
+                    <rect class="edificio-a" x="0" y="52" width="150" height="96"/>
+                    <rect class="edificio-b" x="158" y="30" width="120" height="118"/>
+                    <rect class="edificio-a" x="286" y="58" width="140" height="90"/>
+                    <rect class="edificio-b" x="434" y="38" width="118" height="110"/>
+                    <rect class="edificio-a" x="560" y="60" width="160" height="88"/>
+                    <rect class="ventana" x="18" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="52" y="70" width="22" height="16"/>
+                    <rect class="ventana" x="18" y="100" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="208" y="48" width="22" height="16"/>
+                    <rect class="ventana" x="174" y="78" width="22" height="16"/>
+                    <rect class="ventana" x="302" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="336" y="74" width="22" height="16"/>
+                    <rect class="ventana" x="450" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="484" y="56" width="22" height="16"/>
+                    <rect class="ventana" x="576" y="76" width="22" height="16"/>
+                    <rect class="ventana" x="610" y="76" width="22" height="16"/>
+                    <rect class="vereda" x="0" y="148" width="720" height="18"/>
+                    <ellipse class="tierra" cx="70" cy="158" rx="28" ry="9"/>
+                    <rect class="tronco" x="62" y="138" width="15" height="21" rx="2"/>
+                    <rect class="tronco-claro" x="62" y="138" width="15" height="4" rx="1"/>
+                    <rect class="bici" x="0" y="166" width="720" height="48"/>
+                    <path class="bici-linea" d="M0 190h720"/>
+                    <rect class="calle-clara" x="0" y="214" width="720" height="5"/>
+                    <rect class="calle" x="0" y="219" width="720" height="81"/>
+                    <rect class="pintura" x="0" y="266" width="250" height="6" rx="3" opacity=".75"/>
+                    <rect class="pintura" x="380" y="266" width="340" height="6" rx="3" opacity=".75"/>
+                    <ellipse class="arbol-sano" cx="640" cy="130" rx="30" ry="26"/>
+                    <rect class="tronco" x="637" y="152" width="6" height="16"/></svg>
+              </div>
+              <span class="comparacion-marca comparacion-marca-antes">Antes · 27 oct</span>
+              <span class="comparacion-marca comparacion-marca-despues">Después · 6 nov</span>
+              <span class="comparacion-linea" aria-hidden="true"></span>
+              <span class="comparacion-manija" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 8-4 4 4 4M16 8l4 4-4 4"/></svg>
+              </span>
+              <input type="range" min="0" max="100" value="50" aria-label="Comparar fotos: antes a la izquierda y después a la derecha" aria-valuetext="Corte al 50 por ciento. Antes a la izquierda y después a la derecha.">
+            </div>
+            <p class="ayuda">Deslizá para comparar el antes y el después.</p>
+
+            <div class="progreso-texto">
+              <p class="progreso-cifra">2 de 3 confirmaciones</p>
+              <p class="ayuda">Falta 1</p>
+            </div>
+            <div class="progreso" role="progressbar" aria-label="Confirmaciones de la reparación" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-valuetext="2 de 3 confirmaciones">
+                <span class="progreso-indicador"></span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button class="btn btn-primario" type="button">Confirmar</button>
+              <button class="btn btn-impugnar" type="button">Impugnar</button>
+            </div>
+
+            <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px">
+              <input class="sr-only" id="foto-camara-movil" type="file" accept="image/*" capture="environment">
+              <label class="subida" for="foto-camara-movil">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11H4Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                <span class="subida-titulo">Sacar la foto ahora</span>
+                <span class="subida-ayuda">JPG, PNG o WebP · hasta 15 MB</span>
+              </label>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label class="campo-etiqueta" for="que-se-arreglo-movil">¿Qué se arregló?</label>
+                <div class="selector">
+                  <select id="que-se-arreglo-movil">
+                    <option>Retiraron el árbol o las ramas caídas</option>
+                    <option>Repararon el problema por completo</option>
+                    <option>Taparon el bache con asfalto nuevo</option>
+                    <option>Repararon o cambiaron la luminaria</option>
+                    <option>Limpiaron la basura o el microbasural</option>
+                    <option>Repararon la pérdida de agua o la cañería</option>
+                    <option>Arreglaron la vereda o el cordón</option>
+                    <option>Repusieron o arreglaron el cartel o semáforo</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+              </div>
+              <p class="ayuda">La foto se revisa antes de publicarse.</p>
+            </div>
+          </div>
+          <div class="hoja-pie">
+            <button class="btn btn-primario" type="button">Enviar evidencia</button>
+          </div>
+        </div>
+
+        <div class="hoja" id="h-ubicacion" role="dialog" aria-modal="true" aria-labelledby="h-ubicacion-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="h-ubicacion-titulo">Ubicación</h4>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar el mapa">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <div class="mapa-marco">
+              <svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mapa del cruce de Av. Costanera y Chacra 214, con la parada de colectivos y el río al este">
+                <rect class="mapa-fondo" width="400" height="230"/>
+                <rect class="mapa-manzana" x="14" y="14" width="110" height="70" rx="4"/>
+                <rect class="mapa-manzana" x="14" y="106" width="110" height="60" rx="4"/>
+                <rect class="mapa-manzana" x="148" y="14" width="96" height="70" rx="4"/>
+                <rect class="mapa-manzana" x="148" y="106" width="96" height="60" rx="4"/>
+                <rect class="mapa-parque" x="268" y="96" width="60" height="70" rx="6"/>
+                <path class="mapa-rio" d="M340 0h60v230h-52c14-34 10-76-2-112-9-30-12-66-6-118Z"/>
+                <path class="mapa-avenida" d="M0 98h336"/>
+                <path class="mapa-calle" d="M136 0v230M258 0v230M0 84h336M0 176h336"/>
+                <path class="mapa-eje" d="M0 98h336"/>
+                <circle class="mapa-pin" cx="196" cy="98" r="11"/>
+                <circle class="mapa-pin-punto" cx="196" cy="98" r="4"/>
+              </svg>
+            </div>
+            <div class="mapa-dato">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              <div>
+                <strong>Av. Costanera y Chacra 214</strong>
+                <span>Costanera · a 40 m de la parada de la línea 34</span>
+              </div>
+            </div>
+          </div>
+          <div class="hoja-pie">
+            <a class="btn btn-primario" href="#">Ver en mapa completo</a>
+          </div>
+        </div>
+
+        <div class="hoja" id="h-organismos" role="dialog" aria-modal="true" aria-labelledby="h-organismos-titulo" hidden>
+          <div class="hoja-asa" aria-hidden="true"><span></span></div>
+          <div class="hoja-cabecera">
+            <div style="flex:1;min-width:0">
+              <h4 id="h-organismos-titulo">Contactar a organismos</h4>
+              <p>Contactá directamente al organismo. Reporty no envía mensajes ni garantiza respuestas.</p>
+            </div>
+            <button class="hoja-cerrar" type="button" data-cerrar aria-label="Cerrar los contactos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="hoja-cuerpo">
+            <ul class="organismos" aria-label="Lista de organismos">
+              <li>
+                <span class="texto"><strong>Subsecretaría de Espacios Verdes</strong><span>Teléfono · 0800 555 0142</span></span>
+                <a class="btn btn-primario btn-chico" href="#" aria-label="Llamar: Subsecretaría de Espacios Verdes">Llamar</a>
+              </li>
+              <li>
+                <span class="texto"><strong>Defensa Civil Municipal</strong><span>WhatsApp · +54 9 362 400 1122</span></span>
+                <a class="btn btn-primario btn-chico" href="#" aria-label="Abrir WhatsApp: Defensa Civil Municipal">Abrir WhatsApp</a>
+              </li>
+              <li>
+                <span class="texto"><strong>Guardia Urbana Costanera</strong><span>Correo · guardia@costanera.gob.ar</span></span>
+                <a class="btn btn-primario btn-chico" href="#" aria-label="Redactar correo: Guardia Urbana Costanera">Redactar correo</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <p class="marco-pie">El botón queda sobre la navegación; la hoja cubre parte del reporte.</p>
+    <ul class="piezas" aria-label="Componentes shadcn/ui de este marco">
+      <li><span class="etq">Button</span> FAB (icon-lg) y acciones del menú (secondary + icon-sm)</li>
+      <li><span class="etq">Drawer (vaul)</span> las cuatro hojas inferiores del botón flotante</li>
+      <li><span class="etq">Card</span> tarjeta del reporte y de actividad</li>
+      <li><span class="etq">Badge</span> prioridad, estado y categoría</li>
+      <li><span class="etq">Select</span> «¿Qué novedad tenés?» y «¿Qué se arregló?»</li>
+      <li><span class="etq">Avatar</span> firma de cada novedad</li>
+      <li><span class="etq etq-instalar">a instalar: npx shadcn@latest add progress</span> «2 de 3 confirmaciones»</li>
+    </ul>
+  </section>
+
+</main>
+
+<script>
+  (function () {
+    const diales = Array.from(document.querySelectorAll('[data-dial]'));
+
+    /** Sincroniza el corte y su descripción al mover el deslizador de comparación. */
+    function actualizarComparacion(evento) {
+      const control = evento.currentTarget;
+      control.parentElement.style.setProperty('--corte', `${control.value}%`);
+      control.setAttribute('aria-valuetext', `Corte al ${control.value} por ciento. Antes a la izquierda y después a la derecha.`);
+    }
+
+    document.querySelectorAll('.comparacion input[type="range"]').forEach((control) => {
+      control.addEventListener('input', actualizarComparacion);
+    });
+
+    function elementosEnfocables(raiz) {
+      return Array.from(raiz.querySelectorAll('button, a[href], select, input, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter((elemento) => !elemento.hidden && elemento.offsetParent !== null);
+    }
+
+    /* ---------- Botón de acciones: abrir, cerrar y mover el foco ---------- */
+    function estadoDial(dial, abierto, moverFoco) {
+      const boton = dial.querySelector('.dial-boton');
+      const menu = dial.querySelector('.dial-menu');
+      if (!boton || !menu) return;
+      boton.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      menu.hidden = !abierto;
+      if (!moverFoco) return;
+      const destino = abierto ? menu.querySelector('.dial-accion') : boton;
+      if (destino) destino.focus();
+    }
+
+    function cerrarDiales(moverFoco) {
+      diales.forEach((dial) => {
+        const boton = dial.querySelector('.dial-boton');
+        if (boton && boton.getAttribute('aria-expanded') === 'true') estadoDial(dial, false, moverFoco);
+      });
+    }
+
+    diales.forEach((dial) => {
+      const boton = dial.querySelector('.dial-boton');
+      const menu = dial.querySelector('.dial-menu');
+      if (!boton || !menu) return;
+
+      boton.addEventListener('click', () => {
+        estadoDial(dial, boton.getAttribute('aria-expanded') !== 'true', true);
+      });
+
+      menu.addEventListener('keydown', (evento) => {
+        const acciones = Array.from(menu.querySelectorAll('.dial-accion'));
+        const actual = acciones.indexOf(document.activeElement);
+        if (evento.key === 'ArrowUp' && actual > 0) {
+          evento.preventDefault();
+          acciones[actual - 1].focus();
+        } else if (evento.key === 'ArrowDown' && actual > -1 && actual < acciones.length - 1) {
+          evento.preventDefault();
+          acciones[actual + 1].focus();
+        } else if (evento.key === 'Escape') {
+          evento.preventDefault();
+          estadoDial(dial, false, true);
+        }
+      });
+
+      boton.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Escape' && boton.getAttribute('aria-expanded') === 'true') {
+          evento.preventDefault();
+          estadoDial(dial, false, true);
+        }
+      });
+    });
+
+    /* ---------- Hojas y diálogos ---------- */
+    let disparador = null;
+
+    function abrirPanel(id) {
+      const panel = document.getElementById(id);
+      if (!panel) return;
+      const velo = panel.closest('.velo');
+      if (!velo) return;
+      velo.querySelectorAll('.hoja').forEach((otro) => { otro.hidden = otro !== panel; });
+      velo.hidden = false;
+      const foco = elementosEnfocables(panel)[0];
+      if (foco) foco.focus();
+    }
+
+    function cerrarVelo(velo, restaurar) {
+      if (!velo) return;
+      velo.hidden = true;
+      velo.querySelectorAll('.hoja').forEach((panel) => { panel.hidden = true; });
+      if (!restaurar) return;
+      if (disparador && disparador.isConnected && disparador.offsetParent !== null) {
+        disparador.focus();
+        return;
+      }
+      const dial = disparador && disparador.closest('[data-dial]');
+      const boton = dial && dial.querySelector('.dial-boton');
+      if (boton) boton.focus();
+    }
+
+    document.addEventListener('click', (evento) => {
+      const abrir = evento.target.closest('[data-abrir]');
+      if (abrir) {
+        evento.preventDefault();
+        disparador = abrir;
+        cerrarDiales(false);
+        abrirPanel(abrir.dataset.abrir);
+        return;
+      }
+      const cerrar = evento.target.closest('[data-cerrar]');
+      if (cerrar) {
+        evento.preventDefault();
+        cerrarVelo(cerrar.closest('.velo'), true);
+        return;
+      }
+      if (evento.target.classList.contains('velo')) {
+        cerrarVelo(evento.target, true);
+      }
+    });
+
+    document.addEventListener('keydown', (evento) => {
+      if (evento.key !== 'Escape') return;
+      const velos = Array.from(document.querySelectorAll('.velo:not([hidden])'));
+      if (velos.length) {
+        velos.forEach((velo) => cerrarVelo(velo, true));
+        return;
+      }
+      cerrarDiales(true);
+    });
+  })();
+</script>
+</body>
+</html>

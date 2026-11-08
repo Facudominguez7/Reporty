@@ -1,0 +1,28 @@
+{
+  "title": "Detalle del reporte con evidencia de reparación",
+  "brief": "Tres direcciones móviles (390 px) para el detalle público del reporte en Reporty: los estados «Reparación informada», «En verificación» y «Reparado», la comparación Antes/Después, el flujo mínimo de informar reparación con una foto, y las acciones comunitarias de confirmar e impugnar. Reporte de ejemplo: «Bache en Av. Uruguay y Bolívar», categoría Calles (issue #145).",
+  "feature": "odd/tasks/evidencia-reparacion.md",
+  "artboards": [
+    {
+      "file": "01-deslizador-antes-despues.html",
+      "title": "Deslizador antes/después y barra inferior fija",
+      "tradeoff": "La comparación vive en el mismo lugar que la galería del reporte y queda a un gesto; pero el deslizador muestra media foto por vez, la manija no se descubre sola, y la barra inferior fija recorta 64 px de alto útil en un teléfono chico.",
+      "width": 390,
+      "height": 2640
+    },
+    {
+      "file": "02-tarjetas-lado-a-lado-linea-tiempo.html",
+      "title": "Tarjetas lado a lado y línea de verificación",
+      "tradeoff": "La línea de verificación explica el orden de los tres estados y quién hizo qué, sin depender de un gesto; pero a 390 px cada foto queda en ~170 px de ancho, el antes/después pierde detalle, y la página crece unos 300 px más que las otras direcciones.",
+      "width": 390,
+      "height": 2648
+    },
+    {
+      "file": "03-pestanas-hoja-inferior.html",
+      "title": "Pestañas antes/después y hoja inferior",
+      "tradeoff": "Cada foto se ve completa y las acciones quedan al alcance del pulgar en una hoja inferior; pero las pestañas esconden la mitad de la comparación, la hoja tapa el contexto del reporte mientras se carga la evidencia, y suma un segundo scroll interno en móvil.",
+      "width": 390,
+      "height": 2962
+    }
+  ]
+}

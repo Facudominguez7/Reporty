@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "xakvswev",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "#h-reparacion > div:nth-of-type(3)",
+      "excerpt": "ANTES · 27 OCT DESPUÉS · 6 NOV 2 de 3 confirmaciones Falta 1 Confirmar Impugnar Sacar la foto ahora JPG, PNG o WebP · hasta 15 MB ¿Qué se arregló? Retiraron el árbol o las ramas caídas Repararon el problema por completo Taparon el bache con asfalto nuevo Repararon o cambiaron la luminaria Limpiaron",
+      "comment": "el antes y despues que sea con el coso para mover horizontalmente, lo mismo en escritorio",
+      "createdAt": "2026-11-07T14:34:08.758Z",
+      "status": "resolved",
+      "sentAt": "2026-11-07T14:34:08.794Z",
+      "resolvedAt": "2026-11-07T14:36:51.399Z"
+    },
+    {
+      "id": "c22wxoqv",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "#menu-dial-movil > button:nth-of-type(3) > span:nth-of-type(1)",
+      "excerpt": "Confirmar o impugnar",
+      "comment": "no se entiende asi a simple vista que es confirmar o impugnar, deberiams de cambiar est texto",
+      "createdAt": "2026-11-07T14:41:59.936Z",
+      "status": "resolved",
+      "sentAt": "2026-11-07T14:41:59.961Z",
+      "resolvedAt": "2026-11-07T14:42:49.955Z"
+    },
+    {
+      "id": "hoar3ips",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "#lienzo > section:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div > div",
+      "excerpt": "Detalle del reporte Consultá el estado y los avances del reporte. Av. Costanera y Chacra 214 Costanera · a 40 m de la parada de la línea 34 Ver en mapa completo ¿Ya lo arreglaron? En verificación · 2 de 3 confirmaciones Ver la evidencia Creado el día 27 de oct de 2026 (hace 11 días) PRIORIDAD MEDIA",
+      "comment": "el boton de ubicacion esta dos veces",
+      "createdAt": "2026-11-07T14:44:07.693Z",
+      "status": "resolved",
+      "sentAt": "2026-11-07T14:44:07.719Z",
+      "resolvedAt": "2026-11-07T14:45:40.345Z"
+    },
+    {
+      "id": "esy37bi0",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "body",
+      "excerpt": "Saltar al contenido DETALLE DEL REPORTE SIN TANTO SCROLL · DIRECCIÓN 02 Botón de acciones flotante Un solo botón ámbar en la esquina reúne lo que antes era una tarjeta entera de reparación y una barra de comentario fija: comentar, confirmar o impugnar la reparación, ver la ubicación y avisar a un or",
+      "comment": "revisa el texto en todo el diseño de explicaciones que sean irrelevantes",
+      "createdAt": "2026-11-07T14:46:22.761Z",
+      "status": "resolved",
+      "sentAt": "2026-11-07T14:46:22.788Z",
+      "resolvedAt": "2026-11-07T14:49:38.059Z"
+    },
+    {
+      "id": "scvadf1f",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "#lienzo > section:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1)",
+      "excerpt": "Detalle del reporte",
+      "comment": "esta barra sacala, que quede como esta actualmente",
+      "createdAt": "2026-11-08T12:40:24.306Z",
+      "status": "resolved",
+      "sentAt": "2026-11-08T12:40:24.337Z",
+      "resolvedAt": "2026-11-08T12:41:14.305Z"
+    },
+    {
+      "id": "i7dj64zs",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "#lienzo > section:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div > section:nth-of-type(1) > div:nth-of-type(2) > svg > rect:nth-of-type(1)",
+      "excerpt": "",
+      "comment": "esto tiene que ser con el efecto deslizamiento, por que lo sacaste ya te lo habia dicho",
+      "createdAt": "2026-11-08T12:41:39.028Z",
+      "status": "resolved",
+      "sentAt": "2026-11-08T12:41:39.147Z",
+      "resolvedAt": "2026-11-08T12:43:08.521Z"
+    }
+  ]
+}

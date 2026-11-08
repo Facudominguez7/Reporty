@@ -27,7 +27,7 @@ export type EdicionMascotaAdmin = { id: number; tipoAnimal: "perro" | "gato" | "
 type Evidencia = {
   id: string; reporte_id: number; decision: string; estado_publicacion: string
   motivos: string[]; token: string | null; path_privado: string; hash_sha256: string
-  reemplaza_foto_id: number | null
+  reemplaza_foto_id: number | null; destino: "reporte" | "evidencia_reparacion"
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -95,7 +95,7 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
     }]
   })
   const { data, error } = await servicio.from("moderacion_imagenes")
-    .select("id,reporte_id,decision,estado_publicacion,motivos,creado_at,reemplaza_foto_id")
+    .select("id,reporte_id,decision,estado_publicacion,motivos,creado_at,reemplaza_foto_id,destino")
     .in("estado_publicacion", terminales ? ["publicada", "rechazada"] : ["pendiente", "reclamada", "publicando"])
     .order("creado_at", { ascending: true }).order("id", { ascending: true }).range(indice * 20, indice * 20 + 19)
   if (error) fallar(503)
@@ -103,7 +103,9 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
     id: fila.id, reporteId: fila.reporte_id, decision: fila.decision, estado: fila.estado_publicacion,
     fecha: fila.creado_at, cargaPendiente: fila.motivos?.includes("carga_privada_pendiente") ?? false,
     motivos: describirMotivos(fila.motivos), esReemplazo: fila.reemplaza_foto_id != null, tipo: "reporte" as const,
-    ...(fila.decision === "REJECTED" && fila.reemplaza_foto_id == null ? { aviso: await estadoAviso(servicio, fila.reporte_id) } : {}),
+    // La foto de una evidencia nunca retira el reporte, así que no tiene aviso que conciliar.
+    ...(fila.decision === "REJECTED" && fila.reemplaza_foto_id == null && fila.destino !== "evidencia_reparacion"
+      ? { aviso: await estadoAviso(servicio, fila.reporte_id) } : {}),
   })))
   const petQuery = await servicio.from("mascotas_fotos_moderacion")
     .select("id,decision,estado,estado_publicacion,motivos,creado_at,mascota_id,tipo_animal")
@@ -187,7 +189,7 @@ function describirMotivos(motivos: unknown): string[] {
 /** Lee una sola evidencia exclusivamente después del guard administrativo. */
 async function leerEvidencia(servicio: ReturnType<typeof createAdminClient>, id: string): Promise<Evidencia> {
   const { data, error } = await servicio.from("moderacion_imagenes")
-    .select("id,reporte_id,decision,estado_publicacion,motivos,token,path_privado,hash_sha256,reemplaza_foto_id").eq("id", id).single()
+    .select("id,reporte_id,decision,estado_publicacion,motivos,token,path_privado,hash_sha256,reemplaza_foto_id,destino").eq("id", id).single()
   if (error || !data) fallar(404)
   return data as Evidencia
 }
@@ -223,7 +225,11 @@ export async function ejecutarRevision(id: string, operacion: OperacionRevision)
   if (operacion === "retirarMascota") fallar(400)
   const fila = await leerEvidencia(servicio, id)
   const conflicto = { exito: false, mensaje: "Otro proceso modificó la imagen. Actualizá la cola antes de decidir." }
+  // La foto de una evidencia de reparación nunca retira el reporte: solo invalida la
+  // evidencia y no genera aviso de retiro (S2, S9).
+  const esEvidencia = fila.destino === "evidencia_reparacion"
   if (operacion === "avisar" || operacion === "conciliar") {
+    if (esEvidencia) return { exito: false, mensaje: "La foto de una evidencia de reparación no retira el reporte." }
     if (fila.reemplaza_foto_id != null || fila.decision !== "REJECTED" || fila.estado_publicacion !== "rechazada") return conflicto
     if (operacion === "avisar") {
       await enviarAvisoRetiro(servicio, fila.reporte_id)
@@ -263,6 +269,11 @@ export async function ejecutarRevision(id: string, operacion: OperacionRevision)
       const avisos = await limpiarImagenModerada(servicio, id)
       if (fila.reemplaza_foto_id != null) {
         return { exito: true, reporteId: fila.reporte_id, mensaje: avisos.length ? "Reemplazo rechazado; el reporte se conserva. Limpieza pendiente." : "Reemplazo rechazado; el reporte y sus fotos actuales se conservan." }
+      }
+      if (esEvidencia) {
+        // `decidir_imagen_moderacion` ya rechazó solo la evidencia: el reporte y sus
+        // fotografías originales se conservan y no se envía ningún aviso.
+        return { exito: true, reporteId: fila.reporte_id, mensaje: avisos.length ? "Evidencia de reparación rechazada; el reporte se conserva. Limpieza pendiente." : "Evidencia de reparación rechazada; el reporte y sus fotos se conservan." }
       }
       await enviarAvisoRetiro(servicio, fila.reporte_id)
       return { exito: true, reporteId: fila.reporte_id, mensaje: avisos.length ? "Reporte retirado; advertencia registrada y limpieza pendiente. Reintentá el borrado." : "Reporte retirado; advertencia registrada y archivo privado eliminado." }

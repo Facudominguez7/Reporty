@@ -15,6 +15,7 @@ import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
 import { getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
 import { tieneFotografiaAprobada, tieneFotografiaPendiente } from "@/lib/moderation/estado-publico.server";
+import { obtenerSeccionReparacion } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { obtenerGestionOperativaDetalle } from "@/lib/use-cases/cuadrillas/detalle-operativo";
 import { ReporteDetalleClient, type ReporteDetalleInicial } from "./reporte-detalle-client";
 
@@ -31,6 +32,7 @@ const SIN_REPORTE: ReporteDetalleInicial = {
   fechaCambioEstado: null,
   gestionOperativa: null,
   puedeVotar: false,
+  evidenciaReparacion: null,
 };
 
 function parseReporteId(id: string) {
@@ -122,12 +124,18 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
         )
       : undefined;
 
-    const [fotografiaPendiente, fotografiaAprobada] = encontrado
+    const [fotografiaPendiente, fotografiaAprobada, evidenciaReparacion] = encontrado
       ? await Promise.all([
           tieneFotografiaPendiente(encontrado.id),
           tieneFotografiaAprobada(encontrado.id),
+          // La evidencia de reparación nunca rompe la ficha: si su lectura falla, la
+          // sección desaparece y el reporte sigue renderizado.
+          obtenerSeccionReparacion(encontrado.id, encontrado.estado_id).catch((evidenciaError) => {
+            console.error("Error al cargar la evidencia de reparación:", evidenciaError)
+            return null
+          }),
         ])
-      : [false, false]
+      : [false, false, null]
 
     return {
       reporte: encontrado,
@@ -143,6 +151,7 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
       fechaCambioEstado: cambio?.created_at ?? null,
       gestionOperativa: encontrado ? gestionOperativa : null,
       puedeVotar,
+      evidenciaReparacion,
     };
   } catch (error) {
     unstable_rethrow(error);

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "02-barra-de-acciones-y-hojas.html",
+  "handoffs": {
+    "02-barra-de-acciones-y-hojas.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-07T18:56:24.285Z",
+      "startedAt": "2026-11-07T19:43:45.427Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/evidencia-reparacion.md",
+      "note": "Blocked: minimap accessibility issue remains and isolated independent browser verification is unavailable."
+    }
+  }
+}
