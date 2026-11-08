@@ -1,0 +1,35 @@
+{
+  "title": "Detalle del reporte sin tanto scroll",
+  "brief": "Cuatro direcciones para el detalle del reporte de Reporty que acortan el scroll: comentar, informar o verificar la reparación y llegar a la ubicación en móvil (390 px) y escritorio (1280 px), sin cambiar la funcionalidad ni las microcopias.",
+  "feature": "odd/tasks/evidencia-reparacion.md",
+  "artboards": [
+    {
+      "file": "01-pestanas-unificadas.html",
+      "title": "Pestañas unificadas",
+      "tradeoff": "Un toque reemplaza el scroll largo y el mapa deja de ser lo último; pero la línea de tiempo queda en una columna angosta y solo se ve una sección por vez.",
+      "width": 1800,
+      "height": 1240
+    },
+    {
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "title": "Botón de acciones flotante",
+      "tradeoff": "Un solo botón ámbar en la esquina reúne comentar, reparación, mapa y organismos, y cada acción abre la hoja inferior que ya existe (mismo Drawer de vaul que el filtro del mapa, inseteada al 15% en escritorio), sin barra fija que tape la actividad ni desborde del «+ Crear»; pero hay que abrirlo antes de escribir, la evidencia se ve recién dentro de la hoja y el despliegue tapa el final del historial.",
+      "width": 1800,
+      "height": 1240
+    },
+    {
+      "file": "03-acordeon-resumen.html",
+      "title": "Acordeón de resumen",
+      "tradeoff": "Las tres secciones se leen de un vistazo con el estado vivo en cada título; pero solo una fila puede estar abierta y lo abierto empuja el resto hacia abajo.",
+      "width": 1800,
+      "height": 1240
+    },
+    {
+      "file": "04-sidebar-fija-y-atajos.html",
+      "title": "Barra lateral fija y atajos",
+      "tradeoff": "Mapa, reparación y compositor quedan fijos mientras se lee el historial; pero la columna se angosta, la evidencia se ve en miniatura y en pantallas bajas la barra lateral no entra entera.",
+      "width": 1800,
+      "height": 1240
+    }
+  ]
+}
