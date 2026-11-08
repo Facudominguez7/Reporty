@@ -49,7 +49,7 @@ describe("HistorialArchivado", () => {
     expect(html).toContain("SHA-256 aaaaaaaaaaaa…")
     expect(html).toContain("Verificado")
     // El estado se lee sin esfuerzo: texto más grande que el badge por defecto y un punto de color.
-    expect(html).toMatch(/text-\[0\.65rem\][^"]*">\s*<span aria-hidden="true" class="size-1\.5 rounded-full bg-current/)
+    expect(html).toMatch(/text-\[0\.7rem\][^"]*tracking-\[0\.04em\][^"]*">\s*<span aria-hidden="true" class="size-\[7px\] rounded-full bg-current/)
   })
 
   it("enlaza la descarga y la recuperación solo por rutas del servidor", () => {

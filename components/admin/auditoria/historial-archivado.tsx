@@ -135,8 +135,8 @@ export function HistorialArchivado({ archivos, metricas, filtros, simulacion, ha
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={estado.variante} className="gap-1.5 px-2.5 py-1 text-[0.65rem]">
-                      <span aria-hidden="true" className="size-1.5 rounded-full bg-current opacity-70" />
+                    <Badge variant={estado.variante} className="gap-1.5 px-3 py-1 text-[0.7rem] tracking-[0.04em]">
+                      <span aria-hidden="true" className="size-[7px] rounded-full bg-current opacity-75" />
                       {estado.etiqueta}
                     </Badge>
                     <Link href={`/admin/auditoria/archivo/${archivo.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
