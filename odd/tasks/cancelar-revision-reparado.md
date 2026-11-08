@@ -16,6 +16,12 @@ S5. El comportamiento durables existentes no cambian salvo lo pedido: cancelar d
 
 S6. Seguridad y autorización: la acción viaja por la server action existente `resolverEvidenciaColaAction` (sesión no anónima + rol Admin, revalidada contra la base dentro del caso de uso). Nada de escrituras directas desde el cliente ni cambios al catálogo cerrado de frases.
 
+S7. Decisión del usuario (L13): emparejar «aceptar impugnación», que también rechaza la evidencia: debe dejar la misma actividad durable y avisar al autor, con el mecanismo atómico ya usado para la cancelación.
+
+S8. Decisión del usuario (L14): arreglar las tres suites que ya fallaban en `main` (`tests/auth/verificacion-unica.test.ts`, `app/mascotas/[id]/detalle-mascota.test.ts`, `app/mascotas/[id]/retiro-navegacion.test.ts`) sin cambiar comportamiento visible sin evidencia: si el test codifica una regla intencional se arregla el código, si el comportamiento actual es el intencional se arregla el test, y en cada caso se cita la evidencia.
+
+S9. Decisión del usuario (L15): el PR sale desde `main` con solo los commits de esta feature más el arreglo de suites, sin arrastrar los commits previos de `reparacion/11-ficha-compacta`.
+
 ## Tasks
 
 - T1 — S2 — admin server: `listarEvidenciasEnVerificacion` y `listarEvidenciasValidadas` incluyen la foto de la evidencia y la primera foto del reporte resueltas con `lib/media/report-images.ts`; `EvidenciaEnDecision` gana los campos de foto. Vitest de las dos colas — done; RED 4 fallos → 11 verdes (L8).
@@ -23,6 +29,9 @@ S6. Seguridad y autorización: la acción viaja por la server action existente `
 - T3 — S4 — caso de uso: al rechazar, registrar la cancelación en `historial_estados` y enviar email al autor de la evidencia (`profiles.email`), con plantilla nueva en `lib/notifications/report-notifications.ts`. Vitest — código y tests del worker; verificado por el padre (L8).
 - T4 — S4 — actividad del reporte: `mergeReportActivity` renderiza como texto propio las filas de historial sin cambio de estado (`estado_anterior_id === estado_nuevo_id`), sin alterar el render de las transiciones existentes. Vitest — done; `detail: null` explícito para no romper `comments-section.tsx` (L8).
 - T5 — S5, S6 — verificación: `npm run lint`, `npx tsc --noEmit`, `npm test` y verificación independiente (`Risk: item 3`, `mergeReportActivity` es código compartido) — en curso; `tsc` exit 0 y `lint` 0 errores, la suite completa tiene 161 fallos de 7524 en 35 archivos que la verificación independiente debe atribuir (L9).
+- T7 — S7 — aceptar impugnación: insertar la actividad en la misma transacción del RPC `resolver_impugnacion_reparacion` (migración `create or replace`), avisar al autor de la evidencia con la plantilla existente y actualizar pgTAP y Vitest — en curso.
+- T8 — S8 — arreglar las tres suites preexistentes con evidencia de si cambia test o código — en curso.
+- T9 — S9 — PR desde `main`: crear la rama de entrega, traer solo los commits de la feature y abrir el PR — pendiente de T7 y T8.
 - T6 — S3, S4 — durabilidad: mover el registro de la cancelación en `historial_estados` adentro de la rama `rechazar` de `resolver_evidencia_reparacion_admin` (migración nueva con `create or replace`), quitar el insert del caso de uso y dejar el email como único efecto de mejor esfuerzo; actualizar pgTAP, el test de cancelación y el tipado de `aportes.test.ts` que rompe `tsc` — bloqueante reportado por la verificación independiente (L10) — done; migración `20261108120000_cancelacion_revision_reparado.sql`, pgTAP verde y `tsc` exit 0 (L11).
 
 ## Log
@@ -39,3 +48,6 @@ S6. Seguridad y autorización: la acción viaja por la server action existente `
 - L10 (verificación independiente): `tsc --noEmit` falla por `lib/reportes/aportes.test.ts:44,56` (acceso a `detail` sin acotar la unión) tras el ajuste del padre. El revisor marca además que la actividad de la cancelación es de mejor esfuerzo y puede perderse para siempre ante un fallo transitorio del insert, lo que contradice S4; su reproducción de la suite en copia aislada da 3 archivos y 5 tests fallidos, idénticos en `ab9a749` (preexistentes: `tests/auth/verificacion-unica.test.ts`, `app/mascotas/[id]/detalle-mascota.test.ts`, `app/mascotas/[id]/retiro-navegacion.test.ts`). Decisión del padre: la actividad pasa a escribirse dentro de la transacción del RPC (T6) y el correo queda como único efecto best-effort.
 - L11 (evidencia T6): migración `create or replace` de `resolver_evidencia_reparacion_admin` con el insert de `historial_estados` dentro de la misma transacción y solo para rechazos nuevos; el caso de uso ya no escribe historial y el correo queda como único efecto best-effort. `bash scripts/local-supabase/test-evidencia-reparacion.sh` y `test-admin-reparacion.sh` (compuestos con la migración nueva) → OK y ROLLBACK. `npx tsc --noEmit` exit 0, `npm run lint` 0 errores, 539 tests dirigidos verdes.
 - L12 (atribución de la suite): los 161 fallos que veía el padre eran 32 copias de `* .test.ts` guardadas en `.git/gentle-ai/candidate-views/` que Vitest levanta con su patrón `**/*.test.ts`. Excluyendo `.git`: 140 archivos verdes, 1 omitido y solo 3 archivos con 5 fallos preexistentes en `ab9a749` (`tests/auth/verificacion-unica.test.ts`, `app/mascotas/[id]/detalle-mascota.test.ts`, `app/mascotas/[id]/retiro-navegacion.test.ts`). El cambio no rompe nada; queda como tarea aparte arreglar esas tres suites o restringir el patrón de Vitest para no leer `.git`.
+- L13 (decisión del usuario): «hace la 1» → emparejar el camino de aceptar impugnación (T7).
+- L14 (decisión del usuario): «arregla esas suits» → las tres suites preexistentes (T8).
+- L15 (decisión del usuario): «pr desde main» → rama de entrega desde `main` con solo la feature y el arreglo de suites, y PR (T9).
