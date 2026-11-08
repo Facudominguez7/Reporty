@@ -41,7 +41,7 @@ describe("actividad de reportes", () => {
       content: "La foto no corresponde al lugar",
       username: "Administradora",
     })
-    expect(entrada.detail).toBeNull()
+    expect(entrada).toMatchObject({ detail: null })
   })
 
   it.each([null, "", "   "])("usa un texto administrativo cuando falta el comentario: %j", (comentario) => {
@@ -53,7 +53,7 @@ describe("actividad de reportes", () => {
     }])
 
     expect(entrada.content).toBe("Actualización realizada por administración.")
-    expect(entrada.detail).toBeNull()
+    expect(entrada).toMatchObject({ detail: null })
   })
 
   it("conserva el orden cronológico y los aportes al mezclar eventos", () => {
