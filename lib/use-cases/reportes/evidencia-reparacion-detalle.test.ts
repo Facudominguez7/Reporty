@@ -168,13 +168,23 @@ describe("obtenerSeccionReparacion", () => {
     })
   })
 
-  it("no muestra nada a un visitante sin sesión ni a un reporte ya cerrado", async () => {
+  it("devuelve la franja a un visitante y a un reporte cerrado, sin habilitarles el formulario", async () => {
     mocks.sesion.mockResolvedValue(crearSesion(null))
     mocks.servicio.mockReturnValue(crearServicio({}).servicio)
-    expect(await obtenerSeccionReparacion(9, 1)).toBeNull()
+    // El dueño pidió que la franja «¿Ya lo arreglaron?» se vea también sin cuenta:
+    // el servidor la devuelve sin permiso para informar y el cliente invita a ingresar.
+    expect(await obtenerSeccionReparacion(9, 1)).toEqual({
+      umbral: UMBRAL_CONFIRMACIONES_REPARACION,
+      evidencia: null,
+      puedeInformar: false,
+    })
 
     mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador()))
-    expect(await obtenerSeccionReparacion(9, 2)).toBeNull()
+    expect(await obtenerSeccionReparacion(9, 2)).toEqual({
+      umbral: UMBRAL_CONFIRMACIONES_REPARACION,
+      evidencia: null,
+      puedeInformar: false,
+    })
   })
 
   it("nunca publica la foto privada de una reparación informada", async () => {
