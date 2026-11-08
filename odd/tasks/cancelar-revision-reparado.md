@@ -1,0 +1,34 @@
+# Cancelar la revisión de reparado desde el panel admin
+Objetivo: que el Admin pueda cancelar la revisión de confirmación de reparado cuando detecta una irregularidad en la evidencia, viendo las fotos en la cola. Base: `ab9a749`. Rama: `feat/cancelar-revision-reparado`; entrega: commits por unidad de trabajo, push/PR son decisión del dueño.
+Checks: `npm test` (Vitest), `npm run lint`, `npx tsc --noEmit`. No hay script SQL ni CI; los tests pgTAP de `supabase/tests/` no se tocan (no hay migración nueva).
+
+## Specs
+
+S1. Pedido del usuario (L1): «estaria bueno que desde el panel admin se pueda cancelar la revision de confirmacion de reparado al chequear cualquier irregularidad».
+
+S2. Pedido del usuario (L1): «por ejemplo aca la foto mira [Image#1] subieron cualquier cosa, se entiende?» — la irregularidad se detecta mirando la foto ANTES/DESPUÉS; la cola debe mostrar ambas fotos para poder juzgarla sin salir del panel (L2).
+
+S3. Decisión del usuario (L3): el motivo de la cancelación es **opcional**. Si el Admin lo escribe, queda en `motivo_resolucion` de la evidencia y en la actividad del reporte; si no, se usa el texto por defecto que ya aplica el RPC (`'Rechazada por administración'`).
+
+S4. Decisión del usuario (L4): al cancelar, el autor de la evidencia recibe **email** con el motivo (si lo hubo) y la cancelación queda en la actividad del reporte («Actualizaciones y Comentarios»). El envío es mejor esfuerzo: un proveedor caído nunca deshace la cancelación.
+
+S5. El comportamiento durables existentes no cambian salvo lo pedido: cancelar deja la evidencia `rechazada`, el reporte **sigue Pendiente** (no se toca `estado_id`), las fotos originales se conservan, las impugnaciones pendientes pasan a `aceptada` y el autor puede volver a informar una reparación nueva. La acción sigue siendo solo Admin y auditada (`evidence_rejected`).
+
+S6. Seguridad y autorización: la acción viaja por la server action existente `resolverEvidenciaColaAction` (sesión no anónima + rol Admin, revalidada contra la base dentro del caso de uso). Nada de escrituras directas desde el cliente ni cambios al catálogo cerrado de frases.
+
+## Tasks
+
+- T1 — S2 — admin server: `listarEvidenciasEnVerificacion` y `listarEvidenciasValidadas` incluyen la foto de la evidencia y la primera foto del reporte resueltas con `lib/media/report-images.ts`; `EvidenciaEnDecision` gana los campos de foto. Vitest de las dos colas.
+- T2 — S1, S3 — UI de la cola: miniaturas ANTES/DESPUÉS con su etiqueta shadcn, botón «Cancelar revisión» en la tarjeta en verificación con motivo opcional (máx. 500) que llama `resolverEvidenciaColaAction(id, "rechazar", motivo)`; mensajes del resultado en `lib/moderation/evidencia-reparacion-mensajes.ts`. Vitest de tarjetas y acción con motivo.
+- T3 — S4 — caso de uso: al rechazar, registrar la cancelación en `historial_estados` y enviar email al autor de la evidencia (`profiles.email`), con plantilla nueva en `lib/notifications/report-notifications.ts`. Vitest.
+- T4 — S4 — actividad del reporte: `mergeReportActivity` renderiza como texto propio las filas de historial sin cambio de estado (`estado_anterior_id === estado_nuevo_id`), sin alterar el render de las transiciones existentes. Vitest.
+- T5 — S5, S6 — verificación: `npm run lint`, `npx tsc --noEmit`, `npm test` y verificación independiente (`Risk: item 3`, `mergeReportActivity` es código compartido).
+
+## Log
+
+- L1 (pedido original, verbatim): «estaria bueno que desde el panel admin se pueda cancelar la revision de confirmacion de reparado al chequear cualquier irregularidad, por ejemplo aca la foto mira [Image#1] subieron cualquier cosa, se entiende?»
+- L2 (decisión, Dónde): el control vive en la cola de reparaciones, con las fotos ANTES/DESPUÉS a la vista en la tarjeta; no se agrega un botón en la ficha del reporte.
+- L3 (decisión, Motivo): motivo opcional, sin catálogo cerrado.
+- L4 (decisión, Aviso): email al autor + entrada en la actividad del reporte con el motivo.
+- L5 (exploración, hechos verificados): el rechazo ya existe (`resolverEvidenciaColaAction` con `accion="rechazar"`, RPC `resolver_evidencia_reparacion_admin`, auditoría `evidence_rejected`, reporte queda Pendiente) pero la tarjeta de la cola no trae fotos (`lib/moderation/evidencia-reparacion-admin.server.ts:185,207`), no pide motivo y no avisa al autor; en `/reportes/[id]` no hay acción de Admin para cancelar.
+- L6 (exploración, hechos verificados): la actividad del reporte es `mergeReportActivity` sobre `comentarios_reporte` + `historial_estados` (`lib/reportes/aportes.ts:39`), con `kind` cerrado; `historial_estados` se escribe por insert directo desde TS (`lib/use-cases/reportes/detail-mutations.ts:446`) o desde SQL. Los emails de estado solo admiten `Reparado`/`Rechazado` (`lib/notifications/report-notifications.ts:149-158`), así que hace falta una plantilla propia para no asustar al autor con un «reporte rechazado».
