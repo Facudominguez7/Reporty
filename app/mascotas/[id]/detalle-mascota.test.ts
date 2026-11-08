@@ -69,7 +69,8 @@ describe("pet detail", () => {
     for (const status of ["Perdida", "Encontrada"] as const) {
       const html = renderToStaticMarkup(createElement(DetalleMascota, { pet: { ...pet, status }, isOwner: false, isAdmin: true }))
       expect(html).toContain('aria-label="Editar publicación"')
-      expect(html).not.toContain("Retirar publicación")
+      // S8 y S14: administración puede editar, corregir el estado o retirar la publicación.
+      expect(html).toContain('aria-label="Retirar publicación"')
     }
     expect(render(false)).not.toContain('aria-label="Editar publicación"')
   })

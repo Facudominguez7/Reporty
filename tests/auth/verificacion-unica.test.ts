@@ -92,10 +92,13 @@ describe("verificación de seguridad compartida en /auth", () => {
   it("ofrece ingreso, registro e invitado en la misma lista de pestañas", () => {
     const codigo = fuentePagina()
 
-    // Las tres pestañas salen del módulo compartido, que es el que las prueba por comportamiento.
-    expect(codigo).toContain("PESTANAS_AUTH.map")
+    // La lista sale del módulo compartido; cuando el destino exige cuenta registrada
+    // se ofrece sin la pestaña de invitado (S8 de mascotas y L48).
+    expect(codigo).toContain("PESTANAS_AUTH")
+    expect(codigo).toContain('PESTANAS_AUTH.filter((valor) => valor !== "invitado")')
+    expect(codigo).toContain("pestanas.map((valor) => (")
     expect(codigo).toContain("ETIQUETAS_PESTANA[valor]")
-    expect(codigo).toContain('className="grid w-full grid-cols-3"')
+    expect(codigo).toContain('${conInvitado ? "grid-cols-3" : "grid-cols-2"}')
     expect(codigo).toContain("<TabsContent value=\"ingreso\"")
     expect(codigo).toContain("<TabsContent value=\"registro\"")
     expect(codigo).toContain("<TabsContent value=\"invitado\"")
