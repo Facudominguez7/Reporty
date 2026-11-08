@@ -1,0 +1,14 @@
+{
+  "title": "Historial archivado de auditoría",
+  "brief": "Una dirección de escritorio (1280 px) para /admin/auditoria: conserva la actividad reciente y agrega métricas, filtros por fecha, dry-run administrativo, lotes privados con sus estados y un ejemplo alternativo de historial vacío.",
+  "feature": "odd/tasks/auditoria-archivo-r2.md",
+  "artboards": [
+    {
+      "file": "01-historial-archivado.html",
+      "title": "Auditoría reciente e historial archivado",
+      "tradeoff": "Mantiene la auditoría reciente y presenta cada lote con su integridad y acciones sin recurrir a una tabla; las métricas, las anotaciones de componentes y el estado vacío alternativo alargan la página.",
+      "width": 1280,
+      "height": 2240
+    }
+  ]
+}

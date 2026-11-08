@@ -206,6 +206,15 @@ sequenceDiagram
    NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
    RESEND_API_KEY=tu_resend_api_key
    NEXT_PUBLIC_APP_URL=http://localhost:3000
+   # Archivo histórico de auditoría en Cloudflare R2 (ver docs/auditoria-archivo-r2.md).
+   # Opcional en desarrollo: sin estas variables el panel funciona y solo queda
+   # deshabilitado el archivado. Nunca uses NEXT_PUBLIC_ para estos valores.
+   R2_ACCOUNT_ID=
+   R2_ACCESS_KEY_ID=
+   R2_SECRET_ACCESS_KEY=
+   R2_BUCKET_NAME=reporty-audit-archive
+   AUDIT_ARCHIVE_CRON_SECRET=
+   AUDIT_HOT_DAYS=180
    # Cloudflare Turnstile (ver docs/turnstile.md). Claves de prueba oficiales para desarrollo:
    NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
    TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
