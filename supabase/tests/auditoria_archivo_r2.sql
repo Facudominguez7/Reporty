@@ -237,11 +237,32 @@ select pg_temp.rechazar(
   'Acción de auditoría de archivo no permitida');
 
 -- ---------------------------------------------------------------------------
+-- API pública: los envoltorios de `service_role` responden y el servicio puede
+-- leer sus propios reclamos para reconstruir el lote.
+-- ---------------------------------------------------------------------------
+set local role service_role;
+select pg_temp.exigir(
+  public.auditoria_previsualizar_lote(10, 180) is null
+  or (public.auditoria_previsualizar_lote(10, 180) ->> 'cantidad')::int > 0,
+  'El envoltorio de previsualización debe responder a service_role'
+);
+select pg_temp.exigir(
+  (public.auditoria_metricas(180) ->> 'eventos_en_postgres')::int >= 0,
+  'El envoltorio de métricas debe responder a service_role'
+);
+select pg_temp.exigir(
+  (select count(*) from public.audit_archive_claims) >= 0,
+  'service_role debe poder leer los reclamos para reconstruir un lote'
+);
+reset role;
+
+-- ---------------------------------------------------------------------------
 -- Privilegios: ni las tablas ni las RPC son accesibles para roles de cliente.
 -- ---------------------------------------------------------------------------
 set local role anon;
 select pg_temp.denegado('select * from public.audit_archives');
 select pg_temp.denegado('select * from public.audit_archive_claims');
+select pg_temp.denegado('select public.auditoria_previsualizar_lote(10, 180)');
 select pg_temp.denegado('select private.metricas_archivo_auditoria(180)');
 select pg_temp.denegado('select private.reclamar_lote_auditoria(10, 180, ''anon'')');
 reset role;

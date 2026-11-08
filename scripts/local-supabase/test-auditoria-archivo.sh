@@ -8,6 +8,7 @@ contenedor="${SUPABASE_DB_CONTAINER:-supabase_db_Reporty}"
 base="$raiz/supabase/migrations/20261027150338_admin_audit.sql"
 acciones="$raiz/supabase/migrations/20261106120000_evidencia_reparacion.sql"
 archivo="$raiz/supabase/migrations/20261110120000_auditoria_archivo_r2.sql"
+api="$raiz/supabase/migrations/20261110120100_auditoria_archivo_api.sql"
 prueba="$raiz/supabase/tests/auditoria_archivo_r2.sql"
 emitir() { while IFS= read -r linea || [[ -n "$linea" ]]; do printf '%s\n' "$linea"; done < "$1"; }
 {
@@ -23,6 +24,7 @@ emitir() { while IFS= read -r linea || [[ -n "$linea" ]]; do printf '%s\n' "$lin
       emitir "$acciones"
     fi
     emitir "$archivo"
+    emitir "$api"
   fi
   emitir "$prueba"
   printf 'rollback;\n'

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "wiaxpc6x",
+      "file": "01-historial-archivado.html",
+      "selector": "#contenido > div > section > div:nth-of-type(2) > form > div:nth-of-type(4) > div > span",
+      "excerpt": "SOLO ADMIN",
+      "comment": "no tiene sentido, auditoria solo puede verlo admin",
+      "createdAt": "2026-11-08T16:15:28.782Z",
+      "status": "open",
+      "sentAt": "2026-11-08T16:15:28.791Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "3b8zxb8m",
+      "file": "01-historial-archivado.html",
+      "selector": "#contenido > div",
+      "excerpt": "Auditoría Actividad nueva de reportes, comentarios y votos, de más reciente a más antigua. Formulario GET nativo · input y select nativos · shadcn Button · variant default Usuario Acción Todas Creó un reporte Comentó Votó reparado Votó que no existe Período Todo Últimos 7 días Últimos 30 días Aplica",
+      "comment": "mejora el estilo de los",
+      "createdAt": "2026-11-08T16:15:49.066Z",
+      "status": "open",
+      "sentAt": "2026-11-08T16:15:49.092Z",
+      "resolvedAt": null,
+      "screenshot": ".screenshots/3b8zxb8m.png"
+    }
+  ]
+}

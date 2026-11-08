@@ -145,7 +145,9 @@ export function crearDatosArchivado(supabase?: SupabaseClient): DatosArchivado {
         p_ruta: subida.ruta,
         p_tamano: subida.tamano,
         p_hash: subida.hash,
-        p_ejecutor: lote.estado,
+        // El lote ya guarda quién lo reclamó: `null` conserva ese ejecutor en lugar
+        // de pisarlo con el estado del proceso.
+        p_ejecutor: null,
       })
       if (error) fallar("confirmar la subida del lote", error)
       return data === true

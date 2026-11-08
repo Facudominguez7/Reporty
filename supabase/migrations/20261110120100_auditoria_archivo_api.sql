@@ -109,6 +109,10 @@ as $$
   from candidatos;
 $$;
 
+-- El servicio lee los reclamos para reconstruir los eventos de un lote por
+-- identificadores exactos. Sin este permiso el archivado no puede leer su propio lote.
+grant select on public.audit_archive_claims to service_role;
+
 comment on function public.auditoria_previsualizar_lote(integer, integer) is
 'Describe el próximo lote archivable sin reclamarlo: cantidad, rango de eventos y rango de fechas.';
 
