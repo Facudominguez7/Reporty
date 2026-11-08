@@ -140,13 +140,15 @@ describe("acciones y hojas del detalle", () => {
     expect(html).toContain('aria-haspopup="dialog"')
   })
 
-  it("no repite la tarjeta de ubicación de la barra lateral para quien no administra", () => {
+  it("reserva la tarjeta de ubicación de la barra lateral para editar coordenadas", () => {
     const html = renderizar()
     const admin = renderizar({ isAdmin: true, currentUser: { id: "admin-1", is_anonymous: false } })
 
-    // La ficha de administración conserva su editor de coordenadas.
+    // La franja superior y su hoja ya cubren la consulta: la tarjeta no se repite al abrir.
     expect(html).not.toContain('id="reporte-ubicacion-map"')
-    expect(admin).toContain('id="reporte-ubicacion-map"')
+    expect(admin).not.toContain('id="reporte-ubicacion-map"')
+    // Administración conserva el editor de coordenadas dentro del modo de edición.
+    expect(admin).toContain('Editar reporte')
   })
 
   it("resume el estado de la evidencia y deja las acciones para la hoja", () => {

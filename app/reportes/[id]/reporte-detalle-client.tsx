@@ -1132,9 +1132,9 @@ export function ReporteDetalleClient({
                 </Card>
               )}
 
-            {/* Ubicación: para administración es el editor de coordenadas; el resto
-                de las personas entra por la franja superior y su hoja. */}
-            {isAdmin && (
+            {/* Ubicación: sólo el editor de coordenadas de administración, y sólo al
+                editar; la franja superior y su hoja ya cubren la consulta. */}
+            {isAdmin && isAdminEditing && (
             <Card id="reporte-ubicacion-map" className="scroll-mt-4">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base md:text-lg">Ubicación</CardTitle>
