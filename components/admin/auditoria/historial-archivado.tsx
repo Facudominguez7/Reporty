@@ -108,7 +108,7 @@ export function HistorialArchivado({ archivos, metricas, filtros, simulacion, ha
               Ejecutar archivado (dry-run)
             </Button>
             <span className="text-xs text-muted-foreground">
-              Solo Admin · la simulación no modifica ni elimina datos.
+              La simulación no modifica ni elimina datos.
             </span>
           </div>
         </form>
@@ -135,7 +135,10 @@ export function HistorialArchivado({ archivos, metricas, filtros, simulacion, ha
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={estado.variante}>{estado.etiqueta}</Badge>
+                    <Badge variant={estado.variante} className="gap-1.5 px-2.5 py-1 text-[0.65rem]">
+                      <span aria-hidden="true" className="size-1.5 rounded-full bg-current opacity-70" />
+                      {estado.etiqueta}
+                    </Badge>
                     <Link href={`/admin/auditoria/archivo/${archivo.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
                       Ver eventos
                     </Link>

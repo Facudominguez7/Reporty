@@ -48,6 +48,8 @@ describe("HistorialArchivado", () => {
     expect(html).toContain("01/11/2025 – 30/04/2026")
     expect(html).toContain("SHA-256 aaaaaaaaaaaa…")
     expect(html).toContain("Verificado")
+    // El estado se lee sin esfuerzo: texto más grande que el badge por defecto y un punto de color.
+    expect(html).toMatch(/text-\[0\.65rem\][^"]*">\s*<span aria-hidden="true" class="size-1\.5 rounded-full bg-current/)
   })
 
   it("enlaza la descarga y la recuperación solo por rutas del servidor", () => {
@@ -59,12 +61,12 @@ describe("HistorialArchivado", () => {
     expect(html).not.toContain(archivo.rutaObjeto)
   })
 
-  it("marca el dry-run como acción de Admin que no modifica nada", () => {
+  it("aclara que el dry-run no modifica nada, sin repetir que la página es de Admin", () => {
     const html = renderizar()
 
     expect(html).toContain("Ejecutar archivado (dry-run)")
-    expect(html).toContain("Solo Admin")
     expect(html).toContain("no modifica ni elimina datos")
+    expect(html).not.toMatch(/solo admin/i)
     expect(html).toContain('name="desde"')
     expect(html).toContain('name="hasta"')
     expect(html).toContain('type="date"')
