@@ -1,0 +1,98 @@
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { describe, expect, it, vi } from "vitest"
+
+import { HistorialArchivado } from "./historial-archivado"
+
+// La acción del administrador depende de la sesión; acá solo hace falta que exista.
+vi.mock("@/app/admin/auditoria/acciones", () => ({ simularArchivadoAction: async () => {} }))
+
+const archivo = {
+  id: "11111111-1111-4111-8111-111111111111",
+  estado: "verificado",
+  cantidadRegistros: 1234,
+  primeraFecha: "2025-11-01T10:00:00+00:00",
+  ultimaFecha: "2026-04-30T10:00:00+00:00",
+  tamanoComprimido: Math.round(1.8 * 1024 * 1024),
+  hashSha256: "a".repeat(64),
+  rutaObjeto: "audit/v1/2025/11/audit-41-42-aaaaaaaaaaaaaaaa.jsonl.gz",
+}
+
+const metricas = {
+  eventosArchivados: 1234,
+  bytesEnR2: Math.round(1.8 * 1024 * 1024),
+  elegibles: 7,
+  espacioTablaBytes: 48 * 1024,
+  lotes: 1,
+  lotesFallidos: 0,
+  lotesPendientesPurga: 0,
+}
+
+function renderizar(props: Partial<Parameters<typeof HistorialArchivado>[0]> = {}) {
+  return renderToStaticMarkup(createElement(HistorialArchivado, {
+    archivos: [archivo],
+    metricas,
+    filtros: {},
+    ...props,
+  }))
+}
+
+describe("HistorialArchivado", () => {
+  it("muestra métricas, período, tamaño y hash corto del lote", () => {
+    const html = renderizar()
+
+    expect(html).toContain("Historial archivado")
+    expect(html).toContain("Eventos archivados")
+    expect(html).toContain("1.234")
+    expect(html).toContain("1,8 MB")
+    expect(html).toContain("01/11/2025 – 30/04/2026")
+    expect(html).toContain("SHA-256 aaaaaaaaaaaa…")
+    expect(html).toContain("Verificado")
+  })
+
+  it("enlaza la descarga y la recuperación solo por rutas del servidor", () => {
+    const html = renderizar()
+
+    expect(html).toContain(`/admin/auditoria/archivo/${archivo.id}`)
+    expect(html).toContain(`/api/admin/auditoria/archivo/${archivo.id}/descarga`)
+    expect(html).not.toMatch(/r2\.cloudflarestorage\.com|\.r2\.dev|X-Amz-Signature/)
+    expect(html).not.toContain(archivo.rutaObjeto)
+  })
+
+  it("marca el dry-run como acción de Admin que no modifica nada", () => {
+    const html = renderizar()
+
+    expect(html).toContain("Ejecutar archivado (dry-run)")
+    expect(html).toContain("Solo Admin")
+    expect(html).toContain("no modifica ni elimina datos")
+    expect(html).toContain('name="desde"')
+    expect(html).toContain('name="hasta"')
+    expect(html).toContain('type="date"')
+  })
+
+  it("explica el resultado de la simulación sin prometer cambios", () => {
+    expect(renderizar({ simulacion: "7" })).toContain("se archivarían 7 eventos")
+    expect(renderizar({ simulacion: "error" })).toContain("revisá la configuración de Cloudflare R2")
+  })
+
+  it("muestra el estado vacío y descarta lotes fallidos o sin objeto", () => {
+    expect(renderizar({ archivos: [] })).toContain("Todavía no hay lotes archivados")
+
+    const html = renderizar({
+      archivos: [
+        { ...archivo, id: "fallido", estado: "fallido" },
+        { ...archivo, id: "sin-objeto", rutaObjeto: null },
+      ],
+    })
+    expect(html).toContain("Todavía no hay lotes archivados")
+    expect(html).not.toContain("/archivo/fallido")
+  })
+
+  it("informa el error de carga y aclara que los archivos son privados", () => {
+    const html = renderizar({ hayError: true })
+
+    expect(html).toContain("No pudimos cargar el historial archivado.")
+    expect(html).toContain("bucket privado")
+    expect(html).toContain("Ningún archivo histórico se elimina automáticamente")
+  })
+})

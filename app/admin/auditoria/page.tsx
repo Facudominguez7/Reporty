@@ -3,14 +3,17 @@ import { redirect } from "next/navigation"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { AuditFiltersForm } from "@/components/admin/auditoria/audit-filters"
+import { HistorialArchivado } from "@/components/admin/auditoria/historial-archivado"
 import { Card, CardContent } from "@/components/ui/card"
 import { getAdminAudit, type AuditFilters } from "@/database/queries/admin/admin-audit"
 import { esAccionAuditoria, fraseAccion } from "@/lib/auditoria/acciones"
+import { leerMetricasArchivo } from "@/lib/auditoria-archivo/datos-archivado"
+import { listarArchivosArchivados } from "@/lib/auditoria-archivo/servicio-recuperacion"
 import { createClient } from "@/utils/supabase/server"
 
 export const metadata = { title: "Auditoría · Administración", robots: { index: false, follow: false } }
 
-export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{ page?: string; usuario?: string; accion?: string; periodo?: string }> }) {
+export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{ page?: string; usuario?: string; accion?: string; periodo?: string; desde?: string; hasta?: string; simulacion?: string }> }) {
   const params = await searchParams
   const parsed = Number(params.page)
   const page = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
@@ -27,6 +30,14 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
   if (!user) redirect("/auth?next=/admin/auditoria")
   const { unauthorized, events, hasNext, error } = await getAdminAudit(supabase, user.id, page, filters)
   if (unauthorized) redirect("/mapa")
+
+  const rango = { desde: params.desde?.trim(), hasta: params.hasta?.trim() }
+  // El historial archivado nunca rompe la actividad reciente: si R2 o la tabla de
+  // control no responden, la sección informa el problema y el resto sigue igual.
+  const [historial, metricas] = await Promise.all([
+    listarArchivosArchivados(supabase, user.id, rango).catch(() => null),
+    leerMetricasArchivo(180).catch(() => null),
+  ])
 
   return (
     <div className="space-y-6">
@@ -57,6 +68,14 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
           </nav>}
         </>
       )}
+
+      <HistorialArchivado
+        archivos={historial?.archivos ?? []}
+        metricas={metricas}
+        filtros={rango}
+        simulacion={params.simulacion}
+        hayError={Boolean(historial?.error)}
+      />
     </div>
   )
 }
