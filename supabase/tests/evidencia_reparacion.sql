@@ -138,11 +138,12 @@ update public.profiles set puntos = 0 where id in
 -- -92016 reporte rechazado · -92017 aprobación sin foto · -92018/-92019 admin con
 -- impugnaciones · -92020 verificaciones repetidas · -92021 impugnación que bloquea ·
 -- -92022 fotos originales (S9) · -92023/-92024 cierre directo a 2 y a 3 ·
--- -92025 cierre directo sin foto · -92026 cierre directo sin evidencia.
+-- -92025 cierre directo sin foto · -92026 cierre directo sin evidencia ·
+-- -92027 impugnación aceptada sin motivo de resolución.
 insert into public.reportes(id,usuario_id,titulo,lat,lon,estado_id)
 select -92000 - n, '30000000-0000-0000-0000-000000000001',
   'Evidencia de reparación ' || n, 0, 0, case when n = 7 then 2 else 1 end
-from generate_series(1,26) n;
+from generate_series(1,27) n;
 
 -- ---------------------------------------------------------------------------
 -- S12/S15: solo cuentas registradas con email confirmado informan reparaciones.
@@ -382,9 +383,37 @@ select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92003),
   '30000000-0000-0000-0000-000000000003','confirmacion');
 select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92003),
   '30000000-0000-0000-0000-000000000004','impugnacion','El bache sigue ahí');
+-- Si no se puede escribir la actividad, se revierten la aceptación y la evidencia.
+reset role;
+create function pg_temp.interrumpir_historial_impugnacion() returns trigger language plpgsql as $$
+begin
+  if new.reporte_id=-92003 and current_setting('prueba.fallar_historial_impugnacion', true)='si' then
+    raise exception 'Falla simulada del historial de impugnación';
+  end if;
+  return new;
+end $$;
+create trigger sonda_historial_impugnacion before insert on public.historial_estados
+  for each row execute function pg_temp.interrumpir_historial_impugnacion();
+set local role service_role;
+set local prueba.fallar_historial_impugnacion='si';
+select pg_temp.rechazar($q$select public.resolver_impugnacion_reparacion(
+  pg_temp.impugnacion(pg_temp.evidencia(-92003),'30000000-0000-0000-0000-000000000004'),
+  '30000000-0000-0000-0000-000000000007','aceptada','La foto no muestra la reparación')$q$,
+  'P0001','Falla simulada del historial de impugnación');
+select pg_temp.exigir((select estado='en_verificacion' and resuelta_at is null and resuelta_por is null
+  and motivo_resolucion is null from public.evidencias_reparacion where reporte_id=-92003)
+  and (select estado='pendiente' and resuelta_at is null and resuelta_por is null and motivo_resolucion is null
+    from public.verificaciones_reparacion where evidencia_id=pg_temp.evidencia(-92003) and tipo='impugnacion')
+  and (select count(*)=2 from public.verificaciones_reparacion where evidencia_id=pg_temp.evidencia(-92003))
+  and (select estado_id=1 from public.reportes where id=-92003)
+  and (select puntos=0 from public.profiles where id='30000000-0000-0000-0000-000000000001')
+  and not exists (select 1 from public.historial_estados where reporte_id=-92003)
+  and not exists (select 1 from public.audit_events where report_id=-92003 and action='evidence_challenge_resolved'),
+  'El fallo de actividad revierte aceptación, evidencia, historial y auditoría sin cambiar reporte ni puntos');
+set local prueba.fallar_historial_impugnacion='no';
 select pg_temp.exigir((public.resolver_impugnacion_reparacion(
   pg_temp.impugnacion(pg_temp.evidencia(-92003),'30000000-0000-0000-0000-000000000004'),
-  '30000000-0000-0000-0000-000000000007','aceptada','La foto no muestra la reparación')
+  '30000000-0000-0000-0000-000000000007','aceptada','  La foto no muestra la reparación  ')
   ->> 'evidencia_estado') = 'rechazada', 'Aceptar la impugnación rechaza la evidencia');
 select pg_temp.exigir((select estado='rechazada' and resuelta_por='30000000-0000-0000-0000-000000000007'
   and motivo_resolucion='La foto no muestra la reparación'
@@ -397,15 +426,25 @@ select pg_temp.exigir((select estado_id=1 from public.reportes where id=-92003),
   'El reporte sigue pendiente tras rechazar la evidencia');
 select pg_temp.exigir((select puntos=0 from public.profiles
   where id='30000000-0000-0000-0000-000000000001'), 'Rechazar la evidencia no acredita puntos');
-select pg_temp.exigir(not exists (select 1 from public.historial_estados where reporte_id=-92003),
-  'Rechazar la evidencia no registra cambio de estado');
+select pg_temp.exigir((select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+  and usuario_id='30000000-0000-0000-0000-000000000007'
+  and comentario='Administración aceptó la impugnación y canceló la revisión de reparado. Motivo: La foto no muestra la reparación')
+  from public.historial_estados where reporte_id=-92003),
+  'Aceptar registra una actividad con el estado actual, el administrador y el motivo limpio');
 select pg_temp.rechazar($q$select public.registrar_verificacion_reparacion(
   pg_temp.evidencia(-92003),'30000000-0000-0000-0000-000000000006','confirmacion')$q$,
   'PRE05','La evidencia no está en verificación');
 select pg_temp.exigir((public.resolver_impugnacion_reparacion(
   pg_temp.impugnacion(pg_temp.evidencia(-92003),'30000000-0000-0000-0000-000000000004'),
-  '30000000-0000-0000-0000-000000000007','aceptada') ->> 'repetida') = 'true',
+  '30000000-0000-0000-0000-000000000007','aceptada','Otro motivo') ->> 'repetida') = 'true',
   'Aceptar dos veces la misma impugnación es idempotente');
+select pg_temp.exigir((select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+  and usuario_id='30000000-0000-0000-0000-000000000007'
+  and comentario='Administración aceptó la impugnación y canceló la revisión de reparado. Motivo: La foto no muestra la reparación')
+  from public.historial_estados where reporte_id=-92003)
+  and (select motivo_resolucion='La foto no muestra la reparación' from public.evidencias_reparacion where reporte_id=-92003)
+  and (select count(*)=1 from public.audit_events where report_id=-92003 and action='evidence_challenge_resolved'),
+  'Repetir no duplica ni modifica la actividad, el motivo o la auditoría');
 select pg_temp.rechazar($q$select public.resolver_impugnacion_reparacion(
   pg_temp.impugnacion(pg_temp.evidencia(-92003),'30000000-0000-0000-0000-000000000004'),
   '30000000-0000-0000-0000-000000000007','descartada')$q$,
@@ -415,6 +454,35 @@ select pg_temp.rechazar($q$select public.resolver_impugnacion_reparacion(
     where evidencia_id=pg_temp.evidencia(-92003) and tipo='confirmacion'),
   '30000000-0000-0000-0000-000000000007','descartada')$q$,
   'PRE07','La verificación indicada no es una impugnación');
+
+-- Sin motivo de resolución se conserva el valor anterior de la evidencia y se
+-- registra una actividad explícita por defecto, también idempotente.
+select public.crear_evidencia_reparacion(-92027,'30000000-0000-0000-0000-000000000014',
+  'Reparación impugnada sin motivo administrativo',pg_temp.huella(40));
+select pg_temp.publicar_evidencia(pg_temp.evidencia(-92027),'https://ejemplo.invalid/reparacion-92027.webp');
+select public.registrar_verificacion_reparacion(pg_temp.evidencia(-92027),
+  '30000000-0000-0000-0000-000000000012','impugnacion','El bache no fue reparado');
+select pg_temp.exigir((public.resolver_impugnacion_reparacion(
+  pg_temp.impugnacion(pg_temp.evidencia(-92027),'30000000-0000-0000-0000-000000000012'),
+  '30000000-0000-0000-0000-000000000007','aceptada','   ') ->> 'repetida')='false',
+  'Aceptar sin motivo resuelve la impugnación');
+select pg_temp.exigir((select estado='rechazada' and motivo_resolucion='Impugnación aceptada por administración'
+  from public.evidencias_reparacion where reporte_id=-92027)
+  and (select estado_id=1 from public.reportes where id=-92027)
+  and (select count(*)=1 and bool_and(estado_anterior_id=1 and estado_nuevo_id=1
+    and usuario_id='30000000-0000-0000-0000-000000000007'
+    and comentario='Administración aceptó la impugnación y canceló la revisión de reparado.')
+    from public.historial_estados where reporte_id=-92027),
+  'Sin motivo queda una actividad por defecto y se conserva el motivo anterior de la evidencia');
+select pg_temp.exigir((public.resolver_impugnacion_reparacion(
+  pg_temp.impugnacion(pg_temp.evidencia(-92027),'30000000-0000-0000-0000-000000000012'),
+  '30000000-0000-0000-0000-000000000007','aceptada','Otro motivo') ->> 'repetida')='true',
+  'La aceptación sin motivo también es idempotente');
+select pg_temp.exigir((select count(*)=1 and bool_and(
+  comentario='Administración aceptó la impugnación y canceló la revisión de reparado.')
+  from public.historial_estados where reporte_id=-92027)
+  and (select count(*)=1 from public.audit_events where report_id=-92027 and action='evidence_challenge_resolved'),
+  'La aceptación repetida no duplica ni modifica la actividad o la auditoría');
 
 -- ---------------------------------------------------------------------------
 -- S8: el administrador aprueba, revierte (vuelve a Pendiente con historial y −5

@@ -478,7 +478,7 @@ async function notificarCancelacionReparacion(
   }
 }
 
-/** Lee la evidencia de una impugnación para poder avisar el cierre del reporte. */
+/** Lee la evidencia de una impugnación para avisar su resolución de mejor esfuerzo. */
 async function evidenciaDeImpugnacion(supabase: SupabaseClient, verificacionId: string) {
   try {
     const { data } = await supabase
@@ -670,8 +670,9 @@ export async function resolverEvidenciaReparacionWorkflow(
 }
 
 /**
- * Acepta o descarta una impugnación (S5, S8). Aceptarla rechaza la evidencia y el
- * reporte sigue pendiente; descartarla reevalúa el umbral y puede validar la
+ * Acepta o descarta una impugnación (S5, S7, S8). Aceptarla rechaza la evidencia,
+ * registra la actividad en la transacción y avisa al autor de mejor esfuerzo; el
+ * reporte sigue pendiente. Descartarla reevalúa el umbral y puede validar la
  * reparación en la misma transacción.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
@@ -717,6 +718,10 @@ export async function resolverImpugnacionReparacionWorkflow(
         `Reparación validada por ${resolucion.confirmaciones} confirmaciones de usuarios`,
       )
     }
+  }
+  if (decision === "aceptada" && !resolucion.repetida) {
+    const evidenciaId = await evidenciaDeImpugnacion(supabase, verificacionId)
+    if (evidenciaId) await notificarCancelacionReparacion(supabase, evidenciaId, motivoLimpio)
   }
   return { success: true, data: resolucion }
 }
