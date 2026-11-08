@@ -11,7 +11,7 @@
  * envía la clave y el servidor resuelve la frase aprobada.
  */
 
-import { useId, useState } from "react"
+import { useId, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import dayjs from "dayjs"
@@ -25,6 +25,7 @@ import {
   Flag,
   Images,
   MessageCircle,
+  MoveHorizontal,
   ShieldCheck,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -166,7 +167,7 @@ function ComparadorAntesDespues({
       <CardContent className="space-y-3 pt-0">
         {fotoAntes ? (
           <>
-            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border bg-[var(--surface-subtle)]">
+            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
               <img
                 src={fotoAntes.src}
                 alt={`Foto original del reporte${fechaAntes ? `, del ${fechaAntes}` : ""}`}
@@ -178,26 +179,40 @@ function ComparadorAntesDespues({
                 className="absolute inset-0 size-full object-contain"
                 style={{ clipPath: `inset(0 0 0 ${corte}%)` }}
               />
-              <span className="absolute left-2 top-2 rounded-[var(--radius-pill)] bg-foreground/85 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-card">
+              <span className="pointer-events-none absolute left-2 top-2 rounded-[var(--radius-pill)] bg-foreground/85 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-card">
                 Antes
               </span>
-              <span className="absolute right-2 top-2 rounded-[var(--radius-pill)] bg-foreground/85 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-card">
+              <span className="pointer-events-none absolute right-2 top-2 rounded-[var(--radius-pill)] bg-foreground/85 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-card">
                 Después
               </span>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-card shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
+                style={{ left: `${corte}%` }}
+              />
+              <span
+                data-manija-comparacion=""
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[var(--radius-pill)] border border-border bg-card text-foreground shadow-[var(--elevation-soft)]"
+                style={{ left: `clamp(20px, ${corte}%, calc(100% - 20px))` }}
+              >
+                <MoveHorizontal className="size-5" />
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={corte}
+                onChange={(event) => setCorte(Number(event.target.value))}
+                aria-label="Comparar la foto original con la foto de la reparación"
+                aria-describedby={ayudaId}
+                aria-valuetext={`Mostrando el ${corte} % de la foto original`}
+                className="absolute inset-0 size-full cursor-ew-resize touch-pan-y appearance-none bg-transparent opacity-0"
+              />
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={corte}
-              onChange={(event) => setCorte(Number(event.target.value))}
-              aria-label="Comparar la foto original con la foto de la reparación"
-              aria-describedby={ayudaId}
-              className="h-8 w-full accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
             <p id={ayudaId} className="text-xs text-muted-foreground">
-              Arrastrá el control —o usá las flechas— para comparar las dos fotos.
+              Arrastrá la manija —o usá las flechas— sobre la foto para comparar el antes y el después.
             </p>
           </>
         ) : (
@@ -356,7 +371,8 @@ export function DialogoImpugnar({
   const motivoId = useId()
   return (
     <Dialog open={abierto} onOpenChange={cambiandoAbierto}>
-      <DialogContent>
+      {/* La evidencia vive en una hoja inferior con !z-[70]: el diálogo sube a 80. */}
+      <DialogContent className="z-[80]" overlayClassName="z-[80]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="tone-danger-soft-inline inline-flex size-8 shrink-0 items-center justify-center rounded-xl">
@@ -759,6 +775,59 @@ function FormularioEvidenciaReparacion({
         </form>
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * Resumen compacto de la reparación para la ficha (S11, S13): dice en una línea qué
+ * estado tiene la evidencia y abre la hoja con la comparación y las acciones.
+ *
+ * El estado que muestra es siempre el de la evidencia, nunca el del reporte: un
+ * reporte Pendiente con una reparación informada no se presenta como «Reparado».
+ */
+export function ResumenReparacion({
+  seccion,
+  onVer,
+}: {
+  seccion: SeccionReparacionVista
+  /** Recibe el botón que abrió la hoja para devolverle el foco al cerrarla. */
+  onVer: (disparador: HTMLElement | null) => void
+}) {
+  const botonRef = useRef<HTMLButtonElement>(null)
+  const { evidencia } = seccion
+  if (!evidencia && !seccion.puedeInformar) return null
+
+  const estado = !evidencia
+    ? "Todavía nadie informó una reparación"
+    : evidencia.estado === "reparado"
+      ? "Reparado"
+      : evidencia.estado === "informada"
+        ? "Reparación informada"
+        : `En verificación · ${evidencia.confirmaciones} de ${seccion.umbral} confirmaciones`
+
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card px-3 py-2 shadow-[var(--card-shadow)]">
+      <span
+        aria-hidden="true"
+        className="inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-primary/10 text-primary"
+      >
+        {evidencia?.estado === "reparado" ? <ShieldCheck className="size-5" /> : <Camera className="size-5" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-foreground">¿Ya lo arreglaron?</p>
+        <p className="truncate text-xs text-muted-foreground">{estado}</p>
+      </div>
+      <Button
+        ref={botonRef}
+        type="button"
+        size="sm"
+        aria-haspopup="dialog"
+        className="shrink-0"
+        onClick={() => onVer(botonRef.current)}
+      >
+        {evidencia ? "Ver la evidencia" : "Informar la reparación"}
+      </Button>
+    </div>
   )
 }
 

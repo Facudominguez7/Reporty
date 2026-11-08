@@ -68,13 +68,23 @@ import { ChipEstadoOperativo } from "@/components/cuadrillas/chip-estado-operati
 import { LineaTiempoOperativa } from "@/components/cuadrillas/linea-tiempo-operativa";
 import { CommentsSection } from "@/components/report-detail/comments-section";
 import {
+  ResumenReparacion,
   EvidenciaReparacion,
   type AccionesEvidenciaReparacion,
   type ResultadoAccionReparacion,
 } from "@/components/report-detail/evidencia-reparacion";
+import {
+  AccionesFlotantes,
+  accionesDisponibles,
+  construirAccionesFlotantes,
+  type ClaveAccionFlotante,
+  type ContextoAccionesFlotantes,
+} from "@/components/report-detail/acciones-flotantes";
+import { HojaReporte } from "@/components/report-detail/hojas-reporte";
+import { ContenidoUbicacion, FranjaUbicacion } from "@/components/report-detail/ubicacion-reporte";
 import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
-import { ReportContactDialog } from "@/components/report-contact-actions";
+import { ReportContactActions, ReportContactDialog, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
 import {
   actualizarReporteAdminAction,
@@ -217,6 +227,14 @@ export function ReporteDetalleClient({
   const [votosReparadoCount, setVotosReparadoCount] = useState(reporte?.votos.reparado.count ?? 0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{ src: string; alt: string } | null>(null);
+  // Hoja inferior abierta desde el botón flotante: una sola a la vez (S13, S18).
+  const [hojaAbierta, setHojaAbierta] = useState<ClaveAccionFlotante | null>(null);
+  // El menú flotante lo controla la ficha para poder cerrarlo antes de abrir una hoja.
+  const [menuFlotanteAbierto, setMenuFlotanteAbierto] = useState(false);
+  // Botón que abrió la hoja: recibe el foco cuando el Drawer se cierra.
+  const [disparadorHoja, setDisparadorHoja] = useState<HTMLElement | null>(null);
+  // Enlace del reporte para los mensajes de contacto; se arma al abrir la hoja, ya en el navegador.
+  const [urlReporte, setUrlReporte] = useState("");
 
   // Estados para controlar los AlertDialogs
   const [showDeleteReporteDialog, setShowDeleteReporteDialog] = useState(false);
@@ -586,6 +604,54 @@ export function ReporteDetalleClient({
   const fotoAntesComparacion = fotoOriginalDelReporte
     ? { src: (fotoOriginalDelReporte.publicUrl ?? fotoOriginalDelReporte.url) as string, fecha: reporte.created_at }
     : null;
+
+  // ===== Acciones flotantes y hojas del detalle (S13, S18) =====
+  /**
+   * Abre una hoja recordando el botón que la originó y cerrando antes el menú flotante:
+   * nunca queda un menú desplegado detrás del velo y el foco vuelve a un control real.
+   */
+  const abrirHoja = (hoja: ClaveAccionFlotante, disparador: HTMLElement | null) => {
+    setDisparadorHoja(disparador);
+    setMenuFlotanteAbierto(false);
+    setHojaAbierta(hoja);
+  };
+
+  /**
+   * Arma el enlace del reporte recién al abrir los contactos: `window` sólo existe en el
+   * navegador y el mensaje de los organismos lo usa para citar la publicación real.
+   */
+  const manejadoresAccionesFlotantes: Record<ClaveAccionFlotante, (disparador: HTMLElement | null) => void> = {
+    contactos: (disparador) => {
+      setUrlReporte(new URL(`/reportes/${reporte.id}`, window.location.origin).toString());
+      abrirHoja("contactos", disparador);
+    },
+    ubicacion: (disparador) => abrirHoja("ubicacion", disparador),
+    reparacion: (disparador) => abrirHoja("reparacion", disparador),
+    comentar: (disparador) => abrirHoja("comentar", disparador),
+  };
+
+  const contextoAccionesFlotantes: ContextoAccionesFlotantes = {
+    sesion: { haySesion: Boolean(currentUser), esAnonimo: Boolean(currentUser?.is_anonymous) },
+    reporteCerrado: Boolean(isReporteCerrado),
+    tieneUbicacion: reporte.lat !== null && reporte.lon !== null,
+    puedeContactar,
+    reparacion: evidenciaReparacion
+      ? { hayEvidencia: evidenciaReparacion.evidencia !== null, puedeInformar: evidenciaReparacion.puedeInformar }
+      : null,
+  };
+  const accionesFlotantes = construirAccionesFlotantes(
+    accionesDisponibles(contextoAccionesFlotantes),
+    manejadoresAccionesFlotantes,
+  );
+
+  /** Descripción honesta de la hoja de reparación: depende del estado real de la evidencia. */
+  const descripcionReparacion = !evidenciaReparacion?.evidencia
+    ? "Subí una foto y elegí qué se arregló. La foto pasa por moderación antes de publicarse."
+    : evidenciaReparacion.evidencia.estado === "reparado"
+      ? "La reparación quedó validada y el reporte está Reparado."
+      : evidenciaReparacion.evidencia.estado === "informada"
+        ? "La foto está en moderación. El reporte sigue Pendiente hasta que la comunidad confirme."
+        : `La comunidad está confirmando la reparación. Con ${evidenciaReparacion?.umbral ?? 3} confirmaciones el reporte pasa a Reparado.`;
   const showVoteButtons = (!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado;
   const showVoteFooter = Boolean(
     isReporteCerrado ||
@@ -604,9 +670,23 @@ export function ReporteDetalleClient({
           />
         </section>
 
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FranjaUbicacion
+            lat={reporte.lat}
+            lon={reporte.lon}
+            onVerUbicacion={(disparador) => abrirHoja("ubicacion", disparador)}
+          />
+          {evidenciaReparacion && (
+            <ResumenReparacion
+              seccion={evidenciaReparacion}
+              onVer={(disparador) => abrirHoja("reparacion", disparador)}
+            />
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           {/* Contenido Principal */}
-          <div className="space-y-4 lg:col-span-8">
+          <div className="space-y-4 lg:col-span-7">
             {/* Encabezado del Reporte */}
             <Card className="gap-0">
               <CardHeader className="pb-3">
@@ -852,16 +932,6 @@ export function ReporteDetalleClient({
                     />
                   </div>
                 )}
-                {reporte.lat !== null && reporte.lon !== null && (
-                  <button
-                    type="button"
-                    className="mx-auto mt-1 flex w-fit items-center justify-center gap-1 bg-transparent p-0 text-center text-xs font-semibold text-foreground underline md:hidden"
-                    onClick={() => document.getElementById("reporte-ubicacion-map")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  >
-                    <MapPin className="size-3" aria-hidden="true" />
-                    Ver ubicación
-                  </button>
-                )}
                 {showVoteFooter && (
                   <div className="mt-3">
                     <hr className="mb-2 border-border" />
@@ -904,31 +974,6 @@ export function ReporteDetalleClient({
               </CardContent>
             </Card>
 
-            {evidenciaReparacion && (
-              <EvidenciaReparacion
-                seccion={evidenciaReparacion}
-                fotoAntes={fotoAntesComparacion}
-                acciones={accionesReparacion}
-              />
-            )}
-
-            <CommentsSection
-              comments={comentarios}
-              statusHistory={historialEstados}
-              currentUser={currentUser}
-              reportOwnerId={reporte.usuario_id}
-              isAdmin={isAdmin}
-              isClosed={Boolean(isReporteCerrado)}
-              onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
-              onDeleteComment={async (commentId) => {
-                const result = await eliminarComentarioPropioAction(commentId)
-                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
-              }}
-              onAdminDeleteComment={async (commentId) => {
-                const result = await eliminarComentarioAdminAction(commentId)
-                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
-              }}
-            />
             {isAdmin && isAdminEditing && (
               <AdminReportEditActions
                 saving={isAdminSaving}
@@ -939,8 +984,29 @@ export function ReporteDetalleClient({
             )}
           </div>
 
-          {/* Barra Lateral */}
-          <div className="lg:col-span-4 space-y-4 md:space-y-6">
+          {/* Actividad y barra lateral: la línea de tiempo queda junto al reporte (S13, S18) */}
+          <div className="lg:col-span-5 space-y-4 md:space-y-6">
+
+            <CommentsSection
+              comments={comentarios}
+              statusHistory={historialEstados}
+              currentUser={currentUser}
+              reportOwnerId={reporte.usuario_id}
+              isAdmin={isAdmin}
+              isClosed={Boolean(isReporteCerrado)}
+              compositorAbierto={hojaAbierta === "comentar"}
+              onCambiarCompositor={(abierta) => setHojaAbierta(abierta ? "comentar" : null)}
+              disparadorCompositor={disparadorHoja}
+              onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
+              onDeleteComment={async (commentId) => {
+                const result = await eliminarComentarioPropioAction(commentId)
+                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
+              }}
+              onAdminDeleteComment={async (commentId) => {
+                const result = await eliminarComentarioAdminAction(commentId)
+                return result.success ? { success: true } : { success: false, error: String(result.error || "") }
+              }}
+            />
 
             {/* Seguimiento de la cuadrilla (cuadrillas) - solo lectura; la gestión vive en /dashboard/cuadrillas */}
             {gestionOperativa &&
@@ -983,7 +1049,9 @@ export function ReporteDetalleClient({
                 </Card>
               )}
 
-            {/* Marcador de Posición del Mapa */}
+            {/* Ubicación: para administración es el editor de coordenadas; el resto
+                de las personas entra por la franja superior y su hoja. */}
+            {isAdmin && (
             <Card id="reporte-ubicacion-map" className="scroll-mt-4">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base md:text-lg">Ubicación</CardTitle>
@@ -1054,6 +1122,7 @@ export function ReporteDetalleClient({
                 )}
               </CardContent>
             </Card>
+            )}
           </div>
         </div>
 
@@ -1199,6 +1268,62 @@ export function ReporteDetalleClient({
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Hojas inferiores del botón flotante: el mismo Drawer del filtro del mapa (S18) */}
+      <HojaReporte
+        abierta={hojaAbierta === "reparacion"}
+        disparador={disparadorHoja}
+        cambiandoAbierta={(abierta) => setHojaAbierta(abierta ? "reparacion" : null)}
+        titulo="¿Ya lo arreglaron?"
+        descripcion={descripcionReparacion}
+        etiquetaCerrar="Cerrar la hoja de reparación"
+      >
+        {evidenciaReparacion ? (
+          <EvidenciaReparacion
+            seccion={evidenciaReparacion}
+            fotoAntes={fotoAntesComparacion}
+            acciones={accionesReparacion}
+          />
+        ) : null}
+      </HojaReporte>
+
+      <HojaReporte
+        abierta={hojaAbierta === "ubicacion"}
+        disparador={disparadorHoja}
+        cambiandoAbierta={(abierta) => setHojaAbierta(abierta ? "ubicacion" : null)}
+        titulo="Ubicación"
+        descripcion="El mapa del reporte y el acceso al mapa completo de la ciudad."
+        etiquetaCerrar="Cerrar la ubicación"
+      >
+        <ContenidoUbicacion lat={reporte.lat} lon={reporte.lon} />
+      </HojaReporte>
+
+      <HojaReporte
+        abierta={hojaAbierta === "contactos"}
+        disparador={disparadorHoja}
+        cambiandoAbierta={(abierta) => setHojaAbierta(abierta ? "contactos" : null)}
+        titulo="Contactar a organismos"
+        descripcion={CONTACT_DISCLAIMER}
+        etiquetaCerrar="Cerrar los contactos"
+      >
+        {reporte.lat !== null && reporte.lon !== null && (
+          <ReportContactActions
+            title={reporte.titulo}
+            category={getNameFromRelation(reporte.categorias)}
+            description={reporte.descripcion ?? ""}
+            latitude={reporte.lat}
+            longitude={reporte.lon}
+            date={parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", { timeZone: ZONA_HORARIA })}
+            reportUrl={urlReporte}
+            showHeading={false}
+          />
+        )}
+      </HojaReporte>
+
+      <AccionesFlotantes
+        acciones={accionesFlotantes}
+        abierta={menuFlotanteAbierto}
+        onCambiarAbierta={setMenuFlotanteAbierto}
+      />
     </div>
   );
 }

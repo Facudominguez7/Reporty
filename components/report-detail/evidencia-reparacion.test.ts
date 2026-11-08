@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { createElement, forwardRef, Fragment } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -38,7 +39,7 @@ import type {
   EvidenciaReparacionVista,
   SeccionReparacionVista,
 } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server"
-import { EvidenciaReparacion, DialogoImpugnar, type AccionesEvidenciaReparacion } from "./evidencia-reparacion"
+import { EvidenciaReparacion, DialogoImpugnar, ResumenReparacion, type AccionesEvidenciaReparacion } from "./evidencia-reparacion"
 
 const EVIDENCIA_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -119,13 +120,27 @@ describe("comparación «Antes / Después»", () => {
     expect(html).toContain("https://ejemplo.test/despues.webp")
     expect(html).toMatch(/alt="Foto original del reporte[^"]*"/)
     expect(html).toMatch(/alt="Foto de la reparación informada por Marisa Bogado[^"]*"/)
-    expect(html).toContain("Arrastrá el control")
+    expect(html).toContain("Arrastrá la manija")
   })
 
   it("no anima la comparación para quien prefiere menos movimiento", () => {
     const html = renderizar()
 
     expect(html).not.toMatch(/animate-|transition-all|transition-transform/)
+  })
+
+  it("pone el deslizador sobre la foto, con manija visible y texto que describe el corte", () => {
+    const html = renderizar()
+
+    // El control cubre la foto: se puede arrastrar con el dedo y con las flechas.
+    expect(html).toMatch(/<input[^>]*type="range"[^>]*class="[^"]*absolute inset-0[^"]*opacity-0/)
+    expect(html).toMatch(/<input[^>]*class="[^"]*touch-pan-y/)
+    expect(html).toContain('aria-valuetext="Mostrando el 50 % de la foto original"')
+    // La manija y la línea del corte son decorativas: el texto ya nombra cada foto.
+    expect(html).toContain('data-manija-comparacion')
+    expect(html).toMatch(/data-manija-comparacion[^>]*aria-hidden="true"/)
+    // El foco se ve aunque el control sea transparente.
+    expect(html).toMatch(/class="[^"]*focus-within:ring-2/)
   })
 
   it("muestra el autor, la fecha y el comentario de la evidencia", () => {
@@ -358,6 +373,51 @@ describe("frases cerradas de la reparación (S16, S17)", () => {
   })
 })
 
+describe("resumen de la reparación sobre el contenido", () => {
+  const renderizarResumen = (extra: Partial<SeccionReparacionVista> = {}) =>
+    renderToStaticMarkup(createElement(ResumenReparacion, { seccion: seccion(extra), onVer: () => {} }))
+
+  it("distingue «Reparación informada» de una verificación en curso", () => {
+    const html = renderizarResumen({
+      evidencia: vista({ estado: "informada", publicadaAt: null, foto: null }),
+    })
+
+    expect(html).toContain("¿Ya lo arreglaron?")
+    expect(html).toContain("Reparación informada")
+    expect(html).not.toContain("En verificación")
+    expect(html).toContain("Ver la evidencia")
+  })
+
+  it("resume «En verificación» con las confirmaciones reales del reporte", () => {
+    const html = renderizarResumen()
+
+    expect(html).toContain("En verificación · 2 de 3 confirmaciones")
+    expect(html).toContain("Ver la evidencia")
+  })
+
+  it("dice «Reparado» cuando la evidencia quedó validada", () => {
+    const html = renderizarResumen({
+      evidencia: vista({ estado: "reparado", confirmaciones: 3 }),
+    })
+
+    expect(html).toContain("Reparado")
+    expect(html).not.toContain("En verificación")
+  })
+
+  it("invita a informar la reparación cuando todavía no hay evidencia", () => {
+    const html = renderizarResumen({ evidencia: null, puedeInformar: true })
+
+    expect(html).toContain("¿Ya lo arreglaron?")
+    expect(html).toContain("Informar la reparación")
+    expect(html).not.toContain("En verificación")
+    expect(html).not.toContain("Reparado")
+  })
+
+  it("no muestra nada cuando el reporte no ofrece reparación", () => {
+    expect(renderizarResumen({ evidencia: null, puedeInformar: false })).toBe("")
+  })
+})
+
 describe("carga de evidencia", () => {
   it("ofrece un formulario mínimo con cámara, frase de la lista y verificación anti bots", () => {
     const html = renderizarFormulario()
@@ -375,5 +435,15 @@ describe("carga de evidencia", () => {
   it("no ofrece el formulario cuando el reporte ya está reparado o hay evidencia activa", () => {
     expect(renderizar()).not.toContain("Enviar evidencia")
     expect(renderizar({ evidencia: null, puedeInformar: false })).not.toContain("¿Ya lo arreglaron?")
+  })
+})
+
+describe("diálogo de impugnación sobre la hoja inferior", () => {
+  it("queda por encima del Drawer que muestra la evidencia", () => {
+    const fuente = readFileSync(new URL("./evidencia-reparacion.tsx", import.meta.url), "utf8")
+
+    // El Drawer compartido usa !z-[70]: velo y contenido de la impugnación suben a 80.
+    expect(fuente).toContain('className="z-[80]"')
+    expect(fuente).toContain('overlayClassName="z-[80]"')
   })
 })

@@ -43,6 +43,7 @@ import {
   TurnstileWidget,
 } from "@/components/turnstile-widget";
 import { debeAvisarVerificacionVencida } from "./verificacion-de-aporte";
+import { HojaReporte } from "./hojas-reporte";
 
 /**
  * Action que Turnstile vincula al aporte público. `app/reportes/[id]/actions.ts` verifica el
@@ -86,6 +87,14 @@ export type CommentsSectionProps = {
   ) => Promise<CommentSubmitResult>;
   onDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
   onAdminDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
+  /**
+   * El compositor vive en la hoja inferior mientras la acción flotante lo pide.
+   * Sigue siendo el mismo estado y el mismo envío, así nunca hay dos formularios.
+   */
+  compositorAbierto?: boolean;
+  onCambiarCompositor?: (abierto: boolean) => void;
+  /** Botón que abrió el compositor en la hoja; recupera el foco al cerrarla. */
+  disparadorCompositor?: HTMLElement | null;
 };
 
 export function CommentsSection({
@@ -98,6 +107,9 @@ export function CommentsSection({
   onSubmitComment,
   onDeleteComment,
   onAdminDeleteComment,
+  compositorAbierto = false,
+  onCambiarCompositor,
+  disparadorCompositor,
 }: CommentsSectionProps) {
   const [comments, setComments] = useState(initialComments);
   const [newComment, setNewComment] = useState("");
@@ -147,6 +159,8 @@ export function CommentsSection({
     currentUser && currentUser.id !== reportOwnerId,
   );
   const activity = mergeReportActivity(comments, statusHistory);
+  // Comentar exige una cuenta registrada y un reporte abierto, igual que antes.
+  const puedeComentar = !isClosed && Boolean(currentUser) && !currentUser?.is_anonymous;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -233,6 +247,57 @@ export function CommentsSection({
       setAdminDeleteDialogOpen(false);
     }
   };
+
+  /**
+   * Compositor único de la sección: el mismo formulario se pinta dentro de la tarjeta
+   * o en la hoja inferior, nunca en los dos lugares a la vez ni con dos envíos.
+   */
+  const formularioAporte = (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-3 rounded-xl border border-border/70 bg-muted/30 p-3 sm:p-4"
+    >
+      <label htmlFor="report-contribution" className="block text-sm font-medium">
+        ¿Qué novedad tenés?
+      </label>
+      <select
+        id="report-contribution"
+        value={newComment}
+        onChange={(event) => setNewComment(event.target.value)}
+        disabled={isSubmitting}
+        className="min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
+      >
+        <option value="">Elegí una actualización…</option>
+        {APORTES_COMUNITARIOS.map(({ key, label }) => (
+          <option key={key} value={key}>
+            {label}
+          </option>
+        ))}
+      </select>
+      {captchaNoDisponible && (
+        <Alert variant="destructive">
+          <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
+          <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
+        </Alert>
+      )}
+      {needsCaptcha && !captchaNoDisponible && (
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Verificación de seguridad</p>
+          <TurnstileWidget
+            onTokenChange={setCaptchaToken}
+            resetSignal={captchaResetSignal}
+            action={ACCION_CAPTCHA_COMENTARIO}
+          />
+        </div>
+      )}
+      <div className="flex justify-end">
+        <Button type="submit" size="sm" className="h-9 max-w-full" disabled={!canPublish}>
+          <Send className="mr-1.5 size-3 md:mr-2 md:size-4" />
+          <span className="text-sm">{isSubmitting ? "Publicando..." : "Publicar"}</span>
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <>
@@ -361,69 +426,26 @@ export function CommentsSection({
             )}
           </div>
 
-          {!isClosed && currentUser && !currentUser.is_anonymous && (
-            <form
-              onSubmit={handleSubmit}
-              className="space-y-3 rounded-xl border border-border/70 bg-muted/30 p-3 sm:p-4"
-            >
-              <label
-                htmlFor="report-contribution"
-                className="block text-sm font-medium"
-              >
-                ¿Qué novedad tenés?
-              </label>
-              <select
-                id="report-contribution"
-                value={newComment}
-                onChange={(event) => setNewComment(event.target.value)}
-                disabled={isSubmitting}
-                className="min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
-              >
-                <option value="">Elegí una actualización…</option>
-                {APORTES_COMUNITARIOS.map(({ key, label }) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              {captchaNoDisponible && (
-                <Alert variant="destructive">
-                  <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
-                  <AlertDescription>
-                    {MENSAJE_CAPTCHA_NO_DISPONIBLE}
-                  </AlertDescription>
-                </Alert>
-              )}
-              {needsCaptcha && !captchaNoDisponible && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Verificación de seguridad</p>
-                  <TurnstileWidget
-                    onTokenChange={setCaptchaToken}
-                    resetSignal={captchaResetSignal}
-                    action={ACCION_CAPTCHA_COMENTARIO}
-                  />
-                </div>
-              )}
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="h-9 max-w-full"
-                  disabled={!canPublish}
-                >
-                  <Send className="mr-1.5 size-3 md:mr-2 md:size-4" />
-                  <span className="text-sm">
-                    {isSubmitting ? "Publicando..." : "Publicar"}
-                  </span>
-                </Button>
-              </div>
-            </form>
-          )}
+          {puedeComentar && !compositorAbierto && formularioAporte}
         </CardContent>
       </Card>
 
+      {puedeComentar && (
+        <HojaReporte
+          abierta={compositorAbierto}
+          cambiandoAbierta={(abierto) => onCambiarCompositor?.(abierto)}
+          titulo="¿Qué novedad tenés?"
+          descripcion="Elegí la actualización que describe lo que viste en el lugar."
+          etiquetaCerrar="Cerrar el compositor"
+          disparador={disparadorCompositor}
+        >
+          {formularioAporte}
+        </HojaReporte>
+      )}
+
+      {/* El Drawer compartido usa !z-[70]: la confirmación tiene que quedar por encima. */}
       <AlertDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[80]">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
