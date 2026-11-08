@@ -44,6 +44,17 @@
       "status": "resolved",
       "sentAt": "2026-11-07T14:46:22.788Z",
       "resolvedAt": "2026-11-07T14:49:38.059Z"
+    },
+    {
+      "id": "scvadf1f",
+      "file": "02-barra-de-acciones-y-hojas.html",
+      "selector": "#lienzo > section:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1)",
+      "excerpt": "Detalle del reporte",
+      "comment": "esta barra sacala, que quede como esta actualmente",
+      "createdAt": "2026-11-08T12:40:24.306Z",
+      "status": "resolved",
+      "sentAt": "2026-11-08T12:40:24.337Z",
+      "resolvedAt": "2026-11-08T12:41:14.305Z"
     }
   ]
 }

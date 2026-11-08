@@ -328,11 +328,6 @@
   .organismos span{font-size:.6875rem;color:var(--muted-foreground)}
 
   /* ---------- Móvil ---------- */
-  .movil-barra-superior{
-    display:flex;align-items:center;gap:8px;padding:8px 12px;flex:0 0 auto;
-    background:color-mix(in oklab, var(--card) 92%, transparent);border-bottom:1px solid var(--border);
-  }
-  .movil-barra-superior h3{font-size:.9375rem;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .movil-contenido{display:flex;flex-direction:column;gap:10px;padding:10px 12px 96px}
   .franja-movil{
     display:flex;align-items:center;gap:10px;padding:8px;text-align:left;width:100%;
@@ -927,18 +922,20 @@
       <span class="medida">390 × 844 · acciones cerradas</span>
     </div>
     <div class="pantalla pantalla-movil">
-      <div class="movil-barra-superior">
-        <a class="icono-btn" href="#" aria-label="Volver a Reportes">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-        </a>
-        <h3>Detalle del reporte</h3>
-        <button class="icono-btn" type="button" aria-label="Compartir reporte">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/></svg>
-        </button>
-      </div>
-
       <div class="area-scroll" tabindex="0" role="group" aria-label="Vista de móvil del detalle del reporte, desplazable">
         <div class="movil-contenido">
+
+          <!-- Encabezado como el actual de la app (PageTitleBar con «Volver») -->
+          <header class="barra-pagina">
+            <a class="icono-btn" href="#" aria-label="Volver">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            </a>
+            <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><circle cx="9" cy="11" r="4"/><path d="m12 14 4 4"/></svg></span>
+            <div>
+              <h3>Detalle del reporte</h3>
+              <p>Consultá el estado y los avances del reporte.</p>
+            </div>
+          </header>
 
           <!-- Franja de ubicación, cerca del inicio -->
           <button class="franja-movil" type="button" data-abrir="h-ubicacion">
