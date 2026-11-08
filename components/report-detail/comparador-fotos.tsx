@@ -72,6 +72,10 @@ const ESTILO_ROTULO =
  * Comparación accesible: dos fotos superpuestas, un control de rango transparente
  * encima (arrastre con el dedo, flechas, Inicio y Fin) y una ayuda que explica el
  * gesto. No usa animaciones, así respeta a quien prefiere menos movimiento.
+ *
+ * El alto se limita a `min(48vh, 22rem)`: en escritorio la comparación ya no ocupa
+ * casi toda la pantalla y la hoja necesita menos desplazamiento, mientras que en
+ * móvil el ancho manda porque el aspecto 16/10 queda por debajo del límite.
  */
 export function ComparadorFotos({ antes, despues }: ComparadorFotosProps) {
   const [corte, setCorte] = useState(50)
@@ -82,14 +86,14 @@ export function ComparadorFotos({ antes, despues }: ComparadorFotosProps) {
       <img
         src={despues.src}
         alt={despues.alt}
-        className="aspect-[16/10] w-full rounded-[var(--radius)] border bg-[var(--surface-subtle)] object-contain"
+        className="aspect-[16/10] max-h-[min(48vh,22rem)] w-full rounded-[var(--radius)] border bg-[var(--surface-subtle)] object-contain"
       />
     )
   }
 
   return (
     <>
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius)] border bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+      <div className="relative aspect-[16/10] max-h-[min(48vh,22rem)] w-full overflow-hidden rounded-[var(--radius)] border bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
         <img
           src={antes.src}
           alt={antes.alt}

@@ -797,7 +797,7 @@ export function EvidenciaReparacion({ seccion, fotoAntes, acciones }: EvidenciaR
   const { evidencia } = seccion
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       {evidencia && evidencia.estado !== "informada" && (
         <ComparadorAntesDespues evidencia={evidencia} fotoAntes={fotoAntes} />
       )}
@@ -807,6 +807,6 @@ export function EvidenciaReparacion({ seccion, fotoAntes, acciones }: EvidenciaR
       {seccion.puedeInformar && (
         <FormularioEvidenciaReparacion onInformar={acciones.onInformar} />
       )}
-    </>
+    </div>
   )
 }

@@ -67,7 +67,7 @@ export function HojaReporte({
   return (
     <Drawer open={abierta} onOpenChange={cambiandoAbierta}>
       <DrawerContent
-        className="max-h-[85dvh] bg-card md:inset-x-[15%]"
+        className="max-h-[85dvh] bg-card md:inset-x-[15%] md:max-h-[92dvh]"
         onCloseAutoFocus={crearManejadorFocoAlCerrar(disparador)}
       >
         <div className="flex min-h-0 flex-1 flex-col">
