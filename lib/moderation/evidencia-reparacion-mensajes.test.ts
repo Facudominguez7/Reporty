@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { mensajeDeEvidenciaResuelta, mensajeDeImpugnacionResuelta } from "./evidencia-reparacion-mensajes"
+import {
+  MOTIVO_CANCELACION_MAX,
+  mensajeDeEvidenciaResuelta,
+  mensajeDeImpugnacionResuelta,
+  payloadDeCancelacion,
+} from "./evidencia-reparacion-mensajes"
 
 describe("mensajes de la cola de reparaciones", () => {
   it("aceptar una impugnación rechaza la evidencia y deja el reporte pendiente", () => {
@@ -80,7 +85,7 @@ describe("mensajes de la cola de reparaciones", () => {
     expect(revertida).toContain("cinco puntos")
   })
 
-  it("rechazar la evidencia conserva el reporte y no promete un retiro", () => {
+  it("cancelar la revisión conserva el reporte, no promete un retiro y avisa al autor", () => {
     const mensaje = mensajeDeEvidenciaResuelta({
       accion: "rechazar",
       repetida: false,
@@ -89,8 +94,36 @@ describe("mensajes de la cola de reparaciones", () => {
       evidenciaEstado: "rechazada",
     })
 
-    expect(mensaje).toContain("rechazada")
+    expect(mensaje).toContain("cancelada")
     expect(mensaje).toContain("sigue pendiente")
+    expect(mensaje).toContain("correo")
     expect(mensaje).not.toContain("retirado")
+    expect(mensaje).not.toContain("Rechazado")
+  })
+
+  it("no vuelve a anunciar la cancelación cuando la evidencia ya estaba resuelta", () => {
+    const mensaje = mensajeDeEvidenciaResuelta({
+      accion: "rechazar",
+      repetida: true,
+      cerrado: false,
+      revertido: false,
+      evidenciaEstado: "rechazada",
+    })
+
+    expect(mensaje).toContain("ya estaba resuelta")
+    expect(mensaje).not.toContain("correo")
+  })
+
+  it("el motivo de la cancelación es opcional y se recorta antes de enviarlo", () => {
+    expect(MOTIVO_CANCELACION_MAX).toBe(500)
+    expect(payloadDeCancelacion("")).toBeUndefined()
+    expect(payloadDeCancelacion("   ")).toBeUndefined()
+    expect(payloadDeCancelacion("  la foto es una captura de pantalla  ")).toBe("la foto es una captura de pantalla")
+  })
+
+  it("acepta un motivo largo hasta el máximo y no deja crecer el payload", () => {
+    const motivo = "x".repeat(MOTIVO_CANCELACION_MAX + 120)
+
+    expect(payloadDeCancelacion(motivo)).toHaveLength(MOTIVO_CANCELACION_MAX)
   })
 })

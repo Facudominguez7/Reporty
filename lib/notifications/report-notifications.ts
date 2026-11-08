@@ -1,3 +1,4 @@
+/** Plantillas server-only de los correos transaccionales de reportes. */
 import "server-only";
 
 import { Resend } from "resend";
@@ -32,6 +33,14 @@ type StatusNotificationParams = {
   reporteTitulo: string;
   nuevoEstado: string;
   comentario?: string | null;
+};
+
+type RepairReviewCancelledEmailParams = {
+  autorEmail: string;
+  autorUsername: string | null;
+  reporteId: number;
+  reporteTitulo: string;
+  motivo?: string | null;
 };
 
 type CrewAssignedEmailParams = {
@@ -189,6 +198,58 @@ export async function sendStatusNotificationEmail({
       comentario && `Comentario: ${comentario}`,
       mensajeAdicional,
       `Ver detalles del reporte: ${reportUrl}`,
+      UNSUBSCRIBE_NOTE,
+    ]),
+  });
+}
+
+/** Avisa al autor de la evidencia que su revisión se canceló sin cerrar el reporte. */
+export async function sendRepairReviewCancelledEmail({
+  autorEmail,
+  autorUsername,
+  reporteId,
+  reporteTitulo,
+  motivo,
+}: RepairReviewCancelledEmailParams) {
+  const resend = getResendClient();
+  const urlReporte = `${getAppUrl()}/reportes/${reporteId}`;
+  const autor = autorUsername || "Usuario";
+  const cancelacion = "La foto de reparado que enviaste fue cancelada por administración.";
+  const estado = "El reporte sigue pendiente.";
+  const sugerencia = "Podés volver a informar una reparación con fotos del lugar y del arreglo.";
+
+  return resend.emails.send({
+    from: SENDER,
+    to: [autorEmail],
+    subject: `Cancelamos la revisión de reparado del reporte "${reporteTitulo}"`,
+    html: renderEmailLayout({
+      assetBaseUrl: getAppUrl(),
+      title: "Revisión de reparado cancelada",
+      kicker: "Revisión de reparado",
+      preheader: `${cancelacion} ${estado}`,
+      heading: `¡Hola ${autor}!`,
+      body: [
+        emailParagraph(escapeHtml(cancelacion)),
+        emailParagraph(escapeHtml(estado)),
+        emailPanel({
+          eyebrow: `Reporte N.º ${reporteId}`,
+          title: reporteTitulo,
+          badge: { label: "Pendiente", tone: "info" },
+          content: motivo ? emailField("Motivo", escapeHtml(motivo)) : "",
+        }),
+        emailParagraph(escapeHtml(sugerencia)),
+        emailButton("Ver reporte completo", urlReporte),
+      ].join("\n"),
+      footnote: UNSUBSCRIBE_NOTE,
+    }),
+    text: plainText([
+      `¡Hola ${autor}!`,
+      cancelacion,
+      estado,
+      `Reporte: ${reporteTitulo}`,
+      motivo && `Motivo: ${motivo}`,
+      sugerencia,
+      `Ver reporte completo: ${urlReporte}`,
       UNSUBSCRIBE_NOTE,
     ]),
   });

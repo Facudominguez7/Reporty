@@ -30,7 +30,7 @@ import {
   type ResultadoImagenEvidenciaReparacion,
   moderarYGuardarImagenEvidenciaReparacion,
 } from "@/lib/moderation/imagenes-reporte.server"
-import { sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
+import { sendRepairReviewCancelledEmail, sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
 import { parseFraseImpugnacion, parseFraseReparacion } from "@/lib/reportes/frases-reparacion"
 import { getReportContext } from "./detail-mutations"
 
@@ -416,7 +416,69 @@ async function notificarReparacionValidada(
   }
 }
 
-/** Lee la evidencia de una impugnación para poder avisar el cierre del reporte. */
+/** Avisa al autor de la evidencia de mejor esfuerzo; la RPC ya registró la cancelación. */
+async function notificarCancelacionReparacion(
+  supabase: SupabaseClient,
+  evidenciaId: string,
+  motivo: string,
+) {
+  let evidencia: { reporte_id?: number; autor_id?: string } | null
+  try {
+    const { data, error } = await supabase
+      .from("evidencias_reparacion")
+      .select("reporte_id, autor_id")
+      .eq("id", evidenciaId)
+      .maybeSingle()
+    if (error || !data) {
+      console.error("No pudimos leer la evidencia para avisar la cancelación:", error)
+      return
+    }
+    evidencia = data as { reporte_id?: number; autor_id?: string }
+  } catch (error) {
+    console.error("No pudimos leer la evidencia para avisar la cancelación:", error)
+    return
+  }
+
+  const reporteId = Number(evidencia.reporte_id)
+  if (!Number.isSafeInteger(reporteId) || reporteId <= 0) {
+    console.error("No pudimos avisar la cancelación: el reporte de la evidencia no es válido.")
+    return
+  }
+
+  if (!evidencia.autor_id) return
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("username, email")
+      .eq("id", evidencia.autor_id)
+      .maybeSingle()
+    if (error) {
+      console.error("No pudimos leer el perfil del autor de la evidencia:", error)
+      return
+    }
+    const autor = data as PerfilAutor | null
+    const correo = autor?.email?.trim()
+    if (!correo) return
+
+    const contexto = await getReportContext(supabase, reporteId)
+    if (!contexto.success) {
+      console.error("No pudimos leer el reporte para avisar la cancelación:", contexto.error)
+      return
+    }
+    const envio = await sendRepairReviewCancelledEmail({
+      autorEmail: correo,
+      autorUsername: autor?.username ?? null,
+      reporteId,
+      reporteTitulo: contexto.data.titulo,
+      motivo: motivo || null,
+    })
+    if (envio?.error) console.error("No pudimos enviar el aviso de cancelación:", envio.error)
+  } catch (error) {
+    console.error("No pudimos enviar el aviso de cancelación:", error)
+  }
+}
+
+/** Lee la evidencia de una impugnación para avisar su resolución de mejor esfuerzo. */
 async function evidenciaDeImpugnacion(supabase: SupabaseClient, verificacionId: string) {
   try {
     const { data } = await supabase
@@ -557,7 +619,8 @@ export async function verificarReparacionWorkflow(
 /**
  * Aprueba, rechaza o revierte una evidencia (S8). Aprobar exige la foto publicada,
  * resuelve las impugnaciones pendientes y cierra el reporte como Reparado; revertir
- * devuelve el reporte a Pendiente.
+ * devuelve el reporte a Pendiente. Al rechazar, la RPC registra la cancelación en
+ * la misma transacción y el correo al autor es de mejor esfuerzo.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
  * @param evidenciaId - Evidencia que se resuelve.
@@ -600,12 +663,16 @@ export async function resolverEvidenciaReparacionWorkflow(
       motivoLimpio || "Reparación aprobada por administración",
     )
   }
+  if (accion === "rechazar" && !resolucion.repetida) {
+    await notificarCancelacionReparacion(supabase, evidenciaId, motivoLimpio)
+  }
   return { success: true, data: resolucion }
 }
 
 /**
- * Acepta o descarta una impugnación (S5, S8). Aceptarla rechaza la evidencia y el
- * reporte sigue pendiente; descartarla reevalúa el umbral y puede validar la
+ * Acepta o descarta una impugnación (S5, S7, S8). Aceptarla rechaza la evidencia,
+ * registra la actividad en la transacción y avisa al autor de mejor esfuerzo; el
+ * reporte sigue pendiente. Descartarla reevalúa el umbral y puede validar la
  * reparación en la misma transacción.
  *
  * @param supabase - Cliente de servicio; la acción ya validó la sesión.
@@ -651,6 +718,10 @@ export async function resolverImpugnacionReparacionWorkflow(
         `Reparación validada por ${resolucion.confirmaciones} confirmaciones de usuarios`,
       )
     }
+  }
+  if (decision === "aceptada" && !resolucion.repetida) {
+    const evidenciaId = await evidenciaDeImpugnacion(supabase, verificacionId)
+    if (evidenciaId) await notificarCancelacionReparacion(supabase, evidenciaId, motivoLimpio)
   }
   return { success: true, data: resolucion }
 }

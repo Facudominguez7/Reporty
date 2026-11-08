@@ -146,6 +146,21 @@ describe("acción administrativa: resolver una evidencia", () => {
     expect(mocks.resolverEvidencia).not.toHaveBeenCalled()
   })
 
+  it("delega la cancelación de la revisión con el motivo recortado que escribió administración", async () => {
+    filas.evidencias_reparacion = { id: EVIDENCIA_ID, estado: "en_verificacion", reporte_id: 9 }
+    mocks.resolverEvidencia.mockResolvedValue({
+      success: true,
+      data: {
+        accion: "rechazar", repetida: false, evidenciaEstado: "rechazada", reporteEstadoId: 1,
+        cerrado: false, revertido: false, confirmaciones: 1, impugnaciones: 0, impugnacionesPendientes: 0,
+      },
+    })
+
+    expect(await resolverEvidenciaColaAction(EVIDENCIA_ID, "rechazar", "  la foto es una captura  ")).toMatchObject({ success: true })
+    expect(mocks.resolverEvidencia).toHaveBeenCalledWith(admin, EVIDENCIA_ID, "admin-1", "rechazar", "la foto es una captura")
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/9")
+  })
+
   it("solo revierte una evidencia validada", async () => {
     filas.evidencias_reparacion = { id: EVIDENCIA_ID, estado: "validada", reporte_id: 9 }
     mocks.resolverEvidencia.mockResolvedValue({

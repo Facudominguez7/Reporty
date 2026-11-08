@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), retire: vi.fn(), setters: [] as Array<ReturnType<typeof vi.fn>> }))
 vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => { const setter = vi.fn(); mocks.setters.push(setter); return [initial, setter] } }))
 vi.mock("next/dynamic", () => ({ default: () => () => null }))
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }))
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
+  useSearchParams: () => new URLSearchParams(),
+}))
 vi.mock("./actions", () => ({ marcarMascotaEncontradaAction: vi.fn(), retirarMascotaDetalleAction: mocks.retire }))
 
 import { DetalleMascota } from "./detalle-mascota"
