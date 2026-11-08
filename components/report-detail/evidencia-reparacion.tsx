@@ -25,7 +25,6 @@ import {
   Flag,
   Images,
   MessageCircle,
-  MoveHorizontal,
   ShieldCheck,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -71,6 +70,7 @@ import type {
   EvidenciaReparacionVista,
   SeccionReparacionVista,
 } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server"
+import { ComparadorFotos, type FotoComparada } from "./comparador-fotos"
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -132,9 +132,10 @@ function nombreAutor(evidencia: EvidenciaReparacionVista) {
 }
 
 /**
- * Comparación accesible: dos fotos superpuestas y un control de rango que también
- * responde a las flechas del teclado. Los rótulos «Antes» y «Después» son texto, así
- * que la comparación no depende del color.
+ * Comparación «Antes / Después» de la hoja: reutiliza el comparador compartido con la
+ * tarjeta del reporte y le agrega el marco, el autor y el comentario de la evidencia.
+ * Los rótulos «Antes» y «Después» llevan la fecha de cada foto, así que la
+ * comparación no depende del color.
  */
 function ComparadorAntesDespues({
   evidencia,
@@ -143,8 +144,6 @@ function ComparadorAntesDespues({
   evidencia: EvidenciaReparacionVista
   fotoAntes: { src: string; fecha: string | null } | null
 }) {
-  const [corte, setCorte] = useState(50)
-  const ayudaId = useId()
   const foto = evidencia.foto
   if (!foto) return null
 
@@ -152,6 +151,20 @@ function ComparadorAntesDespues({
   const fecha = formatearFechaHora(evidencia.publicadaAt ?? evidencia.informadaAt)
   const fechaAntes = fotoAntes?.fecha ? formatearFechaDeReporte(fotoAntes.fecha) : null
   const altDespues = `Foto de la reparación informada por ${autor} el ${fecha}`
+
+  // La foto original es el «antes»; sin ella el comparador muestra solo el «después».
+  const antes: FotoComparada | null = fotoAntes
+    ? {
+        src: fotoAntes.src,
+        alt: `Foto original del reporte${fechaAntes ? `, del ${fechaAntes}` : ""}`,
+        fecha: fotoAntes.fecha,
+      }
+    : null
+  const despues: FotoComparada = {
+    src: foto.src,
+    alt: altDespues,
+    fecha: evidencia.publicadaAt ?? evidencia.informadaAt,
+  }
 
   return (
     <Card className="gap-0">
@@ -165,63 +178,7 @@ function ComparadorAntesDespues({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
-        {fotoAntes ? (
-          <>
-            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border bg-[var(--surface-subtle)] focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-              <img
-                src={fotoAntes.src}
-                alt={`Foto original del reporte${fechaAntes ? `, del ${fechaAntes}` : ""}`}
-                className="absolute inset-0 size-full object-contain"
-              />
-              <img
-                src={foto.src}
-                alt={altDespues}
-                className="absolute inset-0 size-full object-contain"
-                style={{ clipPath: `inset(0 0 0 ${corte}%)` }}
-              />
-              <span className="pointer-events-none absolute left-2 top-2 rounded-[var(--radius-pill)] bg-foreground/85 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-card">
-                Antes
-              </span>
-              <span className="pointer-events-none absolute right-2 top-2 rounded-[var(--radius-pill)] bg-foreground/85 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-card">
-                Después
-              </span>
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-card shadow-[0_0_0_1px_rgba(0,0,0,0.15)]"
-                style={{ left: `${corte}%` }}
-              />
-              <span
-                data-manija-comparacion=""
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[var(--radius-pill)] border border-border bg-card text-foreground shadow-[var(--elevation-soft)]"
-                style={{ left: `clamp(20px, ${corte}%, calc(100% - 20px))` }}
-              >
-                <MoveHorizontal className="size-5" />
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={corte}
-                onChange={(event) => setCorte(Number(event.target.value))}
-                aria-label="Comparar la foto original con la foto de la reparación"
-                aria-describedby={ayudaId}
-                aria-valuetext={`Mostrando el ${corte} % de la foto original`}
-                className="absolute inset-0 size-full cursor-ew-resize touch-pan-y appearance-none bg-transparent opacity-0"
-              />
-            </div>
-            <p id={ayudaId} className="text-xs text-muted-foreground">
-              Arrastrá la manija —o usá las flechas— sobre la foto para comparar el antes y el después.
-            </p>
-          </>
-        ) : (
-          <img
-            src={foto.src}
-            alt={altDespues}
-            className="aspect-[16/10] w-full rounded-lg border bg-[var(--surface-subtle)] object-contain"
-          />
-        )}
+        <ComparadorFotos antes={antes} despues={despues} />
         <p className="text-xs text-muted-foreground">
           Evidencia de {autor} · {fecha}
         </p>

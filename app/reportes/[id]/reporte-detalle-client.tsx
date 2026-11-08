@@ -38,6 +38,7 @@ import {
   Users,
   FileSearch2,
   X,
+  ZoomIn,
 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,7 @@ import {
   type AccionesEvidenciaReparacion,
   type ResultadoAccionReparacion,
 } from "@/components/report-detail/evidencia-reparacion";
+import { ComparadorFotos, type FotoComparada } from "@/components/report-detail/comparador-fotos";
 import {
   AccionesFlotantes,
   accionesDisponibles,
@@ -161,6 +163,14 @@ function formatRepairDuration(createdAt: string, repairedAt: string) {
   const days = Math.floor(durationInMinutes / (60 * 24));
 
   return days > 0 ? `${days} ${days === 1 ? "día" : "días"}` : "menos de 1 día";
+}
+
+/**
+ * Fecha de la evidencia de reparación en hora argentina, como el resto de la ficha.
+ * La comparación de la tarjeta la usa en el rótulo y en el texto alternativo.
+ */
+function formatearFechaEvidencia(fecha: string) {
+  return dayjs.utc(fecha).tz(ZONA_HORARIA).format("DD/MM/YYYY");
 }
 
 /** Datos del detalle que la página carga en el servidor antes de renderizar. */
@@ -609,6 +619,39 @@ export function ReporteDetalleClient({
     ? { src: (fotoOriginalDelReporte.publicUrl ?? fotoOriginalDelReporte.url) as string, fecha: reporte.created_at }
     : null;
 
+  // ===== Comparación «Antes / Después» sobre la foto de la tarjeta (S10, S11, S18) =====
+  /**
+   * La comparación solo existe cuando hay dos fotos reales: la original del reporte y
+   * la que la moderación ya publicó para la evidencia. Nunca se inventa un después ni
+   * se reemplaza la foto original, que sigue ampliable desde el diálogo de siempre (S9).
+   */
+  const evidenciaVisible = evidenciaReparacion?.evidencia ?? null;
+  const fotoPublicadaEvidencia =
+    evidenciaVisible && evidenciaVisible.estado !== "informada" ? evidenciaVisible.foto : null;
+  const autorDelReporte = getUsernameFromRelation(reporte.profiles);
+  const fechaDelReporte = parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", {
+    timeZone: ZONA_HORARIA,
+  });
+  const fechaEvidenciaVisible = evidenciaVisible
+    ? formatearFechaEvidencia(evidenciaVisible.publicadaAt ?? evidenciaVisible.informadaAt)
+    : null;
+  const comparaFotos: { idFotoAntes: number; antes: FotoComparada; despues: FotoComparada } | null =
+    fotoOriginalDelReporte && fotoAntesComparacion && fotoPublicadaEvidencia && evidenciaVisible && fechaEvidenciaVisible
+      ? {
+        idFotoAntes: fotoOriginalDelReporte.id,
+        antes: {
+          src: fotoAntesComparacion.src,
+          alt: `Foto original del reporte, publicada por ${autorDelReporte} el ${fechaDelReporte}`,
+          fecha: fotoAntesComparacion.fecha,
+        },
+        despues: {
+          src: fotoPublicadaEvidencia.src,
+          alt: `Foto de la reparación informada por ${evidenciaVisible.autor ?? "una cuenta de la comunidad"} el ${fechaEvidenciaVisible}`,
+          fecha: evidenciaVisible.publicadaAt ?? evidenciaVisible.informadaAt,
+        },
+      }
+      : null;
+
   // ===== Acciones flotantes y hojas del detalle (S13, S18) =====
   /**
    * Abre una hoja recordando el botón que la originó y cerrando antes el menú flotante:
@@ -852,32 +895,67 @@ export function ReporteDetalleClient({
                 {/* Imágenes */}
                 {reporte.fotos_reporte && reporte.fotos_reporte.length > 0 && (
                   <div className="mb-4 flex flex-col items-center gap-3 md:mb-6 lg:mb-8">
-                    {reporte.fotos_reporte.map((foto, index) => (
-                      <div key={foto.id} className="relative w-full max-w-2xl">
-                        <button
-                          type="button"
-                          aria-label={`Ver imagen ${index + 1} del reporte en grande`}
-                          onClick={() => setSelectedPhoto({ src: foto.publicUrl || foto.url || "/placeholder.svg", alt: `Imagen ${index + 1} del reporte` })}
-                          className="flex aspect-video w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-md bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:rounded-lg lg:rounded-xl"
-                        >
-                          <img
-                            src={foto.publicUrl || foto.url || "/placeholder.svg"}
-                            alt={`Imagen ${index + 1} del reporte`}
-                            loading={index === 0 ? undefined : "lazy"}
-                            className="h-full w-full object-contain"
-                          />
-                        </button>
-                        {isAdmin && isAdminEditing && (
-                          <AdminReportPhotoControls
-                            fotoId={foto.id}
-                            index={index}
-                            draft={adminPhotoDrafts[foto.id] ?? { file: null, remove: false, version: 0 }}
-                            onChange={(draft) => updateAdminPhotoDraft(foto.id, draft)}
-                            disabled={isAdminSaving}
-                          />
-                        )}
-                      </div>
-                    ))}
+                    {reporte.fotos_reporte.map((foto, index) => {
+                      // Solo la foto que se compara con la evidencia deja de ser un botón:
+                      // el control de rango no puede vivir dentro de otro control.
+                      const conComparacion = comparaFotos !== null && comparaFotos.idFotoAntes === foto.id;
+                      const altFoto = `Foto ${index + 1} del reporte, publicada por ${autorDelReporte} el ${fechaDelReporte}`;
+
+                      return (
+                        <div key={foto.id} className="relative w-full max-w-2xl">
+                          {conComparacion && comparaFotos ? (
+                            <>
+                              <ComparadorFotos antes={comparaFotos.antes} despues={comparaFotos.despues} />
+                              {/* La comparación no reemplaza la galería: cada foto sigue
+                                  abriéndose en grande en el diálogo de siempre (S9). */}
+                              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedPhoto({ src: comparaFotos.antes.src, alt: comparaFotos.antes.alt })}
+                                >
+                                  <ZoomIn className="mr-2 size-4" aria-hidden="true" />
+                                  Ver la foto original en grande
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedPhoto({ src: comparaFotos.despues.src, alt: comparaFotos.despues.alt })}
+                                >
+                                  <ZoomIn className="mr-2 size-4" aria-hidden="true" />
+                                  Ver la foto de la reparación en grande
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={`Ver imagen ${index + 1} del reporte en grande`}
+                              onClick={() => setSelectedPhoto({ src: foto.publicUrl || foto.url || "/placeholder.svg", alt: altFoto })}
+                              className="flex aspect-video w-full cursor-zoom-in items-center justify-center overflow-hidden rounded-md bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:rounded-lg lg:rounded-xl"
+                            >
+                              <img
+                                src={foto.publicUrl || foto.url || "/placeholder.svg"}
+                                alt={altFoto}
+                                loading={index === 0 ? undefined : "lazy"}
+                                className="h-full w-full object-contain"
+                              />
+                            </button>
+                          )}
+                          {isAdmin && isAdminEditing && (
+                            <AdminReportPhotoControls
+                              fotoId={foto.id}
+                              index={index}
+                              draft={adminPhotoDrafts[foto.id] ?? { file: null, remove: false, version: 0 }}
+                              onChange={(draft) => updateAdminPhotoDraft(foto.id, draft)}
+                              disabled={isAdminSaving}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                     <Dialog open={selectedPhoto !== null} onOpenChange={(open) => { if (!open) setSelectedPhoto(null) }}>
                       <DialogContent showClose={false} className="w-auto max-w-[95vw] gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none sm:p-0">
                         <DialogClose asChild>

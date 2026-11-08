@@ -149,14 +149,13 @@ describe("acciones y hojas del detalle", () => {
     expect(admin).toContain('id="reporte-ubicacion-map"')
   })
 
-  it("resume el estado de la evidencia y deja la comparación para la hoja", () => {
+  it("resume el estado de la evidencia y deja las acciones para la hoja", () => {
     const html = renderizar()
 
     expect(html).toContain("¿Ya lo arreglaron?")
     expect(html).toContain("En verificación · 2 de 3 confirmaciones")
     expect(html).toContain("Ver la evidencia")
-    // La comparación y las acciones viven dentro de la hoja, que está cerrada.
-    expect(html).not.toContain("Antes y después")
+    // La comparación ahora vive sobre la foto de la tarjeta; confirmar e impugnar siguen en la hoja.
     expect(html).not.toContain("Confirmar reparación")
   })
 
@@ -189,5 +188,58 @@ describe("acciones y hojas del detalle", () => {
     expect(fuente).not.toContain("Ver ubicación</button>")
     expect(fuente).toContain("FranjaUbicacion")
     expect(fuente).toContain("ContenidoUbicacion")
+  })
+})
+
+describe("comparación «Antes / Después» sobre la foto de la tarjeta (S10, S11, S18)", () => {
+  it("compara el antes y el después sobre la foto del reporte cuando la evidencia publicó la suya", () => {
+    const html = renderizar()
+
+    expect(html).toContain('type="range"')
+    expect(html).toContain("https://ejemplo.test/antes.webp")
+    expect(html).toContain("https://ejemplo.test/despues.webp")
+    expect(html).toContain("Antes · 12 nov")
+    expect(html).toContain("Después · 28 nov")
+    expect(html).toContain('aria-valuetext="Mostrando el 50 % de la foto original"')
+    expect(html).toContain("Deslizá para comparar el antes y el después.")
+    // Cada foto conserva un nombre accesible con su autor y su fecha.
+    expect(html).toContain('alt="Foto original del reporte, publicada por Usuario el 12/11/2026"')
+    expect(html).toContain('alt="Foto de la reparación informada por Marisa Bogado el 28/11/2026"')
+  })
+
+  it("deja la foto sola y la galería de siempre cuando todavía no hay foto del después", () => {
+    const html = renderizar({
+      evidenciaReparacion: {
+        ...seccionReparacion,
+        evidencia: {
+          ...(seccionReparacion.evidencia as NonNullable<SeccionReparacionVista["evidencia"]>),
+          estado: "informada",
+          publicadaAt: null,
+          foto: null,
+        },
+      },
+    })
+
+    expect(html).not.toContain('type="range"')
+    expect(html).not.toContain("Después")
+    expect(html).toContain("https://ejemplo.test/antes.webp")
+    expect(html).toContain("Ver imagen 1 del reporte en grande")
+  })
+
+  it("no inventa un después cuando la ficha no recibe la sección de reparación", () => {
+    const html = renderizar({ evidenciaReparacion: null })
+
+    expect(html).not.toContain('type="range"')
+    expect(html).toContain("https://ejemplo.test/antes.webp")
+    expect(html).toContain("Ver imagen 1 del reporte en grande")
+  })
+
+  it("mantiene la foto original y la de la reparación ampliables con la comparación", () => {
+    const html = renderizar()
+
+    // La comparación no encierra el control de rango dentro de un botón; cada foto
+    // conserva su propia entrada al diálogo de siempre (S9).
+    expect(html).toContain("Ver la foto original en grande")
+    expect(html).toContain("Ver la foto de la reparación en grande")
   })
 })
