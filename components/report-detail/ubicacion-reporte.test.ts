@@ -91,4 +91,12 @@ describe("contenido de la hoja de ubicación", () => {
     expect(html).not.toContain("data-mini-mapa")
     expect(html).toContain("no tiene coordenadas")
   })
+
+  it("acota el alto del mapa para que la hoja no tenga scroll propio", () => {
+    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { lat: LAT, lon: LON }))
+
+    // En escritorio el mapa crecía con el ancho y empujaba la hoja: se limita a 22rem.
+    expect(html).toContain("max-h-[22rem]")
+    expect(html).not.toContain("max-h-[min(")
+  })
 })

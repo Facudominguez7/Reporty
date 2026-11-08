@@ -105,8 +105,9 @@ export function ContenidoUbicacion({ lat, lon }: { lat: number | null; lon: numb
   }
 
   return (
-    <div className="space-y-3">
-      <div className="aspect-video overflow-hidden rounded-[var(--radius)] border border-border bg-[var(--surface-subtle)]">
+    <div className="flex min-h-0 flex-col gap-3">
+      {/* Altura acotada: el mapa no empuja la hoja y no aparece un scroll interior. */}
+      <div className="aspect-video max-h-[22rem] overflow-hidden rounded-[var(--radius)] border border-border bg-[var(--surface-subtle)]">
         <MiniMap lat={lat} lon={lon} />
       </div>
       <div className="flex items-start gap-2">
