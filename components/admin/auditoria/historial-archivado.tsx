@@ -1,19 +1,16 @@
 import Link from "next/link"
 
-import {
-  diagnosticarConexionR2Action,
-  ejecutarArchivadoManualAction,
-  simularArchivadoAction,
-} from "@/app/admin/auditoria/acciones"
+import { simularArchivadoAction } from "@/app/admin/auditoria/acciones"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { LIMITE_CORRIDA_MANUAL } from "@/lib/auditoria-archivo/configuracion"
+import { contextoRetencion } from "@/lib/auditoria-archivo/retencion"
 import {
   estimarEspacioLiberable,
   formatearCantidad,
+  formatearFechaCorta,
   formatearTamano,
   hashVisible,
   periodoArchivado,
@@ -48,17 +45,39 @@ type Props = {
   filtros: { desde?: string; hasta?: string }
   /** Resultado de la última simulación: cantidad de eventos o `error`. */
   simulacion?: string
-  /** Resultado del diagnóstico de R2: `ok`, `error` o ausente. */
-  r2?: string
-  /** Detalle operativo del diagnóstico; nunca incluye credenciales. */
-  r2Detalle?: string
-  /** Resultado de la última corrida real manual: `ok`, `error` o ausente. */
-  archivado?: string
-  archivadoEventos?: string
-  archivadoPurgado?: string
-  /** Muestra el bloque de pruebas (diagnóstico y corrida manual); `false` en producción. */
-  mostrarPruebas?: boolean
+  /** Días de retención caliente (`AUDIT_HOT_DAYS`). */
+  diasRetencion?: number
+  /** Fecha del evento más viejo que sigue en PostgreSQL; `null` si no hay eventos. */
+  eventoMasViejo?: string | null
+  /** Reloj inyectable para que las fechas del mensaje sean deterministas en pruebas. */
+  ahora?: Date
   hayError?: boolean
+}
+
+/**
+ * Explica el resultado de la simulación con la regla de retención, para que un
+ * cero se entienda sin tener que preguntar.
+ */
+function mensajeSimulacion(
+  simulacion: string,
+  contexto: ReturnType<typeof contextoRetencion>,
+  diasRetencion: number,
+  hayEventos: boolean,
+): string {
+  if (simulacion === "error") return "No pudimos simular el archivado: revisá la configuración de Cloudflare R2."
+
+  const limite = formatearFechaCorta(contexto.limite)
+  const cantidad = Number(simulacion) || 0
+  if (cantidad > 0) {
+    return `Simulación: se archivarían ${formatearCantidad(cantidad)} eventos anteriores al ${limite}. No se modificó ni se eliminó nada.`
+  }
+  if (!hayEventos) {
+    return "Simulación: todavía no hay eventos de auditoría registrados, así que no se archivaría nada. No se modificó ni se eliminó nada."
+  }
+  const proxima = contexto.proximaElegible
+    ? ` El primero será elegible el ${formatearFechaCorta(contexto.proximaElegible)}.`
+    : " Los eventos vencidos ya están en lotes en curso."
+  return `Simulación: no hay eventos anteriores al ${limite} (retención de ${diasRetencion} días), así que no se archivaría nada.${proxima} No se modificó ni se eliminó nada.`
 }
 
 const ETIQUETAS_ESTADO: Record<string, { etiqueta: string; variante: "reparado" | "pendiente" | "destructive" | "outline" | "secondary" }> = {
@@ -92,14 +111,12 @@ export function HistorialArchivado({
   metricas,
   filtros,
   simulacion,
-  r2,
-  r2Detalle,
-  archivado,
-  archivadoEventos,
-  archivadoPurgado,
-  mostrarPruebas = false,
+  diasRetencion = 180,
+  eventoMasViejo = null,
+  ahora,
   hayError = false,
 }: Props) {
+  const contexto = contextoRetencion({ diasRetencion, eventoMasViejo, ahora })
   const eventosArchivados = metricas?.eventosArchivados ?? 0
   const bytesEnR2 = metricas?.bytesEnR2 ?? 0
   const espacioLiberable = estimarEspacioLiberable(metricas)
@@ -107,7 +124,7 @@ export function HistorialArchivado({
   return (
     <section className="space-y-6" aria-labelledby="historial-archivado">
       <header>
-        <h2 id="historial-archivado" className="text-2xl font-semibold leading-8 tracking-tight">Historial archivado</h2>
+        <h2 id="historial-archivado" className="scroll-mt-6 text-2xl font-semibold leading-8 tracking-tight">Historial archivado</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Consultá los períodos archivados y recuperá eventos sin restaurarlos en la tabla principal.
         </p>
@@ -115,50 +132,8 @@ export function HistorialArchivado({
 
       {simulacion && (
         <p role="status" className="rounded-xl border border-border bg-card p-4 text-sm">
-          {simulacion === "error"
-            ? "No pudimos simular el archivado: revisá la configuración de Cloudflare R2."
-            : `Simulación: se archivarían ${formatearCantidad(Number(simulacion) || 0)} eventos. No se modificó ni se eliminó nada.`}
+          {mensajeSimulacion(simulacion, contexto, diasRetencion, Boolean(eventoMasViejo))}
         </p>
-      )}
-
-      {r2 && (
-        <p
-          role="status"
-          className={r2 === "ok" ? "rounded-xl border border-border bg-card p-4 text-sm" : "rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive"}
-        >
-          {r2 === "ok" ? "Conexión con R2 verificada: lectura, escritura e integridad del objeto de prueba." : "No pudimos verificar la conexión con R2."}
-          {r2Detalle ? ` ${r2Detalle}` : ""}
-        </p>
-      )}
-
-      {archivado && (
-        <p role="status" className={archivado === "ok" ? "rounded-xl border border-border bg-card p-4 text-sm" : "rounded-xl border border-destructive/40 bg-card p-4 text-sm text-destructive"}>
-          {archivado === "ok"
-            ? `Corrida real: ${formatearCantidad(Number(archivadoEventos) || 0)} eventos archivados y ${formatearCantidad(Number(archivadoPurgado) || 0)} eliminados de PostgreSQL.`
-            : "La corrida real no pudo completarse: los eventos quedaron en PostgreSQL."}
-        </p>
-      )}
-
-      {mostrarPruebas && (
-        <details className="rounded-xl border border-border bg-card p-4">
-          <summary className="cursor-pointer text-sm font-medium">Probar antes de producción</summary>
-          <div className="mt-3 grid gap-3">
-            <p className="text-xs text-muted-foreground">
-              Estas acciones escriben en el bucket configurado. En producción la corrida real la dispara el cron; acá
-              sirven para validar el ciclo completo en local.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <form action={diagnosticarConexionR2Action}>
-                <Button type="submit" variant="outline" size="sm">Probar conexión con R2</Button>
-              </form>
-              <form action={ejecutarArchivadoManualAction}>
-                <Button type="submit" variant="neutral" size="sm">
-                  Ejecutar corrida real (máx. {LIMITE_CORRIDA_MANUAL})
-                </Button>
-              </form>
-            </div>
-          </div>
-        </details>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3" aria-label="Métricas del historial archivado">
@@ -177,38 +152,49 @@ export function HistorialArchivado({
         </CardContent></Card>
       </div>
 
-      <div className="grid gap-3 rounded-xl border border-border bg-card p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <form method="get" action="/admin/auditoria" aria-label="Filtrar historial archivado" className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="grid min-w-0 flex-1 gap-1.5">
-              <Label htmlFor="archivo-desde">Desde</Label>
-              <Input id="archivo-desde" name="desde" type="date" defaultValue={filtros.desde} />
-            </div>
-            <div className="grid min-w-0 flex-1 gap-1.5">
-              <Label htmlFor="archivo-hasta">Hasta</Label>
-              <Input id="archivo-hasta" name="hasta" type="date" defaultValue={filtros.hasta} />
-            </div>
-            <Button type="submit">Aplicar</Button>
-          </form>
-          <form action={simularArchivadoAction} className="md:pb-0">
-            <Button type="submit" variant="outline" aria-describedby="ayuda-dry-run">
-              Ejecutar archivado (dry-run)
-            </Button>
-          </form>
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold">Próximo lote</h3>
+          <p id="ayuda-dry-run" className="text-xs text-muted-foreground">
+            Simula el próximo lote: eventos de más de {diasRetencion} días (anteriores al {formatearFechaCorta(contexto.limite)}).
+            El dry-run no modifica ni elimina datos.
+          </p>
         </div>
-        <p id="ayuda-dry-run" className="text-xs text-muted-foreground">El dry-run no modifica ni elimina datos.</p>
+        <form action={simularArchivadoAction}>
+          <Button type="submit" variant="outline" aria-describedby="ayuda-dry-run">
+            Ejecutar archivado (dry-run)
+          </Button>
+        </form>
       </div>
 
       {hayError ? (
         <p role="alert" className="text-sm text-destructive">No pudimos cargar el historial archivado.</p>
       ) : (
-        <div className="space-y-2">
+        <div id="lotes-archivados" className="scroll-mt-6 space-y-3">
           <div className="flex items-baseline justify-between gap-4">
             <h3 className="text-base font-semibold">Lotes archivados</h3>
             <p className="text-xs text-muted-foreground">
               {archivos.length === 1 ? "1 lote" : `${formatearCantidad(archivos.length)} lotes`}
             </p>
           </div>
+
+          <form
+            method="get"
+            action="/admin/auditoria#lotes-archivados"
+            aria-label="Filtrar historial archivado"
+            className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+          >
+            <div className="grid min-w-0 gap-1.5">
+              <Label htmlFor="archivo-desde">Desde</Label>
+              <Input id="archivo-desde" name="desde" type="date" defaultValue={filtros.desde} />
+            </div>
+            <div className="grid min-w-0 gap-1.5">
+              <Label htmlFor="archivo-hasta">Hasta</Label>
+              <Input id="archivo-hasta" name="hasta" type="date" defaultValue={filtros.hasta} />
+            </div>
+            <Button type="submit">Aplicar</Button>
+            <p className="text-xs text-muted-foreground sm:col-span-3">El rango filtra solo la lista de lotes archivados.</p>
+          </form>
 
           {archivos.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-4">

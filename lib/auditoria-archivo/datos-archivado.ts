@@ -246,3 +246,20 @@ export async function leerMetricasArchivo(
     espacioTablaBytes: numero(fila?.espacio_tabla_bytes),
   }
 }
+
+/**
+ * Fecha del evento de auditoría más viejo que sigue en PostgreSQL.
+ *
+ * Sirve para explicar en el panel cuándo habrá algo para archivar. El llamador
+ * ya validó el rol Admin; devuelve `null` si la tabla está vacía.
+ */
+export async function leerEventoMasViejo(supabase?: SupabaseClient): Promise<string | null> {
+  const cliente = supabase ?? createAdminClient()
+  const { data, error } = await cliente
+    .from("audit_events")
+    .select("occurred_at")
+    .order("occurred_at", { ascending: true })
+    .limit(1)
+  if (error) fallar("leer el evento de auditoría más viejo", error)
+  return texto((data?.[0] as Fila | undefined)?.occurred_at)
+}

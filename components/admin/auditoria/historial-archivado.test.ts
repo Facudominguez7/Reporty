@@ -5,12 +5,7 @@ import { describe, expect, it, vi } from "vitest"
 import { HistorialArchivado } from "./historial-archivado"
 
 // La acción del administrador depende de la sesión; acá solo hace falta que exista.
-vi.mock("@/app/admin/auditoria/acciones", () => ({
-  simularArchivadoAction: async () => {},
-  diagnosticarConexionR2Action: async () => {},
-  ejecutarArchivadoManualAction: async () => {},
-}))
-vi.mock("@/lib/auditoria-archivo/configuracion", () => ({ LIMITE_CORRIDA_MANUAL: 200 }))
+vi.mock("@/app/admin/auditoria/acciones", () => ({ simularArchivadoAction: async () => {} }))
 
 const archivo = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -39,7 +34,9 @@ function renderizar(props: Partial<Parameters<typeof HistorialArchivado>[0]> = {
     archivos: [archivo],
     metricas,
     filtros: {},
-    mostrarPruebas: true,
+    diasRetencion: 180,
+    eventoMasViejo: "2026-10-27T15:08:21+00:00",
+    ahora: new Date("2026-11-09T12:00:00.000Z"),
     ...props,
   }))
 }
@@ -90,8 +87,20 @@ describe("HistorialArchivado", () => {
   })
 
   it("explica el resultado de la simulación sin prometer cambios", () => {
-    expect(renderizar({ simulacion: "7" })).toContain("se archivarían 7 eventos")
+    expect(renderizar({ simulacion: "7" })).toContain("se archivarían 7 eventos anteriores al 13/05/2026")
     expect(renderizar({ simulacion: "error" })).toContain("revisá la configuración de Cloudflare R2")
+  })
+
+  it("explica por qué la simulación da cero y cuándo habrá algo para archivar", () => {
+    const html = renderizar({ simulacion: "0" })
+
+    expect(html).toContain("no hay eventos anteriores al 13/05/2026 (retención de 180 días)")
+    expect(html).toContain("El primero será elegible el 25/04/2027")
+    expect(html).toContain("No se modificó ni se eliminó nada.")
+  })
+
+  it("aclara el cero cuando todavía no hay eventos registrados", () => {
+    expect(renderizar({ simulacion: "0", eventoMasViejo: null })).toContain("todavía no hay eventos de auditoría registrados")
   })
 
   it("muestra el estado vacío", () => {
@@ -128,38 +137,31 @@ describe("HistorialArchivado", () => {
   })
 })
 
-describe("pruebas previas a producción", () => {
-  it("ofrece el diagnóstico de R2 y una corrida real acotada, plegados", () => {
+describe("sin acciones de prueba", () => {
+  it("no ofrece el diagnóstico de R2 ni la corrida real manual en ningún entorno", () => {
     const html = renderizar()
-
-    expect(html).toContain("<details")
-    expect(html).toContain("Probar antes de producción")
-    expect(html).toContain("Probar conexión con R2")
-    expect(html).toContain("Ejecutar corrida real (máx. 200)")
-    expect(html).toContain("Estas acciones escriben en el bucket")
-    expect(html).toContain("acá sirven para validar el ciclo completo en local")
-  })
-
-  it("informa el resultado del diagnóstico y de la corrida real", () => {
-    expect(renderizar({ r2: "ok", r2Detalle: "Lectura, escritura e integridad verificadas." }))
-      .toContain("Conexión con R2 verificada")
-    expect(renderizar({ r2: "error", r2Detalle: "El token no tiene permiso de escritura (AccessDenied)." }))
-      .toContain("El token no tiene permiso de escritura")
-    expect(renderizar({ archivado: "ok", archivadoEventos: "12", archivadoPurgado: "0" }))
-      .toContain("12 eventos archivados y 0 eliminados de PostgreSQL")
-    expect(renderizar({ archivado: "error" }))
-      .toContain("los eventos quedaron en PostgreSQL")
-  })
-})
-
-describe("pruebas en producción", () => {
-  it("no muestra el bloque de pruebas cuando está deshabilitado", () => {
-    const html = renderizar({ mostrarPruebas: false })
 
     expect(html).not.toContain("Probar antes de producción")
     expect(html).not.toContain("Probar conexión con R2")
     expect(html).not.toContain("Ejecutar corrida real")
     // El dry-run no modifica nada y sigue disponible.
     expect(html).toContain("Ejecutar archivado (dry-run)")
+  })
+})
+
+describe("dry-run separado de los filtros", () => {
+  it("el dry-run no comparte formulario con el rango de fechas y explica qué simula", () => {
+    const html = renderizar()
+    const formularioFiltros = html.slice(html.indexOf('aria-label="Filtrar historial archivado"'))
+    const finFiltros = formularioFiltros.indexOf("</form>")
+
+    expect(formularioFiltros.slice(0, finFiltros)).not.toContain("dry-run")
+    expect(html).toContain("Simula el próximo lote: eventos de más de 180 días (anteriores al 13/05/2026).")
+    expect(html).toContain("El rango filtra solo la lista de lotes archivados.")
+  })
+
+  it("vuelve a la sección al aplicar filtros en lugar de saltar al principio", () => {
+    expect(renderizar()).toContain('action="/admin/auditoria#lotes-archivados"')
+    expect(renderizar()).toContain('id="lotes-archivados"')
   })
 })
