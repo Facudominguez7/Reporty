@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest"
 import {
   ErrorConfiguracionArchivo,
   leerDiasRetencion,
-  pruebasDelPanelHabilitadas,
   endpointR2,
   leerConfiguracionArchivo,
   leerSecretoCron,
@@ -86,14 +85,6 @@ describe("leerSecretoCron", () => {
     expect(leerSecretoCron(entornoValido)).toBe(SECRETO_CRON_FALSO)
     expect(() => leerSecretoCron({ ...entornoValido, AUDIT_ARCHIVE_CRON_SECRET: undefined })).toThrow(ErrorConfiguracionArchivo)
     expect(() => leerSecretoCron({ ...entornoValido, AUDIT_ARCHIVE_CRON_SECRET: "corto" })).toThrow(ErrorConfiguracionArchivo)
-  })
-})
-
-describe("pruebasDelPanelHabilitadas", () => {
-  it("habilita las pruebas del panel solo fuera de producción", () => {
-    expect(pruebasDelPanelHabilitadas({ NODE_ENV: "development" })).toBe(true)
-    expect(pruebasDelPanelHabilitadas({ NODE_ENV: "test" })).toBe(true)
-    expect(pruebasDelPanelHabilitadas({ NODE_ENV: "production" })).toBe(false)
   })
 })
 

@@ -5,12 +5,7 @@ import { describe, expect, it, vi } from "vitest"
 import { HistorialArchivado } from "./historial-archivado"
 
 // La acción del administrador depende de la sesión; acá solo hace falta que exista.
-vi.mock("@/app/admin/auditoria/acciones", () => ({
-  simularArchivadoAction: async () => {},
-  diagnosticarConexionR2Action: async () => {},
-  ejecutarArchivadoManualAction: async () => {},
-}))
-vi.mock("@/lib/auditoria-archivo/configuracion", () => ({ LIMITE_CORRIDA_MANUAL: 200 }))
+vi.mock("@/app/admin/auditoria/acciones", () => ({ simularArchivadoAction: async () => {} }))
 
 const archivo = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -39,7 +34,6 @@ function renderizar(props: Partial<Parameters<typeof HistorialArchivado>[0]> = {
     archivos: [archivo],
     metricas,
     filtros: {},
-    mostrarPruebas: true,
     diasRetencion: 180,
     eventoMasViejo: "2026-10-27T15:08:21+00:00",
     ahora: new Date("2026-11-09T12:00:00.000Z"),
@@ -143,33 +137,9 @@ describe("HistorialArchivado", () => {
   })
 })
 
-describe("pruebas previas a producción", () => {
-  it("ofrece el diagnóstico de R2 y una corrida real acotada, plegados", () => {
+describe("sin acciones de prueba", () => {
+  it("no ofrece el diagnóstico de R2 ni la corrida real manual en ningún entorno", () => {
     const html = renderizar()
-
-    expect(html).toContain("<details")
-    expect(html).toContain("Probar antes de producción")
-    expect(html).toContain("Probar conexión con R2")
-    expect(html).toContain("Ejecutar corrida real (máx. 200)")
-    expect(html).toContain("Estas acciones escriben en el bucket")
-    expect(html).toContain("acá sirven para validar el ciclo completo en local")
-  })
-
-  it("informa el resultado del diagnóstico y de la corrida real", () => {
-    expect(renderizar({ r2: "ok", r2Detalle: "Lectura, escritura e integridad verificadas." }))
-      .toContain("Conexión con R2 verificada")
-    expect(renderizar({ r2: "error", r2Detalle: "El token no tiene permiso de escritura (AccessDenied)." }))
-      .toContain("El token no tiene permiso de escritura")
-    expect(renderizar({ archivado: "ok", archivadoEventos: "12", archivadoPurgado: "0" }))
-      .toContain("12 eventos archivados y 0 eliminados de PostgreSQL")
-    expect(renderizar({ archivado: "error" }))
-      .toContain("los eventos quedaron en PostgreSQL")
-  })
-})
-
-describe("pruebas en producción", () => {
-  it("no muestra el bloque de pruebas cuando está deshabilitado", () => {
-    const html = renderizar({ mostrarPruebas: false })
 
     expect(html).not.toContain("Probar antes de producción")
     expect(html).not.toContain("Probar conexión con R2")

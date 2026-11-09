@@ -7,7 +7,7 @@ import { HistorialArchivado } from "@/components/admin/auditoria/historial-archi
 import { Card, CardContent } from "@/components/ui/card"
 import { getAdminAudit, type AuditFilters } from "@/database/queries/admin/admin-audit"
 import { esAccionAuditoria, fraseAccion } from "@/lib/auditoria/acciones"
-import { leerDiasRetencion, pruebasDelPanelHabilitadas } from "@/lib/auditoria-archivo/configuracion"
+import { leerDiasRetencion } from "@/lib/auditoria-archivo/configuracion"
 import { leerEventoMasViejo, leerMetricasArchivo } from "@/lib/auditoria-archivo/datos-archivado"
 import { listarArchivosArchivados } from "@/lib/auditoria-archivo/servicio-recuperacion"
 import { createClient } from "@/utils/supabase/server"
@@ -17,7 +17,6 @@ export const metadata = { title: "Auditoría · Administración", robots: { inde
 export default async function AuditoriaPage({ searchParams }: { searchParams: Promise<{
     page?: string; usuario?: string; accion?: string; periodo?: string
     desde?: string; hasta?: string; simulacion?: string
-    r2?: string; detalle?: string; archivado?: string; eventos?: string; purgado?: string
   }> }) {
   const params = await searchParams
   const parsed = Number(params.page)
@@ -81,12 +80,6 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
         metricas={metricas}
         filtros={rango}
         simulacion={params.simulacion}
-        r2={params.r2}
-        r2Detalle={params.detalle}
-        archivado={params.archivado}
-        archivadoEventos={params.eventos}
-        archivadoPurgado={params.purgado}
-        mostrarPruebas={pruebasDelPanelHabilitadas()}
         diasRetencion={diasRetencion}
         eventoMasViejo={eventoMasViejo}
         hayError={Boolean(historial?.error)}

@@ -153,21 +153,8 @@ Orden obligatorio; no saltear pasos:
 
 ## Probar en local antes de producción
 
-Todo el ciclo se puede validar en local, contra un bucket de pruebas, sin tocar
-producción. Fuera de producción (`NODE_ENV` distinto de `production`), el panel
-`/admin/auditoria` muestra un bloque **«Probar antes de producción»** con dos
-acciones de Admin. En producción el bloque no aparece y el servidor rechaza esas
-acciones aunque se invoquen directamente; ahí la corrida real la dispara solo el
-cron, y el dry-run del panel sigue disponible porque no modifica nada:
-
-1. **Probar conexión con R2**: sube una sonda a `diagnostico/r2-check.json`, la
-   vuelve a leer, compara su SHA-256 y la borra. No toca el archivo de auditoría.
-   Informa lectura, escritura, integridad y latencia, sin credenciales.
-2. **Ejecutar corrida real (máx. 200)**: corre el archivado completo acotado,
-   respetando `AUDIT_ARCHIVE_PURGE_ENABLED`. Con la purga apagada archiva y
-   verifica, pero **no borra** nada de PostgreSQL.
-
-Pasos sugeridos:
+El ciclo completo se valida en local contra un bucket de pruebas, sin tocar
+producción, llamando al mismo endpoint que usa el cron.
 
 ```env
 # .env.local (no se versiona)
@@ -176,31 +163,28 @@ R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_BUCKET_NAME=reporty-audit-archive-pruebas
 AUDIT_ARCHIVE_CRON_SECRET=...      # >= 32 caracteres
-AUDIT_HOT_DAYS=1                   # ventana mínima (30) o 30; ver nota
-AUDIT_ARCHIVE_MAX_BATCH=200
+AUDIT_HOT_DAYS=180
 AUDIT_ARCHIVE_PURGE_ENABLED=false
 ```
 
 1. Reiniciar `npm run dev` (las variables se leen al arrancar).
-2. Entrar como Admin y abrir `/admin/auditoria`.
-3. «Probar conexión con R2» → tiene que decir «Conexión con R2 verificada».
-4. «Ejecutar archivado (dry-run)» → informa cuántos eventos se archivarían.
-5. «Ejecutar corrida real» → aparece el lote en `verificado`, sin purga.
-6. «Ver eventos» y «Descargar .jsonl.gz» → el archivo se abre con
-   `gunzip -c`, y la cantidad coincide con la del lote.
-7. Revisar la base local:
-   `select id, estado, cantidad_registros, tamano_comprimido, hash_sha256 from public.audit_archives;`
-8. Para probar la purga: poner `AUDIT_ARCHIVE_PURGE_ENABLED=true`, reiniciar y
-   volver a ejecutar; el lote pasa a `origen_eliminado` y sus filas desaparecen de
-   `audit_events` (solo las de ese lote).
+2. Comprobar el secreto: sin token, `POST /api/cron/auditoria-archivo` responde
+   `401` (con `503` el secreto no está cargado).
+3. Dry-run: `GET` con `Authorization: Bearer <secreto>`, o el botón
+   «Ejecutar archivado (dry-run)» del panel.
+4. Corrida real: `POST ...?limite=50` con el mismo header. Con la purga apagada
+   el lote queda `verificado` y no se borra nada de PostgreSQL.
+5. En el panel: «Ver eventos» y «Descargar .jsonl.gz»; el archivo se abre con
+   `gunzip -c` y la cantidad coincide con la del lote.
+6. Para probar la purga: `AUDIT_ARCHIVE_PURGE_ENABLED=true`, reiniciar y volver a
+   llamar; el lote pasa a `origen_eliminado` y desaparecen de `audit_events`
+   solo sus eventos.
 
-Nota sobre `AUDIT_HOT_DAYS`: el mínimo aceptado es 30 días. Si tu base local no
-tiene eventos de ese tiempo, el `dry-run` informa **0 elegibles**, que es el
-resultado correcto. Para forzar una prueba, insertá filas de prueba en
-`audit_events` con `occurred_at` viejo (solo en local) o usá un lote sintético.
-
-Al terminar, limpiá el bucket de pruebas (los objetos `audit/v1/...` de prueba) y
-las filas de `audit_archives` locales si no querés conservarlas.
+Si la base local no tiene eventos de más de `AUDIT_HOT_DAYS` días, el dry-run
+informa **0 elegibles**, que es el resultado correcto. Para forzar una prueba,
+insertá en el Supabase **local** eventos con `occurred_at` viejo. Al terminar,
+limpiá el bucket de pruebas y las filas de `audit_archives` locales si no querés
+conservarlas.
 
 ## Programación semanal
 
@@ -258,8 +242,7 @@ en su proyecto de Supabase.
 - Sin `Authorization` o con token incorrecto: `401`. Sin secreto configurado:
   `503` y no ejecuta nada. Si la corrida falla: `502` con el resumen.
 - El panel `/admin/auditoria` tiene un botón de `dry-run` para el Admin; la
-  corrida real no se expone en la interfaz porque puede superar el tiempo de una
-  request.
+  corrida real no se expone en la interfaz: la dispara solo el cron.
 
 El lote por invocación es acotado a propósito (máximo 5000 eventos): el proceso
 no depende de una request larga y, si quedan eventos, la corrida siguiente los
