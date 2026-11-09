@@ -62,7 +62,7 @@ describe("simulación manual del archivado", () => {
   })
 
   it("simula siempre en dry-run con el Admin como ejecutor", async () => {
-    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=7")
+    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=7#historial-archivado")
 
     expect(ejecutarArchivado).toHaveBeenCalledWith(
       { modo: "dry-run", ejecutor: `admin:${usuario.id}`, actorId: usuario.id },
@@ -73,7 +73,7 @@ describe("simulación manual del archivado", () => {
   it("informa el fallo de configuración sin romper el panel", async () => {
     ejecutarArchivado.mockRejectedValueOnce(new Error("Falta configuración de Cloudflare R2"))
 
-    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=error")
+    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=error#historial-archivado")
   })
 })
 
@@ -87,7 +87,7 @@ describe("diagnóstico de R2 desde el panel", () => {
 
   it("informa el resultado del diagnóstico en la URL", async () => {
     expect(await ejecutar(diagnosticarConexionR2Action))
-      .toBe("REDIRECT:/admin/auditoria?r2=ok&detalle=Lectura%2C%20escritura%20e%20integridad%20verificadas.")
+      .toBe("REDIRECT:/admin/auditoria?r2=ok&detalle=Lectura%2C%20escritura%20e%20integridad%20verificadas.#historial-archivado")
 
     expect(crearClienteR2).toHaveBeenCalledWith({ bucket: "reporty-audit-archive" })
     expect(diagnosticarR2).toHaveBeenCalledWith({ clienteR2: true }, { bucket: "reporty-audit-archive" })
@@ -97,7 +97,7 @@ describe("diagnóstico de R2 desde el panel", () => {
     diagnosticarR2.mockResolvedValueOnce({ ok: false, detalle: "El token no tiene permiso de escritura (AccessDenied)." })
 
     expect(await ejecutar(diagnosticarConexionR2Action))
-      .toBe("REDIRECT:/admin/auditoria?r2=error&detalle=El%20token%20no%20tiene%20permiso%20de%20escritura%20(AccessDenied).")
+      .toBe("REDIRECT:/admin/auditoria?r2=error&detalle=El%20token%20no%20tiene%20permiso%20de%20escritura%20(AccessDenied).#historial-archivado")
   })
 })
 
@@ -114,7 +114,7 @@ describe("corrida real manual", () => {
 
     const destino = await ejecutar(ejecutarArchivadoManualAction)
 
-    expect(destino).toBe("REDIRECT:/admin/auditoria?archivado=ok&eventos=12&purgado=0")
+    expect(destino).toBe("REDIRECT:/admin/auditoria?archivado=ok&eventos=12&purgado=0#historial-archivado")
     expect(ejecutarArchivado).toHaveBeenCalledWith(
       { modo: "real", ejecutor: `admin:${usuario.id}`, actorId: usuario.id, limite: 200 },
       { dependencias: true },
@@ -124,13 +124,13 @@ describe("corrida real manual", () => {
   it("informa el resultado aunque la purga esté apagada", async () => {
     ejecutarArchivado.mockResolvedValueOnce({ ok: true, lote: { cantidadRegistros: 3 }, purgado: 0 })
 
-    expect(await ejecutar(ejecutarArchivadoManualAction)).toBe("REDIRECT:/admin/auditoria?archivado=ok&eventos=3&purgado=0")
+    expect(await ejecutar(ejecutarArchivadoManualAction)).toBe("REDIRECT:/admin/auditoria?archivado=ok&eventos=3&purgado=0#historial-archivado")
   })
 
   it("informa el fallo con los eventos conservados", async () => {
     ejecutarArchivado.mockResolvedValueOnce({ ok: false, lote: null, purgado: 0 })
 
-    expect(await ejecutar(ejecutarArchivadoManualAction)).toBe("REDIRECT:/admin/auditoria?archivado=error&eventos=0&purgado=0")
+    expect(await ejecutar(ejecutarArchivadoManualAction)).toBe("REDIRECT:/admin/auditoria?archivado=error&eventos=0&purgado=0#historial-archivado")
   })
 })
 
@@ -152,7 +152,7 @@ describe("acciones de prueba en producción", () => {
   it("mantiene el dry-run disponible en producción", async () => {
     pruebasDelPanelHabilitadas.mockReturnValue(false)
 
-    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=7")
+    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=7#historial-archivado")
     pruebasDelPanelHabilitadas.mockReturnValue(true)
   })
 })

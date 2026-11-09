@@ -40,6 +40,9 @@ function renderizar(props: Partial<Parameters<typeof HistorialArchivado>[0]> = {
     metricas,
     filtros: {},
     mostrarPruebas: true,
+    diasRetencion: 180,
+    eventoMasViejo: "2026-10-27T15:08:21+00:00",
+    ahora: new Date("2026-11-09T12:00:00.000Z"),
     ...props,
   }))
 }
@@ -90,8 +93,20 @@ describe("HistorialArchivado", () => {
   })
 
   it("explica el resultado de la simulación sin prometer cambios", () => {
-    expect(renderizar({ simulacion: "7" })).toContain("se archivarían 7 eventos")
+    expect(renderizar({ simulacion: "7" })).toContain("se archivarían 7 eventos anteriores al 13/05/2026")
     expect(renderizar({ simulacion: "error" })).toContain("revisá la configuración de Cloudflare R2")
+  })
+
+  it("explica por qué la simulación da cero y cuándo habrá algo para archivar", () => {
+    const html = renderizar({ simulacion: "0" })
+
+    expect(html).toContain("no hay eventos anteriores al 13/05/2026 (retención de 180 días)")
+    expect(html).toContain("El primero será elegible el 25/04/2027")
+    expect(html).toContain("No se modificó ni se eliminó nada.")
+  })
+
+  it("aclara el cero cuando todavía no hay eventos registrados", () => {
+    expect(renderizar({ simulacion: "0", eventoMasViejo: null })).toContain("todavía no hay eventos de auditoría registrados")
   })
 
   it("muestra el estado vacío", () => {
@@ -161,5 +176,22 @@ describe("pruebas en producción", () => {
     expect(html).not.toContain("Ejecutar corrida real")
     // El dry-run no modifica nada y sigue disponible.
     expect(html).toContain("Ejecutar archivado (dry-run)")
+  })
+})
+
+describe("dry-run separado de los filtros", () => {
+  it("el dry-run no comparte formulario con el rango de fechas y explica qué simula", () => {
+    const html = renderizar()
+    const formularioFiltros = html.slice(html.indexOf('aria-label="Filtrar historial archivado"'))
+    const finFiltros = formularioFiltros.indexOf("</form>")
+
+    expect(formularioFiltros.slice(0, finFiltros)).not.toContain("dry-run")
+    expect(html).toContain("Simula el próximo lote: eventos de más de 180 días (anteriores al 13/05/2026).")
+    expect(html).toContain("El rango filtra solo la lista de lotes archivados.")
+  })
+
+  it("vuelve a la sección al aplicar filtros en lugar de saltar al principio", () => {
+    expect(renderizar()).toContain('action="/admin/auditoria#lotes-archivados"')
+    expect(renderizar()).toContain('id="lotes-archivados"')
   })
 })

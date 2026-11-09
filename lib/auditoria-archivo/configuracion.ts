@@ -159,6 +159,28 @@ export function leerSecretoCron(entorno: EntornoArchivoAuditoria = process.env):
 }
 
 /**
+ * Lee los días de retención caliente sin exigir las credenciales de R2.
+ *
+ * La página del panel los necesita aunque el archivo no esté configurado, así
+ * que un valor inválido vuelve al valor por defecto en lugar de romperla.
+ *
+ * @param entorno Variables de entorno; por defecto `process.env`.
+ */
+export function leerDiasRetencion(entorno: EntornoArchivoAuditoria = process.env): number {
+  try {
+    return enteroEnRango(
+      entorno.AUDIT_HOT_DAYS,
+      DIAS_RETENCION_POR_DEFECTO,
+      DIAS_RETENCION_MINIMO,
+      DIAS_RETENCION_MAXIMO,
+      "AUDIT_HOT_DAYS",
+    )
+  } catch {
+    return DIAS_RETENCION_POR_DEFECTO
+  }
+}
+
+/**
  * Indica si el panel puede ofrecer las acciones de prueba (diagnóstico de R2 y
  * corrida real manual).
  *

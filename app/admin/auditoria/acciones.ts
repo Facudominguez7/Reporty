@@ -15,6 +15,12 @@ import { ejecutarArchivado } from "@/lib/auditoria-archivo/servicio-archivado"
 import { createClient } from "@/utils/supabase/server"
 
 /**
+ * Ancla de la sección «Historial archivado»: tras cada acción la página vuelve
+ * a esa sección en lugar de saltar al principio.
+ */
+const ANCLA_HISTORIAL = "#historial-archivado"
+
+/**
  * Autoriza la acción: sesión con rol Admin, verificada contra la base.
  *
  * @returns el usuario autenticado y autorizado.
@@ -51,10 +57,10 @@ export async function simularArchivadoAction(): Promise<void> {
       { modo: "dry-run", ejecutor: `admin:${usuario.id}`, actorId: usuario.id },
       crearDependenciasArchivado(),
     )
-    destino = `/admin/auditoria?simulacion=${resumen.elegibles}`
+    destino = `/admin/auditoria?simulacion=${resumen.elegibles}${ANCLA_HISTORIAL}`
   } catch {
     // Sin configuración de R2 la simulación no puede leer la base de control.
-    destino = "/admin/auditoria?simulacion=error"
+    destino = `/admin/auditoria?simulacion=error${ANCLA_HISTORIAL}`
   }
 
   redirect(destino)
@@ -73,7 +79,7 @@ export async function diagnosticarConexionR2Action(): Promise<void> {
   const configuracion = leerConfiguracionArchivo()
   const resultado = await diagnosticarR2(crearClienteR2(configuracion), configuracion)
 
-  redirect(`/admin/auditoria?r2=${resultado.ok ? "ok" : "error"}&detalle=${encodeURIComponent(resultado.detalle)}`)
+  redirect(`/admin/auditoria?r2=${resultado.ok ? "ok" : "error"}&detalle=${encodeURIComponent(resultado.detalle)}${ANCLA_HISTORIAL}`)
 }
 
 /**
@@ -104,5 +110,5 @@ export async function ejecutarArchivadoManualAction(): Promise<void> {
     eventos: String(resumen.lote?.cantidadRegistros ?? 0),
     purgado: String(resumen.purgado),
   })
-  redirect(`/admin/auditoria?${parametros.toString()}`)
+  redirect(`/admin/auditoria?${parametros.toString()}${ANCLA_HISTORIAL}`)
 }

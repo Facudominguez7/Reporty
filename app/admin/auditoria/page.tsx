@@ -7,8 +7,8 @@ import { HistorialArchivado } from "@/components/admin/auditoria/historial-archi
 import { Card, CardContent } from "@/components/ui/card"
 import { getAdminAudit, type AuditFilters } from "@/database/queries/admin/admin-audit"
 import { esAccionAuditoria, fraseAccion } from "@/lib/auditoria/acciones"
-import { pruebasDelPanelHabilitadas } from "@/lib/auditoria-archivo/configuracion"
-import { leerMetricasArchivo } from "@/lib/auditoria-archivo/datos-archivado"
+import { leerDiasRetencion, pruebasDelPanelHabilitadas } from "@/lib/auditoria-archivo/configuracion"
+import { leerEventoMasViejo, leerMetricasArchivo } from "@/lib/auditoria-archivo/datos-archivado"
 import { listarArchivosArchivados } from "@/lib/auditoria-archivo/servicio-recuperacion"
 import { createClient } from "@/utils/supabase/server"
 
@@ -39,9 +39,11 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
   const rango = { desde: params.desde?.trim(), hasta: params.hasta?.trim() }
   // El historial archivado nunca rompe la actividad reciente: si R2 o la tabla de
   // control no responden, la sección informa el problema y el resto sigue igual.
-  const [historial, metricas] = await Promise.all([
+  const diasRetencion = leerDiasRetencion()
+  const [historial, metricas, eventoMasViejo] = await Promise.all([
     listarArchivosArchivados(supabase, user.id, rango).catch(() => null),
-    leerMetricasArchivo(180).catch(() => null),
+    leerMetricasArchivo(diasRetencion).catch(() => null),
+    leerEventoMasViejo().catch(() => null),
   ])
 
   return (
@@ -85,6 +87,8 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
         archivadoEventos={params.eventos}
         archivadoPurgado={params.purgado}
         mostrarPruebas={pruebasDelPanelHabilitadas()}
+        diasRetencion={diasRetencion}
+        eventoMasViejo={eventoMasViejo}
         hayError={Boolean(historial?.error)}
       />
     </div>

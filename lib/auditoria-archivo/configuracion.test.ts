@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   ErrorConfiguracionArchivo,
+  leerDiasRetencion,
   pruebasDelPanelHabilitadas,
   endpointR2,
   leerConfiguracionArchivo,
@@ -93,5 +94,17 @@ describe("pruebasDelPanelHabilitadas", () => {
     expect(pruebasDelPanelHabilitadas({ NODE_ENV: "development" })).toBe(true)
     expect(pruebasDelPanelHabilitadas({ NODE_ENV: "test" })).toBe(true)
     expect(pruebasDelPanelHabilitadas({ NODE_ENV: "production" })).toBe(false)
+  })
+})
+
+describe("leerDiasRetencion", () => {
+  it("usa AUDIT_HOT_DAYS sin exigir las credenciales de R2", () => {
+    expect(leerDiasRetencion({ AUDIT_HOT_DAYS: "365" })).toBe(365)
+    expect(leerDiasRetencion({})).toBe(180)
+  })
+
+  it("vuelve al valor por defecto si AUDIT_HOT_DAYS es inválido, sin romper la página", () => {
+    expect(leerDiasRetencion({ AUDIT_HOT_DAYS: "12" })).toBe(180)
+    expect(leerDiasRetencion({ AUDIT_HOT_DAYS: "abc" })).toBe(180)
   })
 })
