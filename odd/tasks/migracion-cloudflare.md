@@ -1,0 +1,39 @@
+# Migración de Reporty a Cloudflare Workers
+Objetivo: sacar la app Next.js del hosting compartido de Hostinger (origen saturado: picos de 5 a 60 s aun en endpoints sin trabajo) y servirla desde Cloudflare Workers con OpenNext, con deploy automático desde el repo de GitHub. Base: `02441fc`. Rama: `feat/migracion-cloudflare`; entrega: commits por unidad de trabajo, push/PR/merge y corte de DNS son decisión del dueño.
+Checks: `npm test` (Vitest), `npm run lint`, `npx tsc --noEmit`, build de OpenNext + `wrangler dev` local, y las mediciones de Playwright/curl de la sesión del 2026-11-09 contra producción después del corte.
+
+## Specs
+
+S1. Migración (L1): «vamos a migrar esto a cloudflare urgente, junto a la vinculacion con el repo todo». La app corre en Cloudflare Workers con `@opennextjs/cloudflare`, y Workers Builds queda vinculado a `Facudominguez7/Reporty`, rama `main`, con deploy automático.
+
+S2. Prefetch (L1): «esto del prefetch vamos a sacarlo antes». Decisión del 2026-11-09: revertirlo. #223 se revierte en #225 y #224 se cierra sin mergear (hecho).
+
+S3. Next compatible: `@opennextjs/cloudflare@1.20.16` pide `next >=16.4.5`; producción corre la 16.4.3. Hay que actualizar Next a 16.4.6 sin romper tests ni tipos.
+
+S4. Fotos sin `sharp` (decisión del 2026-11-09: «Cloudflare Images (Recomendado)»): `prepararImagenReporte` usa `sharp`, que no corre en Workers. Se reemplaza por el binding `IMAGES` de Cloudflare Images y se mantienen las mismas garantías: tamaño máximo, tipos aceptados, una sola página o cuadro, dimensiones máximas, salida WebP sin metadatos, miniatura y límite de bytes. Lo usan los reportes, la evidencia de reparación y las mascotas.
+
+S5. Configuración: `wrangler.jsonc`, `open-next.config.ts` y caché incremental para `unstable_cache`. Las variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_APP_URL` y la de Google Analytics van en build; `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, los `R2_*` y el secreto del cron van como secrets. Ningún secreto se commitea.
+
+S6. Cron del archivo de auditoría: hoy lo dispara el cron de Hostinger con `~/reporty-audit-cron.sh` contra `/api/cron/auditoria-archivo`. Tiene que seguir funcionando después del corte, con un Cron Trigger de Cloudflare o apuntando al nuevo origen.
+
+S7. Corte de DNS de `reporty.com.ar` sin romper el correo ni `notificaciones.reporty.com.ar` (sigue en Hostinger), con rollback documentado. Requiere confirmación explícita del dueño antes de tocar DNS.
+
+S8. Verificación: volver a medir producción con los mismos scripts (requests por visita, 5 y 10 concurrentes, robots.txt sin caché) y comparar con las mediciones de Hostinger.
+
+## Tasks
+
+- T1 [S3] Actualizar Next a 16.4.6 — inline — hecho (tsc OK, lint 0 errores, vitest 1473 OK). Risk: item 5 (dependencias).
+- T2 [S4] Reemplazar `sharp` por el binding `IMAGES` en `prepararImagenReporte` — inline — pendiente. Risk: item 2 (es una guarda de seguridad sobre imágenes subidas).
+- T3 [S5] Adaptador OpenNext, `wrangler.jsonc`, caché, scripts y verificación con `wrangler dev` — inline — pendiente. Risk: item 5.
+- T4 [S6] Cron del archivo de auditoría en Cloudflare — inline — pendiente.
+- T5 [S1, S5] Crear el Worker, cargar secrets y vincular Workers Builds con el repo (requiere autenticar los MCP de Cloudflare) — inline — bloqueada por el dueño.
+- T6 [S7] Corte de DNS con rollback — inline — bloqueada por la confirmación del dueño.
+- T7 [S8] Medición post-migración — inline — pendiente.
+
+Ruta: todo inline. No hay unidades paralelas independientes de varios minutos: T2 y T3 comparten el build.
+
+## Log
+
+L1 (2026-11-09, verbatim): «vamos a migrar esto a cloudflare urgente, junto a la vinculacion con el repo todo. esto del prefetch vamos a sacarlo antes»
+L2 (2026-11-09): aclaración de «sacarlo antes»: revertirlo. #225 abierto con el revert de #223 y #224 cerrado. También se pidió «instalate el mcp de cloudflare»: se agregaron `cloudflare`, `cloudflare-builds`, `cloudflare-observability` y `cloudflare-docs` (los tres primeros requieren `/mcp` para autenticar).
+L3 (2026-11-09): para reemplazar `sharp` se eligió «Cloudflare Images (Recomendado)». Evidencia: `npm view @opennextjs/cloudflare` da peer `next: '>=15.5.29 <16 || >=16.4.5'`; producción tiene 16.4.3. Una app Next de este tamaño probablemente requiere el plan pago de Workers (límites de 3 MB de bundle y 10 ms de CPU en el plan gratis).
