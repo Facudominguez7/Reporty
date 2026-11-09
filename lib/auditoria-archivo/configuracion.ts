@@ -159,6 +159,19 @@ export function leerSecretoCron(entorno: EntornoArchivoAuditoria = process.env):
 }
 
 /**
+ * Indica si el panel puede ofrecer las acciones de prueba (diagnóstico de R2 y
+ * corrida real manual).
+ *
+ * Son herramientas para validar el ciclo en local: en producción la corrida la
+ * dispara el cron y estas acciones quedan deshabilitadas, también en el servidor.
+ *
+ * @param entorno Variables de entorno; por defecto `process.env`.
+ */
+export function pruebasDelPanelHabilitadas(entorno: EntornoArchivoAuditoria = process.env): boolean {
+  return entorno.NODE_ENV !== "production"
+}
+
+/**
  * Indica si el archivo está configurado, sin lanzar: lo usa el panel para mostrar
  * el estado real en producción en lugar de romper la página.
  */

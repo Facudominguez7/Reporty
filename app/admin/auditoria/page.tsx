@@ -7,6 +7,7 @@ import { HistorialArchivado } from "@/components/admin/auditoria/historial-archi
 import { Card, CardContent } from "@/components/ui/card"
 import { getAdminAudit, type AuditFilters } from "@/database/queries/admin/admin-audit"
 import { esAccionAuditoria, fraseAccion } from "@/lib/auditoria/acciones"
+import { pruebasDelPanelHabilitadas } from "@/lib/auditoria-archivo/configuracion"
 import { leerMetricasArchivo } from "@/lib/auditoria-archivo/datos-archivado"
 import { listarArchivosArchivados } from "@/lib/auditoria-archivo/servicio-recuperacion"
 import { createClient } from "@/utils/supabase/server"
@@ -83,6 +84,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Pr
         archivado={params.archivado}
         archivadoEventos={params.eventos}
         archivadoPurgado={params.purgado}
+        mostrarPruebas={pruebasDelPanelHabilitadas()}
         hayError={Boolean(historial?.error)}
       />
     </div>

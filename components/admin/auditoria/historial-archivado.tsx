@@ -56,6 +56,8 @@ type Props = {
   archivado?: string
   archivadoEventos?: string
   archivadoPurgado?: string
+  /** Muestra el bloque de pruebas (diagnóstico y corrida manual); `false` en producción. */
+  mostrarPruebas?: boolean
   hayError?: boolean
 }
 
@@ -95,6 +97,7 @@ export function HistorialArchivado({
   archivado,
   archivadoEventos,
   archivadoPurgado,
+  mostrarPruebas = false,
   hayError = false,
 }: Props) {
   const eventosArchivados = metricas?.eventosArchivados ?? 0
@@ -136,25 +139,27 @@ export function HistorialArchivado({
         </p>
       )}
 
-      <details className="rounded-xl border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-medium">Probar antes de producción</summary>
-        <div className="mt-3 grid gap-3">
-          <p className="text-xs text-muted-foreground">
-            Estas acciones escriben en el bucket configurado. En producción la corrida real la dispara el cron; acá
-            servís para validar el ciclo completo en local.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <form action={diagnosticarConexionR2Action}>
-              <Button type="submit" variant="outline" size="sm">Probar conexión con R2</Button>
-            </form>
-            <form action={ejecutarArchivadoManualAction}>
-              <Button type="submit" variant="neutral" size="sm">
-                Ejecutar corrida real (máx. {LIMITE_CORRIDA_MANUAL})
-              </Button>
-            </form>
+      {mostrarPruebas && (
+        <details className="rounded-xl border border-border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-medium">Probar antes de producción</summary>
+          <div className="mt-3 grid gap-3">
+            <p className="text-xs text-muted-foreground">
+              Estas acciones escriben en el bucket configurado. En producción la corrida real la dispara el cron; acá
+              sirven para validar el ciclo completo en local.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <form action={diagnosticarConexionR2Action}>
+                <Button type="submit" variant="outline" size="sm">Probar conexión con R2</Button>
+              </form>
+              <form action={ejecutarArchivadoManualAction}>
+                <Button type="submit" variant="neutral" size="sm">
+                  Ejecutar corrida real (máx. {LIMITE_CORRIDA_MANUAL})
+                </Button>
+              </form>
+            </div>
           </div>
-        </div>
-      </details>
+        </details>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3" aria-label="Métricas del historial archivado">
         <Card><CardContent className="grid gap-2">
