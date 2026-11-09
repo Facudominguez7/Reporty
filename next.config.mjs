@@ -32,5 +32,11 @@ const nextConfig = {
   },
 }
 
+// Exposes the Cloudflare bindings (IMAGES, R2, secrets) to `next dev`, so local development
+// matches the Worker that @opennextjs/cloudflare builds for production.
+if (process.env.NODE_ENV === 'development') {
+  const { initOpenNextCloudflareForDev } = await import('@opennextjs/cloudflare')
+  initOpenNextCloudflareForDev()
+}
 
 export default nextConfig
