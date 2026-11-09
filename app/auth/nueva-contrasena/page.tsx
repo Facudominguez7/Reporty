@@ -48,7 +48,7 @@ export default async function NuevaContrasenaPage() {
               </CardHeader>
               <CardContent>
                 <Button asChild className="w-full">
-                  <Link href={RUTA_RECUPERAR_CONTRASENA}>Pedir un enlace nuevo</Link>
+                  <Link href={RUTA_RECUPERAR_CONTRASENA} prefetch={false}>Pedir un enlace nuevo</Link>
                 </Button>
               </CardContent>
             </>

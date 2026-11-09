@@ -354,7 +354,7 @@ export default function AuthPage() {
                   </Field>
 
                   <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-                    <Link href={RUTA_RECUPERAR_CONTRASENA} className="text-primary hover:underline">
+                    <Link href={RUTA_RECUPERAR_CONTRASENA} prefetch={false} className="text-primary hover:underline">
                       ¿Olvidaste tu contraseña?
                     </Link>
                   </div>
@@ -505,8 +505,8 @@ export default function AuthPage() {
                     <input type="checkbox" className="mt-0.5 size-4 rounded border-border" required />
                     <span>
                       {/* A new tab keeps what was already typed in the form. */}
-                      Acepto los <Link href="/terminos" target="_blank" className="text-primary hover:underline">términos y condiciones</Link> y la{" "}
-                      <Link href="/privacidad" target="_blank" className="text-primary hover:underline">política de privacidad</Link>.
+                      Acepto los <Link href="/terminos" prefetch={false} target="_blank" className="text-primary hover:underline">términos y condiciones</Link> y la{" "}
+                      <Link href="/privacidad" prefetch={false} target="_blank" className="text-primary hover:underline">política de privacidad</Link>.
                     </span>
                   </label>
 

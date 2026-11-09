@@ -40,7 +40,7 @@ export default async function RecuperarPage({ searchParams }: RecuperarPageProps
             <RecoveryForm />
 
             <p className="text-center text-sm text-muted-foreground">
-              <Link href="/auth" className="text-primary hover:underline">
+              <Link href="/auth" prefetch={false} className="text-primary hover:underline">
                 Volver a ingresar
               </Link>
             </p>
