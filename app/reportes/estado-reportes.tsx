@@ -47,6 +47,7 @@ export function EstadoReportes({ searchParams, counts }: EstadoReportesProps) {
 
           return (
             <Link
+              prefetch={false}
               key={option.label}
               href={buildStatusHref(searchParams, option.value)}
               aria-current={isActive ? "page" : undefined}

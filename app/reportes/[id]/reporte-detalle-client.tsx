@@ -601,7 +601,7 @@ export function ReporteDetalleClient({
         <div className="text-center">
           <p className="text-lg text-muted-foreground">Reporte no encontrado</p>
           <Button asChild className="mt-4">
-            <Link href={backHref}>Volver a Reportes</Link>
+            <Link href={backHref} prefetch={false}>Volver a Reportes</Link>
           </Button>
         </div>
       </div>
@@ -721,7 +721,7 @@ export function ReporteDetalleClient({
       <div className="page-container space-y-4 md:space-y-6 lg:space-y-8">
         <section className="space-y-3">
           <PageTitleBar
-            leading={<Button asChild variant="ghost" size="icon" aria-label="Volver" title="Volver"><Link href={backHref}><ArrowLeft className="size-4" aria-hidden="true" /></Link></Button>}
+            leading={<Button asChild variant="ghost" size="icon" aria-label="Volver" title="Volver"><Link href={backHref} prefetch={false}><ArrowLeft className="size-4" aria-hidden="true" /></Link></Button>}
             icon={<FileSearch2 className="size-4" />}
             title="Detalle del reporte"
             description="Consultá el estado y los avances del reporte."
@@ -1136,7 +1136,7 @@ export function ReporteDetalleClient({
                     disabled={isAdminSaving}
                     className="w-full"
                     display={() => (
-                      <Link href="/mapa" className="group block w-full">
+                      <Link href="/mapa" prefetch={false} className="group block w-full">
                         <div className="group relative aspect-square overflow-hidden rounded-md border shadow-sm transition-all group-hover:shadow-md md:rounded-lg">
                           {reporte.lat !== null && reporte.lon !== null ? (
                             <MiniMap lat={reporte.lat} lon={reporte.lon} />
@@ -1169,7 +1169,7 @@ export function ReporteDetalleClient({
                     )}
                   />
                 ) : (
-                  <Link href="/mapa" className="group block">
+                  <Link href="/mapa" prefetch={false} className="group block">
                     <div className="group relative aspect-square overflow-hidden rounded-md border shadow-sm transition-all group-hover:shadow-md md:rounded-lg">
                       {reporte.lat !== null && reporte.lon !== null ? (
                         <MiniMap lat={reporte.lat} lon={reporte.lon} />

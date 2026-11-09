@@ -21,7 +21,7 @@ export function EstadoMascotas({ search, counts }: { search: string; counts: Mas
   const active = params.get("estadoMascota") ?? "all"
   return <nav aria-label="Filtrar mascotas por estado" className="w-full">
     <div className="card-shadow grid w-full grid-cols-3 items-center gap-1 rounded-[var(--radius-pill)] bg-input p-1 !text-foreground">
-      {statuses.map(({ label, value, countKey, activeClass }) => <Link key={value} href={buildEstadoMascotaHref(search, value)} aria-current={active === value ? "page" : undefined} className={cn("inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[var(--radius-pill)] border border-transparent px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", active === value ? activeClass : "text-foreground hover:bg-background")}>{label}<span className="text-xs font-normal opacity-70">({counts[countKey]})</span></Link>)}
+      {statuses.map(({ label, value, countKey, activeClass }) => <Link key={value} prefetch={false} href={buildEstadoMascotaHref(search, value)} aria-current={active === value ? "page" : undefined} className={cn("inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-[var(--radius-pill)] border border-transparent px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background", active === value ? activeClass : "text-foreground hover:bg-background")}>{label}<span className="text-xs font-normal opacity-70">({counts[countKey]})</span></Link>)}
     </div>
   </nav>
 }
