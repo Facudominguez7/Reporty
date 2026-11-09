@@ -4,7 +4,11 @@ import { redirect } from "next/navigation"
 
 import { verificarEsAdmin } from "@/database/queries/admin/verificar-admin"
 import { crearClienteR2 } from "@/lib/auditoria-archivo/cliente-r2"
-import { LIMITE_CORRIDA_MANUAL, leerConfiguracionArchivo } from "@/lib/auditoria-archivo/configuracion"
+import {
+  LIMITE_CORRIDA_MANUAL,
+  leerConfiguracionArchivo,
+  pruebasDelPanelHabilitadas,
+} from "@/lib/auditoria-archivo/configuracion"
 import { crearDependenciasArchivado } from "@/lib/auditoria-archivo/datos-archivado"
 import { diagnosticarR2 } from "@/lib/auditoria-archivo/diagnostico"
 import { ejecutarArchivado } from "@/lib/auditoria-archivo/servicio-archivado"
@@ -60,10 +64,12 @@ export async function simularArchivadoAction(): Promise<void> {
  * Diagnóstico de la conexión con Cloudflare R2 desde el panel.
  *
  * Sube una sonda con prefijo propio, la lee, compara su hash y la borra: nunca
- * toca el archivo de auditoría ni imprime credenciales.
+ * toca el archivo de auditoría ni imprime credenciales. Deshabilitada en producción.
  */
 export async function diagnosticarConexionR2Action(): Promise<void> {
-  const usuario = await autorizarAdministracion()
+  await autorizarAdministracion()
+  // Esconder el botón no alcanza: una server action se puede invocar igual.
+  if (!pruebasDelPanelHabilitadas()) redirect("/admin/auditoria")
   const configuracion = leerConfiguracionArchivo()
   const resultado = await diagnosticarR2(crearClienteR2(configuracion), configuracion)
 
@@ -73,12 +79,15 @@ export async function diagnosticarConexionR2Action(): Promise<void> {
 /**
  * Corrida real acotada disparada desde el panel.
  *
- * Sirve para validar el ciclo completo en local antes de producción. Respeta
+ * Sirve para validar el ciclo completo en local antes de producción y está
+ * deshabilitada en producción. Respeta
  * `AUDIT_ARCHIVE_PURGE_ENABLED`: con la purga apagada archiva y verifica, pero no
  * borra nada de PostgreSQL.
  */
 export async function ejecutarArchivadoManualAction(): Promise<void> {
   const usuario = await autorizarAdministracion()
+  // En producción la corrida real la dispara solo el cron.
+  if (!pruebasDelPanelHabilitadas()) redirect("/admin/auditoria")
 
   const resumen = await ejecutarArchivado(
     {

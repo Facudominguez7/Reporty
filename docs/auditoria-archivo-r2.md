@@ -154,8 +154,11 @@ Orden obligatorio; no saltear pasos:
 ## Probar en local antes de producción
 
 Todo el ciclo se puede validar en local, contra un bucket de pruebas, sin tocar
-producción. El panel `/admin/auditoria` tiene un bloque **«Probar antes de
-producción»** con dos acciones de Admin:
+producción. Fuera de producción (`NODE_ENV` distinto de `production`), el panel
+`/admin/auditoria` muestra un bloque **«Probar antes de producción»** con dos
+acciones de Admin. En producción el bloque no aparece y el servidor rechaza esas
+acciones aunque se invoquen directamente; ahí la corrida real la dispara solo el
+cron, y el dry-run del panel sigue disponible porque no modifica nada:
 
 1. **Probar conexión con R2**: sube una sonda a `diagnostico/r2-check.json`, la
    vuelve a leer, compara su SHA-256 y la borra. No toca el archivo de auditoría.

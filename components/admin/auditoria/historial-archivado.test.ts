@@ -39,6 +39,7 @@ function renderizar(props: Partial<Parameters<typeof HistorialArchivado>[0]> = {
     archivos: [archivo],
     metricas,
     filtros: {},
+    mostrarPruebas: true,
     ...props,
   }))
 }
@@ -136,7 +137,7 @@ describe("pruebas previas a producción", () => {
     expect(html).toContain("Probar conexión con R2")
     expect(html).toContain("Ejecutar corrida real (máx. 200)")
     expect(html).toContain("Estas acciones escriben en el bucket")
-    expect(html).toContain("En producción la corrida real la dispara el cron")
+    expect(html).toContain("acá sirven para validar el ciclo completo en local")
   })
 
   it("informa el resultado del diagnóstico y de la corrida real", () => {
@@ -148,5 +149,17 @@ describe("pruebas previas a producción", () => {
       .toContain("12 eventos archivados y 0 eliminados de PostgreSQL")
     expect(renderizar({ archivado: "error" }))
       .toContain("los eventos quedaron en PostgreSQL")
+  })
+})
+
+describe("pruebas en producción", () => {
+  it("no muestra el bloque de pruebas cuando está deshabilitado", () => {
+    const html = renderizar({ mostrarPruebas: false })
+
+    expect(html).not.toContain("Probar antes de producción")
+    expect(html).not.toContain("Probar conexión con R2")
+    expect(html).not.toContain("Ejecutar corrida real")
+    // El dry-run no modifica nada y sigue disponible.
+    expect(html).toContain("Ejecutar archivado (dry-run)")
   })
 })

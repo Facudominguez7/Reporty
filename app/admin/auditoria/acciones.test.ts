@@ -17,7 +17,12 @@ vi.mock("@/lib/auditoria-archivo/datos-archivado", () => ({ crearDependenciasArc
 vi.mock("@/lib/auditoria-archivo/servicio-archivado", () => ({ ejecutarArchivado }))
 vi.mock("@/lib/auditoria-archivo/diagnostico", () => ({ diagnosticarR2 }))
 vi.mock("@/lib/auditoria-archivo/cliente-r2", () => ({ crearClienteR2 }))
-vi.mock("@/lib/auditoria-archivo/configuracion", () => ({ LIMITE_CORRIDA_MANUAL: 200, leerConfiguracionArchivo }))
+const pruebasDelPanelHabilitadas = vi.hoisted(() => vi.fn(() => true))
+vi.mock("@/lib/auditoria-archivo/configuracion", () => ({
+  LIMITE_CORRIDA_MANUAL: 200,
+  leerConfiguracionArchivo,
+  pruebasDelPanelHabilitadas,
+}))
 vi.mock("next/navigation", () => ({ redirect }))
 
 import { diagnosticarConexionR2Action, ejecutarArchivadoManualAction, simularArchivadoAction } from "./acciones"
@@ -126,5 +131,28 @@ describe("corrida real manual", () => {
     ejecutarArchivado.mockResolvedValueOnce({ ok: false, lote: null, purgado: 0 })
 
     expect(await ejecutar(ejecutarArchivadoManualAction)).toBe("REDIRECT:/admin/auditoria?archivado=error&eventos=0&purgado=0")
+  })
+})
+
+describe("acciones de prueba en producción", () => {
+  it("rechaza el diagnóstico aunque lo invoque un Admin", async () => {
+    pruebasDelPanelHabilitadas.mockReturnValueOnce(false)
+
+    expect(await ejecutar(diagnosticarConexionR2Action)).toBe("REDIRECT:/admin/auditoria")
+    expect(diagnosticarR2).not.toHaveBeenCalled()
+  })
+
+  it("rechaza la corrida real manual aunque la invoque un Admin", async () => {
+    pruebasDelPanelHabilitadas.mockReturnValueOnce(false)
+
+    expect(await ejecutar(ejecutarArchivadoManualAction)).toBe("REDIRECT:/admin/auditoria")
+    expect(ejecutarArchivado).not.toHaveBeenCalled()
+  })
+
+  it("mantiene el dry-run disponible en producción", async () => {
+    pruebasDelPanelHabilitadas.mockReturnValue(false)
+
+    expect(await ejecutar()).toBe("REDIRECT:/admin/auditoria?simulacion=7")
+    pruebasDelPanelHabilitadas.mockReturnValue(true)
   })
 })
