@@ -84,6 +84,12 @@ select pg_temp.exigir(
 -- ---------------------------------------------------------------------------
 -- Reclamo: determinístico, solo eventos vencidos, acotado por lote.
 -- ---------------------------------------------------------------------------
+-- Métricas de partida: la base local puede tener lotes reales, así que las
+-- aserciones de métricas comparan contra este punto y no contra cero.
+create temporary table metricas_inicio on commit drop as
+  select (m ->> 'eventos_purgados')::bigint as purgados, (m ->> 'bytes_en_r2')::bigint as bytes
+  from (select private.metricas_archivo_auditoria(180) as m) x;
+
 create temporary table lote_uno on commit drop as
   select * from private.reclamar_lote_auditoria(3, 180, 'prueba');
 
@@ -349,8 +355,8 @@ select pg_temp.exigir(
 -- Métricas y auditoría de las operaciones del archivo.
 -- ---------------------------------------------------------------------------
 select pg_temp.exigir(
-  (private.metricas_archivo_auditoria(180) ->> 'eventos_purgados')::bigint = 3
-  and (private.metricas_archivo_auditoria(180) ->> 'bytes_en_r2')::bigint >= 1024
+  (private.metricas_archivo_auditoria(180) ->> 'eventos_purgados')::bigint = (select purgados from metricas_inicio) + 3
+  and (private.metricas_archivo_auditoria(180) ->> 'bytes_en_r2')::bigint >= (select bytes from metricas_inicio) + 1024
   and (private.metricas_archivo_auditoria(180) ->> 'eventos_en_postgres')::int >= 4,
   'Las métricas deben informar eventos purgados, bytes en R2 y eventos calientes'
 );
