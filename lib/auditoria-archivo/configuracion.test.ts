@@ -6,13 +6,14 @@ import {
   leerConfiguracionArchivo,
   leerSecretoCron,
 } from "./configuracion"
+import { CLAVE_SECRETA_FALSA, CUENTA_FALSA, ENDPOINT_FALSO, ID_CLAVE_FALSA, SECRETO_CRON_FALSO } from "./__pruebas__/credenciales-falsas"
 
 const entornoValido = {
-  R2_ACCOUNT_ID: "0123456789abcdef0123456789abcdef",
-  R2_ACCESS_KEY_ID: "abcdef0123456789abcdef0123456789",
-  R2_SECRET_ACCESS_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  R2_ACCOUNT_ID: CUENTA_FALSA,
+  R2_ACCESS_KEY_ID: ID_CLAVE_FALSA,
+  R2_SECRET_ACCESS_KEY: CLAVE_SECRETA_FALSA,
   R2_BUCKET_NAME: "reporty-audit-archive",
-  AUDIT_ARCHIVE_CRON_SECRET: "secreto-de-cron-con-mas-de-32-caracteres",
+  AUDIT_ARCHIVE_CRON_SECRET: SECRETO_CRON_FALSO,
   AUDIT_HOT_DAYS: "180",
 }
 
@@ -28,9 +29,9 @@ describe("leerConfiguracionArchivo", () => {
       diasRetencion: 180,
       limitePorLote: 1000,
       purgaHabilitada: false,
-      endpoint: "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com",
+      endpoint: ENDPOINT_FALSO,
     })
-    expect(endpointR2("0123456789abcdef0123456789abcdef")).toBe(configuracion.endpoint)
+    expect(endpointR2(CUENTA_FALSA)).toBe(configuracion.endpoint)
   })
 
   it("rechaza variables faltantes nombrando solo las variables, nunca sus valores", () => {
@@ -80,7 +81,7 @@ describe("leerConfiguracionArchivo", () => {
 
 describe("leerSecretoCron", () => {
   it("exige un secreto suficientemente largo para autenticar la ejecución programada", () => {
-    expect(leerSecretoCron(entornoValido)).toBe("secreto-de-cron-con-mas-de-32-caracteres")
+    expect(leerSecretoCron(entornoValido)).toBe(SECRETO_CRON_FALSO)
     expect(() => leerSecretoCron({ ...entornoValido, AUDIT_ARCHIVE_CRON_SECRET: undefined })).toThrow(ErrorConfiguracionArchivo)
     expect(() => leerSecretoCron({ ...entornoValido, AUDIT_ARCHIVE_CRON_SECRET: "corto" })).toThrow(ErrorConfiguracionArchivo)
   })

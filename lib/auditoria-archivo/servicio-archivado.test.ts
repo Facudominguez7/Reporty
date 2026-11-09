@@ -11,16 +11,17 @@ import {
   type LoteArchivado,
   ejecutarArchivado,
 } from "./servicio-archivado"
+import { CLAVE_SECRETA_FALSA, CUENTA_FALSA, ENDPOINT_FALSO, ID_CLAVE_FALSA } from "./__pruebas__/credenciales-falsas"
 
 const configuracion: ConfiguracionArchivoAuditoria = {
-  cuentaR2: "0123456789abcdef0123456789abcdef",
-  accessKeyId: "abcdef0123456789abcdef0123456789",
-  secretAccessKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  cuentaR2: CUENTA_FALSA,
+  accessKeyId: ID_CLAVE_FALSA,
+  secretAccessKey: CLAVE_SECRETA_FALSA,
   bucket: "reporty-audit-archive",
   diasRetencion: 180,
   limitePorLote: 1000,
   purgaHabilitada: false,
-  endpoint: "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com",
+  endpoint: ENDPOINT_FALSO,
 }
 
 const eventos: EventoAuditoria[] = [

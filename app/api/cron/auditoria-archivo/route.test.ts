@@ -7,8 +7,9 @@ vi.mock("@/lib/auditoria-archivo/datos-archivado", () => ({ crearDependenciasArc
 vi.mock("@/lib/auditoria-archivo/servicio-archivado", () => ({ ejecutarArchivado }))
 
 import { GET, POST } from "./route"
+import { SECRETO_CRON_FALSO } from "@/lib/auditoria-archivo/__pruebas__/credenciales-falsas"
 
-const secreto = "secreto-de-cron-con-mas-de-32-caracteres"
+const secreto = SECRETO_CRON_FALSO
 const resumen = {
   modo: "real",
   ok: true,
