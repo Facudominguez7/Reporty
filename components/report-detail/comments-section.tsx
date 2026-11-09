@@ -323,7 +323,6 @@ export function CommentsSection({
                   Para comentar,{" "}
                   <Link
                     href={`/auth?next=${encodeURIComponent(pathname)}`}
-                    prefetch={false}
                     className="font-medium text-primary hover:underline"
                   >
                     iniciá sesión

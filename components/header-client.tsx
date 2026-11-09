@@ -71,7 +71,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
       {showTopHeader && <div className="h-[calc(3.75rem+env(safe-area-inset-top))] shrink-0 sm:h-[calc(4.75rem+env(safe-area-inset-top))]" aria-hidden="true" />}
       {showTopHeader && (
         <header className="app-header fixed inset-x-0 top-0 z-40 flex min-h-[3.75rem] items-center justify-center bg-transparent px-4 pt-[env(safe-area-inset-top)] sm:min-h-[4.75rem] sm:px-6">
-          <Link href="/" prefetch={false} className="inline-flex rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-secondary" aria-label="Reporty, ir al inicio">
+          <Link href="/" className="inline-flex rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-secondary" aria-label="Reporty, ir al inicio">
             <Image
               src="/logos/logoSinBg.png"
               alt="Reporty"
@@ -95,8 +95,6 @@ export function HeaderClient({ user }: HeaderClientProps) {
             <Link
               key={label}
               href={href}
-              // Sin prefetch: cada ítem dispara un render dinámico en el origen compartido.
-              prefetch={false}
               aria-current={active ? "page" : undefined}
               aria-label={label}
               className={`flex min-h-10 flex-col items-center justify-center gap-1 rounded-[1.1rem] px-1 text-[0.64rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-secondary ${

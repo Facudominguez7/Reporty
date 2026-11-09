@@ -127,7 +127,7 @@ export function ReportCard({
   cuadrillaNombre,
 }: ReportCardProps) {
   return (
-    <Link key={id} href={`/reportes/${id}`} prefetch={false} className="block h-full w-full min-w-0">
+    <Link key={id} href={`/reportes/${id}`} className="block h-full w-full min-w-0">
       <Card className="h-full w-full min-w-0 overflow-hidden transition-colors hover:border-foreground/20">
         <div className="aspect-[16/10] overflow-hidden bg-surface-subtle">
           <img

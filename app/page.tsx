@@ -32,7 +32,7 @@ export default function HomePage() {
             Entre todos, es más fácil que se vea. <span className="text-primary">Es gratis.</span>
           </p>
         </div>
-        <Link href="/mapa" prefetch={false} className={buttonVariants({ size: "lg", className: "mt-1" })}>
+        <Link href="/mapa" className={buttonVariants({ size: "lg", className: "mt-1" })}>
           Explorar el mapa <ArrowRight aria-hidden="true" />
         </Link>
         <p className="text-xs text-primary">Posadas, Misiones</p>
