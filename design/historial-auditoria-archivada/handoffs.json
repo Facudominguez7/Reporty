@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "chosen": "01-historial-archivado.html",
+  "handoffs": {
+    "01-historial-archivado.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-08T16:33:56.302Z",
+      "startedAt": "2026-11-08T16:34:07.166Z",
+      "implementedAt": "2026-11-08T16:37:31.447Z",
+      "feature": "odd/tasks/auditoria-archivo-r2.md",
+      "note": "Sección «Historial archivado» implementada sobre los componentes reales (Card, Badge, Button, Label, Input). 1459 tests verdes, tsc y lint limpios.",
+      "previewUrl": "http://127.0.0.1:3000/admin/auditoria"
+    }
+  }
+}

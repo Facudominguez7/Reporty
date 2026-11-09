@@ -52,3 +52,6 @@ env.local
 # Playwright
 /test-results/
 /playwright-report/
+
+# Capturas que genera el canvas de Gentle Design al comentar (locales, no se versionan)
+design/**/.screenshots/

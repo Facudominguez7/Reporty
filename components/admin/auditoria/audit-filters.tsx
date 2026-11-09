@@ -5,7 +5,9 @@ import { Filter, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { AuditFilters } from "@/database/queries/admin/admin-audit"
+import { accionesPorGrupo } from "@/lib/auditoria/acciones"
 
+/** Filtros del panel de auditoría: usuario, acción y período. */
 export function AuditFiltersForm({ user, action, days }: AuditFilters) {
   const [open, setOpen] = useState(false)
 
@@ -22,10 +24,13 @@ export function AuditFiltersForm({ user, action, days }: AuditFilters) {
         <label className="grid gap-1 text-sm">Acción
           <select name="accion" defaultValue={action ?? ""} className="min-h-10 rounded-md border border-input bg-background px-3">
             <option value="">Todas</option>
-            <option value="report_created">Creó un reporte</option>
-            <option value="comment_created">Comentó</option>
-            <option value="vote_repaired">Votó reparado</option>
-            <option value="vote_not_exists">Votó que no existe</option>
+            {accionesPorGrupo().map((grupo) => (
+              <optgroup key={grupo.grupo} label={grupo.etiqueta}>
+                {grupo.acciones.map((accion) => (
+                  <option key={accion.valor} value={accion.valor}>{accion.etiqueta}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </label>
         <label className="grid gap-1 text-sm">Período
