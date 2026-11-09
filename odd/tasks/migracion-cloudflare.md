@@ -23,9 +23,9 @@ S8. Verificación: volver a medir producción con los mismos scripts (requests p
 ## Tasks
 
 - T1 [S3] Actualizar Next a 16.4.6 — inline — hecho (tsc OK, lint 0 errores, vitest 1473 OK). Risk: item 5 (dependencias).
-- T2 [S4] Reemplazar `sharp` por el binding `IMAGES` en `prepararImagenReporte` — inline — pendiente. Risk: item 2 (es una guarda de seguridad sobre imágenes subidas).
-- T3 [S5] Adaptador OpenNext, `wrangler.jsonc`, caché, scripts y verificación con `wrangler dev` — inline — pendiente. Risk: item 5.
-- T4 [S6] Cron del archivo de auditoría en Cloudflare — inline — pendiente.
+- T2 [S4] Reemplazar `sharp` por el binding `IMAGES` en `prepararImagenReporte` — inline — hecho `7236b49` (RED→GREEN; vitest 1478 OK); verificación independiente en curso. Risk: item 2 (guarda de seguridad sobre imágenes subidas).
+- T3 [S5] Adaptador OpenNext, `wrangler.jsonc`, caché, scripts y verificación con `wrangler dev` — inline — base hecha `6671d92`; falta la caché incremental en R2 (necesita la cuenta, T5). Risk: item 5.
+- T4 [S6] Cron del archivo de auditoría en Cloudflare — inline — hecho (custom-worker.ts + Cron Trigger `0 6 * * 0`); falta borrar el cron de Hostinger en el corte (T6).
 - T5 [S1, S5] Crear el Worker, cargar secrets y vincular Workers Builds con el repo (requiere autenticar los MCP de Cloudflare) — inline — bloqueada por el dueño.
 - T6 [S7] Corte de DNS con rollback — inline — bloqueada por la confirmación del dueño.
 - T7 [S8] Medición post-migración — inline — pendiente.
@@ -37,3 +37,5 @@ Ruta: todo inline. No hay unidades paralelas independientes de varios minutos: T
 L1 (2026-11-09, verbatim): «vamos a migrar esto a cloudflare urgente, junto a la vinculacion con el repo todo. esto del prefetch vamos a sacarlo antes»
 L2 (2026-11-09): aclaración de «sacarlo antes»: revertirlo. #225 abierto con el revert de #223 y #224 cerrado. También se pidió «instalate el mcp de cloudflare»: se agregaron `cloudflare`, `cloudflare-builds`, `cloudflare-observability` y `cloudflare-docs` (los tres primeros requieren `/mcp` para autenticar).
 L3 (2026-11-09): para reemplazar `sharp` se eligió «Cloudflare Images (Recomendado)». Evidencia: `npm view @opennextjs/cloudflare` da peer `next: '>=15.5.29 <16 || >=16.4.5'`; producción tiene 16.4.3. Una app Next de este tamaño probablemente requiere el plan pago de Workers (límites de 3 MB de bundle y 10 ms de CPU en el plan gratis).
+L4 (2026-11-09): T2: APNG pasaba con sharp (solo se chequeaban páginas de WebP); ahora se rechaza. sharp quedó como devDependency, solo para los tests, mediante el doble inyectado en `vitest.setup.ts`. Bundle del Worker: 2,84 MB gzip (antes 2,90 MB). `wrangler dev` (workerd): /, /mapa, /reportes, /reportes/85, /comunidad, /auth y /crear devuelven 200 con datos reales; /reportes/nuevo, /admin y /dashboard sin sesión devuelven 307 a /auth. Advertencia de OpenNext: el soporte del middleware Node (`proxy.ts`) es experimental en Cloudflare.
+L5 (2026-11-09): T4: el cron de Hostinger es `0 6 * * 0` (uid w8GJEVvYpf) y se replicó. No se disparó el handler programado en local porque `.env.local` apunta a la base de producción y haría una corrida real. Hallazgo: la misma cuenta de Hostinger corre `torneosmitai.com` con `queue:work` cada minuto (hasta 50 s), que compite por la CPU y los procesos de la cuenta compartida.
