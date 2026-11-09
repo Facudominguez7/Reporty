@@ -1,32 +1,67 @@
 /**
  * Chequeos estructurales de bytes de imagen que no dependen del decodificador: detectan
  * archivos truncados y formatos animados antes de enviar la imagen a procesar.
+ * Recorren los bloques de cada formato, así que el texto dentro de los metadatos no cuenta,
+ * y aceptan datos después del marcador de fin (algunas cámaras agregan bloques propios).
  */
 import type { REPORT_IMAGE_ACCEPTED_TYPES } from "./report-images"
 
 type TipoAceptado = (typeof REPORT_IMAGE_ACCEPTED_TYPES)[number]
 
-const FIN_PNG = [0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82] as const
+type BloquesPng = { completo: boolean; animado: boolean }
 
-/** Busca una secuencia ASCII de cuatro letras a partir de `desde`. */
-function contieneEtiqueta(bytes: Uint8Array, etiqueta: string, desde = 0, hasta = bytes.length) {
-  const codigos = Array.from(etiqueta, (letra) => letra.charCodeAt(0))
-  for (let i = desde; i + codigos.length <= hasta; i += 1) {
-    if (codigos.every((codigo, j) => bytes[i + j] === codigo)) return i
+/** Lee cuatro bytes como texto ASCII. */
+function etiqueta(bytes: Uint8Array, desde: number) {
+  return String.fromCharCode(bytes[desde], bytes[desde + 1], bytes[desde + 2], bytes[desde + 3])
+}
+
+/** Recorre los chunks PNG hasta IEND: `acTL` antes de `IDAT` marca un APNG. */
+function recorrerPng(bytes: Uint8Array): BloquesPng {
+  const vista = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  let animado = false
+  let posicion = 8
+  while (posicion + 12 <= bytes.length) {
+    const largo = vista.getUint32(posicion)
+    const tipo = etiqueta(bytes, posicion + 4)
+    const fin = posicion + 12 + largo
+    if (fin > bytes.length) break
+    if (tipo === "acTL") animado = true
+    if (tipo === "IEND") return { completo: true, animado }
+    posicion = fin
   }
-  return -1
+  return { completo: false, animado }
+}
+
+/** Recorre los chunks RIFF de un WebP: un VP8X con el bit de animación o `ANIM`/`ANMF` lo marcan animado. */
+function webpAnimado(bytes: Uint8Array) {
+  const vista = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const finRiff = Math.min(bytes.length, vista.getUint32(4, true) + 8)
+  let posicion = 12
+  while (posicion + 8 <= finRiff) {
+    const tipo = etiqueta(bytes, posicion)
+    const largo = vista.getUint32(posicion + 4, true)
+    if (tipo === "ANIM" || tipo === "ANMF") return true
+    if (tipo === "VP8X" && (bytes[posicion + 8] & 0x02) !== 0) return true
+    posicion += 8 + largo + (largo % 2)
+  }
+  return false
+}
+
+/** Indica si el JPEG tiene un fin de imagen (FFD9) después del inicio del escaneo (FFDA). */
+function jpegCompleto(bytes: Uint8Array) {
+  let inicioEscaneo = -1
+  for (let i = 2; i + 1 < bytes.length; i += 1) {
+    if (bytes[i] !== 0xff) continue
+    if (inicioEscaneo === -1 && bytes[i + 1] === 0xda) inicioEscaneo = i
+    else if (inicioEscaneo !== -1 && bytes[i + 1] === 0xd9) return true
+  }
+  return false
 }
 
 /** Indica si el archivo llega completo hasta su marcador de fin según el formato declarado. */
 export function imagenCompleta(bytes: Uint8Array, tipo: TipoAceptado) {
-  if (tipo === "image/jpeg") {
-    let fin = bytes.length
-    while (fin > 2 && bytes[fin - 1] === 0x00) fin -= 1
-    return fin >= 4 && bytes[fin - 2] === 0xff && bytes[fin - 1] === 0xd9
-  }
-  if (tipo === "image/png") {
-    return bytes.length >= 12 && FIN_PNG.every((valor, i) => bytes[bytes.length - 8 + i] === valor)
-  }
+  if (tipo === "image/jpeg") return jpegCompleto(bytes)
+  if (tipo === "image/png") return recorrerPng(bytes).completo
   if (bytes.length < 12) return false
   const tamanoRiff = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true)
   return bytes.length >= tamanoRiff + 8
@@ -34,14 +69,7 @@ export function imagenCompleta(bytes: Uint8Array, tipo: TipoAceptado) {
 
 /** Indica si la imagen declara más de un cuadro: APNG (`acTL`) o WebP animado. */
 export function imagenAnimada(bytes: Uint8Array, tipo: TipoAceptado) {
-  if (tipo === "image/png") {
-    const inicioDatos = contieneEtiqueta(bytes, "IDAT")
-    return contieneEtiqueta(bytes, "acTL", 8, inicioDatos === -1 ? bytes.length : inicioDatos) !== -1
-  }
-  if (tipo === "image/webp") {
-    const extendido = contieneEtiqueta(bytes, "VP8X", 12, 16) === 12
-    if (extendido && (bytes[20] & 0x02) !== 0) return true
-    return contieneEtiqueta(bytes, "ANIM", 12) !== -1 || contieneEtiqueta(bytes, "ANMF", 12) !== -1
-  }
+  if (tipo === "image/png") return recorrerPng(bytes).animado
+  if (tipo === "image/webp") return bytes.length >= 12 && webpAnimado(bytes)
   return false
 }
