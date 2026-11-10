@@ -1,5 +1,6 @@
 /** Administración privada de evidencia: autorización DB en cada entrada y decisiones CAS. */
 import "server-only"
+import { guardarDireccionMascota } from "@/lib/mascotas/direccion-mascota.server"
 import { createHash } from "node:crypto"
 import { createClient } from "@/utils/supabase/server"
 import { createAdminClient } from "@/utils/supabase/admin"
@@ -56,12 +57,14 @@ export async function editarMascotaAdministrativamente(input: EdicionMascotaAdmi
     || !Number.isFinite(input.lon) || input.lon < -180 || input.lon > 180
     || typeof input.telefono !== "string" || !/^[0-9]{1,40}$/.test(input.telefono)
     || !["perdida", "encontrada"].includes(input.estado)) fallar(400)
-  const { sesion } = await autorizarAdministracion()
+  const { sesion, servicio } = await autorizarAdministracion()
   const { data, error } = await sesion.rpc("editar_mascota_moderacion", {
     p_mascota_id: input.id, p_tipo_animal: input.tipoAnimal, p_descripcion: input.descripcion.trim(),
     p_lat: input.lat, p_lon: input.lon, p_telefono: input.telefono.trim(), p_estado: input.estado,
   })
   if (error) fallar(503)
+  // La ubicación pudo cambiar: se recalcula la calle (nunca lanza).
+  if (data === true) await guardarDireccionMascota(servicio, input.id, input.lat, input.lon)
   return data === true
     ? { exito: true, mascotaId: input.id, mensaje: "Publicación de mascota actualizada." }
     : { exito: false, mascotaId: input.id, mensaje: "La publicación ya fue retirada o no está disponible." }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { shareReport } from "@/lib/share/share-report"
+import { compartirHistoria, datosHistoriaMascota, descargarArchivo, generarImagenHistoria } from "@/lib/share/historia-instagram"
+import { MenuCompartir } from "@/components/report-detail/menu-compartir"
 import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation"
 import { marcarMascotaEncontradaAction, retirarMascotaDetalleAction } from "./actions"
@@ -40,6 +42,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
   const [pending, setPending] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(() => petDraft(pet))
+  const historiaPendiente = useRef<Promise<File> | null>(null)
   const statusLabel = getPetStatusAdjective(pet.status)
 
   async function saveAdmin() {
@@ -59,6 +62,30 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
     const outcome = await shareReport({ title: `${pet.species} ${statusLabel.toLowerCase()}`, text: `Mirá esta mascota en Reporty: ${pet.species} ${statusLabel.toLowerCase()}`, url: window.location.href }, navigator)
     if (outcome === "failed") setError("No pudimos compartir el enlace.")
     if (outcome === "copied") setMessage("Enlace copiado.")
+  }
+  /**
+   * Genera la imagen de la historia al abrir el menú, para que `navigator.share`
+   * quede pegado al toque (Safari lo exige). Si falla, el próximo intento la rehace.
+   */
+  function prepararHistoria() {
+    if (historiaPendiente.current) return
+    const pendiente = generarImagenHistoria(
+      datosHistoriaMascota({ especie: pet.species, estado: pet.status, descripcion: pet.description ?? "", direccion: pet.address ?? null, fotoUrl: pet.image ?? null, url: `${window.location.origin}/mascotas/${pet.id}` }),
+      getComputedStyle(document.body).fontFamily,
+    ).then((blob) => new File([blob], `reporty-mascota-${pet.id}.png`, { type: "image/png" }))
+    pendiente.catch(() => { historiaPendiente.current = null })
+    historiaPendiente.current = pendiente
+  }
+
+  /** Comparte la imagen vertical en el menú del sistema o la descarga, con el link copiado. */
+  async function compartirHistoriaMascota() {
+    setError(""); setMessage("")
+    prepararHistoria()
+    try {
+      const resultado = await compartirHistoria(await historiaPendiente.current!, `${window.location.origin}/mascotas/${pet.id}`, navigator, descargarArchivo)
+      if (resultado === "compartida") setMessage("Link copiado: en la historia, tocá el sticker «Enlace» y pegalo.")
+      if (resultado === "descargada") setMessage("Imagen descargada: subila a tu historia. El link quedó copiado para el sticker «Enlace».")
+    } catch { setError("No pudimos armar la imagen. Probá compartir el enlace.") }
   }
   async function found() {
     setPending(true); setError(""); setMessage("")
@@ -96,7 +123,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
             </div>
             <div className="flex min-w-0 items-start gap-3">
               {editing ? <label className="grid min-w-0 flex-1 gap-1 text-sm">Tipo de animal<select aria-label="Tipo de animal" className="min-h-10 rounded-md border bg-background px-3" value={draft.tipoAnimal} onChange={(e) => setDraft({ ...draft, tipoAnimal: e.target.value })} disabled={pending}><option value="perro">Perro</option><option value="gato">Gato</option><option value="otro">Otro</option></select></label> : <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {statusLabel.toLowerCase()}</CardTitle>}
-              <Button type="button" variant="outline" size="icon" className="size-10 shrink-0" onClick={share} aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button>
+              <MenuCompartir onAbrir={prepararHistoria} onCompartirEnlace={share} onCompartirHistoria={compartirHistoriaMascota}><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button></MenuCompartir>
               {(isOwner && pet.status === "Perdida" || isAdmin) && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" size="icon" className="size-10 shrink-0" disabled={pending || editing} aria-label="Retirar publicación" title="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente y se conservará su historial.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
               {isAdmin && !editing && <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 text-muted-foreground" onClick={() => { setDraft(petDraft(pet)); setError(""); setEditing(true) }} aria-label="Editar publicación" title="Editar publicación"><Pencil className="size-4" /></Button>}
             </div>
@@ -109,7 +136,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
               </div>
             </div>
             {editing ? <label className="grid gap-1 text-sm">Teléfono público<Input type="tel" inputMode="numeric" maxLength={40} value={draft.telefono} onChange={(e) => setDraft({ ...draft, telefono: e.target.value.replace(/[^0-9]/g, "") })} disabled={pending} /></label> : <p className="break-words text-sm">Teléfono público: <a className="font-medium underline" href={`tel:${pet.phone}`}>{pet.phone}</a></p>}
-            {pet.coordinates && <a href="#mascota-ubicacion" className="mx-auto mt-3 flex w-fit items-center gap-1 text-xs font-semibold underline lg:hidden"><MapPin className="size-3" aria-hidden="true" />Ver ubicación</a>}
+            {pet.coordinates && <a href="#mascota-ubicacion" className="mx-auto mt-3 flex w-fit items-center gap-1 text-xs font-semibold underline lg:hidden"><MapPin className="size-3 shrink-0" aria-hidden="true" /><span className="line-clamp-1">{pet.address ?? "Ver ubicación"}</span></a>}
             {isOwner && pet.status === "Perdida" && <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row">
               {pet.status === "Perdida" && <AlertDialog><AlertDialogTrigger asChild><Button disabled={pending}>Marcar encontrada</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Marcar como encontrada?</AlertDialogTitle><AlertDialogDescription>Este cambio es definitivo y no se puede deshacer.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={found}>Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
             </div>}
@@ -124,6 +151,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
         <Card id="mascota-ubicacion" className="scroll-mt-4">
           <CardHeader className="pb-3"><CardTitle className="text-base md:text-lg">Ubicación</CardTitle></CardHeader>
           <CardContent className="pt-0">
+            {pet.address && !(isAdmin && editing) && <p className="mb-3 flex items-start gap-2 text-sm font-medium text-foreground"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{pet.address}</span></p>}
             {isAdmin && editing ? <fieldset disabled={pending} className={pending ? "pointer-events-none opacity-70" : ""}>
               <legend className="text-xs font-medium text-muted-foreground">Ubicación</legend>
               <p className="mb-2 text-xs text-muted-foreground">Elegí un punto en el mapa. Con el teclado, mové el mapa con las flechas y seleccioná su centro.</p>

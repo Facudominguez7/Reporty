@@ -1,9 +1,10 @@
 /** Pruebas de autorización DB, lectura privada y decisiones administrativas CAS. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createHash } from "node:crypto"
-const dobles = vi.hoisted(() => ({ sesion: vi.fn(), servicio: vi.fn(), rol: vi.fn(), publicar: vi.fn(), limpiar: vi.fn(), avisar: vi.fn(), preparar: vi.fn() }))
+const dobles = vi.hoisted(() => ({ guardarDireccion: vi.fn(async () => null), sesion: vi.fn(), servicio: vi.fn(), rol: vi.fn(), publicar: vi.fn(), limpiar: vi.fn(), avisar: vi.fn(), preparar: vi.fn() }))
 vi.mock("./avisos-retiro.server", () => ({ enviarAvisoRetiro: dobles.avisar, VENTANA_REINTENTO_MS: (24 * 60 - 5) * 60000 }))
 vi.mock("server-only", () => ({}))
+vi.mock("@/lib/mascotas/direccion-mascota.server", () => ({ guardarDireccionMascota: dobles.guardarDireccion }))
 vi.mock("@/utils/supabase/server", () => ({ createClient: dobles.sesion }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: dobles.servicio }))
 vi.mock("@/lib/media/preparar-imagen-reporte.server", () => ({ prepararImagenReporte: dobles.preparar }))
@@ -47,6 +48,7 @@ describe("frontera administrativa", () => {
     expect(rpc).toHaveBeenCalledWith("editar_mascota_moderacion", {
       p_mascota_id: 9, p_tipo_animal: "gato", p_descripcion: "Revisada", p_lat: -34, p_lon: -56, p_telefono: "555123", p_estado: "perdida",
     })
+    expect(dobles.guardarDireccion).toHaveBeenCalledWith(dobles.servicio.mock.results[0].value, 9, -34, -56)
     expect(dobles.servicio.mock.results[0].value.from).not.toHaveBeenCalled()
   })
   it("non-admin cannot edit and invalid required fields never reach DB", async () => {

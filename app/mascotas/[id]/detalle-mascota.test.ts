@@ -16,6 +16,11 @@ const render = (isOwner: boolean, status: MascotaDetail["status"] = "Perdida") =
   renderToStaticMarkup(createElement(DetalleMascota, { pet: { ...pet, status }, isOwner }))
 
 describe("pet detail", () => {
+  it("shows the written street of the pet location", () => {
+    const html = renderToStaticMarkup(createElement(DetalleMascota, { pet: { ...pet, coordinates: [-27.36, -55.89], address: "Bolívar 1450, Posadas" }, isOwner: false }))
+    expect(html).toContain("Bolívar 1450, Posadas")
+  })
+
   it.each([["Perdida", "Perdido", "bg-destructive"], ["Encontrada", "Encontrado", "bg-primary"]] as const)("styles %s status consistently with its species", (status, label, color) => {
     const html = render(false, status)
     expect(html).toMatch(new RegExp(`class="[^"]*${color}[^"]*"><span[^>]*>Estado</span><span>${label}</span>`))

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createHash } from "node:crypto"
 
-const { preparar, moderar } = vi.hoisted(() => ({ preparar: vi.fn(), moderar: vi.fn() }))
+const { preparar, moderar, guardarDireccion } = vi.hoisted(() => ({ preparar: vi.fn(), moderar: vi.fn(), guardarDireccion: vi.fn(async () => null) }))
+vi.mock("@/lib/mascotas/direccion-mascota.server", () => ({ guardarDireccionMascota: guardarDireccion }))
 vi.mock("server-only", () => ({}))
 vi.mock("@/lib/media/preparar-imagen-reporte.server", () => ({ prepararImagenReporte: preparar }))
 vi.mock("./sightengine.server", () => ({ moderarImagen: moderar }))
@@ -78,6 +79,12 @@ describe("publicarMascotaAprobada", () => {
     const { supabase, evidence, upload } = publicationClient("pendiente")
     expect(await publicarMascotaAprobada(supabase as never, evidence as never, fields)).toEqual({ mascotaId: 9, pointsAwarded: 10 })
     expect(upload).toHaveBeenCalledOnce()
+  })
+
+  it("saves the written street of the new pet after publishing it", async () => {
+    const { supabase, evidence } = publicationClient("pendiente")
+    await publicarMascotaAprobada(supabase as never, evidence as never, fields)
+    expect(guardarDireccion).toHaveBeenCalledWith(supabase, 9, -34, -56)
   })
 
   it("does not reupload for an outstanding claim even if the object is absent", async () => {
