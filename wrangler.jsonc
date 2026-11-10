@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reporty",
+  // custom-worker.ts reuses the OpenNext fetch handler and adds the weekly audit-archive cron.
+  "main": "custom-worker.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": [
+    // Node.js APIs used by Next.js, the Supabase SDK and the AWS S3 SDK.
+    "nodejs_compat",
+    // Lets the app fetch public URLs (Supabase, Resend, R2).
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      // Must match "name" above: OpenNext calls the Worker itself for revalidation.
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "reporty"
+    }
+  ],
+  "images": {
+    // Cloudflare Images: re-encodes every uploaded report and pet photo (replaces sharp).
+    "binding": "IMAGES"
+  },
+  "triggers": {
+    // Weekly audit archive: Sundays 06:00 UTC (CRON_ARCHIVO_AUDITORIA in lib/cloudflare/cron-auditoria.ts).
+    "crons": ["0 6 * * 0"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

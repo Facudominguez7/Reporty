@@ -47,6 +47,28 @@ describe("prepararImagenReporte", () => {
     expect((await sharp(bytes, { animated: true }).metadata()).pages).toBe(2)
     await expect(prepararImagenReporte(new File([new Uint8Array(bytes)], "animada.webp", { type: "image/webp" }))).rejects.toThrow()
   })
+  it("rechaza PNG animado (APNG) aunque el primer cuadro sea válido", async () => {
+    const png = new Uint8Array(await (await imagen("png")).arrayBuffer())
+    // Inserta un chunk acTL (2 cuadros) después de IHDR: la estructura de un APNG real.
+    const actl = new Uint8Array([0, 0, 0, 8, 0x61, 0x63, 0x54, 0x4c, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0])
+    const apng = new Uint8Array([...png.slice(0, 33), ...actl, ...png.slice(33)])
+    await expect(prepararImagenReporte(new File([apng], "animada.png", { type: "image/png" }))).rejects.toThrow("animada")
+  })
+  it("acepta fotos con datos después del marcador de fin, como las de algunas cámaras", async () => {
+    const extra = new TextEncoder().encode("SEFT-trailer")
+    for (const formato of ["jpeg", "png"] as const) {
+      const bytes = new Uint8Array(await (await imagen(formato)).arrayBuffer())
+      const conCola = new File([new Uint8Array([...bytes, ...extra])], `cola.${formato}`, { type: `image/${formato}` })
+      await expect(prepararImagenReporte(conCola)).resolves.toHaveProperty("original")
+    }
+  })
+  it("no confunde texto de metadatos con una animación", async () => {
+    const bytes = await sharp({ create: { width: 32, height: 24, channels: 3, background: "red" } })
+      .withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description>ANIM ANMF acTL</rdf:Description></rdf:RDF></x:xmpmeta>')
+      .webp().toBuffer()
+    expect(Buffer.from(bytes).includes("ANIM")).toBe(true)
+    await expect(prepararImagenReporte(new File([new Uint8Array(bytes)], "xmp.webp", { type: "image/webp" }))).resolves.toHaveProperty("miniatura")
+  })
   it("elimina EXIF real y mantiene los contratos del validador compartido", async () => {
     const origen = await imagen("jpeg")
     const bytes = await sharp(await origen.arrayBuffer()).withMetadata().jpeg().toBuffer()

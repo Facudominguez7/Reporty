@@ -1,2 +1,7 @@
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+  unrs-resolver: true
+  workerd: true
 overrides:
   "@typescript-eslint/typescript-estree>minimatch": 11.0.1

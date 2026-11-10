@@ -55,3 +55,8 @@ env.local
 
 # Capturas que genera el canvas de Gentle Design al comentar (locales, no se versionan)
 design/**/.screenshots/
+
+# OpenNext / Cloudflare build output and local Worker secrets
+.open-next
+.wrangler
+.dev.vars*

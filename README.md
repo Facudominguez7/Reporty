@@ -182,7 +182,7 @@ sequenceDiagram
 ### Prerrequisitos
 
 - Node.js 18+
-- npm o pnpm
+- pnpm
 - Cuenta en Supabase
 - Cuenta en Resend (para emails)
 
@@ -196,11 +196,11 @@ sequenceDiagram
 
 2. **Instalar dependencias**
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. **Configurar variables de entorno**
-   Crear `.env.local` con tus credenciales (git lo ignora; `npm run db:setup` genera además `.env.development.local` para el Supabase local):
+   Crear `.env.local` con tus credenciales (git lo ignora; `pnpm run db:setup` genera además `.env.development.local` para el Supabase local):
    ```env
    NEXT_PUBLIC_SUPABASE_URL=tu_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
@@ -231,24 +231,24 @@ sequenceDiagram
 
 4. **Iniciar servidor de desarrollo**
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 
 5. Abrir [http://localhost:3000](http://localhost:3000)
 
 ### Pruebas
 
-- **Unitarias:** `npm test` (Vitest).
-- **De punta a punta:** `npm run test:e2e` (Playwright). Recorren los flujos principales en una build de producción contra el Supabase local, nunca contra producción:
-  1. Levantar Supabase local con `npm run db:start` (ver `supabase/README.md`).
-  2. Ejecutar `npm run test:e2e`. La primera vez compila la app y la sirve en el puerto 3100; los correos de autenticación quedan en el Mailpit del Supabase local y los de notificación en un Resend falso del puerto 3199, así que no se envía ningún correo real. Turnstile corre de verdad con la site key de prueba oficial, y el servidor verifica los tokens contra un Siteverify falso del puerto 3198 (`TURNSTILE_SITEVERIFY_URL`, que solo acepta loopback). La limpieza de datos necesita `psql` en el PATH.
-  3. Para ver el navegador mientras corren: `E2E_HEADED=1 npm run test:e2e`.
+- **Unitarias:** `pnpm test` (Vitest).
+- **De punta a punta:** `pnpm run test:e2e` (Playwright). Recorren los flujos principales en una build de producción contra el Supabase local, nunca contra producción:
+  1. Levantar Supabase local con `pnpm run db:start` (ver `supabase/README.md`).
+  2. Ejecutar `pnpm run test:e2e`. La primera vez compila la app y la sirve en el puerto 3100; los correos de autenticación quedan en el Mailpit del Supabase local y los de notificación en un Resend falso del puerto 3199, así que no se envía ningún correo real. Turnstile corre de verdad con la site key de prueba oficial, y el servidor verifica los tokens contra un Siteverify falso del puerto 3198 (`TURNSTILE_SITEVERIFY_URL`, que solo acepta loopback). La limpieza de datos necesita `psql` en el PATH.
+  3. Para ver el navegador mientras corren: `E2E_HEADED=1 pnpm run test:e2e`.
 
   Usan el Google Chrome instalado (no descargan navegadores). Cada prueba borra los usuarios, reportes y fotos que creó, aunque falle. Si una prueba falla, su traza queda en `test-results/` y se abre con `npx playwright show-trace <ruta>/trace.zip`.
-- **De carga:** `npm run test:load` (k6 en Docker, sin dependencias npm). Recorre `/`, `/mapa`, `/reportes`, el detalle de un reporte y `/sitemap.xml` con usuarios concurrentes. Corre solo contra una build de producción local con el Supabase local; **nunca apuntes una prueba de carga a producción**.
-  1. Levantar Supabase local con `npm run db:start`. Para que el detalle tenga un reporte, la base local necesita datos (`npm run db:setup`).
-  2. Ejecutar `npm run test:load`. Compila la app, la sirve en el puerto 3100 (si el puerto está ocupado, corta sin probar nada) y corre `scripts/carga/paginas-publicas.js` con la imagen `grafana/k6`.
-  3. Por defecto sube a 20 usuarios virtuales y los mantiene 1 minuto; se cambia con `USUARIOS=50 DURACION=2m npm run test:load`.
+- **De carga:** `pnpm run test:load` (k6 en Docker, sin dependencias npm). Recorre `/`, `/mapa`, `/reportes`, el detalle de un reporte y `/sitemap.xml` con usuarios concurrentes. Corre solo contra una build de producción local con el Supabase local; **nunca apuntes una prueba de carga a producción**.
+  1. Levantar Supabase local con `pnpm run db:start`. Para que el detalle tenga un reporte, la base local necesita datos (`pnpm run db:setup`).
+  2. Ejecutar `pnpm run test:load`. Compila la app, la sirve en el puerto 3100 (si el puerto está ocupado, corta sin probar nada) y corre `scripts/carga/paginas-publicas.js` con la imagen `grafana/k6`.
+  3. Por defecto sube a 20 usuarios virtuales y los mantiene 1 minuto; se cambia con `USUARIOS=50 DURACION=2m pnpm run test:load`.
 
   Falla (código 99) si más del 1 % de los pedidos da error o si el p95 de alguna página supera los 2 s. El resumen queda en `test-results/carga/resumen.json`.
 
