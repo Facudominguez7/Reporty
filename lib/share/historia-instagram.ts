@@ -122,11 +122,15 @@ export type DatosHistoria = {
   /** Texto secundario sin pin (por ejemplo, la descripción de una mascota). */
   detalle: string | null
   fotoUrl: string | null
-  /** Primera línea del recuadro verde; debajo va el link. */
+  /** Primera línea del recuadro verde; debajo va `SITIO_HISTORIA`. */
   llamado: string
-  /** Link a la publicación, se muestra sin «https://». */
-  url: string
 }
+
+/**
+ * Sitio que muestra el pie de la historia. Va siempre el dominio, no el link de la
+ * publicación: en una historia el texto de la imagen no se puede tocar ni copiar.
+ */
+export const SITIO_HISTORIA = "reporty.com.ar"
 
 /**
  * Datos de la historia de un reporte: prioridad, estado y categoría como chips.
@@ -140,7 +144,6 @@ export function datosHistoriaReporte(reporte: {
   categoria: string
   direccion: string | null
   fotoUrl: string | null
-  url: string
 }): DatosHistoria {
   return {
     titulo: reporte.titulo,
@@ -153,7 +156,6 @@ export function datosHistoriaReporte(reporte: {
     detalle: null,
     fotoUrl: reporte.fotoUrl,
     llamado: "Mirá el reporte y sumá tu aporte en",
-    url: reporte.url,
   }
 }
 
@@ -173,7 +175,6 @@ export function datosHistoriaMascota(mascota: {
   /** Calle donde se la vio, guardada al publicarla. */
   direccion: string | null
   fotoUrl: string | null
-  url: string
 }): DatosHistoria {
   const perdida = mascota.estado === "Perdida"
   const adjetivo = perdida ? "Perdido" : "Encontrado"
@@ -184,7 +185,6 @@ export function datosHistoriaMascota(mascota: {
     detalle: mascota.descripcion.trim() || null,
     fotoUrl: mascota.fotoUrl,
     llamado: perdida ? "¿Lo viste? Avisá desde la publicación en" : "Mirá la publicación en",
-    url: mascota.url,
   }
 }
 
@@ -338,8 +338,7 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
   ctx.font = `500 36px ${fuente}`
   ctx.fillText(datos.llamado, ANCHO_HISTORIA / 2, pie.y + 56)
   ctx.font = `700 44px ${fuente}`
-  const enlace = datos.url.replace(/^https?:\/\//, "")
-  ctx.fillText(partirEnLineas(enlace, (t) => ctx.measureText(t).width, interior.w - 48, 1)[0], ANCHO_HISTORIA / 2, pie.y + 114)
+  ctx.fillText(SITIO_HISTORIA, ANCHO_HISTORIA / 2, pie.y + 114)
   ctx.textAlign = "start"
 
   return new Promise((resolver, rechazar) =>
@@ -351,26 +350,24 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
 export type NavegadorHistoria = {
   share?: (datos: { files: File[] }) => Promise<void>
   canShare?: (datos: { files: File[] }) => boolean
-  clipboard?: { writeText: (texto: string) => Promise<void> }
 }
 
 export type ResultadoHistoria = "compartida" | "cancelada" | "descargada"
 
 /**
- * Comparte la imagen con el menú del sistema (Instagram → Historia) o la descarga.
- * Siempre intenta copiar el link para pegarlo en el sticker «Enlace».
+ * Comparte la imagen con el menú del sistema (Instagram → Historia) o la descarga
+ * cuando el navegador no puede compartir archivos.
  *
+ * @param archivo - Imagen de la historia, ya generada: Safari sólo acepta `share`
+ *   pegado al toque, así que no puede esperar a dibujarla.
+ * @param nav - `navigator` (inyectable en pruebas).
  * @param descargar - Guarda el archivo cuando no se puede compartir.
  */
 export async function compartirHistoria(
   archivo: File,
-  url: string,
   nav: NavegadorHistoria,
   descargar: (archivo: File) => void,
 ): Promise<ResultadoHistoria> {
-  // Sin `await`: Safari sólo acepta `share` pegado al toque, así que nada lo demora.
-  void nav.clipboard?.writeText(url).catch(() => undefined)
-
   if (nav.share && nav.canShare?.({ files: [archivo] })) {
     try {
       await nav.share({ files: [archivo] })

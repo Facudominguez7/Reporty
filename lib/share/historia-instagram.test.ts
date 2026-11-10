@@ -4,6 +4,7 @@ import {
   compartirHistoria,
   encuadrarFoto,
   partirEnLineas,
+  SITIO_HISTORIA,
   datosHistoriaMascota,
   datosHistoriaReporte,
   tonoHexEstado,
@@ -60,7 +61,6 @@ describe("datosHistoriaReporte", () => {
       categoria: "Bache",
       direccion: "Bolívar 1450, Posadas",
       fotoUrl: null,
-      url: "u",
     })
 
     expect(datos.chips).toEqual([
@@ -81,7 +81,6 @@ describe("datosHistoriaMascota", () => {
       descripcion: "Golden con collar azul",
       direccion: null,
       fotoUrl: "/api/mascotas/4/foto",
-      url: "https://reporty.com.ar/mascotas/4",
     })
 
     expect(datos.titulo).toBe("Perro perdido")
@@ -92,7 +91,7 @@ describe("datosHistoriaMascota", () => {
   })
 
   it("usa el verde y un llamado neutro cuando la mascota ya fue encontrada", () => {
-    const datos = datosHistoriaMascota({ especie: "Gato", estado: "Encontrada", descripcion: "", direccion: null, fotoUrl: null, url: "u" })
+    const datos = datosHistoriaMascota({ especie: "Gato", estado: "Encontrada", descripcion: "", direccion: null, fotoUrl: null })
 
     expect(datos.titulo).toBe("Gato encontrado")
     expect(datos.chips).toEqual([{ texto: "Encontrado", tono: "#278C5A" }])
@@ -103,25 +102,23 @@ describe("datosHistoriaMascota", () => {
 
 describe("datosHistoriaMascota con calle", () => {
   it("muestra la calle donde se vio la mascota, con su pin", () => {
-    const datos = datosHistoriaMascota({ especie: "Perro", estado: "Perdida", descripcion: "Golden", direccion: "Bolívar 1450, Posadas", fotoUrl: null, url: "u" })
+    const datos = datosHistoriaMascota({ especie: "Perro", estado: "Perdida", descripcion: "Golden", direccion: "Bolívar 1450, Posadas", fotoUrl: null })
     expect(datos.direccion).toBe("Bolívar 1450, Posadas")
   })
 })
 
 describe("compartirHistoria", () => {
   const archivo = new File(["x"], "historia.png", { type: "image/png" })
-  const url = "https://reporty.com.ar/reportes/85"
 
-  it("abre el menú del sistema con la imagen y copia el link para el sticker", async () => {
+  it("abre el menú del sistema con la imagen, sin tocar el portapapeles", async () => {
     const share = vi.fn().mockResolvedValue(undefined)
-    const writeText = vi.fn().mockResolvedValue(undefined)
+    const writeText = vi.fn()
     const descargar = vi.fn()
+    const nav = { share, canShare: () => true, clipboard: { writeText } }
 
-    const resultado = await compartirHistoria(archivo, url, { share, canShare: () => true, clipboard: { writeText } }, descargar)
-
-    expect(resultado).toBe("compartida")
+    expect(await compartirHistoria(archivo, nav, descargar)).toBe("compartida")
     expect(share).toHaveBeenCalledWith({ files: [archivo] })
-    expect(writeText).toHaveBeenCalledWith(url)
+    expect(writeText).not.toHaveBeenCalled()
     expect(descargar).not.toHaveBeenCalled()
   })
 
@@ -129,24 +126,28 @@ describe("compartirHistoria", () => {
     const share = vi.fn().mockRejectedValue(new DOMException("cerrado", "AbortError"))
     const descargar = vi.fn()
 
-    expect(await compartirHistoria(archivo, url, { share, canShare: () => true }, descargar)).toBe("cancelada")
+    expect(await compartirHistoria(archivo, { share, canShare: () => true }, descargar)).toBe("cancelada")
     expect(descargar).not.toHaveBeenCalled()
   })
 
   it("descarga la imagen cuando el navegador no puede compartir archivos", async () => {
     const descargar = vi.fn()
-    const writeText = vi.fn().mockResolvedValue(undefined)
 
-    expect(await compartirHistoria(archivo, url, { canShare: () => false, clipboard: { writeText } }, descargar)).toBe("descargada")
+    expect(await compartirHistoria(archivo, { canShare: () => false }, descargar)).toBe("descargada")
     expect(descargar).toHaveBeenCalledWith(archivo)
-    expect(writeText).toHaveBeenCalledWith(url)
   })
 
   it("descarga si compartir falla por otro motivo", async () => {
     const share = vi.fn().mockRejectedValue(new Error("NotAllowed"))
     const descargar = vi.fn()
 
-    expect(await compartirHistoria(archivo, url, { share, canShare: () => true }, descargar)).toBe("descargada")
+    expect(await compartirHistoria(archivo, { share, canShare: () => true }, descargar)).toBe("descargada")
     expect(descargar).toHaveBeenCalledWith(archivo)
+  })
+})
+
+describe("SITIO_HISTORIA", () => {
+  it("es siempre el dominio de Reporty", () => {
+    expect(SITIO_HISTORIA).toBe("reporty.com.ar")
   })
 })
