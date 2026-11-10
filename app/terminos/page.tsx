@@ -63,8 +63,8 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          Reportá problemas reales de la vía pública, con su ubicación y con fotos tomadas por vos. <strong>No está
-          permitido</strong> publicar:
+          Reportá problemas reales de la vía pública, con su ubicación y con fotos tomadas por vos, y publicá mascotas
+          perdidas o encontradas con datos reales. <strong>No está permitido</strong> publicar:
         </p>
         <ul>
           <li>Reportes falsos, inventados o hechos para molestar.</li>
@@ -75,6 +75,41 @@ const sections: LegalSection[] = [
           <li>Publicidad, spam o contenido que no tenga relación con problemas urbanos.</li>
           <li>Fotos o textos de terceros sin su permiso.</li>
         </ul>
+      </>
+    ),
+  },
+  {
+    id: "fotos",
+    title: "Fotos y responsabilidad por lo que publicás",
+    content: (
+      <>
+        <p>
+          <strong>Sos el único responsable de las fotos y los textos que subís</strong>, en reportes, mascotas, comentarios
+          o cualquier otra parte de Reporty. Al subirlos declarás que los tomaste vos o que tenés permiso para publicarlos, y
+          que no violan la ley ni derechos de otras personas.
+        </p>
+        <p>Además de lo indicado en «Qué podés publicar», está prohibido subir:</p>
+        <ul>
+          <li>Contenido ilegal o que muestre, promueva o facilite un delito.</li>
+          <li>Desnudos, contenido sexual o cualquier imagen sexualizada de menores de edad.</li>
+          <li>Violencia explícita, contenido sangriento, armas usadas para amenazar o imágenes que humillen a alguien.</li>
+          <li>Fotos de otras personas sin su consentimiento, sobre todo de niñas, niños y adolescentes.</li>
+          <li>Imágenes protegidas por derechos de autor o marcas que no te pertenecen.</li>
+        </ul>
+        <p>
+          Las fotos pasan por un control automático y pueden ser revisadas por un administrador antes o después de
+          publicarse. Ese control ayuda, pero Reporty no garantiza que todo el contenido publicado por usuarios sea adecuado
+          ni responde por él: la responsabilidad es de quien lo subió.
+        </p>
+        <p>
+          Si publicás algo que no cumple estas reglas, podemos rechazarlo o eliminarlo sin aviso y suspender tu cuenta.
+          Cuando haya indicios de un delito, o lo pida una autoridad competente, podemos conservar ese contenido y los datos
+          asociados y entregarlos conforme a la ley. Si un tercero reclama por algo que publicaste, la responsabilidad frente
+          a ese reclamo es tuya.
+        </p>
+        <p>
+          Si ves una foto o un texto que no cumple estas reglas, avisanos a <ContactEmail /> y lo revisamos.
+        </p>
       </>
     ),
   },
@@ -203,7 +238,8 @@ export default function TerminosPage() {
       summary={
         <>
           <p>
-            Reportá problemas reales de la vía pública, sin datos personales de otras personas. Lo que publicás es público.
+            Reportá problemas reales de la vía pública, sin datos personales de otras personas. Lo que publicás es público y
+            sos responsable de las fotos y los textos que subís.
           </p>
           <p>
             Reporty es una iniciativa ciudadana: no es un canal oficial de la Municipalidad ni atiende emergencias.
