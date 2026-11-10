@@ -73,13 +73,12 @@ const contar = (html: string, fragmento: string) => html.split(fragmento).length
 beforeEach(() => vi.clearAllMocks())
 
 describe("compositor de aportes dentro de la sección", () => {
-  it("conserva el formulario en la sección mientras la hoja está cerrada", () => {
+  it("no muestra el formulario en la sección: comentar sólo se abre desde el botón flotante", () => {
     const html = renderizar()
 
-    expect(html).toContain("¿Qué novedad tenés?")
-    expect(contar(html, "<select")).toBe(1)
-    expect(html).toContain("Publicar")
-    expect(html).toContain('data-turnstile="comentar_reporte"')
+    expect(contar(html, "<select")).toBe(0)
+    expect(html).not.toContain("Publicar</span>")
+    expect(html).not.toContain('data-turnstile="comentar_reporte"')
   })
 
   it("mueve el compositor a la hoja inferior cuando la acción flotante lo pide", () => {
@@ -141,7 +140,8 @@ describe("diálogos por encima de la hoja inferior", () => {
   it("sube la confirmación de publicación sobre el Drawer cuando el compositor está en la hoja", () => {
     const fuente = readFileSync(new URL("./comments-section.tsx", import.meta.url), "utf8")
 
-    // El Drawer compartido usa !z-[70]; sin esto, la confirmación queda debajo del velo.
-    expect(fuente).toContain('<AlertDialogContent className="z-[80]">')
+    // El Drawer compartido usa !z-[70] y globals.css fuerza z-index 50 !important en los
+    // alertdialog: sin el `!`, la confirmación queda debajo del velo y no se puede tocar.
+    expect(fuente).toContain('<AlertDialogContent className="!z-[80]">')
   })
 })

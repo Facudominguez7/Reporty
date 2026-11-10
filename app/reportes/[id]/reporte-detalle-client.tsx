@@ -84,10 +84,12 @@ import {
   type ContextoAccionesFlotantes,
 } from "@/components/report-detail/acciones-flotantes";
 import { HojaReporte } from "@/components/report-detail/hojas-reporte";
+import { ChipReporte, TONO_CATEGORIA, tonoEstado, tonoPrioridad } from "@/components/report-detail/chip-reporte";
+import { AvisoComentar, useAvisoComentar } from "@/components/report-detail/aviso-comentar";
 import { ContenidoUbicacion, FranjaUbicacion } from "@/components/report-detail/ubicacion-reporte";
 import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
-import { ReportContactActions, ReportContactDialog, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
+import { ReportContactActions, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation";
 import {
@@ -242,7 +244,8 @@ export function ReporteDetalleClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<{ src: string; alt: string } | null>(null);
   // Hoja inferior abierta desde el botón flotante: una sola a la vez (S13, S18).
-  const [hojaAbierta, setHojaAbierta] = useState<ClaveAccionFlotante | null>(null);
+  // La ubicación tiene hoja propia pero no acción flotante: la abre la franja de ubicación.
+  const [hojaAbierta, setHojaAbierta] = useState<ClaveAccionFlotante | "ubicacion" | null>(null);
   // El menú flotante lo controla la ficha para poder cerrarlo antes de abrir una hoja.
   const [menuFlotanteAbierto, setMenuFlotanteAbierto] = useState(false);
   // Botón que abrió la hoja: recibe el foco cuando el Drawer se cierra.
@@ -595,6 +598,12 @@ export function ReporteDetalleClient({
     }
   };
 
+  // Tour mínimo: la primera vez que se puede comentar, un globo señala el lápiz. Va antes
+  // del retorno temprano (regla de hooks); la condición es la misma que ofrece «Comentar».
+  const avisoComentar = useAvisoComentar(
+    Boolean(reporte && currentUser && !currentUser.is_anonymous && !isReporteCerrado),
+  );
+
   if (!reporte) {
     return (
       <div className="page-shell flex items-center justify-center px-4">
@@ -667,7 +676,7 @@ export function ReporteDetalleClient({
    * Abre una hoja recordando el botón que la originó y cerrando antes el menú flotante:
    * nunca queda un menú desplegado detrás del velo y el foco vuelve a un control real.
    */
-  const abrirHoja = (hoja: ClaveAccionFlotante, disparador: HTMLElement | null) => {
+  const abrirHoja = (hoja: ClaveAccionFlotante | "ubicacion", disparador: HTMLElement | null) => {
     setDisparadorHoja(disparador);
     setMenuFlotanteAbierto(false);
     setHojaAbierta(hoja);
@@ -682,7 +691,6 @@ export function ReporteDetalleClient({
       setUrlReporte(new URL(`/reportes/${reporte.id}`, window.location.origin).toString());
       abrirHoja("contactos", disparador);
     },
-    ubicacion: (disparador) => abrirHoja("ubicacion", disparador),
     reparacion: (disparador) => abrirHoja("reparacion", disparador),
     comentar: (disparador) => abrirHoja("comentar", disparador),
   };
@@ -690,16 +698,14 @@ export function ReporteDetalleClient({
   const contextoAccionesFlotantes: ContextoAccionesFlotantes = {
     sesion: { haySesion: Boolean(currentUser), esAnonimo: Boolean(currentUser?.is_anonymous) },
     reporteCerrado: Boolean(isReporteCerrado),
-    tieneUbicacion: reporte.lat !== null && reporte.lon !== null,
     puedeContactar,
     reparacion: evidenciaReparacion
       ? { hayEvidencia: evidenciaReparacion.evidencia !== null, puedeInformar: evidenciaReparacion.puedeInformar }
       : null,
   };
-  const accionesFlotantes = construirAccionesFlotantes(
-    accionesDisponibles(contextoAccionesFlotantes),
-    manejadoresAccionesFlotantes,
-  );
+  const clavesAccionesFlotantes = accionesDisponibles(contextoAccionesFlotantes);
+  const accionesFlotantes = construirAccionesFlotantes(clavesAccionesFlotantes, manejadoresAccionesFlotantes);
+
 
   /** Descripción honesta de la hoja de reparación: depende del estado real de la evidencia. */
   const descripcionReparacion = !evidenciaReparacion?.evidencia
@@ -773,7 +779,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("prioridadId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>}
+                      display={() => <ChipReporte etiqueta="Prioridad" tono={tonoPrioridad(getNameFromRelation(reporte.prioridades))} icono={getPriorityIcon(getNameFromRelation(reporte.prioridades))} valor={getNameFromRelation(reporte.prioridades)} />}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Prioridad del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir prioridad" /></SelectTrigger>
@@ -782,7 +788,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getPriorityVariant(getNameFromRelation(reporte.prioridades))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Prioridad</span><span className="inline-flex items-center gap-1">{getPriorityIcon(getNameFromRelation(reporte.prioridades), "size-3")}{getNameFromRelation(reporte.prioridades)}</span></Badge>
+                    <ChipReporte etiqueta="Prioridad" tono={tonoPrioridad(getNameFromRelation(reporte.prioridades))} icono={getPriorityIcon(getNameFromRelation(reporte.prioridades))} valor={getNameFromRelation(reporte.prioridades)} />
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -793,7 +799,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => setAdminDraft((current) => current ? { ...current, estadoId: value.estadoId, comentarioEstado: value.comentario } : current)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>}
+                      display={() => <ChipReporte etiqueta="Estado" tono={tonoEstado(getNameFromRelation(reporte.estados))} icono={getStatusIcon(getNameFromRelation(reporte.estados))} valor={getNameFromRelation(reporte.estados)} />}
                       editor={(draft, onChange) => (
                         <div className="min-w-0 space-y-2">
                           <Select value={draft.estadoId.toString()} disabled={isAdminSaving} onValueChange={(id) => {
@@ -808,7 +814,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant={getStatusVariant(getNameFromRelation(reporte.estados))} className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Estado</span><span className="inline-flex items-center gap-1">{getStatusIcon(getNameFromRelation(reporte.estados), "size-3")}{getNameFromRelation(reporte.estados)}</span></Badge>
+                    <ChipReporte etiqueta="Estado" tono={tonoEstado(getNameFromRelation(reporte.estados))} icono={getStatusIcon(getNameFromRelation(reporte.estados))} valor={getNameFromRelation(reporte.estados)} />
                   )}
                   {isAdmin ? (
                     <AdminInlineField
@@ -819,7 +825,7 @@ export function ReporteDetalleClient({
                       onChange={(value) => updateAdminDraft("categoriaId", value)}
                       disabled={isAdminSaving}
                       className="min-w-0"
-                      display={() => <Badge variant="category" className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>}
+                      display={() => <ChipReporte etiqueta="Categoría" tono={TONO_CATEGORIA} icono={getCategoryIcon(getNameFromRelation(reporte.categorias))} valor={getNameFromRelation(reporte.categorias)} />}
                       editor={(value, onChange) => (
                         <Select value={value?.toString() ?? ""} disabled={isAdminSaving} onValueChange={(id) => onChange(Number(id))}>
                           <SelectTrigger aria-label="Categoría del reporte" className="min-h-10 w-full"><SelectValue placeholder="Elegir categoría" /></SelectTrigger>
@@ -828,7 +834,7 @@ export function ReporteDetalleClient({
                       )}
                     />
                   ) : (
-                    <Badge variant="category" className="flex flex-col items-center gap-0.5 px-2.5 py-1 text-[10px] leading-none"><span className="text-[8px] font-semibold uppercase leading-none tracking-[0.08em] opacity-90">Categoría</span><span className="inline-flex items-center gap-1">{getCategoryIcon(getNameFromRelation(reporte.categorias), "size-3")}{getNameFromRelation(reporte.categorias)}</span></Badge>
+                    <ChipReporte etiqueta="Categoría" tono={TONO_CATEGORIA} icono={getCategoryIcon(getNameFromRelation(reporte.categorias))} valor={getNameFromRelation(reporte.categorias)} />
                   )}
                 </div>
                 <div className="flex min-w-0 items-start gap-3">
@@ -986,19 +992,6 @@ export function ReporteDetalleClient({
                         </span>
                       )}
                     </span>
-                  </div>
-                )}
-                {puedeContactar && reporte.lat !== null && reporte.lon !== null && (
-                  <div className="mt-2 mb-3">
-                    <ReportContactDialog
-                      title={reporte.titulo}
-                      category={getNameFromRelation(reporte.categorias)}
-                      description={reporte.descripcion ?? ""}
-                      latitude={reporte.lat}
-                      longitude={reporte.lon}
-                      date={parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", { timeZone: ZONA_HORARIA })}
-                      reportId={reporte.id}
-                    />
                   </div>
                 )}
                 {showVoteFooter && (
@@ -1391,7 +1384,12 @@ export function ReporteDetalleClient({
       <AccionesFlotantes
         acciones={accionesFlotantes}
         abierta={menuFlotanteAbierto}
-        onCambiarAbierta={setMenuFlotanteAbierto}
+        onCambiarAbierta={(abierta) => {
+          // Abrir el menú ya cumple el objetivo del aviso: no vuelve a aparecer.
+          if (abierta && avisoComentar.visible) avisoComentar.descartar();
+          setMenuFlotanteAbierto(abierta);
+        }}
+        aviso={avisoComentar.visible ? <AvisoComentar onCerrar={avisoComentar.descartar} /> : undefined}
       />
     </div>
   );

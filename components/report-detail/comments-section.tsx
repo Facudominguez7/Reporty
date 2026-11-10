@@ -88,8 +88,8 @@ export type CommentsSectionProps = {
   onDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
   onAdminDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
   /**
-   * El compositor vive en la hoja inferior mientras la acción flotante lo pide.
-   * Sigue siendo el mismo estado y el mismo envío, así nunca hay dos formularios.
+   * El compositor vive sólo en la hoja inferior que abre la acción flotante «Comentar»;
+   * la tarjeta queda para leer la actividad, así nunca hay dos formularios.
    */
   compositorAbierto?: boolean;
   onCambiarCompositor?: (abierto: boolean) => void;
@@ -168,6 +168,10 @@ export function CommentsSection({
     setPublishDialogOpen(true);
   };
 
+  /**
+   * Publica el aporte confirmado. Con éxito cierra la hoja del compositor para que la
+   * persona vea su aporte en la actividad; con error la deja abierta con lo elegido.
+   */
   const confirmSubmit = async () => {
     if (!currentUser || !newComment) return;
 
@@ -186,6 +190,7 @@ export function CommentsSection({
         result.data.comment,
       ]);
       setNewComment("");
+      onCambiarCompositor?.(false);
       toast.success(
         result.data.pointsAwarded > 0
           ? `¡Actualización publicada! +${result.data.pointsAwarded} puntos`
@@ -249,8 +254,8 @@ export function CommentsSection({
   };
 
   /**
-   * Compositor único de la sección: el mismo formulario se pinta dentro de la tarjeta
-   * o en la hoja inferior, nunca en los dos lugares a la vez ni con dos envíos.
+   * Compositor único de la sección: se pinta sólo en la hoja inferior que abre la
+   * acción flotante «Comentar», nunca dentro de la tarjeta de actividad.
    */
   const formularioAporte = (
     <form
@@ -426,7 +431,6 @@ export function CommentsSection({
             )}
           </div>
 
-          {puedeComentar && !compositorAbierto && formularioAporte}
         </CardContent>
       </Card>
 
@@ -443,9 +447,11 @@ export function CommentsSection({
         </HojaReporte>
       )}
 
-      {/* El Drawer compartido usa !z-[70]: la confirmación tiene que quedar por encima. */}
+      {/* El Drawer compartido usa !z-[70]: la confirmación tiene que quedar por encima.
+          Va con `!` porque globals.css fuerza `z-index: 50 !important` en todo
+          [role="alertdialog"]; sólo un !important de la capa de utilidades le gana. */}
       <AlertDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-        <AlertDialogContent className="z-[80]">
+        <AlertDialogContent className="!z-[80]">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

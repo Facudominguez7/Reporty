@@ -4,7 +4,8 @@
  * Botón flotante de acciones del detalle del reporte (S13, S18).
  *
  * Reúne en un solo botón ámbar las acciones que antes obligaban a recorrer la ficha
- * hasta el final: comentar, informar o ver la reparación, ubicación y organismos.
+ * hasta el final: comentar, informar o ver la reparación y organismos. La ubicación
+ * no está acá: la franja de ubicación de la ficha ya abre su hoja.
  * Cada acción abre una hoja inferior; acá solo vive la apertura del menú, el foco y
  * el cierre, nunca la lógica de negocio de la ficha.
  *
@@ -14,13 +15,13 @@
  * antes y nunca queda `aria-expanded="true"` detrás del velo.
  */
 
-import { useCallback, useEffect, useId, useRef } from "react"
-import { Building2, Camera, MapPin, MessageCircle, Pencil, X, type LucideIcon } from "lucide-react"
+import { useCallback, useEffect, useId, useRef, type ReactNode } from "react"
+import { Building2, Camera, MessageCircle, Pencil, X, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/** Las cuatro acciones que el diseño pone al alcance del pulgar. */
-export type ClaveAccionFlotante = "contactos" | "ubicacion" | "reparacion" | "comentar"
+/** Las tres acciones que el diseño pone al alcance del pulgar. */
+export type ClaveAccionFlotante = "contactos" | "reparacion" | "comentar"
 
 /**
  * Acción concreta del menú. `onSeleccionar` recibe el botón que la abrió para que la
@@ -36,7 +37,6 @@ export type AccionFlotante = {
 /** Etiquetas de las acciones; las mismas palabras que muestra el menú. */
 export const ETIQUETAS_ACCION_FLOTANTE: Record<ClaveAccionFlotante, string> = {
   contactos: "Avisar a un organismo",
-  ubicacion: "Ver ubicación",
   reparacion: "¿Ya lo arreglaron?",
   comentar: "Comentar",
 }
@@ -44,7 +44,6 @@ export const ETIQUETAS_ACCION_FLOTANTE: Record<ClaveAccionFlotante, string> = {
 /** Íconos de las acciones; siempre decorativos, nunca el único texto del botón. */
 export const ICONOS_ACCION_FLOTANTE: Record<ClaveAccionFlotante, LucideIcon> = {
   contactos: Building2,
-  ubicacion: MapPin,
   reparacion: Camera,
   comentar: MessageCircle,
 }
@@ -53,7 +52,6 @@ export const ICONOS_ACCION_FLOTANTE: Record<ClaveAccionFlotante, LucideIcon> = {
 export type ContextoAccionesFlotantes = {
   sesion: { haySesion: boolean; esAnonimo: boolean }
   reporteCerrado: boolean
-  tieneUbicacion: boolean
   puedeContactar: boolean
   /** `null` cuando la ficha no tiene sección de reparación que mostrar. */
   reparacion: { hayEvidencia: boolean; puedeInformar: boolean } | null
@@ -69,7 +67,6 @@ export type ContextoAccionesFlotantes = {
 export function accionesDisponibles(contexto: ContextoAccionesFlotantes): ClaveAccionFlotante[] {
   const disponibles: ClaveAccionFlotante[] = []
   if (contexto.puedeContactar) disponibles.push("contactos")
-  if (contexto.tieneUbicacion) disponibles.push("ubicacion")
   if (contexto.reparacion && (contexto.reparacion.hayEvidencia || contexto.reparacion.puedeInformar)) {
     disponibles.push("reparacion")
   }
@@ -195,18 +192,21 @@ export function ListaAcciones({
  * Botón flotante con su menú. El disparador anuncia si está abierto, controla la
  * lista, cierra con Escape o al tocar afuera y devuelve el foco al botón al cerrar.
  * La apertura la controla la ficha (`abierta`/`onCambiarAbierta`), así una hoja nunca
- * se abre con el menú desplegado.
+ * se abre con el menú desplegado. `aviso` es un globo opcional (el tour de comentar)
+ * que se pinta sobre el botón sólo mientras el menú está cerrado.
  */
 export function AccionesFlotantes({
   acciones,
   abierta,
   onCambiarAbierta,
   etiqueta = "Acciones rápidas del reporte",
+  aviso,
 }: {
   acciones: AccionFlotante[]
   abierta: boolean
   onCambiarAbierta: (abierta: boolean) => void
   etiqueta?: string
+  aviso?: ReactNode
 }) {
   const botonRef = useRef<HTMLButtonElement>(null)
   const contenedorRef = useRef<HTMLDivElement>(null)
@@ -247,6 +247,7 @@ export function AccionesFlotantes({
       data-acciones-flotantes=""
       className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-space)+0.5rem)] z-[65] flex flex-col items-end gap-2 px-3 md:px-4"
     >
+      {!abierta && aviso}
       {abierta && (
         <ListaAcciones
           id={idMenu}

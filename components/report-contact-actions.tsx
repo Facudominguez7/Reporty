@@ -3,40 +3,12 @@
 import { useEffect, useRef, useState } from "react"
 import { Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { contactHref, createContactDraft, getReportContacts, type ReportContact } from "@/lib/report-contacts/contact-actions"
 import { createClient } from "@/utils/supabase/client"
 
 type Props = { title: string; category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string; showHeading?: boolean }
-type DialogProps = Omit<Props, "reportUrl" | "showHeading"> & { reportId: number }
-/** Aviso compartido por el diálogo y por la hoja de contactos del detalle del reporte. */
+/** Aviso que acompaña la hoja de contactos del detalle del reporte. */
 export const CONTACT_DISCLAIMER = "Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta."
-
-export function ReportContactDialog({ reportId, ...props }: DialogProps) {
-  const [open, setOpen] = useState(false)
-  const [reportUrl, setReportUrl] = useState("")
-
-  return (
-    <Dialog open={open} onOpenChange={(nextOpen) => {
-      if (nextOpen) setReportUrl(new URL(`/reportes/${reportId}`, window.location.origin).toString())
-      setOpen(nextOpen)
-    }}>
-      <DialogTrigger asChild>
-        <Button type="button" variant="secondary" className="w-full">
-          <Building2 aria-hidden="true" className="size-4" />
-          Avisar a un organismo
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="gap-3">
-        <DialogHeader>
-          <DialogTitle>Contactar a organismos</DialogTitle>
-          <DialogDescription className="text-[0.7rem]">{CONTACT_DISCLAIMER}</DialogDescription>
-        </DialogHeader>
-        <ReportContactActions {...props} reportUrl={reportUrl} showHeading={false} />
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 export function ReportContactActions({ showHeading = true, ...props }: Props) {
   const draft = createContactDraft(props)
