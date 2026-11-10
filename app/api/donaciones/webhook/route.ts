@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await registrarDonacion(createAdminClient(), dataId)
+    const resultado = await registrarDonacion(createAdminClient(), dataId)
+    if (resultado.tipo === "registrada" && resultado.avisoPendiente) {
+      return NextResponse.json({ error: "Donación guardada; emails pendientes" }, { status: 500 })
+    }
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("Error al registrar la donación", dataId, error)

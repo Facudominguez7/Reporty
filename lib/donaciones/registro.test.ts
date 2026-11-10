@@ -117,15 +117,17 @@ describe("registrarDonacion", () => {
     expect(avisarAdmins).toHaveBeenCalledTimes(1)
   })
 
-  it("libera la marca si falla el envío, para que el próximo aviso reintente", async () => {
+  it("si falla el envío, la donación queda registrada y la marca se libera para reintentar", async () => {
     const { servicio, filas } = supabaseFalso()
     const avisarAdmins = vi.fn().mockRejectedValueOnce(new Error("Resend caído")).mockResolvedValue(undefined)
     const dependencias = { buscarPago: async () => pago(), agradecer: vi.fn(async () => undefined), avisarAdmins }
 
-    await expect(registrarDonacion(servicio, "77", dependencias)).rejects.toThrow("Resend caído")
-    expect(filas.get("77")?.agradecimiento_enviado_at).toBeNull()
+    const primero = await registrarDonacion(servicio, "77", dependencias)
+    expect(primero).toMatchObject({ tipo: "registrada", donacion: { estado: "aprobada", monto: 2000 }, avisoPendiente: true })
+    expect(filas.get("77")).toMatchObject({ estado: "aprobada", agradecimiento_enviado_at: null })
 
-    await registrarDonacion(servicio, "77", dependencias)
+    const segundo = await registrarDonacion(servicio, "77", dependencias)
+    expect(segundo).toMatchObject({ tipo: "registrada", avisoPendiente: false })
     expect(avisarAdmins).toHaveBeenCalledTimes(2)
   })
 

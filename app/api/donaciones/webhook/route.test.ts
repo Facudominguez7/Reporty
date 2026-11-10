@@ -61,6 +61,12 @@ describe("POST /api/donaciones/webhook", () => {
     expect(registrarDonacion).not.toHaveBeenCalled()
   })
 
+  it("responde 500 si la donación se guardó pero faltan los emails, para que Mercado Pago reintente", async () => {
+    registrarDonacion.mockResolvedValue({ tipo: "registrada", donacion: { pagoId: "123" }, avisoPendiente: true })
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    expect((await POST(aviso())).status).toBe(500)
+  })
+
   it("responde 500 si no se pudo registrar, para que Mercado Pago reintente", async () => {
     registrarDonacion.mockRejectedValue(new Error("Supabase caído"))
     vi.spyOn(console, "error").mockImplementation(() => undefined)

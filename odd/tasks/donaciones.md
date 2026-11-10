@@ -20,8 +20,8 @@ Rama: `feat/donaciones` · Entrega: ask-on-risk · Tests: `pnpm vitest run`, `np
 | --- | --- | --- | --- | --- |
 | T1 | S4, S5, S6 | inline | hecho | a48213c |
 | T2 | S3, S4 | inline | hecho | a48213c |
-| T3 | S1, S3, S4 | inline | hecho; falta pago real de prueba | 8dd9fb9 |
-| T4 | S4, S7 | inline | hecho; falta pago real de prueba | a48213c, 8dd9fb9 |
+| T3 | S1, S3, S4 | inline | hecho; pago de prueba real ok | 8dd9fb9 |
+| T4 | S4, S7 | inline | hecho; emails sin probar en local (sin RESEND_API_KEY) | a48213c, 8dd9fb9 |
 | T5 | S6 | inline | hecho; sin verificación visual con sesión admin | 5ca8fdb |
 | T6 | S2 | inline | hecho | 141e335 |
 | T7 | S8 | inline | hecho (docs); faltan credenciales del usuario | 141e335 |
@@ -47,3 +47,5 @@ Ruta: todo inline, sin motivo de delegación (una sola unidad de comportamiento 
 - L7: Pendiente: el usuario carga `MERCADOPAGO_ACCESS_TOKEN` (prueba) en `.env.development.local` para hacer un pago de punta a punta con un comprador de prueba; en producción carga access token y clave secreta del webhook en Cloudflare y aplica la migración.
 - L8: "en que parte del mapa se podria agregar el boton para donar" → propuesta: arriba a la derecha, debajo de contactos y ayuda → "si". Agregado `AccesoDonarMapa` en `app/mapa/mapa-client.tsx`; capturas a 390 px en Incidentes y Mascotas sin superposiciones ni errores de hidratación.
 - L9: Token de prueba cargado en `.env.local`; la preferencia se crea y redirige a Checkout Pro. Chrome headless ve una página de error de Mercado Pago, así que el pago de punta a punta lo hace el usuario con el comprador de prueba `TESTUSER6541742822644250566`.
+- L10: "ojo aca" (captura en escritorio: «Donar» pegado a la ayuda de los marcadores) → desde `lg` el botón va en la fila superior; entre `md` y `lg` la ayuda baja a `top-40`. Verificado en 390, 768, 1024 y 1280 px (53185e1).
+- L11: "ya lo probe" → pago de prueba real `188848686224` por $2.000 aprobado y guardado en la base local. Bug encontrado: sin `RESEND_API_KEY`, la falla de los emails hacía que `/donar/gracias` mostrara el mensaje genérico. Arreglo: `registrarDonacion` devuelve `avisoPendiente` en lugar de lanzar; el webhook responde 500 en ese caso para que Mercado Pago reintente. Verificado con la URL real de vuelta («¡Gracias por tu donación de $2.000!») y con una referencia distinta (mensaje genérico).

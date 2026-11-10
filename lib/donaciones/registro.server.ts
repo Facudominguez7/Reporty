@@ -6,7 +6,12 @@ import { ROLE_IDS } from "@/lib/authz/catalog"
 import { interpretarPago, obtenerPago, type PagoDonacion } from "@/lib/donaciones/mercado-pago.server"
 import { enviarAgradecimientoDonante, enviarAvisoDonacionAdmins } from "@/lib/notifications/donacion-notifications"
 
-export type ResultadoRegistro = { tipo: "registrada"; donacion: PagoDonacion } | { tipo: "ignorada" }
+/**
+ * `avisoPendiente` indica que la donación quedó guardada pero los emails fallaron: el
+ * webhook responde con error para que Mercado Pago reintente, y la página de gracias
+ * igual muestra el pago.
+ */
+export type ResultadoRegistro = { tipo: "registrada"; donacion: PagoDonacion; avisoPendiente: boolean } | { tipo: "ignorada" }
 
 type Dependencias = {
   buscarPago?: typeof obtenerPago
@@ -17,7 +22,7 @@ type Dependencias = {
 /**
  * Consulta el pago en Mercado Pago y guarda o actualiza la donación. Nunca confía en datos
  * del navegador ni del webhook: todo sale de la API con nuestro access token. Si el pago
- * quedó aprobado, manda los emails una sola vez.
+ * quedó aprobado, manda los emails una sola vez; si fallan, no pierde el registro.
  */
 export async function registrarDonacion(
   servicio: SupabaseClient,
@@ -43,11 +48,17 @@ export async function registrarDonacion(
   }, { onConflict: "pago_id" })
   if (error) throw new Error(`No se pudo guardar la donación ${donacion.pagoId}: ${error.message}`)
 
+  let avisoPendiente = false
   if (donacion.estado === "aprobada") {
-    await notificarUnaVez(servicio, donacion, agradecer, avisarAdmins)
+    try {
+      await notificarUnaVez(servicio, donacion, agradecer, avisarAdmins)
+    } catch (falla) {
+      console.error("La donación se guardó pero no se pudieron mandar los emails", donacion.pagoId, falla)
+      avisoPendiente = true
+    }
   }
 
-  return { tipo: "registrada", donacion }
+  return { tipo: "registrada", donacion, avisoPendiente }
 }
 
 /**
