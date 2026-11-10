@@ -4,12 +4,11 @@ import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle, CheckCircle2, CircleX, FilePlus2, LoaderCircle, MapPin, PawPrint, Send } from "lucide-react"
+import { AlertCircle, Cat, CheckCircle2, CircleX, Dog, FilePlus2, LoaderCircle, MapPin, PawPrint, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -24,6 +23,12 @@ const LocationPickerMap = dynamic(
 )
 
 type Moderation = "APPROVED" | "PENDING" | "REVIEW" | "REJECTED"
+
+const TIPOS_ANIMAL = [
+  { value: "perro", label: "Perro", Icon: Dog },
+  { value: "gato", label: "Gato", Icon: Cat },
+  { value: "otro", label: "Otro", Icon: PawPrint },
+] as const
 
 export function PetModerationDialog({ moderation, message, open, onOpenChange }: {
   moderation: "PENDING" | "REVIEW" | "REJECTED"; message: string; open: boolean; onOpenChange: (open: boolean) => void
@@ -224,20 +229,32 @@ export function FormularioMascota() {
                   </div>}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="tipo-animal">Tipo de animal *</Label>
-                  <Select required value={tipoAnimal} onValueChange={setTipoAnimal} disabled={busy}>
-                    <SelectTrigger id="tipo-animal" aria-describedby={!tipoAnimal ? "tipo-animal-error" : undefined} className="w-full">
-                      <SelectValue placeholder="Seleccioná una opción" />
-                    </SelectTrigger>
-                    <SelectContent className="w-full">
-                      <SelectItem value="perro">Perro</SelectItem>
-                      <SelectItem value="gato">Gato</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <fieldset disabled={busy} className="space-y-2">
+                  <legend className="text-sm font-medium">Tipo de animal *</legend>
+                  <div className="grid grid-cols-3 gap-3">
+                    {TIPOS_ANIMAL.map(({ value, label, Icon }) => (
+                      <label key={value} className="min-w-0 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="tipo-animal"
+                          value={value}
+                          checked={tipoAnimal === value}
+                          onChange={() => setTipoAnimal(value)}
+                          required
+                          aria-describedby={!tipoAnimal ? "tipo-animal-error" : undefined}
+                          className="peer sr-only"
+                        />
+                        <span className="flex aspect-square md:aspect-auto md:h-28 min-w-0 flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-muted/20 p-2 text-center transition-colors hover:bg-muted/40 peer-checked:border-primary peer-checked:bg-primary/10 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
+                          <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Icon className="size-6" aria-hidden="true" />
+                          </span>
+                          <span className="text-xs font-medium sm:text-sm">{label}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                   {!tipoAnimal && <p id="tipo-animal-error" className="text-xs text-destructive">Seleccioná el tipo de animal.</p>}
-                </div>
+                </fieldset>
 
                 <div className="space-y-2">
                   <Label htmlFor="descripcion-mascota">Descripción *</Label>

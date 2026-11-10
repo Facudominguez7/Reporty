@@ -79,9 +79,9 @@ export function ChipReporte({
     <span
       style={{ "--tono-chip": tono } as CSSProperties}
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] px-2.5 text-xs font-medium",
+        "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-pill)] px-2.5 text-xs md:text-[length:inherit] font-medium",
         "bg-[color-mix(in_oklch,var(--tono-chip)_16%,transparent)]",
-        "text-[color-mix(in_oklch,var(--tono-chip)_72%,var(--foreground))]",
+        "text-[color:color-mix(in_oklch,var(--tono-chip)_72%,var(--foreground))]",
         "[&_svg]:size-3.5 [&_svg]:shrink-0",
         className,
       )}

@@ -11,6 +11,8 @@ describe("chip de dato del reporte", () => {
     expect(html).toContain('<span class="sr-only">Prioridad: </span>')
     expect(html).toContain("Alta")
     expect(html).toContain("whitespace-nowrap")
+    expect(html).toMatch(/class="[^"]*\btext-xs\b/)
+    expect(html).not.toContain("text-sm")
     expect(html).not.toContain("uppercase")
   })
 
