@@ -2,7 +2,7 @@ import { Children, isValidElement, type ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), retire: vi.fn(), setters: [] as Array<ReturnType<typeof vi.fn>> }))
-vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => { const setter = vi.fn(); mocks.setters.push(setter); return [initial, setter] } }))
+vi.mock("react", async (original) => ({ ...await original<typeof import("react")>(), useRef: (inicial: unknown) => ({ current: inicial }), useState: (initial: unknown) => { const setter = vi.fn(); mocks.setters.push(setter); return [initial, setter] } }))
 vi.mock("next/dynamic", () => ({ default: () => () => null }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),

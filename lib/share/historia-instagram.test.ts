@@ -4,6 +4,8 @@ import {
   compartirHistoria,
   encuadrarFoto,
   partirEnLineas,
+  datosHistoriaMascota,
+  datosHistoriaReporte,
   tonoHexEstado,
   tonoHexPrioridad,
 } from "./historia-instagram"
@@ -46,6 +48,63 @@ describe("tonos de la historia", () => {
     expect(tonoHexEstado("Reparado")).toBe("#278C5A")
     expect(tonoHexEstado("Pendiente")).toBe("#CA9D33")
     expect(tonoHexPrioridad("Desconocida")).toMatch(/^#/)
+  })
+})
+
+describe("datosHistoriaReporte", () => {
+  it("lleva prioridad, estado y categoría como chips, y la calle con su pin", () => {
+    const datos = datosHistoriaReporte({
+      titulo: "Bache",
+      prioridad: "Alta",
+      estado: "Pendiente",
+      categoria: "Bache",
+      direccion: "Bolívar 1450, Posadas",
+      fotoUrl: null,
+      url: "u",
+    })
+
+    expect(datos.chips).toEqual([
+      { texto: "Alta", tono: "#CC3D3D" },
+      { texto: "Pendiente", tono: "#CA9D33" },
+      { texto: "Bache", tono: "#5E5A9A" },
+    ])
+    expect(datos.direccion).toBe("Bolívar 1450, Posadas")
+    expect(datos.llamado).toBe("Mirá el reporte y sumá tu aporte en")
+  })
+})
+
+describe("datosHistoriaMascota", () => {
+  it("arma la historia de una mascota perdida con su estado en rojo y un llamado a avisar", () => {
+    const datos = datosHistoriaMascota({
+      especie: "Perro",
+      estado: "Perdida",
+      descripcion: "Golden con collar azul",
+      direccion: null,
+      fotoUrl: "/api/mascotas/4/foto",
+      url: "https://reporty.com.ar/mascotas/4",
+    })
+
+    expect(datos.titulo).toBe("Perro perdido")
+    expect(datos.chips).toEqual([{ texto: "Perdido", tono: "#CC3D3D" }])
+    expect(datos.detalle).toBe("Golden con collar azul")
+    expect(datos.direccion).toBeNull()
+    expect(datos.llamado).toBe("¿Lo viste? Avisá desde la publicación en")
+  })
+
+  it("usa el verde y un llamado neutro cuando la mascota ya fue encontrada", () => {
+    const datos = datosHistoriaMascota({ especie: "Gato", estado: "Encontrada", descripcion: "", direccion: null, fotoUrl: null, url: "u" })
+
+    expect(datos.titulo).toBe("Gato encontrado")
+    expect(datos.chips).toEqual([{ texto: "Encontrado", tono: "#278C5A" }])
+    expect(datos.detalle).toBeNull()
+    expect(datos.llamado).toBe("Mirá la publicación en")
+  })
+})
+
+describe("datosHistoriaMascota con calle", () => {
+  it("muestra la calle donde se vio la mascota, con su pin", () => {
+    const datos = datosHistoriaMascota({ especie: "Perro", estado: "Perdida", descripcion: "Golden", direccion: "Bolívar 1450, Posadas", fotoUrl: null, url: "u" })
+    expect(datos.direccion).toBe("Bolívar 1450, Posadas")
   })
 })
 

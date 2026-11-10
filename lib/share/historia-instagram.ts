@@ -1,5 +1,6 @@
 /**
- * Imagen vertical (1080×1920) para compartir un reporte en historias de Instagram.
+ * Imagen vertical (1080×1920) para compartir un reporte o una mascota en historias
+ * de Instagram.
  *
  * Se dibuja en el navegador con un canvas: no usa CPU del Worker ni servicios pagos.
  * Instagram no permite que una web publique la historia ni adjunte el link, así que
@@ -108,16 +109,83 @@ export function partirEnLineas(
   return visibles
 }
 
-/** Lo que muestra la historia. */
+/** Chip de la historia: texto y tono (hex). */
+export type ChipHistoria = { texto: string; tono: string }
+
+/** Lo que muestra la historia; sirve para reportes y para mascotas. */
 export type DatosHistoria = {
+  titulo: string
+  /** Se dibujan en orden; los que no entran en la fila se omiten. */
+  chips: ChipHistoria[]
+  /** Calle, con un pin delante. */
+  direccion: string | null
+  /** Texto secundario sin pin (por ejemplo, la descripción de una mascota). */
+  detalle: string | null
+  fotoUrl: string | null
+  /** Primera línea del recuadro verde; debajo va el link. */
+  llamado: string
+  /** Link a la publicación, se muestra sin «https://». */
+  url: string
+}
+
+/**
+ * Datos de la historia de un reporte: prioridad, estado y categoría como chips.
+ *
+ * @param reporte - Nombres tal como llegan de la base y la dirección guardada.
+ */
+export function datosHistoriaReporte(reporte: {
   titulo: string
   prioridad: string
   estado: string
   categoria: string
   direccion: string | null
   fotoUrl: string | null
-  /** Link al reporte, se muestra sin «https://». */
   url: string
+}): DatosHistoria {
+  return {
+    titulo: reporte.titulo,
+    chips: [
+      { texto: reporte.prioridad, tono: tonoHexPrioridad(reporte.prioridad) },
+      { texto: reporte.estado, tono: tonoHexEstado(reporte.estado) },
+      { texto: reporte.categoria, tono: COLORES.categoria },
+    ],
+    direccion: reporte.direccion,
+    detalle: null,
+    fotoUrl: reporte.fotoUrl,
+    llamado: "Mirá el reporte y sumá tu aporte en",
+    url: reporte.url,
+  }
+}
+
+/**
+ * Datos de la historia de una mascota. El estado usa el mismo adjetivo que la ficha
+ * (`getPetStatusAdjective`): «Perdido» en rojo, «Encontrado» en verde. No incluye el
+ * teléfono: la imagen circula fuera de Reporty y el contacto queda en la publicación.
+ *
+ * Con calle, la imagen muestra la calle con su pin; sin calle, la descripción.
+ *
+ * @param mascota - Especie («Perro», «Gato»…), estado («Perdida» o «Encontrada»), descripción y calle.
+ */
+export function datosHistoriaMascota(mascota: {
+  especie: string
+  estado: "Perdida" | "Encontrada"
+  descripcion: string
+  /** Calle donde se la vio, guardada al publicarla. */
+  direccion: string | null
+  fotoUrl: string | null
+  url: string
+}): DatosHistoria {
+  const perdida = mascota.estado === "Perdida"
+  const adjetivo = perdida ? "Perdido" : "Encontrado"
+  return {
+    titulo: `${mascota.especie} ${adjetivo.toLowerCase()}`,
+    chips: [{ texto: adjetivo, tono: perdida ? COLORES.peligro : COLORES.primario }],
+    direccion: mascota.direccion,
+    detalle: mascota.descripcion.trim() || null,
+    fotoUrl: mascota.fotoUrl,
+    llamado: perdida ? "¿Lo viste? Avisá desde la publicación en" : "Mirá la publicación en",
+    url: mascota.url,
+  }
 }
 
 /** Carga una imagen con CORS para poder exportar el canvas después. */
@@ -228,11 +296,10 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
   y += altoFoto + 40
 
   let x = interior.x
-  x += dibujarChip(ctx, x, y, datos.prioridad, tonoHexPrioridad(datos.prioridad), fuente) + 16
-  x += dibujarChip(ctx, x, y, datos.estado, tonoHexEstado(datos.estado), fuente) + 16
-  ctx.font = `600 34px ${fuente}`
-  if (x + ctx.measureText(datos.categoria).width + 56 <= interior.x + interior.w) {
-    dibujarChip(ctx, x, y, datos.categoria, COLORES.categoria, fuente)
+  for (const chip of datos.chips) {
+    ctx.font = `600 34px ${fuente}`
+    if (x + ctx.measureText(chip.texto).width + 56 > interior.x + interior.w) break
+    x += dibujarChip(ctx, x, y, chip.texto, chip.tono, fuente) + 16
   }
   y += 64 + 36
 
@@ -251,6 +318,13 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
     ctx.font = `500 38px ${fuente}`
     const [direccion] = partirEnLineas(datos.direccion, (t) => ctx.measureText(t).width, interior.w - 48, 1)
     ctx.fillText(direccion, interior.x + 48, y)
+  } else if (datos.detalle) {
+    ctx.fillStyle = COLORES.secundario
+    ctx.font = `400 38px ${fuente}`
+    for (const linea of partirEnLineas(datos.detalle, (t) => ctx.measureText(t).width, interior.w, 2)) {
+      ctx.fillText(linea, interior.x, y)
+      y += 50
+    }
   }
 
   // Llamado a la acción al pie de la tarjeta.
@@ -262,7 +336,7 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
   ctx.font = `500 36px ${fuente}`
-  ctx.fillText("Mirá el reporte y sumá tu aporte en", ANCHO_HISTORIA / 2, pie.y + 56)
+  ctx.fillText(datos.llamado, ANCHO_HISTORIA / 2, pie.y + 56)
   ctx.font = `700 44px ${fuente}`
   const enlace = datos.url.replace(/^https?:\/\//, "")
   ctx.fillText(partirEnLineas(enlace, (t) => ctx.measureText(t).width, interior.w - 48, 1)[0], ANCHO_HISTORIA / 2, pie.y + 114)

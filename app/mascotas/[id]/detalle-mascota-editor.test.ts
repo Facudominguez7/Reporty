@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({ values: [] as unknown[], index: 0, save: vi.fn(), refresh: vi.fn() }))
 vi.mock("react", async (original) => ({
   ...await original<typeof import("react")>(),
+  useRef: (inicial: unknown) => ({ current: inicial }),
   useState: (initial: unknown) => {
     const index = mocks.index++
     if (!(index in mocks.values)) mocks.values[index] = typeof initial === "function" ? (initial as () => unknown)() : initial

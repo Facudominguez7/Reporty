@@ -91,7 +91,7 @@ import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
 import { ReportContactActions, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
-import { compartirHistoria, descargarArchivo, generarImagenHistoria } from "@/lib/share/historia-instagram";
+import { compartirHistoria, datosHistoriaReporte, descargarArchivo, generarImagenHistoria } from "@/lib/share/historia-instagram";
 import { MenuCompartir } from "@/components/report-detail/menu-compartir";
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation";
 import {
@@ -398,7 +398,7 @@ export function ReporteDetalleClient({
     if (!reporte || historiaPendiente.current) return;
     const foto = reporte.fotos_reporte?.find((item) => Boolean(item.publicUrl ?? item.url));
     const pendiente = generarImagenHistoria(
-      {
+      datosHistoriaReporte({
         titulo: reporte.titulo,
         prioridad: getNameFromRelation(reporte.prioridades),
         estado: getNameFromRelation(reporte.estados),
@@ -406,7 +406,7 @@ export function ReporteDetalleClient({
         direccion: reporte.direccion ?? null,
         fotoUrl: foto ? ((foto.publicUrl ?? foto.url) as string) : null,
         url: `${window.location.origin}/reportes/${reporte.id}`,
-      },
+      }),
       getComputedStyle(document.body).fontFamily,
     ).then((blob) => new File([blob], `reporty-reporte-${reporte.id}.png`, { type: "image/png" }));
     // Si falla, el próximo intento vuelve a generarla.
