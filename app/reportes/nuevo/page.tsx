@@ -907,7 +907,7 @@ export default function NuevoReportePage() {
                   variant="outline"
                   className="flex-1"
                   asChild
-                  disabled={loading || isSubmitting}
+                  disabled={isSubmitting}
                 >
                   <Link href="/reportes">Cancelar</Link>
                 </Button>

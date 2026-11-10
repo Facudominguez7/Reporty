@@ -28,17 +28,14 @@ import {
   MapPin,
   Pencil,
   Calendar,
-  Flag,
   ThumbsDown,
   Trash2,
-  CheckCircle2,
   Clock,
   Shield,
   Share2,
   Users,
   FileSearch2,
   X,
-  ZoomIn,
 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -62,7 +59,7 @@ import type { Comentario, ReporteDetalle } from "@/database/queries/reportes/[id
 import type { Estado } from "@/database/queries/admin/index";
 import type { GestionOperativaDetalle } from "@/lib/use-cases/cuadrillas/detalle-operativo";
 import type { UsuarioActual } from "@/components/report-detail/comments-section";
-import { getStatusVariant, getPriorityVariant, getPriorityIcon, getStatusIcon, getCategoryIcon } from "@/components/report-card";
+import { getStatusVariant, getPriorityIcon, getStatusIcon, getCategoryIcon } from "@/components/report-card";
 import { PUNTOS } from "@/database/queries/puntos";
 import { optimizeReportImage } from "@/lib/media/optimize-report-image";
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
@@ -1145,69 +1142,46 @@ export function ReporteDetalleClient({
                 <CardTitle className="text-base md:text-lg">Ubicación</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                {isAdmin ? (
-                  <AdminInlineField
-                    key={`location-${isAdminEditing ? "editing" : "display"}`}
-                    editing={isAdminEditing}
-                    label="ubicación"
-                    value={{ lat: adminDraftForRender.lat, lon: adminDraftForRender.lon }}
-                    onChange={(coordinates) => setAdminDraft((current) => current ? { ...current, lat: coordinates.lat, lon: coordinates.lon } : current)}
-                    disabled={isAdminSaving}
-                    className="w-full"
-                    display={() => (
-                      <Link href="/mapa" className="group block w-full">
-                        <div className="group relative aspect-square overflow-hidden rounded-md border shadow-sm transition-all group-hover:shadow-md md:rounded-lg">
-                          {reporte.lat !== null && reporte.lon !== null ? (
-                            <MiniMap lat={reporte.lat} lon={reporte.lon} />
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">Ubicación no disponible</div>
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                          <div className="absolute inset-x-2 bottom-2 rounded-md border bg-background/95 p-2 shadow-lg backdrop-blur-sm md:inset-x-3 md:bottom-3">
-                            <div className="flex items-center gap-2 text-xs text-foreground">
-                              <MapPin className="size-4 shrink-0 text-primary" />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium">Ver en mapa completo</p>
-                                {reporte.lat === null || reporte.lon === null ? <p className="truncate text-xs text-muted-foreground">Ubicación no disponible</p> : null}
-                              </div>
+                <AdminInlineField
+                  editing={isAdminEditing}
+                  label="ubicación"
+                  value={{ lat: adminDraftForRender.lat, lon: adminDraftForRender.lon }}
+                  onChange={(coordinates) => setAdminDraft((current) => current ? { ...current, lat: coordinates.lat, lon: coordinates.lon } : current)}
+                  disabled={isAdminSaving}
+                  className="w-full"
+                  display={() => (
+                    <Link href="/mapa" className="group block w-full">
+                      <div className="group relative aspect-square overflow-hidden rounded-md border shadow-sm transition-all group-hover:shadow-md md:rounded-lg">
+                        {reporte.lat !== null && reporte.lon !== null ? (
+                          <MiniMap lat={reporte.lat} lon={reporte.lon} />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">Ubicación no disponible</div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                        <div className="absolute inset-x-2 bottom-2 rounded-md border bg-background/95 p-2 shadow-lg backdrop-blur-sm md:inset-x-3 md:bottom-3">
+                          <div className="flex items-center gap-2 text-xs text-foreground">
+                            <MapPin className="size-4 shrink-0 text-primary" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">Ver en mapa completo</p>
+                              {reporte.lat === null || reporte.lon === null ? <p className="truncate text-xs text-muted-foreground">Ubicación no disponible</p> : null}
                             </div>
                           </div>
                         </div>
-                      </Link>
-                    )}
-                    editor={(coordinates, onChange) => (
-                      <div className="space-y-2">
-                        <LocationPickerMap
-                          key={coordinates.lat === null ? "no-location" : "has-location"}
-                          initialLat={coordinates.lat}
-                          initialLon={coordinates.lon}
-                          heightClassName="h-48"
-                          onLocationSelect={(lat, lon) => onChange({ lat, lon })}
-                        />
                       </div>
-                    )}
-                  />
-                ) : (
-                  <Link href="/mapa" className="group block">
-                    <div className="group relative aspect-square overflow-hidden rounded-md border shadow-sm transition-all group-hover:shadow-md md:rounded-lg">
-                      {reporte.lat !== null && reporte.lon !== null ? (
-                        <MiniMap lat={reporte.lat} lon={reporte.lon} />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-muted text-sm text-muted-foreground">Ubicación no disponible</div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                      <div className="absolute inset-x-2 bottom-2 rounded-md border bg-background/95 p-2 shadow-lg backdrop-blur-sm md:inset-x-3 md:bottom-3">
-                        <div className="flex items-center gap-2 text-xs text-foreground">
-                          <MapPin className="size-4 shrink-0 text-primary" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium">Ver en mapa completo</p>
-                            {reporte.lat === null || reporte.lon === null ? <p className="truncate text-xs text-muted-foreground">Ubicación no disponible</p> : null}
-                          </div>
-                        </div>
-                      </div>
+                    </Link>
+                  )}
+                  editor={(coordinates, onChange) => (
+                    <div className="space-y-2">
+                      <LocationPickerMap
+                        key={coordinates.lat === null ? "no-location" : "has-location"}
+                        initialLat={coordinates.lat}
+                        initialLon={coordinates.lon}
+                        heightClassName="h-48"
+                        onLocationSelect={(lat, lon) => onChange({ lat, lon })}
+                      />
                     </div>
-                  </Link>
-                )}
+                  )}
+                />
               </CardContent>
             </Card>
             )}

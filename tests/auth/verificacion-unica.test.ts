@@ -137,7 +137,7 @@ describe("verificación de seguridad compartida en /auth", () => {
   })
 
   it("envía a los dos formularios el token de esa verificación", () => {
-    const campos = fuentePagina().match(/name="captcha_token" value=\{(<[^>]*>|[^}])*\} \/>/g) ?? []
+    const campos = fuentePagina().match(/name="captcha_token" value=\{(<[^>]*>|[^}<])*\} \/>/g) ?? []
 
     expect(campos).toHaveLength(2)
     expect(campos.every((campo) => campo.includes("verificacion.token"))).toBe(true)

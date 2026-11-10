@@ -1,5 +1,4 @@
 import { beforeEach, expect, it, vi } from "vitest"
-import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), reports: vi.fn() }))

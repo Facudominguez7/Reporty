@@ -4,7 +4,7 @@
 
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { BarChart3, Calendar, CheckCircle, Clock, FileText, Plus, Star, Timer, TrendingUp, Trophy, UserRound, Users } from "lucide-react"
+import { BarChart3, CheckCircle, Clock, FileText, Plus, Star, Timer, TrendingUp, Trophy, UserRound, Users } from "lucide-react"
 
 import { GraficoReportesPorCategoriaDiferido, GraficoZonasCalientesDiferido } from "@/components/dashboard/graficos-diferidos"
 import { MapaCalorZonas } from "@/components/dashboard/mapa-calor-zonas"
