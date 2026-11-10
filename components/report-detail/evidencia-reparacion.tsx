@@ -260,7 +260,6 @@ function AvisoParticipacion({ motivo }: { motivo: NonNullable<EvidenciaReparacio
         confirmado.{" "}
         <Link
           href={`/auth?next=${encodeURIComponent(pathname ?? "/reportes")}`}
-          prefetch={false}
           className="font-medium text-primary hover:underline"
         >
           Iniciá sesión
@@ -771,7 +770,7 @@ export function ResumenReparacion({
           </p>
         </div>
         <Button asChild size="sm" className="shrink-0">
-          <Link href="/auth" prefetch={false}>Ingresar</Link>
+          <Link href="/auth">Ingresar</Link>
         </Button>
       </div>
     )
