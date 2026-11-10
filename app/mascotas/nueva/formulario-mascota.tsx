@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic"
 import Link from "next/link"
+import { InvitacionDonar } from "@/components/donaciones/invitacion-donar"
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import { AlertCircle, CheckCircle2, CircleX, FilePlus2, LoaderCircle, MapPin, PawPrint, Send } from "lucide-react"
@@ -171,6 +172,7 @@ export function FormularioMascota() {
               <Button asChild size="sm" className="min-w-0 whitespace-normal [overflow-wrap:anywhere] text-center"><Link href="/reportes?vista=mascotas">Ver mascotas</Link></Button>
               <Button asChild variant="outline" size="sm" className="min-w-0 whitespace-normal [overflow-wrap:anywhere] text-center"><Link href={`/mascotas/${createdPet.mascotaId}`}>Ver la publicación</Link></Button>
             </div>
+            <InvitacionDonar />
           </DialogContent>
         </Dialog>
       </div>

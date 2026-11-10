@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { MapPin, Send, CheckCircle2, CircleX, Info, FilePlus2, LoaderCircle } from "lucide-react"
 import Link from "next/link"
+import { InvitacionDonar } from "@/components/donaciones/invitacion-donar"
 import { PUNTOS } from "@/database/queries/puntos"
 import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/loading-skeletons"
 import { REPORT_IMAGE_ACCEPT_ATTR } from "@/lib/media/report-images"
@@ -623,6 +624,7 @@ export default function NuevoReportePage() {
                 <Link href={`/reportes/${createdReport.reportId}`}>Ver el reporte</Link>
               </Button>}
             </div>
+            {!createdReport.withdrawn && <InvitacionDonar />}
             {(!createdReport.imageApproved || createdReport.withdrawn) && (
               <Button type="button" variant="ghost-bordered" className="w-full" onClick={startNewReport}>
                 Crear otro reporte
