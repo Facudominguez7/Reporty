@@ -5,10 +5,11 @@ import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Calendar, MapPin, PawPrint, Pencil, Share2, Trash2 } from "lucide-react"
+import { ArrowLeft, Calendar, CircleCheck, MapPin, PawPrint, Pencil, Phone, Share2, Trash2, TriangleAlert } from "lucide-react"
+import { ChipReporte, TONO_CATEGORIA } from "@/components/report-detail/chip-reporte"
+import { describirAntiguedad, ZONA_HORARIA_APP } from "@/lib/fechas/antiguedad"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
@@ -30,6 +31,9 @@ const MiniMap = dynamic(() => import("@/components/mini-map").then((m) => m.Mini
 const LocationPickerMap = dynamic(() => import("@/components/location-picker-map").then((m) => m.LocationPickerMap), { ssr: false })
 
 type Props = { pet: MascotaDetail; isOwner: boolean; isAdmin?: boolean }
+
+/** Botón de la barra de acciones: ícono arriba y texto abajo, igual que en la ficha del reporte. */
+const CLASE_ACCION = "aspect-square h-auto min-h-11 w-16 flex-col gap-1 whitespace-normal rounded-full px-1 text-center text-[10px] leading-tight text-muted-foreground hover:bg-muted"
 function petDraft(pet: MascotaDetail) {
   return { tipoAnimal: pet.species === "Perro" ? "perro" : pet.species === "Gato" ? "gato" : "otro", descripcion: pet.description, lat: pet.coordinates?.[0]?.toString() ?? "", lon: pet.coordinates?.[1]?.toString() ?? "", telefono: pet.phone, estado: pet.status === "Perdida" ? "perdida" : "encontrada" }
 }
@@ -102,18 +106,18 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
       <div className="space-y-4 lg:col-span-8">
         <Card className="gap-0">
-          <CardHeader className="pb-3">
-            <div className="col-span-full mb-1 flex items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
+          {/* Mismo formato que la ficha del reporte: fecha, chips, título, descripción, foto, contacto y barra de acciones. */}
+          <CardHeader className="gap-3 pb-4">
+            <div className="col-span-full flex flex-wrap items-center gap-1.5 border-b border-border pb-2 text-xs text-muted-foreground">
               <Calendar className="size-3.5 shrink-0" aria-hidden="true" />
-              <span>Publicada el día <time dateTime={pet.createdAt}>{new Date(pet.createdAt).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</time></span>
+              <span className="min-w-0">Publicada el día <time dateTime={pet.createdAt}>{new Date(pet.createdAt).toLocaleDateString("es-AR", { year: "numeric", month: "short", day: "numeric", timeZone: ZONA_HORARIA_APP })}</time> <span className="font-bold">({describirAntiguedad(new Date(pet.createdAt))})</span></span>
             </div>
-            <div className="flex flex-wrap items-center gap-1">
-              {editing ? <label className="grid gap-1 text-xs">Estado<select aria-label="Estado" className="min-h-10 rounded-md border bg-background px-3" value={draft.estado} onChange={(e) => setDraft({ ...draft, estado: e.target.value })} disabled={pending}><option value="perdida">Perdida</option><option value="encontrada">Encontrada</option></select></label> : <Badge variant={pet.status === "Perdida" ? "destructive" : "primary"} className="flex flex-col items-start gap-1 px-2 py-1 text-[10px] leading-none"><span className="text-[8px] font-medium normal-case leading-none tracking-normal opacity-90">Estado</span><span>{statusLabel}</span></Badge>}
+            <div className="flex w-full flex-wrap items-center gap-1.5">
+              {editing ? <label className="grid gap-1 text-xs">Estado<select aria-label="Estado" className="min-h-10 rounded-md border bg-background px-3" value={draft.estado} onChange={(e) => setDraft({ ...draft, estado: e.target.value })} disabled={pending}><option value="perdida">Perdida</option><option value="encontrada">Encontrada</option></select></label> : <ChipReporte etiqueta="Estado" tono={pet.status === "Perdida" ? "var(--destructive)" : "var(--primary)"} icono={pet.status === "Perdida" ? <TriangleAlert aria-hidden="true" /> : <CircleCheck aria-hidden="true" />} valor={statusLabel} />}
+              {!editing && <ChipReporte etiqueta="Animal" tono={TONO_CATEGORIA} icono={<PawPrint aria-hidden="true" />} valor={pet.species} />}
             </div>
             <div className="flex min-w-0 items-start gap-3">
               {editing ? <label className="grid min-w-0 flex-1 gap-1 text-sm">Tipo de animal<select aria-label="Tipo de animal" className="min-h-10 rounded-md border bg-background px-3" value={draft.tipoAnimal} onChange={(e) => setDraft({ ...draft, tipoAnimal: e.target.value })} disabled={pending}><option value="perro">Perro</option><option value="gato">Gato</option><option value="otro">Otro</option></select></label> : <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {statusLabel.toLowerCase()}</CardTitle>}
-              <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={share} onCompartirHistoria={historia.compartir}><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button></MenuCompartir>
-              {(isOwner && pet.status === "Perdida" || isAdmin) && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" size="icon" className="size-10 shrink-0" disabled={pending || editing} aria-label="Retirar publicación" title="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente y se conservará su historial.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
               {isAdmin && !editing && <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 text-muted-foreground" onClick={() => { setDraft(petDraft(pet)); setError(""); setEditing(true) }} aria-label="Editar publicación" title="Editar publicación"><Pencil className="size-4" /></Button>}
             </div>
           </CardHeader>
@@ -124,11 +128,16 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
                 <Image src={pet.image} alt={`Foto de ${pet.species.toLowerCase()}`} fill sizes="(max-width: 1024px) 100vw, 60vw" className="object-contain" priority />
               </div>
             </div>
-            {editing ? <label className="grid gap-1 text-sm">Teléfono público<Input type="tel" inputMode="numeric" maxLength={40} value={draft.telefono} onChange={(e) => setDraft({ ...draft, telefono: e.target.value.replace(/[^0-9]/g, "") })} disabled={pending} /></label> : <p className="break-words text-sm">Teléfono público: <a className="font-medium underline" href={`tel:${pet.phone}`}>{pet.phone}</a></p>}
-            {pet.coordinates && <a href="#mascota-ubicacion" className="mx-auto mt-3 flex w-fit items-center gap-1 text-xs font-semibold underline lg:hidden"><MapPin className="size-3 shrink-0" aria-hidden="true" /><span className="line-clamp-1">{pet.address ?? "Ver ubicación"}</span></a>}
-            {isOwner && pet.status === "Perdida" && <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row">
-              {pet.status === "Perdida" && <AlertDialog><AlertDialogTrigger asChild><Button disabled={pending}>Marcar encontrada</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Marcar como encontrada?</AlertDialogTitle><AlertDialogDescription>Este cambio es definitivo y no se puede deshacer.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={found}>Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
-            </div>}
+            {editing ? <label className="grid gap-1 text-sm">Teléfono público<Input type="tel" inputMode="numeric" maxLength={40} value={draft.telefono} onChange={(e) => setDraft({ ...draft, telefono: e.target.value.replace(/[^0-9]/g, "") })} disabled={pending} /></label> : <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted" aria-hidden="true"><Phone className="size-3" /></span><span className="min-w-0 break-words">Teléfono público: <a className="font-medium text-foreground underline" href={`tel:${pet.phone}`}>{pet.phone}</a></span></div>}
+            {pet.coordinates && <a href="#mascota-ubicacion" className="mt-3 flex w-fit items-center gap-1 text-xs font-semibold underline lg:hidden"><MapPin className="size-3 shrink-0" aria-hidden="true" /><span className="line-clamp-1">{pet.address ?? "Ver ubicación"}</span></a>}
+            <div className="mt-3">
+              <hr className="mb-2 border-border" />
+              <div role="group" aria-label="Acciones sobre la publicación" className="flex flex-wrap justify-center gap-4">
+                <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={share} onCompartirHistoria={historia.compartir}><Button type="button" variant="ghost" size="xs" className={CLASE_ACCION} aria-label="Compartir publicación"><Share2 className="size-4" aria-hidden="true" />Compartir</Button></MenuCompartir>
+                {isOwner && pet.status === "Perdida" && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="ghost" size="xs" className={`${CLASE_ACCION} text-primary hover:bg-primary/10`} disabled={pending || editing}><CircleCheck className="size-4" aria-hidden="true" />Marcar encontrada</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Marcar como encontrada?</AlertDialogTitle><AlertDialogDescription>Este cambio es definitivo y no se puede deshacer.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={found}>Confirmar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
+                {(isOwner && pet.status === "Perdida" || isAdmin) && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="ghost" size="xs" className={`${CLASE_ACCION} text-destructive hover:bg-destructive/10`} disabled={pending || editing} aria-label="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" />Retirar</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente y se conservará su historial.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
+              </div>
+            </div>
             {error && <Alert variant="destructive" className="mt-3"><AlertDescription role="alert">{error}</AlertDescription></Alert>}
             {message && <Alert className="mt-3"><AlertDescription role="status">{message}</AlertDescription></Alert>}
             {isAdmin && editing && <AdminReportEditActions saving={pending} onSave={() => void saveAdmin()} onCancel={() => { setEditing(false); setError(""); setDraft(petDraft(pet)) }} errorMessage={error} />}

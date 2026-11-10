@@ -21,10 +21,20 @@ describe("pet detail", () => {
     expect(html).toContain("Bolívar 1450, Posadas")
   })
 
-  it.each([["Perdida", "Perdido", "bg-destructive"], ["Encontrada", "Encontrado", "bg-primary"]] as const)("styles %s status consistently with its species", (status, label, color) => {
+  it.each([["Perdida", "Perdido", "--destructive"], ["Encontrada", "Encontrado", "--primary"]] as const)("shows %s status as a soft chip like the report detail", (status, label, tono) => {
     const html = render(false, status)
-    expect(html).toMatch(new RegExp(`class="[^"]*${color}[^"]*"><span[^>]*>Estado</span><span>${label}</span>`))
+    expect(html).toMatch(new RegExp(`--tono-chip:var\\(${tono}\\)[^>]*><span class="sr-only">Estado: </span><svg[^>]*>.*?</svg>${label}</span>`))
+    expect(html).toMatch(/<span class="sr-only">Animal: <\/span><svg[^>]*lucide-paw-print[^>]*>.*?<\/svg>Perro<\/span>/)
     expect(html).toContain(`Perro ${label.toLowerCase()}`)
+  })
+
+  it("shows the publication date with its age, like the report detail", () => {
+    expect(render(false)).toMatch(/Publicada el día <time[^>]*>1 de nov de 2026<\/time> <span class="font-bold">\(hace \d+ días?\)<\/span>/)
+  })
+
+  it("puts share in a labeled action bar below the photo", () => {
+    const html = render(false)
+    expect(html).toMatch(/role="group" aria-label="Acciones sobre la publicación"[\s\S]*?aria-label="Compartir publicación"[^>]*><svg[^>]*lucide-share2[\s\S]*?<\/svg>Compartir<\/button>/)
   })
 
   it("shows public pet information and sharing without owner controls", () => {
@@ -38,7 +48,6 @@ describe("pet detail", () => {
     expect(html).not.toContain("Ubicación")
     expect(html).not.toContain("Prioridad")
     expect(html).not.toContain("Comentarios")
-    expect(html).toContain("1/11/2026")
     expect(html).not.toContain("Marcar encontrada")
     expect(html).not.toContain("Retirar publicación")
   })
@@ -64,10 +73,9 @@ describe("pet detail", () => {
     expect(render(true, "Encontrada")).not.toContain("Retirar publicación")
   })
 
-  it("places an accessible destructive withdrawal icon next to sharing", () => {
+  it("shows owner actions with their labels in the action bar", () => {
     const html = render(true)
-    expect(html).toMatch(/aria-label="Compartir publicación"[\s\S]*?<button[^>]*class="[^"]*bg-destructive[^"]*"[^>]*aria-label="Retirar publicación"[^>]*title="Retirar publicación"[^>]*><svg[^>]*lucide-trash2/)
-    expect(html).not.toContain(">Retirar publicación</button>")
+    expect(html).toMatch(/aria-label="Acciones sobre la publicación"[\s\S]*?>Compartir<\/button>[\s\S]*?<svg[^>]*lucide-circle-check[\s\S]*?<\/svg>Marcar encontrada<\/button>[\s\S]*?aria-label="Retirar publicación"[^>]*><svg[^>]*lucide-trash2[\s\S]*?<\/svg>Retirar<\/button>/)
   })
 
   it("offers editing to administrators independently of ownership and status", () => {
