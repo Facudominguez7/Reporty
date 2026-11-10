@@ -182,7 +182,7 @@ sequenceDiagram
 ### Prerrequisitos
 
 - Node.js 18+
-- npm o pnpm
+- npm
 - Cuenta en Supabase
 - Cuenta en Resend (para emails)
 
