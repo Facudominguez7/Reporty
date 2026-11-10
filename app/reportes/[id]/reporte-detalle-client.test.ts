@@ -132,6 +132,15 @@ describe("acciones y hojas del detalle", () => {
     expect(html).toContain("data-acciones-flotantes")
   })
 
+  it("muestra la calle en la franja de ubicación cuando el reporte la tiene guardada", () => {
+    const html = renderizar({
+      reporte: { ...reporte, direccion: "Bolívar 1450, Posadas" } as unknown as ReporteDetalle,
+    })
+
+    expect(html).toContain("Bolívar 1450")
+    expect(html).not.toContain("-27,36708 · -55,89610")
+  })
+
   it("deja una sola entrada visible al mapa para quien no administra", () => {
     const html = renderizar()
 

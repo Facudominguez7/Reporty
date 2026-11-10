@@ -14,6 +14,7 @@ const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
       descripcion,
       lat,
       lon,
+      direccion,
       created_at,
       usuario_id,
       estado_id,
@@ -37,6 +38,8 @@ type ReporteDetalleRow = {
   descripcion: string | null
   lat: number | null
   lon: number | null
+  /** Dirección legible guardada al crear el reporte; `null` si no se encontró. */
+  direccion?: string | null
   created_at: string
   usuario_id: string
   estado_id: number
@@ -60,7 +63,7 @@ export type ReporteDetalle = ReporteDetalleView
  * Recupera el registro completo de un reporte identificado por su ID, incluyendo relaciones relacionadas.
  *
  * @param reporteId - ID del reporte a recuperar
- * @returns Un objeto con `data` y `error`. `data` contiene el reporte (campos: `id`, `titulo`, `descripcion`, `lat`, `lon`, `created_at`, `usuario_id`, `estado_id`, y relaciones `categorias.nombre`, `prioridades.nombre`, `estados.{id,nombre}`, `fotos_reporte.url`, `profiles.username`) o `null` si no se encontró; `error` contiene el error de la consulta o `null` si la operación tuvo éxito.
+ * @returns Un objeto con `data` y `error`. `data` contiene el reporte (campos: `id`, `titulo`, `descripcion`, `lat`, `lon`, `direccion`, `created_at`, `usuario_id`, `estado_id`, y relaciones `categorias.nombre`, `prioridades.nombre`, `estados.{id,nombre}`, `fotos_reporte.url`, `profiles.username`) o `null` si no se encontró; `error` contiene el error de la consulta o `null` si la operación tuvo éxito.
  */
 export async function getReporteDetalle(
   supabase: SupabaseClient,

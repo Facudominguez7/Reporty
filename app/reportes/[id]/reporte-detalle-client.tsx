@@ -738,6 +738,7 @@ export function ReporteDetalleClient({
           <FranjaUbicacion
             lat={reporte.lat}
             lon={reporte.lon}
+            direccion={reporte.direccion}
             onVerUbicacion={(disparador) => abrirHoja("ubicacion", disparador)}
           />
           {evidenciaReparacion && (
@@ -1356,7 +1357,7 @@ export function ReporteDetalleClient({
         descripcion="El mapa del reporte y el acceso al mapa completo de la ciudad."
         etiquetaCerrar="Cerrar la ubicación"
       >
-        <ContenidoUbicacion lat={reporte.lat} lon={reporte.lon} />
+        <ContenidoUbicacion lat={reporte.lat} lon={reporte.lon} direccion={reporte.direccion} />
       </HojaReporte>
 
       <HojaReporte
