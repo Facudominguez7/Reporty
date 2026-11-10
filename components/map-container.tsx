@@ -95,7 +95,7 @@ export function MapContainer({ reports, mascotas = [], layer = "reportes", showL
       )}
 
       {/* Instrucciones de uso del mapa - Oculta en mobile para no saturar */}
-      <div className="map-legend-card absolute right-5 top-40 hidden max-w-xs z-10 md:block lg:top-28">
+      <div className="map-legend-card absolute right-5 top-28 hidden max-w-xs z-10 md:block">
         <p className="text-xs text-muted-foreground flex items-center gap-2">
           <MousePointer2 className="size-4" aria-hidden="true" />
           <span>Haz clic en los marcadores para ver detalles</span>

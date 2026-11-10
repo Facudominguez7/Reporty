@@ -1,7 +1,8 @@
+import { readFileSync } from "node:fs"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { AccesoDonarMapa, MAP_LAYER_OPTIONS, PetLayerError, shouldShowMascotasOnboarding } from "./mapa-client"
+import { BotonDonarMapa, MAP_LAYER_OPTIONS, PetLayerError, shouldShowMascotasOnboarding } from "./mapa-client"
 
 describe("map layer labels", () => {
   it("calls the report layer Incidentes", () => {
@@ -26,11 +27,30 @@ describe("PetLayerError", () => {
   })
 })
 
-describe("AccesoDonarMapa", () => {
-  it("muestra el botón Donar arriba a la derecha, debajo de contactos y ayuda", () => {
-    const markup = renderToStaticMarkup(createElement(AccesoDonarMapa))
-    expect(markup).toContain("fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))]")
-    expect(markup).toContain("lg:hidden")
-    expect(markup).toMatch(/<a [^>]*href="\/donar"[^>]*>(?:(?!<\/a>).)*Donar<\/a>/)
+describe("BotonDonarMapa", () => {
+  it("es un botón redondo verde con el corazón que lleva a /donar", () => {
+    const markup = renderToStaticMarkup(createElement(BotonDonarMapa))
+    expect(markup).toMatch(/^<a [^>]*href="\/donar"/)
+    expect(markup).toContain('aria-label="Donar a Reporty"')
+    expect(markup).toContain("size-9")
+    expect(markup).toContain("rounded-full")
+    expect(markup).toContain("bg-primary")
+    expect(markup).toContain("lucide-heart-handshake")
+    expect(markup).not.toContain(">Donar<")
+  })
+
+  it("va en la fila de arriba, junto a contactos y ayuda, y reemplaza a la píldora", () => {
+    const fuente = readFileSync(new URL("./mapa-client.tsx", import.meta.url), "utf8")
+    expect(fuente).toMatch(/<BotonDonarMapa \/>\s*<ContactsDialog \/>\s*<HowToUseDialog/)
+    expect(fuente).not.toContain("BotonDonarEncabezado")
+    expect(fuente).not.toContain("AccesoDonarMapa")
+  })
+})
+
+describe("acciones del botón flotante", () => {
+  it("usan el tamaño chico y quedan pegadas al botón", () => {
+    const fuente = readFileSync(new URL("./mapa-client.tsx", import.meta.url), "utf8")
+    expect(fuente).toContain('buttonVariants({ size: "sm", variant: "floating" })')
+    expect(fuente).toContain('<div className="flex flex-col items-end gap-1.5">')
   })
 })
