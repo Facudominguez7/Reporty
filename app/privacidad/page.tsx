@@ -41,8 +41,8 @@ const sections: LegalSection[] = [
           podés vincular a uno más adelante.
         </li>
         <li>
-          <strong>Tus reportes:</strong> título, descripción, categoría, prioridad, la ubicación que marcás en el mapa y las
-          fotos que subís.
+          <strong>Tus reportes y mascotas:</strong> título, descripción, categoría, prioridad, la ubicación que marcás en el
+          mapa, las fotos que subís y, en mascotas, el teléfono de contacto que elegís publicar.
         </li>
         <li>
           <strong>Tu participación:</strong> comentarios, votos y los puntos que sumás al participar.
@@ -70,10 +70,15 @@ const sections: LegalSection[] = [
         <p>
           Reporty funciona porque los reportes se ven. Cualquier persona, tenga o no cuenta, puede ver{" "}
           <strong>tus reportes con su ubicación exacta y sus fotos</strong>, tu nombre de usuario como autor, tus comentarios, y
-          tus puntos y tu posición en el ranking de la comunidad.
+          tus puntos y tu posición en el ranking de la comunidad. Si publicás una mascota, también se ven su foto, la zona
+          donde se perdió o se encontró y el teléfono que elegiste mostrar.
         </p>
         <p>
-          Las donaciones no son públicas: el monto, el nombre y el mensaje solo los ven los administradores. Tu email nunca se muestra. Te pedimos que no incluyas datos personales tuyos ni de otras personas en los textos o en
+          Quien sube una foto es responsable de su contenido, como explican los{" "}
+          <Link href="/terminos#fotos" className="font-medium text-primary underline-offset-4 hover:underline">
+            términos y condiciones
+          </Link>
+          . Las donaciones no son públicas: el monto, el nombre y el mensaje solo los ven los administradores. Tu email nunca se muestra. Te pedimos que no incluyas datos personales tuyos ni de otras personas en los textos o en
           las fotos: rostros reconocibles, patentes, nombres, teléfonos o domicilios particulares.
         </p>
       </>
@@ -88,7 +93,7 @@ const sections: LegalSection[] = [
         <li>Crear y mantener tu cuenta, y permitirte comentar, votar y sumar puntos.</li>
         <li>Avisarte por email cuando comentan tus reportes o cuando cambia su estado.</li>
         <li>Registrar las donaciones y, si donaste con tu cuenta, mandarte un email de agradecimiento.</li>
-        <li>Prevenir abusos, reportes falsos y usos indebidos de la plataforma.</li>
+        <li>Prevenir abusos, reportes falsos y usos indebidos de la plataforma, incluida la revisión de las fotos.</li>
         <li>Entender cómo se usa el sitio para mejorarlo.</li>
       </ul>
     ),
@@ -115,6 +120,10 @@ const sections: LegalSection[] = [
           <li>
             <strong>Mercado Pago:</strong> procesamiento de las donaciones. Los datos de pago los tratás directamente con Mercado
             Pago, según su propia política de privacidad.
+          </li>
+          <li>
+            <strong>Sightengine:</strong> análisis automático de las fotos que subís para detectar desnudos, armas, violencia o
+            contenido gráfico antes de publicarlas.
           </li>
           <li>
             <strong>Google Analytics:</strong> medición del uso del sitio.
@@ -168,6 +177,10 @@ const sections: LegalSection[] = [
           Cuando eliminás un reporte, deja de verse de inmediato, pero lo conservamos en nuestra base de datos como registro y
           para prevenir abusos. Si querés que lo borremos de forma definitiva, o que eliminemos tu cuenta, escribinos a{" "}
           <ContactEmail />.
+        </p>
+        <p>
+          Si una foto o un texto se elimina por no cumplir los términos, podemos conservarlo junto con los datos asociados
+          cuando haya indicios de un delito o lo pida una autoridad competente.
         </p>
       </>
     ),

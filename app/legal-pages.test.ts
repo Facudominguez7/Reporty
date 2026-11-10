@@ -34,6 +34,11 @@ describe("privacy policy page", () => {
     expect(privacidad).toContain("AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA")
   })
 
+  it("says who is responsible for uploaded photos and that Sightengine analyzes them", () => {
+    expect(privacidad).toContain("<strong>Sightengine:</strong>")
+    expect(privacidad).toContain("Quien sube una foto es responsable de su contenido")
+  })
+
   it("has its own title and canonical URL and can be indexed", () => {
     expect(privacidadMetadata.title).toBe("Política de privacidad")
     expect(privacidadMetadata.alternates).toEqual({ canonical: "/privacidad" })
@@ -51,6 +56,14 @@ describe("terms page", () => {
   it("says Reporty is not an official municipal channel and links to the privacy policy", () => {
     expect(terminos).toContain("no es un canal oficial de la Municipalidad de Posadas")
     expect(terminos).toContain('href="/privacidad"')
+  })
+
+  it("makes the user responsible for the photos they upload and lists what is forbidden", () => {
+    expect(terminos).toContain('id="fotos"')
+    expect(terminos).toContain("Sos el único responsable de las fotos")
+    expect(terminos).toContain("Contenido ilegal")
+    expect(terminos).toContain("autoridad competente")
+    expect(terminos).toContain("no garantiza que todo el contenido")
   })
 
   it("has a donations section: voluntary, paid through Mercado Pago, with no reward and not tax deductible", () => {
