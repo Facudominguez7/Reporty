@@ -24,4 +24,11 @@ describe("AdminNav pending reviews", () => {
     const html = renderToStaticMarkup(createElement(AdminNav, { email: "operator@example.com", roleId: ROLE_IDS.OPERADOR, pendingReviews: 2 }))
     expect(html).not.toContain("revisiones pendientes")
   })
+
+  it("muestra Donaciones solo al admin", () => {
+    const admin = renderToStaticMarkup(createElement(AdminNav, { email: "admin@example.com", roleId: ROLE_IDS.ADMIN, pendingReviews: 0 }))
+    const interesado = renderToStaticMarkup(createElement(AdminNav, { email: "ong@example.com", roleId: ROLE_IDS.INTERESADO, pendingReviews: 0 }))
+    expect(admin).toContain('href="/admin/donaciones"')
+    expect(interesado).not.toContain('href="/admin/donaciones"')
+  })
 })
