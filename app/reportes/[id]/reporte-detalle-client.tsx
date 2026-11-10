@@ -754,8 +754,9 @@ export function ReporteDetalleClient({
           <div className="space-y-4 lg:col-span-7">
             {/* Encabezado del Reporte */}
             <Card className="gap-0">
-              <CardHeader className="pb-3">
-                <div className="col-span-full mb-1 flex flex-wrap items-center gap-1.5 border-b border-border pb-1 text-xs text-muted-foreground">
+              {/* gap-3: fecha, chips y título necesitan aire; el gap-1.5 base los pegaba. */}
+              <CardHeader className="gap-3 pb-4">
+                <div className="col-span-full flex flex-wrap items-center gap-1.5 border-b border-border pb-2 text-xs text-muted-foreground">
                   <Calendar className="size-3.5 shrink-0" />
                   <span className="min-w-0">
                     Creado el día{" "}
@@ -770,7 +771,7 @@ export function ReporteDetalleClient({
                     </span>
                   </span>
                 </div>
-                <div className="flex w-full flex-wrap items-center gap-1">
+                <div className="flex w-full flex-wrap items-center gap-1.5">
                   {isAdmin ? (
                     <AdminInlineField
                       key={`priority-${isAdminEditing ? "editing" : "display"}`}
