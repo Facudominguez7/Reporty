@@ -4,10 +4,9 @@ import { signIn } from "./support/auth"
 import { rejectNextVerification, resetSiteverify, setVerificationAction } from "./support/siteverify"
 import { adminClient, uniqueTag } from "./support/test-data"
 
-/** Abre el compositor de aportes desde el botón flotante: la ficha ya no lo muestra fijo. */
+/** Espera el compositor inline de aportes dentro de la actividad. */
 async function abrirCompositor(page: Page) {
-  await page.getByRole("button", { name: "Acciones rápidas del reporte" }).click()
-  await page.getByRole("button", { name: "Comentar", exact: true }).click()
+  await page.getByRole("combobox", { name: "¿Qué novedad tenés?" }).waitFor()
 }
 
 type CapturedEmail = { to: string[]; subject: string; text: string; html: string }
@@ -57,8 +56,9 @@ test.describe("community", () => {
     await page.getByRole("button", { name: "Publicar", exact: true }).click()
     await page.getByRole("alertdialog").getByRole("button", { name: "Publicar actualización" }).click()
     await expect(page.getByRole("alertdialog")).toBeHidden()
-    // Con éxito la hoja se cierra y el aporte queda a la vista en la actividad.
-    await expect(contribution).toBeHidden()
+    // El compositor inline se limpia y permanece disponible tras publicar.
+    await expect(contribution).toBeVisible()
+    await expect(contribution).toHaveValue("")
     // El aporte aparece como texto propio; el texto del combo no cuenta como publicación.
     const published = page.getByRole("paragraph").filter({ hasText: comment })
     await expect(published).toHaveCount(1)
@@ -101,14 +101,15 @@ test.describe("community", () => {
     await publish.click()
     await page.getByRole("alertdialog").getByRole("button", { name: "Publicar actualización" }).click()
     await expect(page.getByRole("alertdialog")).toBeHidden()
-    // Con éxito la hoja se cierra y el aporte queda a la vista en la actividad.
-    await expect(contribution).toBeHidden()
+    // El compositor inline se limpia y permanece disponible tras publicar.
+    await expect(contribution).toBeVisible()
+    await expect(contribution).toHaveValue("")
     await expect(published).toHaveCount(1)
     await page.reload()
     await expect(published).toHaveCount(1)
   })
 
-  test("the update form only opens from the floating actions, never inside the activity card", async ({ page, testData }) => {
+  test("the update form is inline in the activity card", async ({ page, testData }) => {
     const owner = await testData.createUser()
     const reader = await testData.createUser()
     const report = await testData.createReport(owner)
@@ -117,13 +118,9 @@ test.describe("community", () => {
 
     const activityCard = page.locator('[data-slot="card"]').filter({ has: page.getByText("Actualizaciones y Comentarios", { exact: true }) }).first()
     await expect(activityCard.getByText("Aún no hay actividad", { exact: true })).toBeVisible()
-    await expect(page.getByLabel("¿Qué novedad tenés?")).toHaveCount(0)
+    await expect(activityCard.getByRole("combobox", { name: "¿Qué novedad tenés?" })).toBeVisible()
 
-    await page.getByRole("button", { name: "Acciones rápidas del reporte" }).click()
-    await expect(page.getByRole("button", { name: "Ver ubicación", exact: true })).toHaveCount(0)
-    await page.getByRole("button", { name: "Comentar", exact: true }).click()
-    await expect(page.getByRole("combobox", { name: "¿Qué novedad tenés?" })).toBeVisible()
-    await expect(activityCard.getByLabel("¿Qué novedad tenés?")).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Acciones de reparación" })).toHaveCount(0)
   })
 
   test("un ciudadano cambia su voto y conserva una sola recompensa", async ({ page, testData }) => {

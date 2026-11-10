@@ -82,8 +82,8 @@ import {
   type ContextoAccionesFlotantes,
 } from "@/components/report-detail/acciones-flotantes";
 import { HojaReporte } from "@/components/report-detail/hojas-reporte";
-import { ChipReporte, TONO_CATEGORIA, tonoEstado, tonoPrioridad } from "@/components/report-detail/chip-reporte";
 import { AvisoComentar, useAvisoComentar } from "@/components/report-detail/aviso-comentar";
+import { ChipReporte, TONO_CATEGORIA, tonoEstado, tonoPrioridad } from "@/components/report-detail/chip-reporte";
 import { ContenidoUbicacion, FranjaUbicacion } from "@/components/report-detail/ubicacion-reporte";
 import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
@@ -246,7 +246,7 @@ export function ReporteDetalleClient({
   const [selectedPhoto, setSelectedPhoto] = useState<{ src: string; alt: string } | null>(null);
   // Hoja inferior abierta desde el botón flotante: una sola a la vez (S13, S18).
   // La ubicación tiene hoja propia pero no acción flotante: la abre la franja de ubicación.
-  const [hojaAbierta, setHojaAbierta] = useState<ClaveAccionFlotante | "ubicacion" | null>(null);
+  const [hojaAbierta, setHojaAbierta] = useState<ClaveAccionFlotante | "contactos" | "ubicacion" | null>(null);
   // El menú flotante lo controla la ficha para poder cerrarlo antes de abrir una hoja.
   const [menuFlotanteAbierto, setMenuFlotanteAbierto] = useState(false);
   // Botón que abrió la hoja: recibe el foco cuando el Drawer se cierra.
@@ -617,9 +617,13 @@ export function ReporteDetalleClient({
     }
   };
 
-  // Tour mínimo: la primera vez que se puede comentar, un globo señala el lápiz. Va antes
-  // del retorno temprano (regla de hooks); la condición es la misma que ofrece «Comentar».
+  // Aviso de reparación antes del retorno temprano (regla de hooks); sólo aparece cuando
+  // el control flotante puede abrir esa acción.
   /** Historia de Instagram: la imagen se genera al abrir el menú de compartir. */
+  const avisoComentar = useAvisoComentar(Boolean(
+    evidenciaReparacion && (evidenciaReparacion.evidencia !== null || evidenciaReparacion.puedeInformar),
+  ));
+
   const historia = useHistoriaInstagram(
     () => crearArchivoHistoria(),
     (resultado) => {
@@ -628,9 +632,6 @@ export function ReporteDetalleClient({
     },
   );
 
-  const avisoComentar = useAvisoComentar(
-    Boolean(reporte && currentUser && !currentUser.is_anonymous && !isReporteCerrado),
-  );
 
   if (!reporte) {
     return (
@@ -694,29 +695,21 @@ export function ReporteDetalleClient({
    * Abre una hoja recordando el botón que la originó y cerrando antes el menú flotante:
    * nunca queda un menú desplegado detrás del velo y el foco vuelve a un control real.
    */
-  const abrirHoja = (hoja: ClaveAccionFlotante | "ubicacion", disparador: HTMLElement | null) => {
+  const abrirHoja = (hoja: ClaveAccionFlotante | "contactos" | "ubicacion", disparador: HTMLElement | null) => {
     setDisparadorHoja(disparador);
     setMenuFlotanteAbierto(false);
     setHojaAbierta(hoja);
   };
 
   /**
-   * Arma el enlace del reporte recién al abrir los contactos: `window` sólo existe en el
+   * Arma el enlace del reporte al abrir la hoja de contactos: `window` sólo existe en el
    * navegador y el mensaje de los organismos lo usa para citar la publicación real.
    */
   const manejadoresAccionesFlotantes: Record<ClaveAccionFlotante, (disparador: HTMLElement | null) => void> = {
-    contactos: (disparador) => {
-      setUrlReporte(new URL(`/reportes/${reporte.id}`, window.location.origin).toString());
-      abrirHoja("contactos", disparador);
-    },
     reparacion: (disparador) => abrirHoja("reparacion", disparador),
-    comentar: (disparador) => abrirHoja("comentar", disparador),
   };
 
   const contextoAccionesFlotantes: ContextoAccionesFlotantes = {
-    sesion: { haySesion: Boolean(currentUser), esAnonimo: Boolean(currentUser?.is_anonymous) },
-    reporteCerrado: Boolean(isReporteCerrado),
-    puedeContactar,
     reparacion: evidenciaReparacion
       ? { hayEvidencia: evidenciaReparacion.evidencia !== null, puedeInformar: evidenciaReparacion.puedeInformar }
       : null,
@@ -994,6 +987,19 @@ export function ReporteDetalleClient({
                   </Avatar>
                   <span className="truncate">Reportado por {getUsernameFromRelation(reporte.profiles)}</span>
                 </div>
+                {puedeContactar && reporte.lat !== null && reporte.lon !== null && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="mx-auto mt-3 flex w-fit max-w-full whitespace-normal bg-black text-white hover:bg-black/90"
+                    onClick={(event) => {
+                      setUrlReporte(new URL(`/reportes/${reporte.id}`, window.location.origin).toString());
+                      abrirHoja("contactos", event.currentTarget);
+                    }}
+                  >
+                    Avisar a un organismo
+                  </Button>
+                )}
                 {fechaCambioEstado && isReporteCerrado && (
                   <div className={`mt-3 inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium ${getNameFromRelation(reporte.estados).toLowerCase() === 'reparado'
                     ? 'tone-success-inline'
@@ -1079,9 +1085,6 @@ export function ReporteDetalleClient({
               reportOwnerId={reporte.usuario_id}
               isAdmin={isAdmin}
               isClosed={Boolean(isReporteCerrado)}
-              compositorAbierto={hojaAbierta === "comentar"}
-              onCambiarCompositor={(abierta) => setHojaAbierta(abierta ? "comentar" : null)}
-              disparadorCompositor={disparadorHoja}
               onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
               onDeleteComment={async (commentId) => {
                 const result = await eliminarComentarioPropioAction(commentId)
@@ -1385,7 +1388,6 @@ export function ReporteDetalleClient({
         acciones={accionesFlotantes}
         abierta={menuFlotanteAbierto}
         onCambiarAbierta={(abierta) => {
-          // Abrir el menú ya cumple el objetivo del aviso: no vuelve a aparecer.
           if (abierta && avisoComentar.visible) avisoComentar.descartar();
           setMenuFlotanteAbierto(abierta);
         }}

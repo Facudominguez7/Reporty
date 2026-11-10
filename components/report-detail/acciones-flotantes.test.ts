@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
-import { Camera, MessageCircle, Building2 } from "lucide-react"
+import { Camera } from "lucide-react"
 import { describe, expect, it, vi } from "vitest"
 
 import {
@@ -15,27 +15,16 @@ import {
 } from "./acciones-flotantes"
 
 const acciones: AccionFlotante[] = [
-  { clave: "contactos", etiqueta: "Avisar a un organismo", icono: Building2, onSeleccionar: vi.fn() },
   { clave: "reparacion", etiqueta: "¿Ya lo arreglaron?", icono: Camera, onSeleccionar: vi.fn() },
-  { clave: "comentar", etiqueta: "Comentar", icono: MessageCircle, onSeleccionar: vi.fn() },
 ]
 
 describe("disponibilidad de las acciones flotantes", () => {
   const contextoBase = {
-    sesion: { haySesion: true, esAnonimo: false },
-    reporteCerrado: false,
-    puedeContactar: true,
     reparacion: { hayEvidencia: false, puedeInformar: true },
   }
 
-  it("ofrece las tres acciones en el orden del diseño cuando todo está disponible", () => {
-    expect(accionesDisponibles(contextoBase)).toEqual(["contactos", "reparacion", "comentar"])
-  })
-
-  it("no ofrece comentar sin sesión, como invitado ni en un reporte cerrado", () => {
-    expect(accionesDisponibles({ ...contextoBase, sesion: { haySesion: false, esAnonimo: false } })).not.toContain("comentar")
-    expect(accionesDisponibles({ ...contextoBase, sesion: { haySesion: true, esAnonimo: true } })).not.toContain("comentar")
-    expect(accionesDisponibles({ ...contextoBase, reporteCerrado: true })).not.toContain("comentar")
+  it("ofrece sólo la acción de reparación cuando está disponible", () => {
+    expect(accionesDisponibles(contextoBase)).toEqual(["reparacion"])
   })
 
   it("sólo ofrece la reparación cuando hay evidencia visible o se puede informar una", () => {
@@ -45,23 +34,14 @@ describe("disponibilidad de las acciones flotantes", () => {
     expect(accionesDisponibles({ ...contextoBase, reparacion: { hayEvidencia: true, puedeInformar: true } })).toContain("reparacion")
   })
 
-  it("sólo ofrece organismos cuando el reporte los tiene", () => {
-    expect(accionesDisponibles({ ...contextoBase, puedeContactar: false })).not.toContain("contactos")
-  })
-
   it("arma cada acción con su etiqueta visible y su manejador", () => {
-    const manejadores = {
-      contactos: vi.fn(),
-      reparacion: vi.fn(),
-      comentar: vi.fn(),
-    }
+    const manejadores = { reparacion: vi.fn() }
 
-    const armadas = construirAccionesFlotantes(["comentar", "contactos"], manejadores)
+    const armadas = construirAccionesFlotantes(["reparacion"], manejadores)
 
-    expect(armadas).toHaveLength(2)
-    expect(armadas[0]).toMatchObject({ clave: "comentar", etiqueta: "Comentar" })
-    expect(armadas[1]).toMatchObject({ clave: "contactos", etiqueta: "Avisar a un organismo" })
-    expect(armadas[0].onSeleccionar).toBe(manejadores.comentar)
+    expect(armadas).toHaveLength(1)
+    expect(armadas[0]).toMatchObject({ clave: "reparacion", etiqueta: "¿Ya lo arreglaron?" })
+    expect(armadas[0].onSeleccionar).toBe(manejadores.reparacion)
   })
 })
 
@@ -70,7 +50,7 @@ describe("botón flotante cerrado", () => {
     const html = renderToStaticMarkup(createElement(AccionesFlotantes, { acciones, abierta: false, onCambiarAbierta: () => {} }))
 
     expect(html).toContain('aria-expanded="false"')
-    expect(html).toContain('aria-label="Acciones rápidas del reporte"')
+    expect(html).toContain('aria-label="Acciones de reparación"')
     expect(html).toMatch(/aria-controls="[^"]+"/)
     expect(html).toContain("data-acciones-flotantes")
   })
@@ -78,8 +58,7 @@ describe("botón flotante cerrado", () => {
   it("no muestra las acciones hasta abrirlo", () => {
     const html = renderToStaticMarkup(createElement(AccionesFlotantes, { acciones, abierta: false, onCambiarAbierta: () => {} }))
 
-    expect(html).not.toContain("Comentar")
-    expect(html).not.toContain("Avisar a un organismo")
+    expect(html).not.toContain("¿Ya lo arreglaron?")
   })
 
   it("queda sobre la navegación inferior y no anima por su cuenta", () => {
@@ -98,7 +77,7 @@ describe("apertura controlada por el padre", () => {
     )
 
     expect(html).toContain('aria-expanded="false"')
-    expect(html).toContain('aria-label="Acciones rápidas del reporte"')
+    expect(html).toContain('aria-label="Acciones de reparación"')
     expect(html).not.toContain("¿Ya lo arreglaron?")
   })
 
@@ -109,7 +88,6 @@ describe("apertura controlada por el padre", () => {
 
     expect(html).toContain('aria-expanded="true"')
     expect(html).toContain('aria-label="Cerrar acciones del reporte"')
-    expect(html).toContain("Comentar")
     expect(html).toContain("¿Ya lo arreglaron?")
   })
 })
@@ -122,7 +100,7 @@ describe("elegir una acción del menú", () => {
     const disparador = { isConnected: true } as unknown as HTMLElement
 
     ejecutarAccionFlotante(
-      { clave: "contactos", etiqueta: "Avisar a un organismo", icono: Building2, onSeleccionar },
+      { clave: "reparacion", etiqueta: "¿Ya lo arreglaron?", icono: Camera, onSeleccionar },
       disparador,
       cerrarMenu,
     )

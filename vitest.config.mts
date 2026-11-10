@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
-    exclude: ["node_modules/**", ".next/**", ".open-next/**", ".git/**"],
+    exclude: ["node_modules/**", ".next/**", ".open-next/**", ".git/**", ".worktrees/**"],
     setupFiles: ["./vitest.setup.ts"],
   },
 })

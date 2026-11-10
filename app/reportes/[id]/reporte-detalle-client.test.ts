@@ -191,16 +191,25 @@ describe("acciones y hojas del detalle", () => {
     expect(html).toContain("Actualizaciones y Comentarios")
   })
 
-  it("no repite «Avisar a un organismo» en la ficha: sólo lo ofrece la acción flotante", () => {
+  it("ubica avisar a un organismo debajo de Reportado por", () => {
     const html = renderizar()
 
-    expect(html).not.toContain("Avisar a un organismo")
+    expect(html.indexOf("Reportado por Usuario")).toBeLessThan(html.indexOf("Avisar a un organismo"))
   })
 
-  it("no pinta el formulario de comentarios en la ficha: sólo lo abre la acción flotante", () => {
+  it("muestra el compositor inline a una cuenta registrada", () => {
     const html = renderizar()
 
-    expect(html).not.toContain('id="report-contribution"')
+    expect(html).toContain('id="report-contribution"')
+    expect(html).toContain('data-turnstile="comentar_reporte"')
+  })
+
+  it("no muestra compositor inline a invitados ni en reportes cerrados", () => {
+    const anonimo = renderizar({ currentUser: { id: "guest", is_anonymous: true } })
+    const cerrado = renderizar({ reporte: { ...reporte, estado_id: 2 } as unknown as ReporteDetalle })
+
+    expect(anonimo).not.toContain('id="report-contribution"')
+    expect(cerrado).not.toContain('id="report-contribution"')
   })
 
   it("no repite el botón de ubicación en móvil", () => {

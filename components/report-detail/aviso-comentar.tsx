@@ -1,15 +1,12 @@
 "use client"
 
 /**
- * Pequeño tour de la ficha del reporte: la primera vez que alguien puede comentar,
- * un globo junto al botón flotante le explica que el lápiz abre el comentario.
- *
- * Se recuerda en el navegador (como el onboarding del mapa) y no vuelve a aparecer
- * después de «Entendido» ni después de abrir el menú del lápiz.
+ * Aviso de la ficha del reporte: la primera vez que la acción de reparación está
+ * disponible, explica el botón check flotante. La vista se recuerda en el navegador.
  */
 
 import { useCallback, useState, useSyncExternalStore } from "react"
-import { Pencil } from "lucide-react"
+import { Check } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ClaveAccionFlotante } from "./acciones-flotantes"
@@ -22,10 +19,10 @@ export const CLAVE_AVISO_COMENTAR = "reporty_aviso_comentar_visto"
  *
  * @param acciones - Acciones flotantes disponibles para esta persona y este reporte.
  * @param yaVisto - Si el navegador ya recuerda el aviso.
- * @returns `true` sólo cuando se puede comentar y el aviso no se vio antes.
+ * @returns `true` sólo cuando está disponible la reparación y el aviso no se vio antes.
  */
 export function debeMostrarAvisoComentar(acciones: ClaveAccionFlotante[], yaVisto: boolean): boolean {
-  return acciones.includes("comentar") && !yaVisto
+  return acciones.includes("reparacion") && !yaVisto
 }
 
 /** Lee la marca del navegador sin romper la ficha si el almacenamiento está bloqueado. */
@@ -55,10 +52,10 @@ function suscribirseSinCambios(): () => void {
  * Estado del aviso para la ficha. En el servidor (y en la hidratación) cuenta como
  * visto, así nunca aparece antes de saber qué recuerda el navegador.
  *
- * @param puedeComentar - Si el menú flotante ofrece «Comentar» a esta persona.
+ * @param puedeInformarReparacion - Si el control flotante ofrece la acción de reparación.
  * @returns Si se muestra y la función que lo descarta para siempre.
  */
-export function useAvisoComentar(puedeComentar: boolean) {
+export function useAvisoComentar(puedeInformarReparacion: boolean) {
   const yaVisto = useSyncExternalStore(suscribirseSinCambios, avisoYaVisto, () => true)
   const [descartado, setDescartado] = useState(false)
 
@@ -67,7 +64,7 @@ export function useAvisoComentar(puedeComentar: boolean) {
     setDescartado(true)
   }, [])
 
-  const visible = debeMostrarAvisoComentar(puedeComentar ? ["comentar"] : [], yaVisto || descartado)
+  const visible = debeMostrarAvisoComentar(puedeInformarReparacion ? ["reparacion"] : [], yaVisto || descartado)
   return { visible, descartar }
 }
 
@@ -79,13 +76,12 @@ export function useAvisoComentar(puedeComentar: boolean) {
 export function AvisoComentar({ onCerrar }: { onCerrar: () => void }) {
   return (
     <aside
-      aria-label="Cómo comentar"
+      aria-label="Cómo informar una reparación"
       className="pointer-events-auto relative mr-1 w-[min(17rem,calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card p-3 text-card-foreground shadow-[var(--elevation-soft)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2"
     >
-      <p className="text-sm font-semibold">¿Viste algo nuevo en el lugar?</p>
+      <p className="text-sm font-semibold">¿Ya lo arreglaron?</p>
       <p className="mt-1 text-sm leading-5 text-muted-foreground">
-        Tocá el lápiz <Pencil aria-hidden="true" className="inline size-3.5 align-[-2px]" /> para comentar,
-        contar si ya lo arreglaron o avisar a un organismo.
+        Tocá el botón <Check aria-hidden="true" className="inline size-3.5 align-[-2px]" /> para informar una reparación o consultar su evidencia.
       </p>
       <div className="mt-2 flex justify-end">
         <Button type="button" size="sm" onClick={onCerrar}>

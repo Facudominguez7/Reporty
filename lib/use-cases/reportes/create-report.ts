@@ -13,10 +13,11 @@ import { canCreateReports, getUserRoleContext, isGuestRole } from "@/lib/authz/r
 import { moderarYGuardarImagenReporte, type ResultadoImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
+import { moderateText } from "@/lib/moderation/textos.server"
 
 type MutationResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string }
+  | { success: false; error: string; errorKind?: "moderation" | "verification" | "timeout" }
 
 export type CreateReportWorkflowInput = CrearReporteParams & {
   image?: File | null
@@ -50,17 +51,40 @@ export async function crearReporteWorkflow(
     return { success: false, error: "No tenés permisos para crear reportes." }
   }
 
-  // Arranca ya para no sumar su espera a la validación de la foto; nunca lanza.
-  const direccionPendiente = input.lat !== null && input.lon !== null
-    ? obtenerDireccion(input.lat, input.lon)
-    : Promise.resolve(null)
-
   // Validación histórica después de sesión, claim y rol; no se lee la miniatura ajena.
   if (input.image) {
     if (!isAcceptedReportImageType(input.image.type)) throw new Error("La imagen debe estar en formato JPG, PNG o WebP.")
     if (input.image.size > REPORT_IMAGE_MAX_BYTES) throw new Error(`La imagen optimizada no puede superar los ${REPORT_IMAGE_MAX_BYTES_LABEL}.`)
     await validateUploadedReportImage(input.image)
   }
+  const { data: category, error: categoryError } = await supabase.from("categorias").select("nombre").eq("id", input.categoriaId).single()
+  if (categoryError || typeof category?.nombre !== "string") {
+    console.warn("[text-moderation] reporte CATEGORY_LOOKUP_FAILED")
+    return { success: false, error: "No pudimos verificar el texto. Intentá nuevamente más tarde.", errorKind: "verification" }
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("reservar_presupuesto_texto", { p_usuario_id: input.usuarioId })
+    if (error || data !== true) {
+      console.warn(error ? "[text-moderation] reporte BUDGET_RPC_ERROR" : data === false ? "[text-moderation] reporte BUDGET_DENIED" : "[text-moderation] reporte BUDGET_INVALID_RESPONSE")
+      return { success: false, error: "No pudimos verificar el texto. Intentá nuevamente más tarde.", errorKind: "verification" }
+    }
+  } catch {
+    console.warn("[text-moderation] reporte BUDGET_RPC_ERROR")
+    return { success: false, error: "No pudimos verificar el texto. Intentá nuevamente más tarde.", errorKind: "verification" }
+  }
+  const textResult = await moderateText({ tipo: "reporte", categoria: category.nombre, titulo: input.titulo, descripcion: input.descripcion })
+  if (textResult.decision !== "APPROVED") return {
+    success: false,
+    error: textResult.error,
+    errorKind: textResult.decision === "UNAVAILABLE" && textResult.motivo === "TIMEOUT" ? "timeout"
+      : textResult.decision === "UNAVAILABLE" && textResult.motivo === "SERVICE_UNAVAILABLE" ? "verification" : "moderation",
+  }
+
+  // Only resolve coordinates after approval; rejected content should not reach external geocoding.
+  const direccionPendiente = input.lat !== null && input.lon !== null
+    ? obtenerDireccion(input.lat, input.lon)
+    : Promise.resolve(null)
   const reporte = await crearReporte(supabase, { ...input, direccion: await direccionPendiente })
 
   let imageModeration = input.image

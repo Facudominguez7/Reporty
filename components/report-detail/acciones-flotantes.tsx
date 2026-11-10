@@ -3,9 +3,8 @@
 /**
  * Botón flotante de acciones del detalle del reporte (S13, S18).
  *
- * Reúne en un solo botón ámbar las acciones que antes obligaban a recorrer la ficha
- * hasta el final: comentar, informar o ver la reparación y organismos. La ubicación
- * no está acá: la franja de ubicación de la ficha ya abre su hoja.
+ * Reúne la acción de reparación en un botón check primary. Contactar organismos y
+ * comentar permanecen en la ficha; la ubicación abre su hoja desde la franja superior.
  * Cada acción abre una hoja inferior; acá solo vive la apertura del menú, el foco y
  * el cierre, nunca la lógica de negocio de la ficha.
  *
@@ -16,12 +15,12 @@
  */
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react"
-import { Building2, Camera, MessageCircle, Pencil, X, type LucideIcon } from "lucide-react"
+import { Check, Camera, X, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/** Las tres acciones que el diseño pone al alcance del pulgar. */
-export type ClaveAccionFlotante = "contactos" | "reparacion" | "comentar"
+/** La acción de reparación disponible desde el control flotante. */
+export type ClaveAccionFlotante = "reparacion"
 
 /**
  * Acción concreta del menú. `onSeleccionar` recibe el botón que la abrió para que la
@@ -36,44 +35,28 @@ export type AccionFlotante = {
 
 /** Etiquetas de las acciones; las mismas palabras que muestra el menú. */
 export const ETIQUETAS_ACCION_FLOTANTE: Record<ClaveAccionFlotante, string> = {
-  contactos: "Avisar a un organismo",
   reparacion: "¿Ya lo arreglaron?",
-  comentar: "Comentar",
 }
 
 /** Íconos de las acciones; siempre decorativos, nunca el único texto del botón. */
 export const ICONOS_ACCION_FLOTANTE: Record<ClaveAccionFlotante, LucideIcon> = {
-  contactos: Building2,
   reparacion: Camera,
-  comentar: MessageCircle,
 }
 
 /** Lo que la ficha sabe de la persona y del reporte para decidir qué ofrecer. */
 export type ContextoAccionesFlotantes = {
-  sesion: { haySesion: boolean; esAnonimo: boolean }
-  reporteCerrado: boolean
-  puedeContactar: boolean
   /** `null` cuando la ficha no tiene sección de reparación que mostrar. */
   reparacion: { hayEvidencia: boolean; puedeInformar: boolean } | null
 }
 
 /**
- * Decide qué acciones se ofrecen, en el orden en que las muestra el menú.
- *
- * Comentar exige una cuenta registrada y un reporte abierto, igual que el formulario
- * de aportes. La reparación aparece con evidencia visible o cuando se puede informar
- * una nueva; nunca se ofrece cargar otra foto mientras hay una evidencia activa.
+ * Ofrece la reparación cuando hay evidencia visible o se puede informar una nueva;
+ * nunca ofrece cargar otra foto mientras hay una evidencia activa.
  */
 export function accionesDisponibles(contexto: ContextoAccionesFlotantes): ClaveAccionFlotante[] {
-  const disponibles: ClaveAccionFlotante[] = []
-  if (contexto.puedeContactar) disponibles.push("contactos")
-  if (contexto.reparacion && (contexto.reparacion.hayEvidencia || contexto.reparacion.puedeInformar)) {
-    disponibles.push("reparacion")
-  }
-  if (contexto.sesion.haySesion && !contexto.sesion.esAnonimo && !contexto.reporteCerrado) {
-    disponibles.push("comentar")
-  }
-  return disponibles
+  return contexto.reparacion && (contexto.reparacion.hayEvidencia || contexto.reparacion.puedeInformar)
+    ? ["reparacion"]
+    : []
 }
 
 /**
@@ -199,7 +182,7 @@ export function AccionesFlotantes({
   acciones,
   abierta,
   onCambiarAbierta,
-  etiqueta = "Acciones rápidas del reporte",
+  etiqueta = "Acciones de reparación",
   aviso,
 }: {
   acciones: AccionFlotante[]
@@ -265,12 +248,12 @@ export function AccionesFlotantes({
         onClick={() => onCambiarAbierta(!abierta)}
         className={cn(
           "pointer-events-auto inline-flex size-[3.25rem] shrink-0 items-center justify-center rounded-[var(--radius-pill)]",
-          "border border-foreground/25 bg-[var(--semantic-warning)] text-foreground shadow-[var(--elevation-soft)]",
-          "motion-safe:transition-colors hover:bg-[color-mix(in_oklab,var(--semantic-warning)_88%,var(--foreground))]",
+          "border border-primary/25 bg-primary text-primary-foreground shadow-[var(--elevation-soft)]",
+          "motion-safe:transition-colors hover:bg-primary/90",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         )}
       >
-        {abierta ? <X className="size-[1.375rem]" aria-hidden="true" /> : <Pencil className="size-[1.375rem]" aria-hidden="true" />}
+        {abierta ? <X className="size-[1.375rem]" aria-hidden="true" /> : <Check className="size-[1.375rem]" aria-hidden="true" />}
       </button>
     </div>
   )

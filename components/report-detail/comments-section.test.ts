@@ -73,20 +73,19 @@ const contar = (html: string, fragmento: string) => html.split(fragmento).length
 beforeEach(() => vi.clearAllMocks())
 
 describe("compositor de aportes dentro de la sección", () => {
-  it("no muestra el formulario en la sección: comentar sólo se abre desde el botón flotante", () => {
+  it("muestra el formulario inline para comentar directamente", () => {
     const html = renderizar()
 
-    expect(contar(html, "<select")).toBe(0)
-    expect(html).not.toContain("Publicar</span>")
-    expect(html).not.toContain('data-turnstile="comentar_reporte"')
+    expect(contar(html, "<select")).toBe(1)
+    expect(html).toContain("Publicar</span>")
+    expect(html).toContain('data-turnstile="comentar_reporte"')
   })
 
-  it("mueve el compositor a la hoja inferior cuando la acción flotante lo pide", () => {
-    const html = renderizar({ compositorAbierto: true })
+  it("no muestra el compositor en reportes cerrados", () => {
+    const html = renderizar({ isClosed: true })
 
-    expect(contar(html, "<select")).toBe(1)
-    expect(html).toContain('aria-label="Cerrar el compositor"')
-    expect(html).toContain('data-turnstile="comentar_reporte"')
+    expect(contar(html, "<select")).toBe(0)
+    expect(html).not.toContain('data-turnstile="comentar_reporte"')
   })
 
   it("respeta el cierre del reporte también cuando la hoja está abierta", () => {
@@ -98,11 +97,11 @@ describe("compositor de aportes dentro de la sección", () => {
   })
 
   it("no abre el compositor sin sesión ni como invitado", () => {
-    const sinSesion = renderizar({ compositorAbierto: true, currentUser: null })
+    const sinSesion = renderizar({ currentUser: null })
     expect(contar(sinSesion, "<select")).toBe(0)
     expect(sinSesion).toContain("iniciá sesión")
 
-    const invitado = renderizar({ compositorAbierto: true, currentUser: { id: "guest-1", is_anonymous: true } })
+    const invitado = renderizar({ currentUser: { id: "guest-1", is_anonymous: true } })
     expect(contar(invitado, "<select")).toBe(0)
     expect(invitado).toContain("vinculá tu correo")
   })

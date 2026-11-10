@@ -43,7 +43,6 @@ import {
   TurnstileWidget,
 } from "@/components/turnstile-widget";
 import { debeAvisarVerificacionVencida } from "./verificacion-de-aporte";
-import { HojaReporte } from "./hojas-reporte";
 
 /**
  * Action que Turnstile vincula al aporte público. `app/reportes/[id]/actions.ts` verifica el
@@ -87,14 +86,6 @@ export type CommentsSectionProps = {
   ) => Promise<CommentSubmitResult>;
   onDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
   onAdminDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
-  /**
-   * El compositor vive sólo en la hoja inferior que abre la acción flotante «Comentar»;
-   * la tarjeta queda para leer la actividad, así nunca hay dos formularios.
-   */
-  compositorAbierto?: boolean;
-  onCambiarCompositor?: (abierto: boolean) => void;
-  /** Botón que abrió el compositor en la hoja; recupera el foco al cerrarla. */
-  disparadorCompositor?: HTMLElement | null;
 };
 
 export function CommentsSection({
@@ -107,9 +98,6 @@ export function CommentsSection({
   onSubmitComment,
   onDeleteComment,
   onAdminDeleteComment,
-  compositorAbierto = false,
-  onCambiarCompositor,
-  disparadorCompositor,
 }: CommentsSectionProps) {
   const [comments, setComments] = useState(initialComments);
   const [newComment, setNewComment] = useState("");
@@ -190,7 +178,6 @@ export function CommentsSection({
         result.data.comment,
       ]);
       setNewComment("");
-      onCambiarCompositor?.(false);
       toast.success(
         result.data.pointsAwarded > 0
           ? `¡Actualización publicada! +${result.data.pointsAwarded} puntos`
@@ -254,8 +241,7 @@ export function CommentsSection({
   };
 
   /**
-   * Compositor único de la sección: se pinta sólo en la hoja inferior que abre la
-   * acción flotante «Comentar», nunca dentro de la tarjeta de actividad.
+   * Compositor inline junto a la actividad para comentar directamente.
    */
   const formularioAporte = (
     <form
@@ -430,22 +416,9 @@ export function CommentsSection({
               })
             )}
           </div>
-
+          {puedeComentar && formularioAporte}
         </CardContent>
       </Card>
-
-      {puedeComentar && (
-        <HojaReporte
-          abierta={compositorAbierto}
-          cambiandoAbierta={(abierto) => onCambiarCompositor?.(abierto)}
-          titulo="¿Qué novedad tenés?"
-          descripcion="Elegí la actualización que describe lo que viste en el lugar."
-          etiquetaCerrar="Cerrar el compositor"
-          disparador={disparadorCompositor}
-        >
-          {formularioAporte}
-        </HojaReporte>
-      )}
 
       {/* El Drawer compartido usa !z-[70]: la confirmación tiene que quedar por encima.
           Va con `!` porque globals.css fuerza `z-index: 50 !important` en todo

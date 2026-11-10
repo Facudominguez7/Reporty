@@ -742,9 +742,8 @@ function FormularioEvidenciaReparacion({
  * El estado que muestra es siempre el de la evidencia, nunca el del reporte: un
  * reporte Pendiente con una reparación informada no se presenta como «Reparado».
  *
- * La ficha muestra y el lápiz hace: sin evidencia y con permiso para informar no se
- * pinta nada, porque «Informar la reparación» ya vive en el botón flotante. Sin
- * cuenta sí se pinta, porque el lápiz no ofrece esa acción y es la única invitación.
+ * El resumen ofrece el acceso alto «¿Ya lo arreglaron?» y abre la hoja de reparación;
+ * el control flotante también conserva ese acceso para quien puede informar o ver evidencia.
  */
 export function ResumenReparacion({
   seccion,
@@ -780,7 +779,22 @@ export function ResumenReparacion({
     )
   }
 
-  if (!evidencia) return null
+  if (!evidencia) {
+    return (
+      <div className="flex items-center gap-3 rounded-[var(--radius)] border border-border bg-card px-3 py-2 shadow-[var(--card-shadow)]">
+        <span aria-hidden="true" className="inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-primary/10 text-primary">
+          <Camera className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">¿Ya lo arreglaron?</p>
+          <p className="text-xs text-muted-foreground">Informá la reparación con una foto.</p>
+        </div>
+        <Button ref={botonRef} type="button" size="sm" aria-haspopup="dialog" className="shrink-0" onClick={() => onVer(botonRef.current)}>
+          Informar
+        </Button>
+      </div>
+    )
+  }
 
   const estado =
     evidencia.estado === "reparado"

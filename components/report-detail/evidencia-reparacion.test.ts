@@ -418,10 +418,11 @@ describe("resumen de la reparación sobre el contenido", () => {
     expect(html).not.toContain("En verificación")
   })
 
-  it("no repite «Informar la reparación»: sin evidencia, esa acción vive sólo en el lápiz", () => {
+  it("ofrece informar desde el resumen alto cuando no hay evidencia", () => {
     const html = renderizarResumen({ evidencia: null, puedeInformar: true })
 
-    expect(html).toBe("")
+    expect(html).toContain("¿Ya lo arreglaron?")
+    expect(html).toContain(">Informar</button>")
   })
 
   it("invita a ingresar cuando el reporte no ofrece reparación a esta cuenta", () => {

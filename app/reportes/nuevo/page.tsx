@@ -480,8 +480,13 @@ export default function NuevoReportePage() {
         // Siteverify consumed the token: the retry needs a new challenge, but the report
         // and everything already written in the form stay exactly as they were.
         requestNewCaptcha()
-        toast.error("Error al crear el reporte", {
-          description: result.error,
+        const errorTitle = result.errorKind === "moderation" ? "Revisá el texto"
+          : result.errorKind === "timeout" ? "La verificación tardó demasiado"
+          : result.errorKind === "verification" ? "No pudimos verificar el texto"
+          : "No se pudo enviar el reporte"
+        toast.error(errorTitle, {
+          description: result.errorKind === "timeout" ? "Intentá nuevamente."
+            : result.errorKind === "verification" ? "Intentá nuevamente más tarde." : result.error,
         })
         return
       }
