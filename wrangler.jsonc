@@ -27,7 +27,7 @@
   },
   "triggers": {
     // Weekly audit archive: Sundays 06:00 UTC (CRON_ARCHIVO_AUDITORIA in lib/cloudflare/cron-auditoria.ts).
-    "crons": ["0 6 * * 0"]
+    "crons": ["0 6 * * SUN"]
   },
   "observability": {
     "enabled": true
