@@ -30,6 +30,7 @@ import Link from "next/link"
 import { PUNTOS } from "@/database/queries/puntos"
 import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/loading-skeletons"
 import { REPORT_IMAGE_ACCEPT_ATTR } from "@/lib/media/report-images"
+import { buscarUbicacionPrecisa, esUbicacionAproximada } from "@/lib/geolocalizacion/ubicacion-precisa"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import { createReportImageThumbnail, optimizeReportImage } from "@/lib/media/optimize-report-image"
 import { toast } from "sonner"
@@ -281,7 +282,12 @@ export default function NuevoReportePage() {
     }))
   }
 
-  const handleUseCurrentLocation = () => {
+  /**
+   * Toma la ubicación del dispositivo esperando unos segundos la lectura más precisa
+   * (ver `buscarUbicacionPrecisa`). Si el margen de error sigue siendo grande, marca el
+   * punto igual y pide corregirlo tocando el mapa.
+   */
+  const handleUseCurrentLocation = async () => {
     if (!("geolocation" in navigator)) {
       toast.error("No pudimos obtener tu ubicación", {
         description: "No hace falta habilitar el GPS: podés marcar el punto en el mapa."
@@ -290,26 +296,28 @@ export default function NuevoReportePage() {
     }
 
     setIsLocatingLocation(true)
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setIsLocatingLocation(false)
-        if (!isWithinReportCoverage(coords.latitude, coords.longitude)) {
-          toast.error("Tu ubicación está fuera del área de cobertura", {
-            description: "Podés marcar manualmente en el mapa si el problema ocurrió en Posadas, Garupá o Candelaria."
-          })
-          return
-        }
-
-        handleLocationSelect(coords.latitude, coords.longitude)
-      },
-      () => {
-        setIsLocatingLocation(false)
-        toast.error("No pudimos obtener tu ubicación", {
-          description: "No hace falta habilitar el GPS: podés marcar el punto en el mapa."
+    try {
+      const { lat, lon, precision } = await buscarUbicacionPrecisa(navigator.geolocation)
+      if (!isWithinReportCoverage(lat, lon)) {
+        toast.error("Tu ubicación está fuera del área de cobertura", {
+          description: "Podés marcar manualmente en el mapa si el problema ocurrió en Posadas, Garupá o Candelaria."
         })
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+        return
+      }
+
+      handleLocationSelect(lat, lon)
+      if (esUbicacionAproximada(precision)) {
+        toast.warning(`Ubicación aproximada (±${Math.round(precision)} m)`, {
+          description: "Si el punto no quedó en el lugar exacto, tocá el mapa donde está el problema."
+        })
+      }
+    } catch {
+      toast.error("No pudimos obtener tu ubicación", {
+        description: "No hace falta habilitar el GPS: podés marcar el punto en el mapa."
+      })
+    } finally {
+      setIsLocatingLocation(false)
+    }
   }
 
   const isGuestMode = !user || user.is_anonymous === true

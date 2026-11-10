@@ -106,3 +106,17 @@ test("la geolocalización centra el marcador y rechaza ubicaciones fuera de cobe
   const posicionRechazada = await posicionDelMarcador(mapa)
   expect(Math.hypot(posicionRechazada.x - posicionAceptada.x, posicionRechazada.y - posicionAceptada.y)).toBeLessThan(1)
 })
+
+test("una ubicación imprecisa se marca igual y pide corregirla en el mapa", async ({ page, context, testData }) => {
+  const usuario = await testData.createUser()
+  await signIn(page, usuario)
+  await context.grantPermissions(["geolocation"])
+  // Margen de 120 m: nunca alcanza la precisión suficiente, así que espera el tiempo máximo.
+  await context.setGeolocation({ latitude: -27.3676, longitude: -55.8961, accuracy: 120 })
+  await page.goto("/reportes/nuevo")
+
+  await page.getByRole("button", { name: "Usar mi ubicación" }).click()
+  await expect(page.getByRole("button", { name: "Buscando ubicación…" })).toBeVisible()
+  await expect(page.getByText("Ubicación aproximada (±120 m)")).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(/Ubicación seleccionada:/)).toHaveText("Ubicación seleccionada: -27.36760, -55.89610")
+})
