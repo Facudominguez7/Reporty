@@ -9,7 +9,7 @@ import { pageMetadata } from "@/lib/seo/site"
 export const metadata: Metadata = pageMetadata({
   title: "Términos y condiciones",
   description:
-    "Las reglas para usar Reporty: qué se puede publicar, qué pasa con tu contenido, cómo funcionan la moderación y los puntos.",
+    "Las reglas para usar Reporty: qué se puede publicar, qué pasa con tu contenido, cómo funcionan la moderación, los puntos y las donaciones.",
   path: "/terminos",
 })
 
@@ -118,6 +118,43 @@ const sections: LegalSection[] = [
         Los puntos reconocen tu participación. No tienen valor económico, no se pueden canjear ni transferir, y podemos
         ajustarlos o anularlos si detectamos abusos.
       </p>
+    ),
+  },
+  {
+    id: "donaciones",
+    title: "Donaciones",
+    content: (
+      <>
+        <p>
+          Las donaciones son voluntarias: Reporty es gratis y lo seguirá siendo, dones o no. Lo que donás se usa para mantener
+          la plataforma: servidores, mapas y envío de avisos.
+        </p>
+        <ul>
+          <li>
+            El pago se hace en Mercado Pago, con sus propios términos. Reporty no ve ni guarda los datos de tu tarjeta o de tu
+            cuenta de Mercado Pago.
+          </li>
+          <li>
+            Donar no da derecho a nada a cambio: las donaciones no dan puntos, no cambian la prioridad de tus reportes ni dan
+            acceso a funciones especiales.
+          </li>
+          <li>
+            Reporty es una iniciativa ciudadana, no una organización sin fines de lucro registrada: no emitimos recibos de
+            donación y las donaciones no son deducibles de impuestos.
+          </li>
+          <li>
+            El nombre y el mensaje que dejes son opcionales y solo los ven los administradores, como explica la{" "}
+            <Link href="/privacidad" className={linkClassName}>
+              política de privacidad
+            </Link>
+            .
+          </li>
+          <li>
+            Si donaste por error o el monto no es el que querías, escribinos a <ContactEmail /> con el número de operación de
+            Mercado Pago y vemos cómo devolverlo.
+          </li>
+        </ul>
+      </>
     ),
   },
   {

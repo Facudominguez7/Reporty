@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 import { HeartHandshake } from "lucide-react"
 
 import { PageTitleBar } from "@/components/page-title-bar"
@@ -24,6 +25,13 @@ export default function DonarPage() {
           description="Reporty es gratis. Tu donación paga los servidores, los mapas y los avisos a los organismos."
         />
         <FormularioDonacion />
+        <p className="text-center text-xs text-muted-foreground">
+          Al donar aceptás los{" "}
+          <Link href="/terminos#donaciones" className="font-medium text-primary underline-offset-4 hover:underline">
+            términos de las donaciones
+          </Link>
+          . Las donaciones no son deducibles de impuestos.
+        </p>
       </div>
     </div>
   )

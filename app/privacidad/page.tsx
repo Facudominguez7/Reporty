@@ -48,6 +48,10 @@ const sections: LegalSection[] = [
           <strong>Tu participación:</strong> comentarios, votos y los puntos que sumás al participar.
         </li>
         <li>
+          <strong>Tus donaciones:</strong> monto, fecha, estado del pago y número de operación de Mercado Pago; el nombre y el
+          mensaje si los dejás, y tu usuario si donaste con la sesión iniciada.
+        </li>
+        <li>
           <strong>Uso del sitio:</strong> páginas visitadas, tipo de dispositivo, navegador y ciudad aproximada, medidos con
           Google Analytics.
         </li>
@@ -69,7 +73,7 @@ const sections: LegalSection[] = [
           tus puntos y tu posición en el ranking de la comunidad.
         </p>
         <p>
-          Tu email nunca se muestra. Te pedimos que no incluyas datos personales tuyos ni de otras personas en los textos o en
+          Las donaciones no son públicas: el monto, el nombre y el mensaje solo los ven los administradores. Tu email nunca se muestra. Te pedimos que no incluyas datos personales tuyos ni de otras personas en los textos o en
           las fotos: rostros reconocibles, patentes, nombres, teléfonos o domicilios particulares.
         </p>
       </>
@@ -83,6 +87,7 @@ const sections: LegalSection[] = [
         <li>Mostrar los reportes en el mapa, en el listado y en su página de detalle.</li>
         <li>Crear y mantener tu cuenta, y permitirte comentar, votar y sumar puntos.</li>
         <li>Avisarte por email cuando comentan tus reportes o cuando cambia su estado.</li>
+        <li>Registrar las donaciones y, si donaste con tu cuenta, mandarte un email de agradecimiento.</li>
         <li>Prevenir abusos, reportes falsos y usos indebidos de la plataforma.</li>
         <li>Entender cómo se usa el sitio para mejorarlo.</li>
       </ul>
@@ -106,6 +111,10 @@ const sections: LegalSection[] = [
           </li>
           <li>
             <strong>Resend:</strong> envío de los emails de aviso y de acceso a tu cuenta.
+          </li>
+          <li>
+            <strong>Mercado Pago:</strong> procesamiento de las donaciones. Los datos de pago los tratás directamente con Mercado
+            Pago, según su propia política de privacidad.
           </li>
           <li>
             <strong>Google Analytics:</strong> medición del uso del sitio.
