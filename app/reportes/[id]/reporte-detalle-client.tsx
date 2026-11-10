@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import dayjs from "dayjs";
+import { describirAntiguedad } from "@/lib/fechas/antiguedad";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import dynamic from "next/dynamic";
@@ -647,17 +648,7 @@ export function ReporteDetalleClient({
     );
   }
 
-  const diasDesdeCreacion = Math.max(0, dayjs().tz(ZONA_HORARIA).startOf("day").diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA).startOf("day"), "day"));
-  /**
-   * Antigüedad legible del reporte: los días de calendario sirven para ayer y antes,
-   * pero un reporte de hoy se describe en horas (nunca «hace 0 días»).
-   */
-  const antiguedadReporte = (() => {
-    if (diasDesdeCreacion >= 1) return `hace ${diasDesdeCreacion} ${diasDesdeCreacion === 1 ? "día" : "días"}`;
-    const horas = Math.max(0, dayjs().tz(ZONA_HORARIA).diff(dayjs(parseFechaReporte(reporte.created_at)).tz(ZONA_HORARIA), "hour"));
-    if (horas >= 1) return `hace ${horas} ${horas === 1 ? "hora" : "horas"}`;
-    return "hace minutos";
-  })();
+  const antiguedadReporte = describirAntiguedad(parseFechaReporte(reporte.created_at));
   const adminDraftForRender = adminDraft ?? createAdminReportDraft(reporte);
   const adminBaseForRender = adminBase ?? adminDraftForRender;
   const tiempoReparacion = fechaCambioEstado && reporte.estado_id === REPORT_STATE_IDS.REPARADO
