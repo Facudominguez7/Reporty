@@ -20,6 +20,7 @@ import { eliminarFotoReportePublicada, moderarYGuardarImagenReporte } from "@/li
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
+import { obtenerDireccion } from "@/lib/geocodificacion/direccion-inversa"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -262,6 +263,10 @@ async function ensureAdmin(supabase: SupabaseClient, userId: string): Promise<Mu
   return { success: true, data: true }
 }
 
+/**
+ * Edición administrativa de los datos del reporte. Sólo escribe los campos pedidos;
+ * cuando las coordenadas cambian, recalcula también la dirección guardada.
+ */
 export async function actualizarDatosReporteAdminWorkflow(
   supabase: SupabaseClient,
   reporteId: number,
@@ -278,6 +283,7 @@ export async function actualizarDatosReporteAdminWorkflow(
     prioridad_id?: number
     lat?: number | null
     lon?: number | null
+    direccion?: string | null
   } = {}
   if (input.titulo !== undefined) changes.titulo = input.titulo
   if (input.descripcion !== undefined) changes.descripcion = input.descripcion
@@ -306,6 +312,12 @@ export async function actualizarDatosReporteAdminWorkflow(
     }
     changes.lat = location.lat
     changes.lon = location.lon
+    // La dirección guardada describe las coordenadas viejas: se recalcula al moverlas.
+    if (locationChanged) {
+      changes.direccion = location.lat !== null && location.lon !== null
+        ? await obtenerDireccion(location.lat, location.lon)
+        : null
+    }
   }
   const { data, error } = await supabase.from("reportes").update(changes)
     .eq("id", reporteId).is("deleted_at", null).select("id").maybeSingle()

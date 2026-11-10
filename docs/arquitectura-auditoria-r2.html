@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arquitectura · Archivo de auditoría en Cloudflare R2 · Reporty</title>
+<style>
+  /* Tokens de app/globals.css (design/system.md). */
+  :root {
+    --background: oklch(94.463% 0.00213 14.416);
+    --foreground: oklch(0.19 0.01 95);
+    --card: oklch(1 0 0);
+    --muted: oklch(96.115% 0.00011 271.152);
+    --muted-foreground: oklch(0.45 0.028 157);
+    --border: oklch(78.892% 0.00009 271.152);
+    --primary: oklch(0.57 0.12 157);
+    --primary-soft: oklch(0.93 0.03 157);
+    --info: oklch(0.56 0.11 240);
+    --info-soft: oklch(0.94 0.03 240);
+    --admin: oklch(0.5 0.1 285);
+    --admin-soft: oklch(0.94 0.03 285);
+    --warning: oklch(0.72 0.13 85);
+    --warning-soft: oklch(0.95 0.05 85);
+    --danger: oklch(0.57 0.18 25);
+    --danger-soft: oklch(0.95 0.03 25);
+    --r2: oklch(0.68 0.16 55);
+    --r2-soft: oklch(0.95 0.04 60);
+    --radius: 0.75rem;
+    --card-shadow: 7px 7px 12px color-mix(in oklab, var(--foreground) 14%, transparent);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5;
+  }
+  main { max-width: 1320px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+  header h1 { margin: 0; font-size: 2rem; letter-spacing: -0.025em; }
+  header p { margin: .5rem 0 0; color: var(--muted-foreground); max-width: 70ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+  .chip { border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: .2rem .75rem; font-size: .8rem; }
+  .chip b { font-weight: 600; }
+  section { margin-top: 2rem; }
+  h2 { font-size: 1.35rem; letter-spacing: -0.02em; margin: 0 0 .25rem; }
+  .ayuda { color: var(--muted-foreground); font-size: .9rem; margin: 0 0 1rem; }
+  .tarjeta {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--card-shadow); padding: 1rem; overflow-x: auto;
+  }
+  svg { display: block; width: 100%; height: auto; min-width: 980px; }
+  svg text { font-family: inherit; fill: var(--foreground); }
+  .t { font-size: 15px; font-weight: 650; }
+  .s { font-size: 12px; fill: var(--muted-foreground); }
+  .m { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+  .e { font-size: 11.5px; font-weight: 600; fill: var(--foreground); }
+  .grupo { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .flecha { fill: none; stroke: var(--foreground); stroke-width: 1.6; marker-end: url(#punta); }
+  .flecha-datos { fill: none; stroke: var(--r2); stroke-width: 2; marker-end: url(#punta-r2); }
+  .flecha-db { fill: none; stroke: var(--info); stroke-width: 2; marker-end: url(#punta-db); }
+  .flecha-admin { fill: none; stroke: var(--admin); stroke-width: 1.8; marker-end: url(#punta-admin); }
+  .punteada { stroke-dasharray: 6 5; }
+  .etiqueta-fondo { fill: var(--card); }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: .75rem; font-size: .85rem; color: var(--muted-foreground); }
+  .leyenda span.punteado-leyenda::before { border-top-style: dashed; }
+  .leyenda span::before { content: ""; display: inline-block; width: 22px; height: 0; border-top: 2.5px solid var(--c); vertical-align: middle; margin-right: .4rem; }
+  .grilla { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .grilla .tarjeta h3 { margin: 0 0 .5rem; font-size: 1rem; }
+  .grilla .tarjeta ul { margin: 0; padding-left: 1.1rem; }
+  .grilla .tarjeta li { margin: .25rem 0; font-size: .9rem; }
+  ol.pasos { margin: 0; padding: 0; list-style: none; counter-reset: paso; display: grid; gap: .5rem; }
+  ol.pasos li {
+    counter-increment: paso; position: relative; padding: .6rem .8rem .6rem 3rem;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); font-size: .92rem;
+  }
+  ol.pasos li::before {
+    content: counter(paso); position: absolute; left: .75rem; top: .55rem; width: 1.6rem; height: 1.6rem;
+    border-radius: 999px; background: var(--primary); color: white; display: grid; place-items: center;
+    font-size: .8rem; font-weight: 700;
+  }
+  ol.pasos li.critico::before { background: var(--danger); }
+  ol.pasos li small { display: block; color: var(--muted-foreground); }
+  code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .85em; background: var(--muted); padding: .05rem .3rem; border-radius: .3rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+  footer { margin-top: 2.5rem; color: var(--muted-foreground); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Archivo de auditoría en Cloudflare R2</h1>
+    <p>
+      PostgreSQL conserva los últimos 180 días de <code>audit_events</code>; lo más viejo se archiva en un bucket privado de
+      R2 (API compatible con S3) como JSON Lines comprimido, verificado por SHA-256 antes de cualquier borrado.
+    </p>
+    <div class="chips">
+      <span class="chip"><b>PR</b> #220 · <code>9b33015</code></span>
+      <span class="chip"><b>SDK</b> @aws-sdk/client-s3</span>
+      <span class="chip"><b>Región</b> auto</span>
+      <span class="chip"><b>Formato</b> .jsonl.gz · v1</span>
+      <span class="chip"><b>Retención caliente</b> 180 días</span>
+      <span class="chip"><b>Purga</b> detrás de AUDIT_ARCHIVE_PURGE_ENABLED</span>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <section aria-labelledby="t-arquitectura">
+    <h2 id="t-arquitectura">1. Componentes y flujos</h2>
+    <p class="ayuda">Quién llama a quién. Todo lo que toca credenciales o datos corre en el servidor Node.js; el navegador nunca habla con R2.</p>
+    <div class="tarjeta">
+      <svg viewBox="0 0 1240 760" role="img" aria-label="Diagrama de componentes del archivo de auditoría">
+        <defs>
+          <marker id="punta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--foreground)"/></marker>
+          <marker id="punta-r2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--r2)"/></marker>
+          <marker id="punta-db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--info)"/></marker>
+          <marker id="punta-admin" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--admin)"/></marker>
+        </defs>
+
+        <!-- Disparadores -->
+        <text x="30" y="60" class="grupo" fill="var(--muted-foreground)">Disparadores</text>
+        <rect x="30" y="80" width="240" height="118" rx="12" fill="var(--warning-soft)" stroke="var(--warning)" stroke-width="1.5"/>
+        <text x="48" y="108" class="t">Cron semanal</text>
+        <text x="48" y="130" class="s">Hostinger (curl) o</text>
+        <text x="48" y="147" class="s">Supabase Cron + pg_net + Vault</text>
+        <text x="48" y="172" class="m">POST · Bearer &lt;secreto&gt;</text>
+        <text x="48" y="189" class="s">acotado: 1 lote por llamada</text>
+
+        <rect x="30" y="420" width="240" height="118" rx="12" fill="var(--admin-soft)" stroke="var(--admin)" stroke-width="1.5"/>
+        <text x="48" y="448" class="t">Admin · navegador</text>
+        <text x="48" y="470" class="s">sesión de Supabase Auth</text>
+        <text x="48" y="487" class="s">rol Admin (verificado en servidor)</text>
+        <text x="48" y="512" class="m">/admin/auditoria</text>
+        <text x="48" y="529" class="s">nunca recibe URLs de R2</text>
+
+        <!-- Servidor Next.js -->
+        <rect x="310" y="40" width="530" height="690" rx="16" fill="var(--muted)" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="8 6"/>
+        <text x="330" y="68" class="grupo" fill="var(--muted-foreground)">Next.js 16 · runtime Node.js · Hostinger</text>
+
+        <rect x="340" y="88" width="470" height="78" rx="12" fill="var(--card)" stroke="var(--border)"/>
+        <text x="358" y="114" class="t m" style="font-size:14px">/api/cron/auditoria-archivo</text>
+        <text x="358" y="136" class="s">GET = dry-run (no reclama, no sube, no borra) · POST = corrida real</text>
+        <text x="358" y="154" class="s">timingSafeEqual · 401 sin token · 503 sin secreto · 502 si falla</text>
+
+        <rect x="340" y="190" width="470" height="112" rx="12" fill="var(--primary-soft)" stroke="var(--primary)" stroke-width="1.5"/>
+        <text x="358" y="216" class="t">servicio-archivado.ts</text>
+        <text x="358" y="238" class="s">recupera estancados → purga verificados (revalida en R2)</text>
+        <text x="358" y="255" class="s">→ reclama 1 mes → JSONL → GZIP → SHA-256 → sube</text>
+        <text x="358" y="272" class="s">→ descarga y compara hash + cantidad → confirma</text>
+        <text x="358" y="289" class="s">→ purga ids exactos (solo si la purga está habilitada)</text>
+
+        <rect x="340" y="326" width="470" height="70" rx="12" fill="var(--r2-soft)" stroke="var(--r2)" stroke-width="1.5"/>
+        <text x="358" y="352" class="t">cliente-r2.ts · @aws-sdk/client-s3</text>
+        <text x="358" y="374" class="s">region auto · &lt;cuenta&gt;.r2.cloudflarestorage.com · sin ACL · 3 intentos</text>
+
+        <rect x="340" y="430" width="470" height="78" rx="12" fill="var(--card)" stroke="var(--admin)" stroke-width="1.3"/>
+        <text x="358" y="456" class="t m" style="font-size:14px">/admin/auditoria · server actions</text>
+        <text x="358" y="478" class="s">verificarEsAdmin → historial, métricas, dry-run,</text>
+        <text x="358" y="495" class="s">diagnóstico de R2 y corrida manual (≤ 200 eventos)</text>
+
+        <rect x="340" y="532" width="470" height="70" rx="12" fill="var(--card)" stroke="var(--border)"/>
+        <text x="358" y="558" class="t">servicio-recuperacion.ts</text>
+        <text x="358" y="580" class="s">valida UUID y ruta · revalida SHA-256 · lee sin restaurar filas</text>
+
+        <rect x="340" y="628" width="470" height="78" rx="12" fill="var(--card)" stroke="var(--admin)" stroke-width="1.3"/>
+        <text x="358" y="654" class="t m" style="font-size:14px">/api/admin/auditoria/archivo/[id]/descarga</text>
+        <text x="358" y="676" class="s">Admin · attachment .jsonl.gz · no-store, private</text>
+        <text x="358" y="693" class="s">registra audit_archive_downloaded</text>
+
+        <!-- Supabase -->
+        <rect x="880" y="40" width="330" height="340" rx="16" fill="var(--info-soft)" stroke="var(--info)" stroke-width="1.5"/>
+        <text x="900" y="68" class="grupo" fill="var(--info)">Supabase PostgreSQL</text>
+
+        <rect x="900" y="84" width="290" height="62" rx="10" fill="var(--card)" stroke="var(--border)"/>
+        <text x="916" y="108" class="t m" style="font-size:14px">audit_events</text>
+        <text x="916" y="130" class="s">4 triggers de captura, sin cambios</text>
+
+        <rect x="900" y="156" width="290" height="62" rx="10" fill="var(--card)" stroke="var(--border)"/>
+        <text x="916" y="180" class="t m" style="font-size:14px">audit_archives</text>
+        <text x="916" y="202" class="s">lote: rango, ruta, tamaño, SHA-256, estado</text>
+
+        <rect x="900" y="228" width="290" height="62" rx="10" fill="var(--card)" stroke="var(--border)"/>
+        <text x="916" y="252" class="t m" style="font-size:14px">audit_archive_claims</text>
+        <text x="916" y="274" class="s">PK event_id: un evento, un solo lote</text>
+
+        <rect x="900" y="300" width="290" height="62" rx="10" fill="var(--card)" stroke="var(--info)"/>
+        <text x="916" y="324" class="t m" style="font-size:13px">private.* · public.auditoria_*</text>
+        <text x="916" y="346" class="s">security definer · solo service_role</text>
+
+        <!-- R2 -->
+        <rect x="880" y="420" width="330" height="310" rx="16" fill="var(--r2-soft)" stroke="var(--r2)" stroke-width="1.5"/>
+        <text x="900" y="448" class="grupo" fill="var(--r2)">Cloudflare R2 · API S3</text>
+
+        <rect x="900" y="466" width="290" height="80" rx="10" fill="var(--card)" stroke="var(--border)"/>
+        <text x="916" y="490" class="t m" style="font-size:13px">reporty-audit-archive</text>
+        <text x="916" y="512" class="s">bucket privado · Standard</text>
+        <text x="916" y="530" class="s">r2.dev deshabilitado · sin dominios</text>
+
+        <rect x="900" y="560" width="290" height="150" rx="10" fill="var(--card)" stroke="var(--border)"/>
+        <text x="916" y="584" class="m">audit/v1/2026/05/</text>
+        <text x="930" y="604" class="m" style="font-size:11px">audit-4101-4800-9f2c….jsonl.gz</text>
+        <text x="916" y="626" class="m">audit/v1/2026/06/</text>
+        <text x="930" y="646" class="m" style="font-size:11px">audit-4801-5230-1a7e….jsonl.gz</text>
+        <text x="916" y="674" class="s">1 mes UTC por archivo · JSONL + GZIP</text>
+        <text x="916" y="692" class="s">nunca se borran automáticamente</text>
+
+        <!-- Flechas: disparadores -->
+        <path class="flecha" d="M270 139 C 305 139, 305 127, 338 127"/>
+        <rect x="276" y="104" width="58" height="18" rx="4" class="etiqueta-fondo"/><text x="280" y="117" class="e">HTTPS</text>
+        <path class="flecha-admin" d="M270 470 C 305 470, 305 469, 338 469"/>
+        <path class="flecha-admin" d="M200 538 C 200 640, 260 667, 338 667"/>
+        <rect x="214" y="600" width="72" height="18" rx="4" class="etiqueta-fondo"/><text x="218" y="613" class="e" style="fill:var(--admin)">descarga</text>
+
+        <!-- Flechas internas -->
+        <path class="flecha" d="M575 166 L575 188"/>
+        <path class="flecha" d="M575 302 L575 324"/>
+        <path class="flecha" d="M575 508 L575 530"/>
+        <path class="flecha" d="M575 628 L575 604"/>
+        <path class="flecha" d="M810 470 C 830 470, 830 410, 810 410 C 760 410, 760 385, 760 398"/>
+
+        <!-- Flechas a Supabase -->
+        <path class="flecha-db" d="M810 230 C 850 230, 860 331, 898 331"/>
+        <rect x="828" y="300" width="40" height="18" rx="4" class="etiqueta-fondo"/><text x="833" y="313" class="e" style="fill:var(--info)">RPC</text>
+        <path class="flecha-db punteada" d="M810 450 C 860 450, 860 187, 898 187"/>
+        <rect x="826" y="160" width="66" height="18" rx="4" class="etiqueta-fondo"/><text x="830" y="173" class="e" style="fill:var(--info)">lee lotes</text>
+
+        <!-- Flechas a R2 -->
+        <path class="flecha-datos" d="M810 361 C 855 361, 855 506, 898 506"/>
+        <rect x="846" y="390" width="96" height="18" rx="4" class="etiqueta-fondo"/><text x="850" y="403" class="e" style="fill:var(--r2)">Put/Get/Head</text>
+        <path class="flecha-datos punteada" d="M810 567 C 855 567, 855 520, 898 520"/>
+        <rect x="822" y="572" width="88" height="18" rx="4" class="etiqueta-fondo"/><text x="826" y="585" class="e" style="fill:var(--r2)">Get + hash</text>
+
+        <!-- Triggers -->
+        <path class="flecha punteada" d="M1045 20 L1045 82" />
+        <text x="1036" y="30" class="s" text-anchor="end">actividad normal de la app (reportes, comentarios, votos, evidencias)</text>
+      </svg>
+      <div class="leyenda">
+        <span style="--c: var(--foreground)">control / llamada</span>
+        <span style="--c: var(--info)">PostgreSQL (service_role)</span>
+        <span style="--c: var(--r2)">objetos en R2</span>
+        <span style="--c: var(--admin)">acceso de Admin</span>
+        <span style="--c: var(--muted-foreground)" class="punteado-leyenda">punteado = solo lectura</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section aria-labelledby="t-estados">
+    <h2 id="t-estados">2. Ciclo de vida de un lote</h2>
+    <p class="ayuda">Estados de <code>audit_archives.estado</code>. Ningún camino borra eventos sin pasar por <b>verificado</b>.</p>
+    <div class="tarjeta">
+      <svg viewBox="0 0 1240 350" role="img" aria-label="Máquina de estados de un lote">
+        <defs>
+          <marker id="p2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--foreground)"/></marker>
+          <marker id="p2d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--danger)"/></marker>
+        </defs>
+        <rect x="30" y="50" width="230" height="84" rx="14" fill="var(--card)" stroke="var(--border)" stroke-width="1.5"/>
+        <text x="50" y="82" class="t m" style="font-size:15px">reclamado</text>
+        <text x="50" y="106" class="s">eventos reservados en claims</text>
+        <text x="50" y="122" class="s">(advisory lock, 1 mes UTC)</text>
+
+        <rect x="340" y="50" width="230" height="84" rx="14" fill="var(--warning-soft)" stroke="var(--warning)" stroke-width="1.5"/>
+        <text x="360" y="82" class="t m" style="font-size:15px">subido</text>
+        <text x="360" y="106" class="s">ruta, tamaño y SHA-256</text>
+        <text x="360" y="122" class="s">registrados (aún sin verificar)</text>
+
+        <rect x="650" y="50" width="230" height="84" rx="14" fill="var(--primary-soft)" stroke="var(--primary)" stroke-width="1.5"/>
+        <text x="670" y="82" class="t m" style="font-size:15px">verificado</text>
+        <text x="670" y="106" class="s">objeto descargado: hash y</text>
+        <text x="670" y="122" class="s">cantidad coinciden</text>
+
+        <rect x="960" y="50" width="250" height="84" rx="14" fill="var(--info-soft)" stroke="var(--info)" stroke-width="1.5"/>
+        <text x="980" y="82" class="t m" style="font-size:15px">origen_eliminado</text>
+        <text x="980" y="106" class="s">filas borradas por id exacto;</text>
+        <text x="980" y="122" class="s">el archivo sigue en R2</text>
+
+        <rect x="490" y="226" width="260" height="78" rx="14" fill="var(--danger-soft)" stroke="var(--danger)" stroke-width="1.5"/>
+        <text x="510" y="258" class="t m" style="font-size:15px">fallido</text>
+        <text x="510" y="282" class="s">reclamos liberados: los eventos</text>
+        <text x="510" y="297" class="s">siguen en PostgreSQL</text>
+
+        <path d="M260 92 L338 92" fill="none" stroke="var(--foreground)" stroke-width="1.6" marker-end="url(#p2)"/>
+        <text x="268" y="84" class="e">subida OK</text>
+        <path d="M570 92 L648 92" fill="none" stroke="var(--foreground)" stroke-width="1.6" marker-end="url(#p2)"/>
+        <text x="580" y="70" class="e">re-descarga</text><text x="580" y="84" class="e">OK</text>
+        <path d="M880 92 L958 92" fill="none" stroke="var(--foreground)" stroke-width="1.6" marker-end="url(#p2)"/>
+        <text x="884" y="40" class="e">purga habilitada +</text>
+        <text x="884" y="56" class="e">revalidación en R2</text>
+
+        <path d="M145 134 C 145 260, 420 265, 488 265" fill="none" stroke="var(--danger)" stroke-width="1.6" marker-end="url(#p2d)"/>
+        <path d="M455 134 C 455 200, 540 200, 560 224" fill="none" stroke="var(--danger)" stroke-width="1.6" marker-end="url(#p2d)"/>
+        <text x="186" y="172" class="e" style="fill:var(--danger)">error · hash distinto · interrupción</text>
+        <text x="186" y="188" class="e" style="fill:var(--danger)">(estancado &gt; 12 h se recupera solo)</text>
+
+        <path d="M620 304 L620 330 L18 330 L18 92 L28 92" fill="none" stroke="var(--muted-foreground)" stroke-width="1.4" stroke-dasharray="6 5" marker-end="url(#p2)"/>
+        <text x="636" y="324" class="s">la corrida siguiente vuelve a reclamar estos eventos</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section aria-labelledby="t-secuencia">
+    <h2 id="t-secuencia">3. Una corrida real, paso a paso</h2>
+    <p class="ayuda"><code>POST /api/cron/auditoria-archivo</code> → <code>ejecutarArchivado()</code>. En <code>GET</code> (dry-run) solo se ejecuta la previsualización.</p>
+    <ol class="pasos">
+      <li>Autentica el Bearer en tiempo constante contra <code>AUDIT_ARCHIVE_CRON_SECRET</code>.<small>Sin secreto configurado responde 503; con token incorrecto, 401. No toca nada.</small></li>
+      <li>Recupera lotes estancados (<code>reclamado</code>/<code>subido</code> sin avanzar &gt; 12 h).<small>Los marca <code>fallido</code> y libera sus reclamos.</small></li>
+      <li class="critico">Si la purga está habilitada, purga lotes <code>verificado</code> de corridas anteriores.<small>Antes de borrar vuelve a descargar el objeto y compara SHA-256 y cantidad. Si el archivo cambió o no existe, no borra nada.</small></li>
+      <li>Reclama un lote: hasta el límite, solo eventos del mes UTC del elegible más viejo.<small><code>pg_try_advisory_xact_lock</code> + PK por <code>event_id</code>: dos corridas nunca toman el mismo evento.</small></li>
+      <li>Lee los eventos por id exacto y verifica que la cantidad y el mes coincidan.</li>
+      <li>Serializa JSONL determinístico (<code>version</code>, id, fecha UTC, actor, reporte, título, acción), comprime con GZIP y calcula SHA-256.</li>
+      <li>Sube a <code>audit/v1/AAAA/MM/audit-{primer}-{último}-{hash16}.jsonl.gz</code>.<small>Si el objeto ya existe no se vuelve a subir: el nombre depende del contenido, así que reintentar no duplica.</small></li>
+      <li>Descarga el objeto y compara SHA-256 y cantidad de líneas.<small>No se confía en el ETag de R2.</small></li>
+      <li>Marca el lote <code>verificado</code> y registra <code>audit_archive_uploaded</code> / <code>audit_archive_verified</code>.</li>
+      <li class="critico">Si la purga está habilitada, borra de <code>audit_events</code> exactamente los ids reclamados.<small>Si la cantidad borrada no coincide, la transacción se revierte entera.</small></li>
+    </ol>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section aria-labelledby="t-garantias">
+    <h2 id="t-garantias">4. Garantías y límites de seguridad</h2>
+    <div class="grilla">
+      <div class="tarjeta">
+        <h3>Credenciales</h3>
+        <ul>
+          <li>Variables privadas del servidor; ninguna con <code>NEXT_PUBLIC_</code>.</li>
+          <li>Token de R2 con <b>Object Read &amp; Write</b> limitado al bucket.</li>
+          <li>Los errores nombran variables, nunca valores.</li>
+          <li>Buckets separados para pruebas y producción.</li>
+        </ul>
+      </div>
+      <div class="tarjeta">
+        <h3>Acceso a datos</h3>
+        <ul>
+          <li><code>anon</code> y <code>authenticated</code>: sin lectura de lotes ni ejecución de RPC.</li>
+          <li><code>service_role</code>: lectura y RPC; sin escritura directa.</li>
+          <li>Descarga y recuperación: rol Admin verificado en el servidor.</li>
+          <li>Id validado como UUID y ruta contra un patrón exacto (anti-IDOR y traversal).</li>
+        </ul>
+      </div>
+      <div class="tarjeta">
+        <h3>Integridad</h3>
+        <ul>
+          <li>Nunca se borra sin un objeto verificado por descarga.</li>
+          <li>Si R2 falla, PostgreSQL conserva los eventos.</li>
+          <li>Reanudable, idempotente y seguro ante concurrencia.</li>
+          <li>Los triggers de captura no cambiaron.</li>
+        </ul>
+      </div>
+      <div class="tarjeta">
+        <h3>Límites conocidos</h3>
+        <ul>
+          <li>1 lote (≤ 1 mes) por corrida: un atraso de varios meses se recupera de a uno.</li>
+          <li>Sin alertas: un lote fallido se ve en el panel y en la respuesta del cron.</li>
+          <li>Sin retención en R2: los archivos históricos no se borran nunca.</li>
+          <li>Primer evento elegible en producción: ~25/04/2027.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section aria-labelledby="t-archivos">
+    <h2 id="t-archivos">5. Dónde vive cada pieza</h2>
+    <div class="tarjeta">
+      <table>
+        <thead><tr><th>Pieza</th><th>Archivo</th></tr></thead>
+        <tbody>
+          <tr><td>Configuración validada</td><td><code>lib/auditoria-archivo/configuracion.ts</code></td></tr>
+          <tr><td>Cliente S3 de R2</td><td><code>lib/auditoria-archivo/cliente-r2.ts</code></td></tr>
+          <tr><td>JSONL, GZIP y SHA-256</td><td><code>lib/auditoria-archivo/serializacion.ts</code></td></tr>
+          <tr><td>Rutas de objeto</td><td><code>lib/auditoria-archivo/rutas-objeto.ts</code></td></tr>
+          <tr><td>Servicio de archivado</td><td><code>lib/auditoria-archivo/servicio-archivado.ts</code> · <code>datos-archivado.ts</code></td></tr>
+          <tr><td>Recuperación y descarga</td><td><code>lib/auditoria-archivo/servicio-recuperacion.ts</code></td></tr>
+          <tr><td>Diagnóstico de conexión</td><td><code>lib/auditoria-archivo/diagnostico.ts</code></td></tr>
+          <tr><td>Endpoint programado</td><td><code>app/api/cron/auditoria-archivo/route.ts</code></td></tr>
+          <tr><td>Descarga autorizada</td><td><code>app/api/admin/auditoria/archivo/[id]/descarga/route.ts</code></td></tr>
+          <tr><td>Panel y acciones</td><td><code>app/admin/auditoria/</code> · <code>components/admin/auditoria/</code></td></tr>
+          <tr><td>Migraciones</td><td><code>supabase/migrations/20261110120000…120300_auditoria_archivo_*.sql</code></td></tr>
+          <tr><td>Contrato SQL</td><td><code>supabase/tests/auditoria_archivo_r2.sql</code></td></tr>
+          <tr><td>Runbook</td><td><code>docs/auditoria-archivo-r2.md</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Reporty · arquitectura del archivo de auditoría · estado de <code>main</code> en <code>9b33015</code>.</footer>
+</main>
+</body>
+</html>

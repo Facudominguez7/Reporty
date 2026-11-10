@@ -741,6 +741,10 @@ function FormularioEvidenciaReparacion({
  *
  * El estado que muestra es siempre el de la evidencia, nunca el del reporte: un
  * reporte Pendiente con una reparación informada no se presenta como «Reparado».
+ *
+ * La ficha muestra y el lápiz hace: sin evidencia y con permiso para informar no se
+ * pinta nada, porque «Informar la reparación» ya vive en el botón flotante. Sin
+ * cuenta sí se pinta, porque el lápiz no ofrece esa acción y es la única invitación.
  */
 export function ResumenReparacion({
   seccion,
@@ -776,9 +780,10 @@ export function ResumenReparacion({
     )
   }
 
-  const estado = !evidencia
-    ? "Todavía nadie informó una reparación"
-    : evidencia.estado === "reparado"
+  if (!evidencia) return null
+
+  const estado =
+    evidencia.estado === "reparado"
       ? "Reparado"
       : evidencia.estado === "informada"
         ? "Reparación informada"
@@ -790,10 +795,10 @@ export function ResumenReparacion({
         aria-hidden="true"
         className="inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius)] bg-primary/10 text-primary"
       >
-        {evidencia?.estado === "reparado" ? <ShieldCheck className="size-5" /> : <Camera className="size-5" />}
+        {evidencia.estado === "reparado" ? <ShieldCheck className="size-5" /> : <Camera className="size-5" />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground">¿Ya lo arreglaron?</p>
+        <p className="text-sm font-semibold text-foreground">Reparación</p>
         <p className="truncate text-xs text-muted-foreground">{estado}</p>
       </div>
       <Button
@@ -804,7 +809,7 @@ export function ResumenReparacion({
         className="shrink-0"
         onClick={() => onVer(botonRef.current)}
       >
-        {evidencia ? "Ver la evidencia" : "Informar la reparación"}
+        Ver la evidencia
       </Button>
     </div>
   )

@@ -8,6 +8,7 @@ import {
   crearReporte,
   type CrearReporteParams,
 } from "@/database/queries/reportes/nuevo"
+import { obtenerDireccion } from "@/lib/geocodificacion/direccion-inversa"
 import { canCreateReports, getUserRoleContext, isGuestRole } from "@/lib/authz/roles"
 import { moderarYGuardarImagenReporte, type ResultadoImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
@@ -32,7 +33,13 @@ export type CreateReportWorkflowResult = {
   isGuest: boolean
 }
 
-/** Acredita creación sólo por ledger serializado con retiro; nunca compensa fallos por fuera. */
+/**
+ * Crea el reporte con su dirección y su foto. Acredita creación sólo por ledger
+ * serializado con retiro; nunca compensa fallos por fuera.
+ *
+ * La dirección se busca en paralelo con la validación de la imagen y nunca bloquea:
+ * si Nominatim falla o tarda, el reporte se crea con `direccion` en null.
+ */
 export async function crearReporteWorkflow(
   supabase: SupabaseClient,
   input: CreateReportWorkflowInput,
@@ -43,13 +50,18 @@ export async function crearReporteWorkflow(
     return { success: false, error: "No tenés permisos para crear reportes." }
   }
 
+  // Arranca ya para no sumar su espera a la validación de la foto; nunca lanza.
+  const direccionPendiente = input.lat !== null && input.lon !== null
+    ? obtenerDireccion(input.lat, input.lon)
+    : Promise.resolve(null)
+
   // Validación histórica después de sesión, claim y rol; no se lee la miniatura ajena.
   if (input.image) {
     if (!isAcceptedReportImageType(input.image.type)) throw new Error("La imagen debe estar en formato JPG, PNG o WebP.")
     if (input.image.size > REPORT_IMAGE_MAX_BYTES) throw new Error(`La imagen optimizada no puede superar los ${REPORT_IMAGE_MAX_BYTES_LABEL}.`)
     await validateUploadedReportImage(input.image)
   }
-  const reporte = await crearReporte(supabase, input)
+  const reporte = await crearReporte(supabase, { ...input, direccion: await direccionPendiente })
 
   let imageModeration = input.image
     ? await moderarYGuardarImagenReporte(supabase, { reporteId: reporte.id, propietarioId: input.usuarioId, image: input.image })

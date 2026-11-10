@@ -10,13 +10,15 @@ export interface CrearReporteParams {
   prioridadId: number
   lat: number | null
   lon: number | null
+  /** Dirección legible de las coordenadas; `null` si no se encontró. */
+  direccion?: string | null
 }
 
 /**
  * Inserta un nuevo reporte en la tabla `reportes` y devuelve el registro creado.
  *
  * @param supabase - Cliente de Supabase usado para ejecutar la consulta
- * @param params - Parámetros del reporte a crear (usuarioId, titulo, descripcion, categoriaId, prioridadId, lat, lon)
+ * @param params - Parámetros del reporte a crear (usuarioId, titulo, descripcion, categoriaId, prioridadId, lat, lon, direccion)
  * @returns El registro insertado del reporte
  * @throws Error si la creación del reporte falla
  */
@@ -31,7 +33,8 @@ export async function crearReporte(supabase: SupabaseClient, params: CrearReport
         prioridad_id: params.prioridadId,
         estado_id: REPORT_STATE_IDS.PENDIENTE,
         lat: params.lat,
-        lon: params.lon
+        lon: params.lon,
+        direccion: params.direccion ?? null,
       })
     .select()
     .single()

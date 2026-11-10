@@ -394,7 +394,9 @@ describe("resumen de la reparación sobre el contenido", () => {
       evidencia: vista({ estado: "informada", publicadaAt: null, foto: null }),
     })
 
-    expect(html).toContain("¿Ya lo arreglaron?")
+    // Con evidencia la franja muestra estado: no repite la pregunta del lápiz.
+    expect(html).toContain(">Reparación<")
+    expect(html).not.toContain("¿Ya lo arreglaron?")
     expect(html).toContain("Reparación informada")
     expect(html).not.toContain("En verificación")
     expect(html).toContain("Ver la evidencia")
@@ -416,13 +418,10 @@ describe("resumen de la reparación sobre el contenido", () => {
     expect(html).not.toContain("En verificación")
   })
 
-  it("invita a informar la reparación cuando todavía no hay evidencia", () => {
+  it("no repite «Informar la reparación»: sin evidencia, esa acción vive sólo en el lápiz", () => {
     const html = renderizarResumen({ evidencia: null, puedeInformar: true })
 
-    expect(html).toContain("¿Ya lo arreglaron?")
-    expect(html).toContain("Informar la reparación")
-    expect(html).not.toContain("En verificación")
-    expect(html).not.toContain("Reparado")
+    expect(html).toBe("")
   })
 
   it("invita a ingresar cuando el reporte no ofrece reparación a esta cuenta", () => {

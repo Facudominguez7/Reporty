@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
-import { Camera, MapPin, MessageCircle, Building2 } from "lucide-react"
+import { Camera, MessageCircle, Building2 } from "lucide-react"
 import { describe, expect, it, vi } from "vitest"
 
 import {
@@ -16,7 +16,6 @@ import {
 
 const acciones: AccionFlotante[] = [
   { clave: "contactos", etiqueta: "Avisar a un organismo", icono: Building2, onSeleccionar: vi.fn() },
-  { clave: "ubicacion", etiqueta: "Ver ubicación", icono: MapPin, onSeleccionar: vi.fn() },
   { clave: "reparacion", etiqueta: "¿Ya lo arreglaron?", icono: Camera, onSeleccionar: vi.fn() },
   { clave: "comentar", etiqueta: "Comentar", icono: MessageCircle, onSeleccionar: vi.fn() },
 ]
@@ -25,13 +24,12 @@ describe("disponibilidad de las acciones flotantes", () => {
   const contextoBase = {
     sesion: { haySesion: true, esAnonimo: false },
     reporteCerrado: false,
-    tieneUbicacion: true,
     puedeContactar: true,
     reparacion: { hayEvidencia: false, puedeInformar: true },
   }
 
-  it("ofrece las cuatro acciones en el orden del diseño cuando todo está disponible", () => {
-    expect(accionesDisponibles(contextoBase)).toEqual(["contactos", "ubicacion", "reparacion", "comentar"])
+  it("ofrece las tres acciones en el orden del diseño cuando todo está disponible", () => {
+    expect(accionesDisponibles(contextoBase)).toEqual(["contactos", "reparacion", "comentar"])
   })
 
   it("no ofrece comentar sin sesión, como invitado ni en un reporte cerrado", () => {
@@ -47,24 +45,22 @@ describe("disponibilidad de las acciones flotantes", () => {
     expect(accionesDisponibles({ ...contextoBase, reparacion: { hayEvidencia: true, puedeInformar: true } })).toContain("reparacion")
   })
 
-  it("sólo ofrece ubicación y organismos cuando el reporte los tiene", () => {
-    expect(accionesDisponibles({ ...contextoBase, tieneUbicacion: false })).not.toContain("ubicacion")
+  it("sólo ofrece organismos cuando el reporte los tiene", () => {
     expect(accionesDisponibles({ ...contextoBase, puedeContactar: false })).not.toContain("contactos")
   })
 
   it("arma cada acción con su etiqueta visible y su manejador", () => {
     const manejadores = {
       contactos: vi.fn(),
-      ubicacion: vi.fn(),
       reparacion: vi.fn(),
       comentar: vi.fn(),
     }
 
-    const armadas = construirAccionesFlotantes(["comentar", "ubicacion"], manejadores)
+    const armadas = construirAccionesFlotantes(["comentar", "contactos"], manejadores)
 
     expect(armadas).toHaveLength(2)
     expect(armadas[0]).toMatchObject({ clave: "comentar", etiqueta: "Comentar" })
-    expect(armadas[1]).toMatchObject({ clave: "ubicacion", etiqueta: "Ver ubicación" })
+    expect(armadas[1]).toMatchObject({ clave: "contactos", etiqueta: "Avisar a un organismo" })
     expect(armadas[0].onSeleccionar).toBe(manejadores.comentar)
   })
 })
@@ -83,7 +79,7 @@ describe("botón flotante cerrado", () => {
     const html = renderToStaticMarkup(createElement(AccionesFlotantes, { acciones, abierta: false, onCambiarAbierta: () => {} }))
 
     expect(html).not.toContain("Comentar")
-    expect(html).not.toContain("Ver ubicación")
+    expect(html).not.toContain("Avisar a un organismo")
   })
 
   it("queda sobre la navegación inferior y no anima por su cuenta", () => {
@@ -126,7 +122,7 @@ describe("elegir una acción del menú", () => {
     const disparador = { isConnected: true } as unknown as HTMLElement
 
     ejecutarAccionFlotante(
-      { clave: "ubicacion", etiqueta: "Ver ubicación", icono: MapPin, onSeleccionar },
+      { clave: "contactos", etiqueta: "Avisar a un organismo", icono: Building2, onSeleccionar },
       disparador,
       cerrarMenu,
     )

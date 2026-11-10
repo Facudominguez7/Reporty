@@ -66,6 +66,17 @@ describe("franja de ubicación", () => {
     expect(html.slice(html.indexOf("<button"))).not.toContain("data-mini-mapa")
   })
 
+  it("muestra la calle guardada en lugar de las coordenadas", () => {
+    const html = renderToStaticMarkup(
+      createElement(FranjaUbicacion, { lat: LAT, lon: LON, direccion: "Bolívar 1450, Posadas", onVerUbicacion: () => {} }),
+    )
+
+    // En la franja va sólo la calle: la localidad se lee completa en la hoja.
+    expect(html).toContain("Bolívar 1450")
+    expect(html).not.toContain("Bolívar 1450, Posadas")
+    expect(html).not.toContain("-27,36708")
+  })
+
   it("dice que no hay ubicación y no ofrece mapa cuando faltan las coordenadas", () => {
     const html = renderToStaticMarkup(createElement(FranjaUbicacion, { lat: null, lon: null, onVerUbicacion: () => {} }))
 
@@ -83,6 +94,14 @@ describe("contenido de la hoja de ubicación", () => {
     expect(html).toContain("-27,36708 · -55,89610")
     expect(html).toContain('href="/mapa"')
     expect(html).toContain("Ver en mapa completo")
+  })
+
+  it("encabeza la hoja con la calle y deja las coordenadas como dato secundario", () => {
+    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { lat: LAT, lon: LON, direccion: "Bolívar 1450, Posadas" }))
+
+    expect(html).toContain("Bolívar 1450, Posadas")
+    expect(html).toContain("-27,36708 · -55,89610")
+    expect(html.indexOf("Bolívar 1450, Posadas")).toBeLessThan(html.indexOf("-27,36708"))
   })
 
   it("no pinta un mapa vacío cuando faltan las coordenadas", () => {

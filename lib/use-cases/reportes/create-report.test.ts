@@ -1,7 +1,8 @@
 /** Contratos de creación, autorización y puntos independientes de la fotografía. */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { SupabaseClient } from "@supabase/supabase-js"
-const dobles = vi.hoisted(() => ({ crearReporte: vi.fn(), sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), moderarYGuardarImagenReporte: vi.fn(), subirImagenReporte: vi.fn() }))
+const dobles = vi.hoisted(() => ({ crearReporte: vi.fn(), sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), moderarYGuardarImagenReporte: vi.fn(), subirImagenReporte: vi.fn(), obtenerDireccion: vi.fn() }))
+vi.mock("@/lib/geocodificacion/direccion-inversa", () => ({ obtenerDireccion: dobles.obtenerDireccion }))
 vi.mock("@/database/queries/reportes/nuevo", () => ({ crearReporte: dobles.crearReporte, subirImagenReporte: dobles.subirImagenReporte }))
 vi.mock("@/database/queries/puntos", () => ({ sumarPuntos: dobles.sumarPuntos, PUNTOS: { CREAR_REPORTE: 10 } }))
 vi.mock("@/lib/authz/roles", async (original) => ({ ...await original<typeof import("@/lib/authz/roles")>(), getUserRoleContext: dobles.getUserRoleContext }))
@@ -18,6 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   dobles.getUserRoleContext.mockResolvedValue({ data: { roleId: 2 }, error: null })
   dobles.crearReporte.mockResolvedValue({ id: 7 })
+  dobles.obtenerDireccion.mockResolvedValue("Bolívar 1450, Posadas")
   rpc.mockReset().mockResolvedValue({ data: true, error: null })
   leerReporte.mockReset().mockResolvedValue({ data: { deleted_at: null }, error: null })
   dobles.sumarPuntos.mockResolvedValue({ success: true })
@@ -25,6 +27,16 @@ beforeEach(() => {
 })
 
 describe("crearReporteWorkflow", () => {
+  it("guarda la dirección de las coordenadas al crear el reporte", async () => {
+    await crearReporteWorkflow(supabase, entrada)
+    expect(dobles.obtenerDireccion).toHaveBeenCalledWith(-27.37, -55.9)
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ direccion: "Bolívar 1450, Posadas" }))
+  })
+  it("crea el reporte igual cuando no se encuentra la dirección", async () => {
+    dobles.obtenerDireccion.mockResolvedValue(null)
+    expect(await crearReporteWorkflow(supabase, entrada)).toMatchObject({ success: true })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ direccion: null }))
+  })
   it("sin imagen conserva creación y puntos", async () => {
     expect(await crearReporteWorkflow(supabase, entrada)).toMatchObject({ success: true, data: { reportId: 7, imageUploaded: false, pointsAwarded: 10, isGuest: false } })
     expect(dobles.moderarYGuardarImagenReporte).not.toHaveBeenCalled()

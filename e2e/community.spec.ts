@@ -1,8 +1,14 @@
 import { expect, test } from "./fixtures"
-import type { BrowserContext } from "@playwright/test"
+import type { BrowserContext, Page } from "@playwright/test"
 import { signIn } from "./support/auth"
 import { rejectNextVerification, resetSiteverify, setVerificationAction } from "./support/siteverify"
 import { adminClient, uniqueTag } from "./support/test-data"
+
+/** Abre el compositor de aportes desde el botón flotante: la ficha ya no lo muestra fijo. */
+async function abrirCompositor(page: Page) {
+  await page.getByRole("button", { name: "Acciones rápidas del reporte" }).click()
+  await page.getByRole("button", { name: "Comentar", exact: true }).click()
+}
 
 type CapturedEmail = { to: string[]; subject: string; text: string; html: string }
 
@@ -45,12 +51,14 @@ test.describe("community", () => {
     await page.goto(`/reportes/${report.id}`)
     // El challenge del aporte se emite para la action que el servidor verifica con Siteverify.
     await setVerificationAction("comentar_reporte")
-    const contribution = page.getByLabel("¿Qué novedad tenés?")
+    await abrirCompositor(page)
+    const contribution = page.getByRole("combobox", { name: "¿Qué novedad tenés?" })
     await contribution.selectOption("problema_sigue_igual")
     await page.getByRole("button", { name: "Publicar", exact: true }).click()
     await page.getByRole("alertdialog").getByRole("button", { name: "Publicar actualización" }).click()
     await expect(page.getByRole("alertdialog")).toBeHidden()
-    await expect(contribution).toHaveValue("")
+    // Con éxito la hoja se cierra y el aporte queda a la vista en la actividad.
+    await expect(contribution).toBeHidden()
     // El aporte aparece como texto propio; el texto del combo no cuenta como publicación.
     const published = page.getByRole("paragraph").filter({ hasText: comment })
     await expect(published).toHaveCount(1)
@@ -75,7 +83,8 @@ test.describe("community", () => {
     await page.goto(`/reportes/${report.id}`)
     await setVerificationAction("comentar_reporte")
     await rejectNextVerification()
-    const contribution = page.getByLabel("¿Qué novedad tenés?")
+    await abrirCompositor(page)
+    const contribution = page.getByRole("combobox", { name: "¿Qué novedad tenés?" })
     const publish = page.getByRole("button", { name: "Publicar", exact: true })
     const published = page.getByRole("paragraph").filter({ hasText: comment })
 
@@ -92,13 +101,14 @@ test.describe("community", () => {
     await publish.click()
     await page.getByRole("alertdialog").getByRole("button", { name: "Publicar actualización" }).click()
     await expect(page.getByRole("alertdialog")).toBeHidden()
-    await expect(contribution).toHaveValue("")
+    // Con éxito la hoja se cierra y el aporte queda a la vista en la actividad.
+    await expect(contribution).toBeHidden()
     await expect(published).toHaveCount(1)
     await page.reload()
     await expect(published).toHaveCount(1)
   })
 
-  test("the update form follows the activity and empty state", async ({ page, testData }) => {
+  test("the update form only opens from the floating actions, never inside the activity card", async ({ page, testData }) => {
     const owner = await testData.createUser()
     const reader = await testData.createUser()
     const report = await testData.createReport(owner)
@@ -106,13 +116,14 @@ test.describe("community", () => {
     await page.goto(`/reportes/${report.id}`)
 
     const activityCard = page.locator('[data-slot="card"]').filter({ has: page.getByText("Actualizaciones y Comentarios", { exact: true }) }).first()
-    const emptyState = activityCard.getByText("Aún no hay actividad", { exact: true }).locator("xpath=..")
-    const form = activityCard.getByLabel("¿Qué novedad tenés?").locator("xpath=ancestor::form")
-    await expect(emptyState).toBeVisible()
-    const emptyStateBounds = await emptyState.boundingBox()
-    const formBounds = await form.boundingBox()
-    if (!emptyStateBounds || !formBounds) throw new Error("Activity state or update form is not rendered")
-    expect(formBounds.y).toBeGreaterThan(emptyStateBounds.y + emptyStateBounds.height)
+    await expect(activityCard.getByText("Aún no hay actividad", { exact: true })).toBeVisible()
+    await expect(page.getByLabel("¿Qué novedad tenés?")).toHaveCount(0)
+
+    await page.getByRole("button", { name: "Acciones rápidas del reporte" }).click()
+    await expect(page.getByRole("button", { name: "Ver ubicación", exact: true })).toHaveCount(0)
+    await page.getByRole("button", { name: "Comentar", exact: true }).click()
+    await expect(page.getByRole("combobox", { name: "¿Qué novedad tenés?" })).toBeVisible()
+    await expect(activityCard.getByLabel("¿Qué novedad tenés?")).toHaveCount(0)
   })
 
   test("un ciudadano cambia su voto y conserva una sola recompensa", async ({ page, testData }) => {

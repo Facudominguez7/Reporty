@@ -4,10 +4,10 @@
  * Ubicación del reporte dentro del detalle (S13, S18).
  *
  * La franja superior es la entrada principal al mapa: muestra el mapa real del reporte
- * en miniatura, sus coordenadas y un botón propio «Ver en mapa» que abre la hoja
- * inferior. La miniatura nunca recibe puntero ni lectores de pantalla, así no compite
- * con el botón ni lo atrapa. Cuando faltan coordenadas se dice, jamás se inventa una
- * dirección.
+ * en miniatura, su calle (o sus coordenadas si no se encontró) y un botón propio
+ * «Ver en mapa» que abre la hoja inferior. La miniatura nunca recibe puntero ni
+ * lectores de pantalla, así no compite con el botón ni lo atrapa. La calle sale de
+ * `reportes.direccion`, guardada al crear el reporte: acá jamás se inventa.
  */
 
 import { useRef } from "react"
@@ -33,17 +33,32 @@ export function formatearCoordenadas(lat: number, lon: number) {
 }
 
 /**
- * Franja compacta con la ubicación del reporte: miniatura del mapa, coordenadas reales
- * y una única acción directa que abre la hoja. La vista previa es decorativa y no
- * intercepta el puntero, por eso el botón sigue siendo el único control de la franja.
+ * Calle de una dirección guardada («Bolívar 1450, Posadas» → «Bolívar 1450»). La
+ * franja es angosta en móvil y todos los reportes son de la misma zona, así que ahí
+ * alcanza con la calle; la hoja muestra la dirección completa.
+ */
+export function calleDeDireccion(direccion: string) {
+  const ultimaComa = direccion.lastIndexOf(",")
+  return ultimaComa > 0 ? direccion.slice(0, ultimaComa) : direccion
+}
+
+/**
+ * Franja compacta con la ubicación del reporte: miniatura del mapa, la calle (o las
+ * coordenadas reales si no hay calle guardada) y una única acción directa que abre la
+ * hoja. La vista previa es decorativa y no intercepta el puntero, por eso el botón
+ * sigue siendo el único control de la franja.
+ *
+ * @param direccion - Calle guardada del reporte; sin ella se muestran las coordenadas.
  */
 export function FranjaUbicacion({
   lat,
   lon,
+  direccion,
   onVerUbicacion,
 }: {
   lat: number | null
   lon: number | null
+  direccion?: string | null
   onVerUbicacion?: (disparador: HTMLElement | null) => void
 }) {
   const botonRef = useRef<HTMLButtonElement>(null)
@@ -71,8 +86,12 @@ export function FranjaUbicacion({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ubicación</p>
-        <p className="truncate text-sm font-medium text-foreground">
-          {hayUbicacion ? formatearCoordenadas(lat, lon) : "Ubicación no disponible"}
+        <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
+          {!hayUbicacion
+            ? "Ubicación no disponible"
+            : direccion
+              ? calleDeDireccion(direccion)
+              : formatearCoordenadas(lat, lon)}
         </p>
       </div>
       {hayUbicacion && (
@@ -94,10 +113,21 @@ export function FranjaUbicacion({
 }
 
 /**
- * Cuerpo de la hoja de ubicación: el mapa real del reporte y el acceso al mapa
- * completo. Sin coordenadas no se pinta un mapa vacío.
+ * Cuerpo de la hoja de ubicación: el mapa real del reporte, su calle con las
+ * coordenadas como dato secundario y el acceso al mapa completo. Sin coordenadas no
+ * se pinta un mapa vacío.
+ *
+ * @param direccion - Calle guardada del reporte; sin ella el título son las coordenadas.
  */
-export function ContenidoUbicacion({ lat, lon }: { lat: number | null; lon: number | null }) {
+export function ContenidoUbicacion({
+  lat,
+  lon,
+  direccion,
+}: {
+  lat: number | null
+  lon: number | null
+  direccion?: string | null
+}) {
   if (lat === null || lon === null) {
     return (
       <p className="text-sm text-muted-foreground">Este reporte no tiene coordenadas cargadas.</p>
@@ -113,7 +143,7 @@ export function ContenidoUbicacion({ lat, lon }: { lat: number | null; lon: numb
       <div className="flex items-start gap-2">
         <MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">Coordenadas del reporte</p>
+          <p className="text-sm font-semibold text-foreground">{direccion ?? "Coordenadas del reporte"}</p>
           <p className="text-xs text-muted-foreground">{formatearCoordenadas(lat, lon)}</p>
         </div>
       </div>

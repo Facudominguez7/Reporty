@@ -132,6 +132,15 @@ describe("acciones y hojas del detalle", () => {
     expect(html).toContain("data-acciones-flotantes")
   })
 
+  it("muestra la calle en la franja de ubicación cuando el reporte la tiene guardada", () => {
+    const html = renderizar({
+      reporte: { ...reporte, direccion: "Bolívar 1450, Posadas" } as unknown as ReporteDetalle,
+    })
+
+    expect(html).toContain("Bolívar 1450")
+    expect(html).not.toContain("-27,36708 · -55,89610")
+  })
+
   it("deja una sola entrada visible al mapa para quien no administra", () => {
     const html = renderizar()
 
@@ -154,7 +163,7 @@ describe("acciones y hojas del detalle", () => {
   it("resume el estado de la evidencia y deja las acciones para la hoja", () => {
     const html = renderizar()
 
-    expect(html).toContain("¿Ya lo arreglaron?")
+    expect(html).toContain(">Reparación<")
     expect(html).toContain("En verificación · 2 de 3 confirmaciones")
     expect(html).toContain("Ver la evidencia")
     // La comparación ahora vive sobre la foto de la tarjeta; confirmar e impugnar siguen en la hoja.
@@ -174,14 +183,24 @@ describe("acciones y hojas del detalle", () => {
     expect(html).toContain("Ubicación no disponible")
   })
 
-  it("conserva compartir, el voto «No existe», los comentarios y los organismos", () => {
+  it("conserva compartir, el voto «No existe» y los comentarios", () => {
     const html = renderizar()
 
     expect(html).toContain("Compartir reporte")
     expect(html).toContain("No existe")
     expect(html).toContain("Actualizaciones y Comentarios")
-    expect(html).toContain("Avisar a un organismo")
-    expect(html).toContain('id="report-contribution"')
+  })
+
+  it("no repite «Avisar a un organismo» en la ficha: sólo lo ofrece la acción flotante", () => {
+    const html = renderizar()
+
+    expect(html).not.toContain("Avisar a un organismo")
+  })
+
+  it("no pinta el formulario de comentarios en la ficha: sólo lo abre la acción flotante", () => {
+    const html = renderizar()
+
+    expect(html).not.toContain('id="report-contribution"')
   })
 
   it("no repite el botón de ubicación en móvil", () => {

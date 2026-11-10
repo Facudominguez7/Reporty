@@ -32,8 +32,6 @@ describe("report contact actions", () => {
     expect(actions).toContain('className="shrink-0 whitespace-nowrap"')
     expect(actions).toContain("contact.organization")
     expect(actions).toContain('variant="default"')
-    expect(actions).toContain('variant="secondary" className="w-full"')
-    expect(actions).toContain('<ReportContactActions {...props} reportUrl={reportUrl} showHeading={false} />')
     expect(actions).toContain('rounded-lg border border-border')
     expect(actions).toContain('aria-label={`${action}: ${contact.organization}`}')
     expect(actions).toContain("contactHref(contact.channel_type, contact.channel_value, draft, props.title)")
@@ -139,7 +137,8 @@ describe("report contact actions", () => {
     const creation = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
     const detail = readFileSync(new URL("../[id]/reporte-detalle-client.tsx", import.meta.url), "utf8")
     expect(creation).toMatch(/<ReportContactActions\s+title=\{formData.title\}/)
-    expect(detail).toMatch(/<ReportContactDialog\s+[\s\S]*?title=\{reporte.titulo\}/)
+    expect(detail).toMatch(/<ReportContactActions\s+[\s\S]*?title=\{reporte.titulo\}/)
+    expect(detail).not.toContain("<ReportContactDialog")
   })
 
   it("constructs editable messages and encoded links without assuming publication", () => {

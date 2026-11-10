@@ -5,9 +5,10 @@ import { actualizarDatosReporteAdminWorkflow, applyReportStateChange, crearComen
 
 const mocks = vi.hoisted(() => ({
   sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), isAdminRole: vi.fn(),
-  reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), validarImagen: vi.fn(),
+  reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), validarImagen: vi.fn(), obtenerDireccion: vi.fn(),
 }))
 vi.mock("server-only", () => ({}))
+vi.mock("@/lib/geocodificacion/direccion-inversa", () => ({ obtenerDireccion: mocks.obtenerDireccion }))
 vi.mock("@/lib/moderation/imagenes-reporte.server", () => ({
   moderarYGuardarImagenReporte: mocks.reemplazarFoto,
   eliminarFotoReportePublicada: mocks.quitarFoto,
@@ -30,6 +31,7 @@ beforeEach(() => {
   mocks.reemplazarFoto.mockReset().mockResolvedValue({ estado: "REVIEW", publicada: false, motivos: [], advertencias: [] })
   mocks.quitarFoto.mockReset().mockResolvedValue({ success: true, cleanupPending: false })
   mocks.validarImagen.mockReset().mockResolvedValue(undefined)
+  mocks.obtenerDireccion.mockReset().mockResolvedValue("Bolívar 1450, Posadas")
 })
 
 describe("admin report edits", () => {
@@ -59,6 +61,28 @@ describe("admin report edits", () => {
     expect(update).toHaveBeenCalledWith({ titulo: "New title", descripcion: "Valid description", categoria_id: 3, prioridad_id: 2, lat: -34.6, lon: -58.4 })
     expect(updateQuery.eq).toHaveBeenCalledWith("id", 4)
     expect(updateQuery.is).toHaveBeenCalledWith("deleted_at", null)
+    // Las coordenadas no cambiaron: la dirección guardada sigue valiendo.
+    expect(mocks.obtenerDireccion).not.toHaveBeenCalled()
+  })
+
+  it("recalcula la dirección cuando el admin mueve el reporte", async () => {
+    const update = vi.fn()
+    const updateQuery = {
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 4 }, error: null }),
+    }
+    const reportQuery = {
+      eq: () => ({ single: async () => ({ data: { id: 4, usuario_id: "owner", titulo: "Old", estado_id: 1, lat: -27.36, lon: -55.9, deleted_at: null, ownerProfile: null }, error: null }) }),
+    }
+    const supabase = { from: () => ({ select: () => reportQuery, update: (values: unknown) => { update(values); return updateQuery } }) } as never
+
+    const result = await actualizarDatosReporteAdminWorkflow(supabase, 4, "admin", { lat: -27.37, lon: -55.89 })
+
+    expect(result).toEqual({ success: true, data: true })
+    expect(mocks.obtenerDireccion).toHaveBeenCalledWith(-27.37, -55.89)
+    expect(update).toHaveBeenCalledWith({ lat: -27.37, lon: -55.89, direccion: "Bolívar 1450, Posadas" })
   })
 
   it("updates only the requested field without rewriting the rest of the report", async () => {
