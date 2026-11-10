@@ -1,13 +1,15 @@
 /**
- * Completa `reportes.direccion` en los reportes creados antes de guardar la calle.
+ * Completa la calle (`direccion`) de los reportes y de las mascotas publicadas antes
+ * de que se guardara al crearlos.
  *
  * Uso:
  *   node --env-file=.env.development.local scripts/geocodificacion/completar-direcciones.mjs           # sólo muestra
  *   node --env-file=.env.development.local scripts/geocodificacion/completar-direcciones.mjs --aplicar # escribe
  *
  * Lee NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY del entorno. Respeta la
- * política de Nominatim: una consulta cada 1,1 s. Sólo toca reportes vivos, con
- * coordenadas y sin dirección; si no se encuentra la calle, el reporte queda igual.
+ * política de Nominatim: una consulta cada 1,1 s. Sólo toca reportes vivos y mascotas
+ * no retiradas, con coordenadas y sin dirección; si no se encuentra la calle, la fila
+ * queda igual.
  */
 import { setTimeout as esperar } from "node:timers/promises"
 import { createClient } from "@supabase/supabase-js"
@@ -27,41 +29,50 @@ function requerida(nombre) {
   return valor
 }
 
-/** Recorre los reportes sin dirección y la completa (o la muestra en modo prueba). */
+/** Tablas a completar: nombre, filtro de filas vivas y etiqueta para el log. */
+const TABLAS = [
+  { tabla: "reportes", columnaViva: "deleted_at", etiqueta: "reportes" },
+  { tabla: "mascotas_perdidas", columnaViva: "retirada_at", etiqueta: "mascotas" },
+]
+
+/** Recorre las filas sin dirección de cada tabla y la completa (o la muestra en modo prueba). */
 async function principal() {
   const supabase = createClient(requerida("NEXT_PUBLIC_SUPABASE_URL"), requerida("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false },
   })
 
-  const { data: reportes, error } = await supabase
-    .from("reportes")
-    .select("id, lat, lon")
-    .is("direccion", null)
-    .is("deleted_at", null)
-    .not("lat", "is", null)
-    .not("lon", "is", null)
-    .order("id")
-
-  if (error) throw error
-  console.log(`${reportes.length} reportes sin dirección${aplicar ? "" : " (modo prueba: agregá --aplicar para guardar)"}`)
-
-  let guardados = 0
-  for (const [indice, reporte] of reportes.entries()) {
-    if (indice > 0) await esperar(PAUSA_MS)
-    const direccion = await obtenerDireccion(reporte.lat, reporte.lon)
-    console.log(`#${reporte.id}: ${direccion ?? "(sin calle)"}`)
-    if (!aplicar || !direccion) continue
-
-    const { error: errorUpdate } = await supabase
-      .from("reportes")
-      .update({ direccion })
-      .eq("id", reporte.id)
+  let consultas = 0
+  for (const { tabla, columnaViva, etiqueta } of TABLAS) {
+    const { data: filas, error } = await supabase
+      .from(tabla)
+      .select("id, lat, lon")
       .is("direccion", null)
-    if (errorUpdate) console.error(`#${reporte.id}: no se pudo guardar`, errorUpdate.message)
-    else guardados += 1
-  }
+      .is(columnaViva, null)
+      .not("lat", "is", null)
+      .not("lon", "is", null)
+      .order("id")
 
-  if (aplicar) console.log(`Listo: ${guardados} direcciones guardadas.`)
+    if (error) throw error
+    console.log(`${filas.length} ${etiqueta} sin dirección${aplicar ? "" : " (modo prueba: agregá --aplicar para guardar)"}`)
+
+    let guardados = 0
+    for (const fila of filas) {
+      if (consultas++ > 0) await esperar(PAUSA_MS)
+      const direccion = await obtenerDireccion(fila.lat, fila.lon)
+      console.log(`${etiqueta} #${fila.id}: ${direccion ?? "(sin calle)"}`)
+      if (!aplicar || !direccion) continue
+
+      const { error: errorUpdate } = await supabase
+        .from(tabla)
+        .update({ direccion })
+        .eq("id", fila.id)
+        .is("direccion", null)
+      if (errorUpdate) console.error(`${etiqueta} #${fila.id}: no se pudo guardar`, errorUpdate.message)
+      else guardados += 1
+    }
+
+    if (aplicar) console.log(`Listo: ${guardados} direcciones de ${etiqueta} guardadas.`)
+  }
 }
 
 await principal()

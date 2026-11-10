@@ -6,6 +6,7 @@ import { moderarImagen } from "./sightengine.server"
 import type { ResultadoModeracion } from "./tipos"
 import type { MascotaSubmission } from "@/lib/security/mascota-submission-guard.server"
 import { esObjetoAusente } from "./imagenes-reporte.server"
+import { guardarDireccionMascota } from "@/lib/mascotas/direccion-mascota.server"
 
 const PRIVATE_BUCKET = "reportes-pendientes"
 const PUBLIC_BUCKET = "reportes"
@@ -190,7 +191,10 @@ export async function publicarMascotaAprobada(
     p_lon: fields.lon,
     p_telefono: fields.telefono,
   })
-  return error || !data ? { mascotaId: null, pointsAwarded: 0 } : { mascotaId: Number(data), pointsAwarded: 10 }
+  if (error || !data) return { mascotaId: null, pointsAwarded: 0 }
+  const mascotaId = Number(data)
+  await guardarDireccionMascota(supabase, mascotaId, fields.lat, fields.lon)
+  return { mascotaId, pointsAwarded: 10 }
 }
 
 /** Admin-only caller supplies the fields already persisted with a pending publication. */
