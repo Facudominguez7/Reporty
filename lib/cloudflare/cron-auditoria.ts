@@ -3,8 +3,8 @@
  * Hostinger (`~/reporty-audit-cron.sh`), que llamaba al mismo endpoint con `curl`.
  */
 
-/** Programación semanal: domingos 06:00 UTC, la misma que tenía el cron de Hostinger. */
-export const CRON_ARCHIVO_AUDITORIA = "0 6 * * 0"
+/** Programación semanal: domingos 06:00 UTC, como el cron de Hostinger. Cloudflare rechaza "0" como domingo. */
+export const CRON_ARCHIVO_AUDITORIA = "0 6 * * SUN"
 
 /** Lote por corrida: el mismo `limite` que usaba el script de Hostinger. */
 const LIMITE_POR_CORRIDA = 1000
