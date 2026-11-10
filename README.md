@@ -220,6 +220,10 @@ sequenceDiagram
    TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
    # Con las claves de prueba Siteverify responde example.com; en producción: reporty.com.ar
    TURNSTILE_ALLOWED_HOSTNAMES=example.com
+   # Donaciones con Mercado Pago (ver docs/donaciones.md). En desarrollo, credenciales de prueba.
+   # Nunca uses NEXT_PUBLIC_ para estos valores.
+   MERCADOPAGO_ACCESS_TOKEN=
+   MERCADOPAGO_WEBHOOK_SECRET=
    # Opcional: habilita la gestión de cuadrillas (desactivada si no se define)
    CUADRILLAS_ENABLED=true
    # Opcional: ID de medición de Google Analytics 4 (G-XXXXXXXXXX).
@@ -293,6 +297,7 @@ Reporty envía notificaciones por email en los siguientes casos:
 
 - **Nuevo comentario**: Cuando alguien comenta en tu reporte
 - **Cambio de estado**: Cuando un administrador cambia el estado de tu reporte
+- **Donación aprobada**: agradecimiento al donante con sesión y aviso a los administradores
 
 Los emails son enviados mediante [Resend](https://resend.com) con plantillas HTML personalizadas.
 

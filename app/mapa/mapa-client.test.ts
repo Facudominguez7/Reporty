@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
-import { MAP_LAYER_OPTIONS, PetLayerError, shouldShowMascotasOnboarding } from "./mapa-client"
+import { AccesoDonarMapa, MAP_LAYER_OPTIONS, PetLayerError, shouldShowMascotasOnboarding } from "./mapa-client"
 
 describe("map layer labels", () => {
   it("calls the report layer Incidentes", () => {
@@ -23,5 +23,14 @@ describe("PetLayerError", () => {
     expect(markup).toContain('role="alert"')
     expect(markup).toContain("No se pudieron cargar las mascotas: pet read denied")
     expect(renderToStaticMarkup(createElement(PetLayerError, { error: null }))).toBe("")
+  })
+})
+
+describe("AccesoDonarMapa", () => {
+  it("muestra el botón Donar arriba a la derecha, debajo de contactos y ayuda", () => {
+    const markup = renderToStaticMarkup(createElement(AccesoDonarMapa))
+    expect(markup).toContain("fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))]")
+    expect(markup).toContain("lg:hidden")
+    expect(markup).toMatch(/<a [^>]*href="\/donar"[^>]*>(?:(?!<\/a>).)*Donar<\/a>/)
   })
 })

@@ -22,6 +22,12 @@ describe("privacy policy page", () => {
     }
   })
 
+  it("explains what donation data is kept, that Mercado Pago processes the payment and that donations are not public", () => {
+    expect(privacidad).toContain("<strong>Tus donaciones:</strong>")
+    expect(privacidad).toContain("<strong>Mercado Pago:</strong>")
+    expect(privacidad).toContain("Las donaciones no son públicas")
+  })
+
   it("includes the access-rights notice required by Ley 25.326", () => {
     expect(privacidad).toContain("Ley N° 25.326")
     expect(privacidad).toContain("en forma gratuita a intervalos no inferiores a seis meses")
@@ -47,6 +53,14 @@ describe("terms page", () => {
     expect(terminos).toContain('href="/privacidad"')
   })
 
+  it("has a donations section: voluntary, paid through Mercado Pago, with no reward and not tax deductible", () => {
+    expect(terminos).toContain('id="donaciones"')
+    expect(terminos).toContain("Las donaciones son voluntarias")
+    expect(terminos).toContain("Mercado Pago")
+    expect(terminos).toContain("no dan puntos")
+    expect(terminos).toContain("no son deducibles")
+  })
+
   it("has its own title and canonical URL and can be indexed", () => {
     expect(terminosMetadata.title).toBe("Términos y condiciones")
     expect(terminosMetadata.alternates).toEqual({ canonical: "/terminos" })
@@ -60,5 +74,13 @@ describe("sign-up form", () => {
 
     expect(source).toMatch(/href="\/terminos"[^>]*>términos y condiciones</)
     expect(source).toMatch(/href="\/privacidad"[^>]*>política de privacidad</)
+  })
+})
+
+describe("donate page", () => {
+  it("links the donation terms", () => {
+    const source = readFileSync(new URL("./donar/page.tsx", import.meta.url), "utf8")
+
+    expect(source).toMatch(/href="\/terminos#donaciones"[^>]*>\s*términos de las donaciones/)
   })
 })

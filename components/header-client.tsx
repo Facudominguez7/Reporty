@@ -17,7 +17,9 @@ import type { User } from "@supabase/supabase-js";
 import { buttonVariants } from "@/components/ui/button";
 import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { ContactsDialog } from "@/components/contacts-dialog";
+import { BotonDonarEncabezado } from "@/components/donaciones/invitacion-donar";
 import { needsPasswordSetup } from "@/lib/authz/guest-account";
+import { muestraEncabezadoSuperior } from "@/lib/routes/encabezado";
 
 interface HeaderClientProps {
   user: User | null | undefined;
@@ -54,7 +56,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
   ];
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
-  const showTopHeader = !isAdminRoute && pathname !== "/" && pathname !== "/mapa" && !pathname.startsWith("/auth");
+  const showTopHeader = muestraEncabezadoSuperior(pathname);
 
   const isActive = (href: string) => {
     if (href === "/mapa") return pathname === "/" || pathname.startsWith("/mapa");
@@ -81,6 +83,9 @@ export function HeaderClient({ user }: HeaderClientProps) {
               priority
             />
           </Link>
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 sm:left-6">
+            <BotonDonarEncabezado actual={pathname.startsWith("/donar")} />
+          </div>
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 sm:right-6 sm:gap-2">
             <ContactsDialog />
             <HowToUseDialog />

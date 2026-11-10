@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 import { ContactsDialog } from "@/components/contacts-dialog"
+import { BotonDonarEncabezado } from "@/components/donaciones/invitacion-donar"
 import { FiltrosReportes } from "@/components/filtros-reportes"
 import { FiltrosMascotasMapa } from "@/components/filtros-mascotas-mapa"
 import { filtrarMascotasMapa } from "./filtros-mascotas-mapa"
@@ -53,6 +54,19 @@ export const MAP_LAYER_OPTIONS = [["reportes", "Incidentes"], ["mascotas", "Masc
 
 export function shouldShowMascotasOnboarding(layer: "reportes" | "mascotas", completed: boolean) {
   return layer === "mascotas" && !completed
+}
+
+/**
+ * Botón «Donar» del mapa en celulares y tablets: la misma píldora del encabezado,
+ * debajo de contactos y ayuda, porque la fila superior no tiene lugar. Desde `lg` el botón
+ * pasa a esa fila y este se oculta; entre `md` y `lg` la ayuda de los marcadores baja para no chocar.
+ */
+export function AccesoDonarMapa() {
+  return (
+    <div className="pointer-events-none fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))] z-40 sm:right-6 sm:top-[calc(4.75rem+env(safe-area-inset-top))] lg:hidden">
+      <BotonDonarEncabezado className="pointer-events-auto" />
+    </div>
+  )
 }
 
 export function PetLayerError({ error }: { error: string | null }) {
@@ -122,10 +136,12 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
       <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
         <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
+          <BotonDonarEncabezado className="hidden lg:inline-flex" />
           <ContactsDialog />
           <HowToUseDialog layer={layer} />
         </div>
       </div>
+      <AccesoDonarMapa />
       <div className="absolute inset-0 z-0">
         {error ? (
           <div className="flex h-full items-center justify-center p-5">
@@ -199,6 +215,14 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
           Aplicando filtros...
         </div>
       )}
+
+      {/* Reporty no tiene footer: el enlace a los términos queda visible sobre la navegación inferior. */}
+      <Link
+        href="/terminos"
+        className="absolute bottom-[calc(var(--bottom-nav-space)+0.25rem)] left-3 z-10 rounded-full bg-card/85 px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground shadow-sm backdrop-blur underline-offset-4 hover:text-foreground hover:underline sm:left-5"
+      >
+        Términos y condiciones
+      </Link>
 
       <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-30 flex flex-col items-end gap-3 sm:right-6">
         {showActions && (

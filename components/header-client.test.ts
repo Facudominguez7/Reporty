@@ -32,4 +32,14 @@ describe("HeaderClient create navigation", () => {
     }
     path.value = "/crear"
   })
+
+  it("muestra el botón Donar en el encabezado y lo marca activo en /donar", () => {
+    path.value = "/reportes"
+    const enReportes = renderToStaticMarkup(createElement(HeaderClient, { user: null }))
+    expect(enReportes).toMatch(/<a [^>]*href="\/donar"[^>]*>(?:(?!<\/a>).)*Donar<\/a>/)
+    expect(enReportes).not.toMatch(/<a (?=[^>]*href="\/donar")(?=[^>]*aria-current)/)
+    path.value = "/donar"
+    expect(renderToStaticMarkup(createElement(HeaderClient, { user: null }))).toMatch(/<a (?=[^>]*href="\/donar")(?=[^>]*aria-current="page")/)
+    path.value = "/crear"
+  })
 })

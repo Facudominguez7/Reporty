@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, ClipboardCheck, FileText, History, LayoutDashboard, Users, UsersRound } from "lucide-react"
+import { BarChart3, ClipboardCheck, FileText, HandHeart, History, LayoutDashboard, Users, UsersRound } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { MouseEvent } from "react"
 
@@ -19,6 +19,7 @@ const adminItems: AdminNavItem[] = [
   { href: "/admin/moderacion", label: "Revisiones", icon: ClipboardCheck },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
   { href: "/admin/metricas", label: "Métricas", icon: BarChart3 },
+  { href: "/admin/donaciones", label: "Donaciones", icon: HandHeart },
   { href: "/admin/auditoria", label: "Auditoría", icon: History },
 ]
 

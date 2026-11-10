@@ -1,0 +1,55 @@
+# Donaciones con Mercado Pago
+
+Objetivo: cualquiera puede donar a Reporty por Mercado Pago (Checkout Pro) y el admin ve todas las donaciones.
+Rama: `feat/donaciones` · Entrega: ask-on-risk · Tests: `pnpm vitest run`, `npx tsc --noEmit`, `pnpm run lint`.
+
+## Specs
+
+- **S1 — Quién dona.** "Cualquiera (Recomendado)": no hace falta sesión; si hay sesión, la donación queda asociada al usuario.
+- **S2 — Ubicación.** "opcion 2 y despues de publicar un reporte o mascota": un botón «Donar» fijo en el encabezado (B) y una invitación dentro del diálogo que aparece después de publicar un reporte o una mascota (D). Las dos llevan a `/donar`.
+- **S3 — Montos.** "1.000 a 20.000 + Otro (Recomendado)": $1.000, $2.000, $5.000, $10.000 y $20.000, más «Otro» con monto libre (mínimo $500). Nombre y mensaje son opcionales.
+- **S4 — Pago.** "la plata iria a un mercado pago": el pago se hace en Checkout Pro de Mercado Pago (redirección). Reporty no ve datos de tarjeta. El servidor confirma el estado consultando `GET /v1/payments/{id}`, nunca confiando en el navegador.
+- **S5 — Privacidad.** "Solo el admin las ve (Recomendado)": nombre y mensaje no se muestran en público.
+- **S6 — Panel admin.** "desde el panel admin se debe de poder visualizar todas las donaciones" + "Lo anterior + exportar CSV": tabla con fecha, monto, estado (aprobada/pendiente/rechazada), nombre, mensaje y usuario si tenía sesión; totales del mes y de siempre; filtros por estado y mes; exportar CSV.
+- **S7 — Emails.** "Avisar también al admin": cuando el pago queda aprobado, email de agradecimiento al donante si tenía sesión ("Gracias por tu donación de $X") y aviso a los admins. Cada email se manda una sola vez por pago.
+- **S8 — Credenciales.** "Sí, ya la tengo": se desarrolla con las credenciales de prueba de la app `57185228504296`; el usuario carga las de producción en Cloudflare. Variables: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET`.
+
+## Tasks
+
+| ID | Specs | Ruta | Estado | Commit |
+| --- | --- | --- | --- | --- |
+| T1 | S4, S5, S6 | inline | hecho | a48213c |
+| T2 | S3, S4 | inline | hecho | a48213c |
+| T3 | S1, S3, S4 | inline | hecho; pago de prueba real ok | 8dd9fb9 |
+| T4 | S4, S7 | inline | hecho; emails sin probar en local (sin RESEND_API_KEY) | a48213c, 8dd9fb9 |
+| T5 | S6 | inline | hecho; sin verificación visual con sesión admin | 5ca8fdb |
+| T6 | S2 | inline | hecho | 141e335 |
+| T7 | S8 | inline | hecho (docs); faltan credenciales del usuario | 141e335 |
+
+- T1: migración `donaciones` (RLS sin políticas: solo service role).
+- T2: `lib/donaciones` (montos, validación, cliente de Mercado Pago, firma del webhook).
+- T3: página `/donar`, acción que crea la preferencia, página de vuelta `/donar/gracias` que concilia el pago.
+- T4: webhook `/api/donaciones/webhook` + emails al donante y a los admins.
+- T5: `/admin/donaciones` con totales, filtros y CSV.
+- T6: botón «Donar» en el encabezado e invitación en los diálogos de publicación.
+- T7: documentación de variables y del webhook.
+
+Ruta: todo inline, sin motivo de delegación (una sola unidad de comportamiento encadenada). Riesgo: items 1 (tabla nueva con datos de pagos), 2 (webhook público con firma) y 5 (variables de despliegue).
+
+## Log
+
+- L1 (2026-11-10): "ahora propongo lo siguiente queremos agregar un boton para que la gente pueda donarnos, la plata iria a un mercado pago en la parte donaciones investiga en internet si se puede de alguna manera. desde el panel admin se debe de poder visualizar todas las donaciones"
+- L2: "si, vamos con la opción A - haceme preguntas antes de implementar"; respuestas en S1–S8.
+- L3: "tiene que existir mcp de mercado pago para que puedas configurar lo que necesites, buscalo tmb" → MCP oficial agregado y autenticado; app `57185228504296`.
+- L4: Decisión: API de Preferencias por `fetch` (sin SDK nuevo). La fila de la donación se crea recién cuando existe un pago (webhook o vuelta de Checkout Pro), con nombre, mensaje y usuario tomados de `metadata` de la preferencia, que arma el servidor. Así los checkouts abandonados no ensucian la tabla.
+- L5: Webhook de producción configurado por MCP: `https://reporty.com.ar/api/donaciones/webhook`, topic `payment`. Sin URL sandbox (el servidor local no es público; la vuelta a `/donar/gracias` concilia el pago).
+- L6: Verificación: vitest 1576 ok, `tsc` ok, lint 0 errores. Capturas a 390 px de `/donar`, error de monto mínimo y encabezado con «Donar». Se quitó la condición por ruta del botón del encabezado porque producía un aviso de hidratación en `/donar`. En `/` y `/mapa` no hay encabezado superior.
+- L7: Pendiente: el usuario carga `MERCADOPAGO_ACCESS_TOKEN` (prueba) en `.env.development.local` para hacer un pago de punta a punta con un comprador de prueba; en producción carga access token y clave secreta del webhook en Cloudflare y aplica la migración.
+- L8: "en que parte del mapa se podria agregar el boton para donar" → propuesta: arriba a la derecha, debajo de contactos y ayuda → "si". Agregado `AccesoDonarMapa` en `app/mapa/mapa-client.tsx`; capturas a 390 px en Incidentes y Mascotas sin superposiciones ni errores de hidratación.
+- L9: Token de prueba cargado en `.env.local`; la preferencia se crea y redirige a Checkout Pro. Chrome headless ve una página de error de Mercado Pago, así que el pago de punta a punta lo hace el usuario con el comprador de prueba `TESTUSER6541742822644250566`.
+- L10: "ojo aca" (captura en escritorio: «Donar» pegado a la ayuda de los marcadores) → desde `lg` el botón va en la fila superior; entre `md` y `lg` la ayuda baja a `top-40`. Verificado en 390, 768, 1024 y 1280 px (53185e1).
+- L11: "ya lo probe" → pago de prueba real `188848686224` por $2.000 aprobado y guardado en la base local. Bug encontrado: sin `RESEND_API_KEY`, la falla de los emails hacía que `/donar/gracias` mostrara el mensaje genérico. Arreglo: `registrarDonacion` devuelve `avisoPendiente` en lugar de lanzar; el webhook responde 500 en ese caso para que Mercado Pago reintente. Verificado con la URL real de vuelta («¡Gracias por tu donación de $2.000!») y con una referencia distinta (mensaje genérico).
+- L12: "hay que actualizar los terminos y condiciones" → sección «Donaciones» en `/terminos` (voluntarias, por Mercado Pago, sin contraprestación, no deducibles, devoluciones por error a contacto), donaciones en `/privacidad` (datos, uso, Mercado Pago como proveedor, no públicas), fecha legal 10 de noviembre de 2026 y enlace desde `/donar`. Tests en `app/legal-pages.test.ts`.
+- L13: "algo que no me cierra es que solo se puede acceder a los terminos y politica desde registrarse" → "investiga en internet donde debe ir teniendo en cuenta que no tenemos footer" → "si, hacelo así". Términos y privacidad en la atribución de Leaflet (como Google Maps) y en una línea al final de las páginas con encabezado (`EnlacesLegales`, regla compartida `muestraEncabezadoSuperior`). En `/mapa` la atribución estaba tapada por la navegación inferior, incluidos los créditos de OpenStreetMap: ahora sube con `[data-mapa-principal] .leaflet-bottom`, fuera de las capas CSS para ganarle a leaflet.css. Verificado con capturas a 390 y 1280 px.
+- L14: "lo de leaflet deja como estaba, solo agrega terminos y condiciones" → se revierte la subida de la atribución en `/mapa` y la atribución solo suma «Términos y condiciones».
+- L15: "bueno pero que se vea en el mapa los terminos y condiciones" → Leaflet queda idéntico al original (sin `addAttribution`); `/mapa` tiene su propio enlace «Términos y condiciones» abajo a la izquierda, sobre la navegación inferior. Verificado a 390, 768 y 1280 px: visible, sin superponerse con la leyenda.
