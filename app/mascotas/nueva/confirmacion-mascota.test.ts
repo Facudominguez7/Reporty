@@ -57,7 +57,7 @@ describe("pet submission confirmation", () => {
     expect(find(tree, (el) => el.type === AlertDialog)!.props.open).toBe(false)
 
     await find(tree, (el) => el.props.id === "foto-mascota" && el.type === "input")!.props.onChange({ target: { files: [new File(["photo"], "pet.jpg", { type: "image/jpeg" })], value: "" } })
-    find(tree, (el) => el.props.onValueChange && el.props.required)!.props.onValueChange("perro")
+    find(tree, (el) => el.type === "input" && el.props.name === "tipo-animal" && el.props.value === "perro")!.props.onChange()
     find(tree, (el) => el.props.id === "descripcion-mascota")!.props.onChange({ target: { value: "Brown dog" } })
     find(tree, (el) => el.props.id === "telefono-mascota")!.props.onChange({ target: { value: "123456" } })
     find(tree, (el) => el.props.id === "confirmar-telefono-publico")!.props.onChange({ target: { checked: true } })

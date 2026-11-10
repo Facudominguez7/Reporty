@@ -347,10 +347,7 @@ export type SignOutResult = { ok: true } | { ok: false; reason: 'failed' }
  */
 export async function signout(): Promise<SignOutResult> {
   const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
+  const { error: userError } = await supabase.auth.getUser()
 
   // Sin poder leer la sesión no se sabe si es de invitado, así que no se cierra. Un
   // AuthSessionMissingError solo indica que no hay sesión, y cerrarla no tiene riesgo.

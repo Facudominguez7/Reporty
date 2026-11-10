@@ -135,7 +135,7 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
             return null
           }),
         ])
-      : [false, false, null]
+      : [false, false, null];
 
     return {
       reporte: encontrado,
