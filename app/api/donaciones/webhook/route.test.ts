@@ -61,6 +61,21 @@ describe("POST /api/donaciones/webhook", () => {
     expect(registrarDonacion).not.toHaveBeenCalled()
   })
 
+  it("rechaza un id de pago que no es numérico sin consultar el pago", async () => {
+    const respuesta = await POST(aviso({ id: "abc" }))
+    expect(respuesta.status).toBe(400)
+    expect(registrarDonacion).not.toHaveBeenCalled()
+  })
+
+  it("no escribe en el log el id que llega en la URL", async () => {
+    const consola = vi.spyOn(console, "error").mockImplementation(() => {})
+    registrarDonacion.mockRejectedValue(new Error("Supabase caído"))
+    await POST(aviso({ id: "987654" }))
+    expect(consola).toHaveBeenCalledTimes(1)
+    expect(consola.mock.calls[0]).not.toContain("987654")
+    consola.mockRestore()
+  })
+
   it("responde 500 si la donación se guardó pero faltan los emails, para que Mercado Pago reintente", async () => {
     registrarDonacion.mockResolvedValue({ tipo: "registrada", donacion: { pagoId: "123" }, avisoPendiente: true })
     vi.spyOn(console, "error").mockImplementation(() => undefined)
