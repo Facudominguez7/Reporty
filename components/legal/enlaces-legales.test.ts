@@ -4,7 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 
 import { EnlacesLegales } from "./enlaces-legales"
-import { ATRIBUCION_LEGAL_MAPA } from "@/lib/legal/info"
 
 const ruta = vi.hoisted(() => ({ valor: "/reportes" }))
 vi.mock("next/navigation", () => ({ usePathname: () => ruta.valor }))
@@ -36,13 +35,11 @@ describe("EnlacesLegales", () => {
   })
 })
 
-describe("atribución del mapa", () => {
-  it("enlaza solo los términos y condiciones", () => {
-    expect(ATRIBUCION_LEGAL_MAPA).toBe('<a href="/terminos">Términos y condiciones</a>')
-  })
-
-  it("se agrega al mapa principal junto a los créditos de los mosaicos", () => {
-    const mapa = readFileSync(new URL("../leaflet-map.tsx", import.meta.url), "utf8")
-    expect(mapa).toContain("map.attributionControl.addAttribution(ATRIBUCION_LEGAL_MAPA)")
+describe("enlace a los términos en el mapa", () => {
+  it("se muestra en /mapa por encima de la navegación inferior, sin tocar la atribución de Leaflet", () => {
+    const mapa = readFileSync(new URL("../../app/mapa/mapa-client.tsx", import.meta.url), "utf8")
+    const leaflet = readFileSync(new URL("../leaflet-map.tsx", import.meta.url), "utf8")
+    expect(mapa).toMatch(/<Link\s+href="\/terminos"\s+className="[^"]*bottom-\[calc\(var\(--bottom-nav-space\)[^"]*"[^>]*>\s*Términos y condiciones\s*<\/Link>/)
+    expect(leaflet).not.toContain("addAttribution")
   })
 })

@@ -216,6 +216,14 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
         </div>
       )}
 
+      {/* Reporty no tiene footer: el enlace a los términos queda visible sobre la navegación inferior. */}
+      <Link
+        href="/terminos"
+        className="absolute bottom-[calc(var(--bottom-nav-space)+0.25rem)] left-3 z-10 rounded-full bg-card/85 px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground shadow-sm backdrop-blur underline-offset-4 hover:text-foreground hover:underline sm:left-5"
+      >
+        Términos y condiciones
+      </Link>
+
       <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-30 flex flex-col items-end gap-3 sm:right-6">
         {showActions && (
           <div className="flex flex-col items-end gap-2">

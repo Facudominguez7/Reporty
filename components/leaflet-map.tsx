@@ -16,7 +16,6 @@ import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/ca
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
-import { ATRIBUCION_LEGAL_MAPA } from "@/lib/legal/info"
 import {
   INITIAL_MAP_VIEW_CONFIG,
   MAP_MAX_ZOOM,
@@ -351,8 +350,6 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     const tileLayer = L.tileLayer(MAP_TILE_URL, {
       attribution: MAP_TILE_ATTRIBUTION,
     })
-    // Reporty no tiene footer: el enlace a los términos vive en la atribución del mapa.
-    map.attributionControl.addAttribution(ATRIBUCION_LEGAL_MAPA)
 
     const clusterGroup = L.markerClusterGroup({
       maxClusterRadius: 42,
