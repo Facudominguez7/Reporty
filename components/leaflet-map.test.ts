@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   const markerOptions: Array<{ title?: string; alt?: string }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
-  const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
+  const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(), attributionControl: { addAttribution: vi.fn() } }
   const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), getLayers: vi.fn(() => []) }
   const marker = { bindPopup: vi.fn(), on: vi.fn() }
   return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, marker, refIndex: 0 }
@@ -69,6 +69,7 @@ describe("LeafletMap initial view", () => {
     render([report])
     expect(mocks.map.setView).toHaveBeenCalledOnce()
     expect(mocks.map.setView).toHaveBeenCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
+    expect(mocks.map.attributionControl.addAttribution).toHaveBeenCalledWith('<a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a>')
     expect(mocks.calls).toEqual(["tileLayer", "setView", "addLayer"])
     expect(mocks.marker.bindPopup).toHaveBeenCalledOnce()
   })

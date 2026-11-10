@@ -19,6 +19,7 @@ import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { ContactsDialog } from "@/components/contacts-dialog";
 import { BotonDonarEncabezado } from "@/components/donaciones/invitacion-donar";
 import { needsPasswordSetup } from "@/lib/authz/guest-account";
+import { muestraEncabezadoSuperior } from "@/lib/routes/encabezado";
 
 interface HeaderClientProps {
   user: User | null | undefined;
@@ -55,7 +56,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
   ];
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
-  const showTopHeader = !isAdminRoute && pathname !== "/" && pathname !== "/mapa" && !pathname.startsWith("/auth");
+  const showTopHeader = muestraEncabezadoSuperior(pathname);
 
   const isActive = (href: string) => {
     if (href === "/mapa") return pathname === "/" || pathname.startsWith("/mapa");
