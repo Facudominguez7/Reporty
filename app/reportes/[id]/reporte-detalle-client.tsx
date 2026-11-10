@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -91,7 +91,8 @@ import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
 import { ReportContactActions, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
 import { buildReportShareData, shareReport } from "@/lib/share/share-report";
-import { compartirHistoria, datosHistoriaReporte, descargarArchivo, generarImagenHistoria } from "@/lib/share/historia-instagram";
+import { datosHistoriaReporte, generarImagenHistoria } from "@/lib/share/historia-instagram";
+import { useHistoriaInstagram } from "@/components/share/use-historia-instagram";
 import { MenuCompartir } from "@/components/report-detail/menu-compartir";
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation";
 import {
@@ -390,14 +391,11 @@ export function ReporteDetalleClient({
     }
   };
 
-  /**
-   * Empieza a generar la imagen de la historia apenas se abre el menú, así al tocar
-   * «Historia de Instagram» ya está lista y `navigator.share` sale pegado al toque.
-   */
-  const prepararHistoria = () => {
-    if (!reporte || historiaPendiente.current) return;
+  /** Genera la imagen de la historia del reporte (la pide `useHistoriaInstagram`). */
+  const crearArchivoHistoria = async () => {
+    if (!reporte) throw new Error("Reporte no disponible");
     const foto = reporte.fotos_reporte?.find((item) => Boolean(item.publicUrl ?? item.url));
-    const pendiente = generarImagenHistoria(
+    const blob = await generarImagenHistoria(
       datosHistoriaReporte({
         titulo: reporte.titulo,
         prioridad: getNameFromRelation(reporte.prioridades),
@@ -405,39 +403,10 @@ export function ReporteDetalleClient({
         categoria: getNameFromRelation(reporte.categorias),
         direccion: reporte.direccion ?? null,
         fotoUrl: foto ? ((foto.publicUrl ?? foto.url) as string) : null,
-        url: `${window.location.origin}/reportes/${reporte.id}`,
       }),
       getComputedStyle(document.body).fontFamily,
-    ).then((blob) => new File([blob], `reporty-reporte-${reporte.id}.png`, { type: "image/png" }));
-    // Si falla, el próximo intento vuelve a generarla.
-    pendiente.catch(() => {
-      historiaPendiente.current = null;
-    });
-    historiaPendiente.current = pendiente;
-  };
-
-  /** Comparte la imagen vertical en el menú del sistema o la descarga, con el link copiado. */
-  const handleShareStory = async () => {
-    if (!reporte) return;
-    prepararHistoria();
-    try {
-      const archivo = await historiaPendiente.current!;
-      const resultado = await compartirHistoria(
-        archivo,
-        `${window.location.origin}/reportes/${reporte.id}`,
-        navigator,
-        descargarArchivo,
-      );
-      if (resultado === "compartida") {
-        toast.success("Link copiado", { description: "En la historia, tocá el sticker «Enlace» y pegalo." });
-      } else if (resultado === "descargada") {
-        toast.success("Imagen descargada", {
-          description: "Subila a tu historia. El link quedó copiado para el sticker «Enlace».",
-        });
-      }
-    } catch {
-      toast.error("No pudimos armar la imagen", { description: "Probá compartir el enlace." });
-    }
+    );
+    return new File([blob], `reporty-reporte-${reporte.id}.png`, { type: "image/png" });
   };
 
   const handleDeleteReporte = async () => {
@@ -652,8 +621,14 @@ export function ReporteDetalleClient({
 
   // Tour mínimo: la primera vez que se puede comentar, un globo señala el lápiz. Va antes
   // del retorno temprano (regla de hooks); la condición es la misma que ofrece «Comentar».
-  /** Imagen de la historia, generada al abrir el menú de compartir (ver `MenuCompartir`). */
-  const historiaPendiente = useRef<Promise<File> | null>(null);
+  /** Historia de Instagram: la imagen se genera al abrir el menú de compartir. */
+  const historia = useHistoriaInstagram(
+    () => crearArchivoHistoria(),
+    (resultado) => {
+      if (resultado === "descargada") toast.success("Imagen descargada", { description: "Subila a tu historia de Instagram." });
+      if (resultado === "error") toast.error("No pudimos armar la imagen", { description: "Probá compartir el enlace." });
+    },
+  );
 
   const avisoComentar = useAvisoComentar(
     Boolean(reporte && currentUser && !currentUser.is_anonymous && !isReporteCerrado),
@@ -912,7 +887,7 @@ export function ReporteDetalleClient({
                   )}
                   <div className="flex shrink-0 items-center gap-1.5">
                     {!showVoteButtons && (
-                      <MenuCompartir onAbrir={prepararHistoria} onCompartirEnlace={handleShareReport} onCompartirHistoria={handleShareStory}>
+                      <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={handleShareReport} onCompartirHistoria={historia.compartir}>
                         <Button variant="outline" size="icon" className="size-10" aria-label="Compartir reporte" title="Compartir reporte">
                           <Share2 className="size-4" />
                         </Button>
@@ -1059,7 +1034,7 @@ export function ReporteDetalleClient({
                     <div className="flex flex-wrap items-center gap-1.5">
                       {showVoteButtons && (
                         <div role="group" aria-label="Acciones sobre el reporte" className="mx-auto grid w-full max-w-56 grid-cols-2 justify-items-center gap-4">
-                          <MenuCompartir onAbrir={prepararHistoria} onCompartirEnlace={handleShareReport} onCompartirHistoria={handleShareStory}>
+                          <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={handleShareReport} onCompartirHistoria={historia.compartir}>
                             <Button
                               variant="ghost"
                               size="xs"

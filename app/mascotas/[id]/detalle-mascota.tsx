@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useState } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import Link from "next/link"
@@ -13,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { shareReport } from "@/lib/share/share-report"
-import { compartirHistoria, datosHistoriaMascota, descargarArchivo, generarImagenHistoria } from "@/lib/share/historia-instagram"
+import { datosHistoriaMascota, generarImagenHistoria } from "@/lib/share/historia-instagram"
+import { useHistoriaInstagram } from "@/components/share/use-historia-instagram"
 import { MenuCompartir } from "@/components/report-detail/menu-compartir"
 import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { resolveReportesReturnTo } from "@/lib/reportes/navigation"
@@ -42,7 +43,11 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
   const [pending, setPending] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(() => petDraft(pet))
-  const historiaPendiente = useRef<Promise<File> | null>(null)
+  const historia = useHistoriaInstagram(crearArchivoHistoria, (resultado) => {
+    setError(""); setMessage("")
+    if (resultado === "descargada") setMessage("Imagen descargada: subila a tu historia de Instagram.")
+    if (resultado === "error") setError("No pudimos armar la imagen. Probá compartir el enlace.")
+  })
   const statusLabel = getPetStatusAdjective(pet.status)
 
   async function saveAdmin() {
@@ -63,29 +68,13 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
     if (outcome === "failed") setError("No pudimos compartir el enlace.")
     if (outcome === "copied") setMessage("Enlace copiado.")
   }
-  /**
-   * Genera la imagen de la historia al abrir el menú, para que `navigator.share`
-   * quede pegado al toque (Safari lo exige). Si falla, el próximo intento la rehace.
-   */
-  function prepararHistoria() {
-    if (historiaPendiente.current) return
-    const pendiente = generarImagenHistoria(
-      datosHistoriaMascota({ especie: pet.species, estado: pet.status, descripcion: pet.description ?? "", direccion: pet.address ?? null, fotoUrl: pet.image ?? null, url: `${window.location.origin}/mascotas/${pet.id}` }),
+  /** Genera la imagen de la historia de la mascota (la pide `useHistoriaInstagram`). */
+  async function crearArchivoHistoria() {
+    const blob = await generarImagenHistoria(
+      datosHistoriaMascota({ especie: pet.species, estado: pet.status, descripcion: pet.description ?? "", direccion: pet.address ?? null, fotoUrl: pet.image ?? null }),
       getComputedStyle(document.body).fontFamily,
-    ).then((blob) => new File([blob], `reporty-mascota-${pet.id}.png`, { type: "image/png" }))
-    pendiente.catch(() => { historiaPendiente.current = null })
-    historiaPendiente.current = pendiente
-  }
-
-  /** Comparte la imagen vertical en el menú del sistema o la descarga, con el link copiado. */
-  async function compartirHistoriaMascota() {
-    setError(""); setMessage("")
-    prepararHistoria()
-    try {
-      const resultado = await compartirHistoria(await historiaPendiente.current!, `${window.location.origin}/mascotas/${pet.id}`, navigator, descargarArchivo)
-      if (resultado === "compartida") setMessage("Link copiado: en la historia, tocá el sticker «Enlace» y pegalo.")
-      if (resultado === "descargada") setMessage("Imagen descargada: subila a tu historia. El link quedó copiado para el sticker «Enlace».")
-    } catch { setError("No pudimos armar la imagen. Probá compartir el enlace.") }
+    )
+    return new File([blob], `reporty-mascota-${pet.id}.png`, { type: "image/png" })
   }
   async function found() {
     setPending(true); setError(""); setMessage("")
@@ -123,7 +112,7 @@ export function DetalleMascota({ pet, isOwner, isAdmin = false }: Props) {
             </div>
             <div className="flex min-w-0 items-start gap-3">
               {editing ? <label className="grid min-w-0 flex-1 gap-1 text-sm">Tipo de animal<select aria-label="Tipo de animal" className="min-h-10 rounded-md border bg-background px-3" value={draft.tipoAnimal} onChange={(e) => setDraft({ ...draft, tipoAnimal: e.target.value })} disabled={pending}><option value="perro">Perro</option><option value="gato">Gato</option><option value="otro">Otro</option></select></label> : <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{pet.species} {statusLabel.toLowerCase()}</CardTitle>}
-              <MenuCompartir onAbrir={prepararHistoria} onCompartirEnlace={share} onCompartirHistoria={compartirHistoriaMascota}><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button></MenuCompartir>
+              <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={share} onCompartirHistoria={historia.compartir}><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Compartir publicación" title="Compartir publicación"><Share2 className="size-4" /></Button></MenuCompartir>
               {(isOwner && pet.status === "Perdida" || isAdmin) && <AlertDialog><AlertDialogTrigger asChild><Button type="button" variant="destructive" size="icon" className="size-10 shrink-0" disabled={pending || editing} aria-label="Retirar publicación" title="Retirar publicación"><Trash2 className="size-4" aria-hidden="true" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Retirar publicación?</AlertDialogTitle><AlertDialogDescription>La publicación dejará de aparecer públicamente y se conservará su historial.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={retire}>Retirar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
               {isAdmin && !editing && <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 text-muted-foreground" onClick={() => { setDraft(petDraft(pet)); setError(""); setEditing(true) }} aria-label="Editar publicación" title="Editar publicación"><Pencil className="size-4" /></Button>}
             </div>
