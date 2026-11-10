@@ -350,6 +350,7 @@ async function main() {
   } else {
     // Migrations seed these values; replace them with the authoritative production data.
     localSql("delete from public.presupuesto_moderacion;")
+    localSql("delete from public.report_contact_directory;")
     await removeMigrationSeededBucket(status)
     await loadSqlFile(DATA_FILE)
     // Re-run this idempotent data migration after import so older saved snapshots gain new catalog rows.
