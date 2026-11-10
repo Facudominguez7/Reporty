@@ -1,0 +1,49 @@
+# Análisis estático de seguridad y calidad con CodeQL.
+#
+# Corre en cada PR a main, en cada push a main y una vez por semana (para detectar
+# reglas nuevas sobre código que no cambió). Los hallazgos aparecen en
+# Security → Code scanning y como comentarios en el PR.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analizar:
+    name: Analizar (${{ matrix.lenguaje }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        # TypeScript/JavaScript de la app y los propios workflows de GitHub Actions.
+        lenguaje: [javascript-typescript, actions]
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v7
+
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.lenguaje }}
+          # Sin compilar: CodeQL lee el código fuente directamente.
+          build-mode: none
+          # Suma las consultas de calidad de código a las de seguridad.
+          queries: security-and-quality
+
+      - name: Analizar
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.lenguaje }}"
