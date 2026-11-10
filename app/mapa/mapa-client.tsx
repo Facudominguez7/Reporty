@@ -4,14 +4,13 @@ import { useCallback, useRef, useState, useTransition } from "react"
 import { preconnect } from "react-dom"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { AlertCircle, FilePlus2, List, Plus, Search, SlidersHorizontal, X, PawPrint } from "lucide-react"
+import { AlertCircle, FilePlus2, HeartHandshake, List, Plus, Search, SlidersHorizontal, X, PawPrint } from "lucide-react"
 import { useSearchParams, useServerInsertedHTML } from "next/navigation"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 import { ContactsDialog } from "@/components/contacts-dialog"
-import { BotonDonarEncabezado } from "@/components/donaciones/invitacion-donar"
 import { FiltrosReportes } from "@/components/filtros-reportes"
 import { FiltrosMascotasMapa } from "@/components/filtros-mascotas-mapa"
 import { filtrarMascotasMapa } from "./filtros-mascotas-mapa"
@@ -57,15 +56,19 @@ export function shouldShowMascotasOnboarding(layer: "reportes" | "mascotas", com
 }
 
 /**
- * Botón «Donar» del mapa en celulares y tablets: la misma píldora del encabezado,
- * debajo de contactos y ayuda, porque la fila superior no tiene lugar. Desde `lg` el botón
- * pasa a esa fila y este se oculta; entre `md` y `lg` la ayuda de los marcadores baja para no chocar.
+ * Botón «Donar» del mapa: un círculo verde con el corazón, del mismo tamaño que los botones
+ * de contactos y ayuda, junto a ellos en la fila de arriba.
  */
-export function AccesoDonarMapa() {
+export function BotonDonarMapa() {
   return (
-    <div className="pointer-events-none fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))] z-40 sm:right-6 sm:top-[calc(4.75rem+env(safe-area-inset-top))] lg:hidden">
-      <BotonDonarEncabezado className="pointer-events-auto" />
-    </div>
+    <Link
+      href="/donar"
+      aria-label="Donar a Reporty"
+      title="Donar a Reporty"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <HeartHandshake className="size-4.5" aria-hidden="true" />
+    </Link>
   )
 }
 
@@ -127,7 +130,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
     setShowFilters(open)
   }, [])
 
-  const mapActionLinkClassName = buttonVariants({ size: "lg", variant: "floating" })
+  const mapActionLinkClassName = buttonVariants({ size: "sm", variant: "floating" })
 
   return (
     <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
@@ -136,12 +139,11 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
       <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
         <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
-          <BotonDonarEncabezado className="hidden lg:inline-flex" />
+          <BotonDonarMapa />
           <ContactsDialog />
           <HowToUseDialog layer={layer} />
         </div>
       </div>
-      <AccesoDonarMapa />
       <div className="absolute inset-0 z-0">
         {error ? (
           <div className="flex h-full items-center justify-center p-5">
@@ -158,9 +160,10 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
       {layer === "mascotas" && !error && <PetLayerError error={petError} />}
 
-      <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)]">
+      {/* Hasta lg se corre a la izquierda para quedar en el hueco entre filtros y donar, contactos y ayuda. */}
+      <div className="pointer-events-none absolute left-[calc(50%-1.75rem)] top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)] sm:left-[calc(50%-6.5rem)] lg:left-1/2">
         <div className="pointer-events-auto flex rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur" role="group" aria-label="Capa del mapa">
-          {MAP_LAYER_OPTIONS.map(([value, label]) => <Button key={value} type="button" size="sm" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => handleLayerChange(value)}>{label}</Button>)}
+          {MAP_LAYER_OPTIONS.map(([value, label]) => <Button key={value} type="button" size="sm" className="px-2.5 sm:px-3.5" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => handleLayerChange(value)}>{label}</Button>)}
         </div>
       </div>
 
@@ -224,9 +227,9 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
         Términos y condiciones
       </Link>
 
-      <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-30 flex flex-col items-end gap-3 sm:right-6">
+      <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-30 flex flex-col items-end gap-2 sm:right-6">
         {showActions && (
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-1.5">
             <Link href="/reportes/nuevo" className={mapActionLinkClassName}>
               <FilePlus2 className="size-4" aria-hidden="true" />
               Crear reporte
