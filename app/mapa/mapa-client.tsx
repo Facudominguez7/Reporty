@@ -57,12 +57,13 @@ export function shouldShowMascotasOnboarding(layer: "reportes" | "mascotas", com
 }
 
 /**
- * Botón «Donar» del mapa: la misma píldora del encabezado, arriba a la derecha y debajo
- * de contactos y ayuda, porque la fila superior ya no tiene lugar en el celular.
+ * Botón «Donar» del mapa en celulares y tablets: la misma píldora del encabezado,
+ * debajo de contactos y ayuda, porque la fila superior no tiene lugar. Desde `lg` el botón
+ * pasa a esa fila y este se oculta; entre `md` y `lg` la ayuda de los marcadores baja para no chocar.
  */
 export function AccesoDonarMapa() {
   return (
-    <div className="pointer-events-none fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))] z-40 sm:right-6 sm:top-[calc(4.75rem+env(safe-area-inset-top))]">
+    <div className="pointer-events-none fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))] z-40 sm:right-6 sm:top-[calc(4.75rem+env(safe-area-inset-top))] lg:hidden">
       <BotonDonarEncabezado className="pointer-events-auto" />
     </div>
   )
@@ -135,6 +136,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
       <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
         <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
+          <BotonDonarEncabezado className="hidden lg:inline-flex" />
           <ContactsDialog />
           <HowToUseDialog layer={layer} />
         </div>

@@ -30,6 +30,7 @@ describe("AccesoDonarMapa", () => {
   it("muestra el botón Donar arriba a la derecha, debajo de contactos y ayuda", () => {
     const markup = renderToStaticMarkup(createElement(AccesoDonarMapa))
     expect(markup).toContain("fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))]")
+    expect(markup).toContain("lg:hidden")
     expect(markup).toMatch(/<a [^>]*href="\/donar"[^>]*>(?:(?!<\/a>).)*Donar<\/a>/)
   })
 })
