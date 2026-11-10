@@ -351,7 +351,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     const tileLayer = L.tileLayer(MAP_TILE_URL, {
       attribution: MAP_TILE_ATTRIBUTION,
     })
-    // Reporty no tiene footer: los enlaces legales viven en la atribución del mapa.
+    // Reporty no tiene footer: el enlace a los términos vive en la atribución del mapa.
     map.attributionControl.addAttribution(ATRIBUCION_LEGAL_MAPA)
 
     const clusterGroup = L.markerClusterGroup({

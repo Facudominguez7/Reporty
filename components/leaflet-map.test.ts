@@ -69,7 +69,7 @@ describe("LeafletMap initial view", () => {
     render([report])
     expect(mocks.map.setView).toHaveBeenCalledOnce()
     expect(mocks.map.setView).toHaveBeenCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
-    expect(mocks.map.attributionControl.addAttribution).toHaveBeenCalledWith('<a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a>')
+    expect(mocks.map.attributionControl.addAttribution).toHaveBeenCalledWith('<a href="/terminos">Términos y condiciones</a>')
     expect(mocks.calls).toEqual(["tileLayer", "setView", "addLayer"])
     expect(mocks.marker.bindPopup).toHaveBeenCalledOnce()
   })

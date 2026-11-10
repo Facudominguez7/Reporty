@@ -435,13 +435,6 @@ body:not(:has(.admin-workspace)),
   z-index: 2 !important;
 }
 
-/* En /mapa la navegación inferior fija tapa la esquina del mapa: los créditos y los
-   enlaces legales de la atribución suben por encima de ella. Va fuera de las capas
-   para ganarle a leaflet.css. */
-[data-mapa-principal] .leaflet-bottom {
-  bottom: var(--bottom-nav-space);
-}
-
 [role="dialog"],
 [role="alertdialog"],
 [role="menu"],

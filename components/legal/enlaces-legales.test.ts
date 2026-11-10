@@ -37,19 +37,12 @@ describe("EnlacesLegales", () => {
 })
 
 describe("atribución del mapa", () => {
-  it("enlaza los términos y la privacidad", () => {
-    expect(ATRIBUCION_LEGAL_MAPA).toBe('<a href="/terminos">Términos</a> · <a href="/privacidad">Privacidad</a>')
+  it("enlaza solo los términos y condiciones", () => {
+    expect(ATRIBUCION_LEGAL_MAPA).toBe('<a href="/terminos">Términos y condiciones</a>')
   })
 
   it("se agrega al mapa principal junto a los créditos de los mosaicos", () => {
     const mapa = readFileSync(new URL("../leaflet-map.tsx", import.meta.url), "utf8")
     expect(mapa).toContain("map.attributionControl.addAttribution(ATRIBUCION_LEGAL_MAPA)")
-  })
-
-  it("queda por encima de la navegación inferior en /mapa, para que se vea", () => {
-    const mapa = readFileSync(new URL("../../app/mapa/mapa-client.tsx", import.meta.url), "utf8")
-    const estilos = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8")
-    expect(mapa).toMatch(/<div data-mapa-principal className="relative h-\[100dvh\]/)
-    expect(estilos).toMatch(/\[data-mapa-principal\] \.leaflet-bottom \{\s*bottom: var\(--bottom-nav-space\);/)
   })
 })
