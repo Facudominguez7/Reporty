@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 import { ContactsDialog } from "@/components/contacts-dialog"
+import { BotonDonarEncabezado } from "@/components/donaciones/invitacion-donar"
 import { FiltrosReportes } from "@/components/filtros-reportes"
 import { FiltrosMascotasMapa } from "@/components/filtros-mascotas-mapa"
 import { filtrarMascotasMapa } from "./filtros-mascotas-mapa"
@@ -53,6 +54,18 @@ export const MAP_LAYER_OPTIONS = [["reportes", "Incidentes"], ["mascotas", "Masc
 
 export function shouldShowMascotasOnboarding(layer: "reportes" | "mascotas", completed: boolean) {
   return layer === "mascotas" && !completed
+}
+
+/**
+ * Botón «Donar» del mapa: la misma píldora del encabezado, arriba a la derecha y debajo
+ * de contactos y ayuda, porque la fila superior ya no tiene lugar en el celular.
+ */
+export function AccesoDonarMapa() {
+  return (
+    <div className="pointer-events-none fixed right-2 top-[calc(4.25rem+env(safe-area-inset-top))] z-40 sm:right-6 sm:top-[calc(4.75rem+env(safe-area-inset-top))]">
+      <BotonDonarEncabezado className="pointer-events-auto" />
+    </div>
+  )
 }
 
 export function PetLayerError({ error }: { error: string | null }) {
@@ -126,6 +139,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
           <HowToUseDialog layer={layer} />
         </div>
       </div>
+      <AccesoDonarMapa />
       <div className="absolute inset-0 z-0">
         {error ? (
           <div className="flex h-full items-center justify-center p-5">
