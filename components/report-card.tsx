@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
+import { ChipReporte, TONO_CATEGORIA, tonoEstado, tonoPrioridad } from "@/components/report-detail/chip-reporte"
 import { Card, CardContent } from "@/components/ui/card"
 import { ChipEstadoOperativo } from "@/components/cuadrillas/chip-estado-operativo"
 import type { EstadoOperativo } from "@/lib/authz/catalog"
@@ -140,18 +140,9 @@ export function ReportCard({
 
         <CardContent className="flex h-full min-w-0 flex-col gap-3 pt-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Badge variant={getPriorityVariant(prioridad)} className="gap-1">
-              {getPriorityIcon(prioridad)}
-              {prioridad}
-            </Badge>
-            <Badge variant={getStatusVariant(estado)} className="gap-1">
-              {getStatusIcon(estado)}
-              {estado}
-            </Badge>
-            <Badge variant="category" className="gap-1">
-              {getCategoryIcon(categoria)}
-              {categoria}
-            </Badge>
+            <ChipReporte etiqueta="Prioridad" tono={tonoPrioridad(prioridad)} icono={getPriorityIcon(prioridad)} valor={prioridad} />
+            <ChipReporte etiqueta="Estado" tono={tonoEstado(estado)} icono={getStatusIcon(estado)} valor={estado} />
+            <ChipReporte etiqueta="Categoría" tono={TONO_CATEGORIA} icono={getCategoryIcon(categoria)} valor={categoria} />
             <ChipEstadoOperativo estadoOperativo={estadoOperativo} cuadrillaNombre={cuadrillaNombre} />
           </div>
 
