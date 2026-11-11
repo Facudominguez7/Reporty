@@ -72,7 +72,7 @@ export function ContactsDialog() {
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { setResult(null); setOpen(nextOpen) }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="size-9 p-0 gap-1.5 rounded-full shadow-sm sm:size-auto sm:px-3.5">
+        <Button variant="liquid-glass" size="sm" className="size-9 p-0 gap-1.5 sm:size-auto sm:px-3.5">
           <Phone className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Contactos</span>
           <span className="sr-only sm:hidden">Contactos</span>

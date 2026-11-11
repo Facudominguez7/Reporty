@@ -1,10 +1,10 @@
 "use client"
 
-import { useCallback, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { preconnect } from "react-dom"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { AlertCircle, FilePlus2, HeartHandshake, List, Plus, Search, SlidersHorizontal, X, PawPrint } from "lucide-react"
+import { AlertCircle, CircleHelp, CircleX, FilePlus2, HeartHandshake, List, Plus, Search, SlidersHorizontal, X, PawPrint } from "lucide-react"
 import { useSearchParams, useServerInsertedHTML } from "next/navigation"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -69,6 +69,52 @@ export function BotonDonarMapa() {
     >
       <HeartHandshake className="size-4.5" aria-hidden="true" />
     </Link>
+  )
+}
+
+const MAP_ACTIONS_HIDE_DELAY = 4200
+
+function MapHeaderActions({ layer }: { layer: "reportes" | "mascotas" }) {
+  const [expanded, setExpanded] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }, [])
+
+  const toggleActions = () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (expanded) {
+      setExpanded(false)
+      return
+    }
+    setExpanded(true)
+    timerRef.current = setTimeout(() => setExpanded(false), MAP_ACTIONS_HIDE_DELAY)
+  }
+
+  return (
+    <div className="relative flex min-w-9 items-center justify-end sm:hidden">
+      <div
+        className={`absolute right-0 top-[calc(100%+0.5rem)] flex origin-top-right flex-col items-end gap-2 transition-all duration-300 ease-out ${expanded ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-2 scale-90 opacity-0"}`}
+        aria-hidden={!expanded}
+        inert={!expanded}
+      >
+        <BotonDonarMapa />
+        <ContactsDialog />
+        <HowToUseDialog layer={layer} />
+      </div>
+      <Button
+        type="button"
+        variant="liquid-glass"
+        size="icon-sm"
+        className="relative transition-transform duration-300"
+        aria-label={expanded ? "Cerrar acciones del mapa" : "Mostrar acciones del mapa"}
+        aria-expanded={expanded}
+        onClick={toggleActions}
+      >
+        {expanded ? <CircleX className="size-4" aria-hidden="true" /> : <CircleHelp className="size-4" aria-hidden="true" />}
+      </Button>
+    </div>
   )
 }
 
@@ -138,10 +184,13 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
       <OnboardingModal />
       <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
-        <div className="pointer-events-auto flex items-center gap-1 sm:gap-2">
+        <div className="pointer-events-auto hidden items-center gap-1 sm:flex sm:gap-2">
           <BotonDonarMapa />
           <ContactsDialog />
           <HowToUseDialog layer={layer} />
+        </div>
+        <div className="pointer-events-auto sm:hidden">
+          <MapHeaderActions layer={layer} />
         </div>
       </div>
       <div className="absolute inset-0 z-0">
@@ -160,9 +209,9 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
       {layer === "mascotas" && !error && <PetLayerError error={petError} />}
 
-      {/* Hasta lg se corre a la izquierda para quedar en el hueco entre filtros y donar, contactos y ayuda. */}
-      <div className="pointer-events-none absolute left-[calc(50%-1.75rem)] top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)] sm:left-[calc(50%-6.5rem)] lg:left-1/2">
-        <div className="pointer-events-auto flex rounded-full border border-border bg-card/95 p-1 shadow-lg backdrop-blur" role="group" aria-label="Capa del mapa">
+      {/* En mobile queda centrado entre filtros y ayuda; en desktop vuelve al centro del mapa. */}
+      <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)] sm:left-[calc(50%-6.5rem)] lg:left-1/2">
+        <div className="pointer-events-auto flex rounded-full border border-white/70 bg-white/45 p-1 shadow-[0_8px_24px_rgb(15_23_42_/_0.16)] backdrop-blur-xl backdrop-saturate-150" role="group" aria-label="Capa del mapa">
           {MAP_LAYER_OPTIONS.map(([value, label]) => <Button key={value} type="button" size="sm" className="px-2.5 sm:px-3.5" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => handleLayerChange(value)}>{label}</Button>)}
         </div>
       </div>

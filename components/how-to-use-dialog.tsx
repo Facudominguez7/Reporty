@@ -36,9 +36,9 @@ export function HowToUseDialog({ layer }: { layer?: "reportes" | "mascotas" }) {
       <DialogTrigger asChild>
         <Button
           type="button"
-          variant="outline"
+          variant="liquid-glass"
           size="sm"
-          className="size-9 p-0 gap-1.5 rounded-full shadow-sm sm:size-auto sm:px-3.5"
+          className="size-9 p-0 gap-1.5 sm:size-auto sm:px-3.5"
         >
           <CircleHelp className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Cómo usar</span>

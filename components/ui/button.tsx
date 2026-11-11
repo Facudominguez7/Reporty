@@ -19,6 +19,8 @@ const buttonVariants = cva(
           "border border-border bg-card text-card-foreground hover:bg-muted",
         outline:
           "border border-border bg-background text-foreground hover:bg-muted",
+        "liquid-glass":
+          "border border-white/70 bg-white/55 text-foreground shadow-[0_8px_24px_rgb(15_23_42_/_0.16)] backdrop-blur-xl backdrop-saturate-150 hover:border-white/90 hover:bg-white/75 hover:shadow-[0_10px_28px_rgb(15_23_42_/_0.2)] focus-visible:ring-primary/70",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/90",
         floating:
