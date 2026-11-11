@@ -18,14 +18,13 @@ import dayjs from "dayjs"
 import utc from "dayjs/plugin/utc"
 import timezone from "dayjs/plugin/timezone"
 import {
-  AlertTriangle,
   Camera,
   CheckCircle2,
   Clock,
-  Flag,
   FilePlus2,
   Images,
   MessageCircle,
+  LoaderCircle,
   ShieldCheck,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -60,11 +59,8 @@ import {
 } from "@/lib/media/report-images"
 import { optimizeReportImage } from "@/lib/media/optimize-report-image"
 import {
-  FRASES_IMPUGNACION,
   FRASES_REPARACION,
-  PLACEHOLDER_FRASE_IMPUGNACION,
   PLACEHOLDER_FRASE_REPARACION,
-  PREGUNTA_POR_QUE_NO_ESTA_REPARADO,
   PREGUNTA_QUE_SE_ARREGLO,
 } from "@/lib/reportes/frases-reparacion"
 import type {
@@ -95,7 +91,6 @@ export type ResultadoAccionReparacion = { success: boolean; error?: string }
 /** Acciones server-side que la ficha delega; el cliente nunca decide el resultado. */
 export type AccionesEvidenciaReparacion = {
   onConfirmar: () => Promise<ResultadoAccionReparacion>
-  onImpugnar: (motivoClave: string) => Promise<ResultadoAccionReparacion>
   onInformar: (
     fraseClave: string,
     imagen: File,
@@ -268,111 +263,6 @@ function AvisoParticipacion({ motivo }: { motivo: NonNullable<EvidenciaReparacio
 }
 
 /**
- * Aviso de impugnación pendiente: la verificación queda en pausa hasta que un
- * administrador la revise (S4, S5). Nunca nombra a quien impugnó.
- */
-function AvisoImpugnacionPendiente() {
-  const tituloId = useId()
-  return (
-    <div
-      role="group"
-      aria-labelledby={tituloId}
-      className="tone-warning-card flex items-start gap-2.5 rounded-[var(--radius)] border p-3"
-    >
-      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <div className="space-y-1">
-        <p id={tituloId} className="text-sm font-semibold">
-          Impugnación pendiente
-        </p>
-        <p className="text-xs leading-relaxed">
-          La verificación está en pausa hasta que un administrador revise la
-          impugnación. Si la acepta, la evidencia se rechaza y el reporte sigue
-          Pendiente; si la descarta, vuelven a contar las confirmaciones.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Diálogo de impugnación: el motivo se elige de la lista cerrada de S17 y se valida
- * en el servidor antes de registrar la impugnación. Exportado para que la prueba del
- * formulario pueda renderizarlo abierto.
- */
-export function DialogoImpugnar({
-  abierto,
-  cambiandoAbierto,
-  enviando,
-  motivo,
-  onMotivo,
-  onEnviar,
-}: {
-  abierto: boolean
-  cambiandoAbierto: (abierto: boolean) => void
-  enviando: boolean
-  /** Clave de la frase elegida; vacío mientras no se eligió ninguna. */
-  motivo: string
-  onMotivo: (motivo: string) => void
-  onEnviar: () => void
-}) {
-  const motivoId = useId()
-  return (
-    <Dialog open={abierto} onOpenChange={cambiandoAbierto}>
-      {/* La evidencia vive en una hoja inferior con !z-[70]: el diálogo sube a 80. */}
-      <DialogContent className="z-[80]" overlayClassName="z-[80]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="tone-danger-soft-inline inline-flex size-8 shrink-0 items-center justify-center rounded-xl">
-              <Flag className="size-4" aria-hidden="true" />
-            </span>
-            Impugnar la reparación
-          </DialogTitle>
-          <DialogDescription>
-            Elegí por qué la reparación no está hecha. Administración revisa la
-            impugnación antes de validar la evidencia.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <label htmlFor={motivoId} className="text-sm font-medium">
-            {PREGUNTA_POR_QUE_NO_ESTA_REPARADO}
-          </label>
-          <select
-            id={motivoId}
-            value={motivo}
-            onChange={(event) => onMotivo(event.target.value)}
-            disabled={enviando}
-            className={ESTILO_SELECT_FRASE}
-          >
-            <option value="">{PLACEHOLDER_FRASE_IMPUGNACION}</option>
-            {FRASES_IMPUGNACION.map(({ key, label }) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <DialogFooter className="gap-2">
-          <DialogClose asChild>
-            <Button variant="outline" type="button" disabled={enviando}>
-              Cancelar
-            </Button>
-          </DialogClose>
-          <Button
-            type="button"
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={onEnviar}
-            disabled={enviando || motivo.length === 0}
-          >
-            <Flag className="mr-2 size-4" aria-hidden="true" />
-            {enviando ? "Enviando..." : "Enviar impugnación"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/**
  * Estado de la evidencia con sus acciones: informada, en verificación o reparada.
  * Cada estado tiene su propio texto y su propio ícono, así nunca se presenta uno
  * como otro (S11).
@@ -388,9 +278,6 @@ function TarjetaEstadoEvidencia({
 }) {
   const router = useRouter()
   const [confirmando, setConfirmando] = useState(false)
-  const [impugnando, setImpugnando] = useState(false)
-  const [dialogoAbierto, setDialogoAbierto] = useState(false)
-  const [motivo, setMotivo] = useState("")
 
   const autor = nombreAutor(evidencia)
   const fechaInforme = formatearFechaHora(evidencia.informadaAt)
@@ -398,7 +285,6 @@ function TarjetaEstadoEvidencia({
   // Una cuenta deja una sola verificación por evidencia (S7): quien ya confirmó o
   // impugnó no puede cambiar de tipo, así que solo se le muestra lo que registró.
   const puedeConfirmar = participacion.puede && participacion.yaVerifico === null
-  const puedeImpugnar = participacion.puede && participacion.yaVerifico === null
 
   const confirmar = async () => {
     setConfirmando(true)
@@ -417,28 +303,6 @@ function TarjetaEstadoEvidencia({
       toast.error("No pudimos registrar tu confirmación.")
     } finally {
       setConfirmando(false)
-    }
-  }
-
-  const impugnar = async () => {
-    setImpugnando(true)
-    try {
-      const resultado = await acciones.onImpugnar(motivo)
-      if (!resultado.success) {
-        toast.error(resultado.error ?? "No pudimos registrar tu impugnación.")
-        return
-      }
-      toast.success("Impugnación enviada", {
-        description: "Administración la revisa antes de validar la reparación.",
-      })
-      setMotivo("")
-      setDialogoAbierto(false)
-      router.refresh()
-    } catch (error) {
-      console.error("Error al impugnar la reparación:", error)
-      toast.error("No pudimos registrar tu impugnación.")
-    } finally {
-      setImpugnando(false)
     }
   }
 
@@ -497,30 +361,11 @@ function TarjetaEstadoEvidencia({
       <CardContent className="space-y-3 pt-0">
         <ProgresoConfirmaciones hechas={evidencia.confirmaciones} umbral={umbral} />
 
-        {/* Una reparación ya validada no está en pausa: sus impugnaciones quedaron resueltas (S5). */}
-        {!reparado && evidencia.impugnacionesPendientes > 0 && <AvisoImpugnacionPendiente />}
-
-        {!reparado && participacion.puede && (
-          <div className="grid grid-cols-2 gap-2">
-            {puedeConfirmar && (
-              <Button type="button" className="min-w-0 whitespace-normal px-2 text-xs leading-tight sm:text-sm" onClick={confirmar} disabled={confirmando || impugnando}>
-                <CheckCircle2 className="mr-1.5 size-4 shrink-0" aria-hidden="true" />
-                {confirmando ? "Confirmando..." : "Confirmar reparación"}
-              </Button>
-            )}
-            {puedeImpugnar && (
-              <Button
-                type="button"
-                variant="outline"
-                className="min-w-0 whitespace-normal border-destructive/45 px-2 text-xs leading-tight text-destructive hover:bg-destructive/10 hover:text-destructive sm:text-sm"
-                onClick={() => setDialogoAbierto(true)}
-                disabled={confirmando || impugnando}
-              >
-                <Flag className="mr-1.5 size-4 shrink-0" aria-hidden="true" />
-                Impugnar
-              </Button>
-            )}
-          </div>
+        {!reparado && puedeConfirmar && (
+          <Button type="button" className="w-full" onClick={confirmar} disabled={confirmando}>
+            <CheckCircle2 className="mr-2 size-4" aria-hidden="true" />
+            {confirmando ? "Confirmando..." : "Confirmar reparación"}
+          </Button>
         )}
 
         {!reparado && participacion.yaVerifico === "confirmacion" && (
@@ -529,25 +374,10 @@ function TarjetaEstadoEvidencia({
           </p>
         )}
 
-        {!reparado && participacion.yaVerifico === "impugnacion" && (
-          <p className="text-xs text-muted-foreground">
-            Tu impugnación está pendiente de revisión. La verificación sigue en pausa
-            hasta que un administrador la resuelva.
-          </p>
-        )}
-
         {!reparado && !participacion.puede && participacion.motivo && (
           <AvisoParticipacion motivo={participacion.motivo} />
         )}
 
-        <DialogoImpugnar
-          abierto={dialogoAbierto}
-          cambiandoAbierto={setDialogoAbierto}
-          enviando={impugnando}
-          motivo={motivo}
-          onMotivo={setMotivo}
-          onEnviar={impugnar}
-        />
       </CardContent>
     </Card>
   )
@@ -738,6 +568,19 @@ function FormularioEvidenciaReparacion({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {enviando && (
+          <div className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center bg-primary px-6 py-10 text-primary-foreground">
+            <div role="status" aria-live="polite" aria-busy="true" className="flex max-w-md flex-col items-center gap-5 text-center">
+              <LoaderCircle className="size-12 animate-spin" aria-hidden="true" />
+              <div className="space-y-2">
+                <h2 className="text-2xl font-semibold">La IA está analizando tu foto</h2>
+                <p className="text-sm leading-relaxed opacity-90">
+                  Estamos revisando la imagen y terminando de enviar tu evidencia. Puede demorar unos segundos; dejá esta pantalla abierta.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

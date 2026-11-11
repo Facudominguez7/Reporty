@@ -98,7 +98,6 @@ import {
   cambiarEstadoAdminAction,
   confirmarReparacionAction,
   crearComentarioAction,
-  impugnarReparacionAction,
   informarReparacionAction,
   quitarFotoReporteAdminAction,
   reemplazarFotoReporteAdminAction,
@@ -350,15 +349,6 @@ export function ReporteDetalleClient({
     return confirmarReparacionAction(reporte.id, evidenciaId);
   };
 
-  /** Impugna la reparación; el motivo se elige de la lista cerrada y lo valida el servidor (S4, S5, S17). */
-  const impugnarEvidenciaReparacion = async (motivoClave: string): Promise<ResultadoAccionReparacion> => {
-    const evidenciaId = evidenciaReparacion?.evidencia?.evidenciaId;
-    if (!reporte || !evidenciaId) {
-      return { success: false, error: "No pudimos identificar la evidencia de reparación." };
-    }
-    return impugnarReparacionAction(reporte.id, evidenciaId, motivoClave);
-  };
-
   /**
    * Informa una reparación con su foto y la frase elegida de la lista; el pipeline
    * existente la manda a moderación (S2, S13, S16).
@@ -374,7 +364,6 @@ export function ReporteDetalleClient({
 
   const accionesReparacion: AccionesEvidenciaReparacion = {
     onConfirmar: confirmarEvidenciaReparacion,
-    onImpugnar: impugnarEvidenciaReparacion,
     onInformar: informarEvidenciaReparacion,
   };
 
@@ -726,7 +715,11 @@ export function ReporteDetalleClient({
       : evidenciaReparacion.evidencia.estado === "informada"
         ? "La foto está en moderación. El reporte sigue Pendiente hasta que la comunidad confirme."
         : `La comunidad está confirmando la reparación. Con ${evidenciaReparacion?.umbral ?? 3} confirmaciones el reporte pasa a Reparado.`;
-  const showVoteButtons = (!currentUser || currentUser.is_anonymous || puedeVotar) && !isAdmin && !isReporteCerrado;
+  const showVoteButtons = (!currentUser || currentUser.is_anonymous || puedeVotar)
+    && currentUser?.id !== reporte.usuario_id
+    && !isAdmin
+    && !isReporteCerrado;
+  const showShareFooter = currentUser?.id === reporte.usuario_id;
   const showVoteFooter = Boolean(
     isReporteCerrado ||
     currentUser?.id === reporte.usuario_id ||
@@ -867,7 +860,7 @@ export function ReporteDetalleClient({
                     <CardTitle className="min-w-0 flex-1 break-words text-xl font-bold tracking-tight md:text-2xl">{reporte.titulo}</CardTitle>
                   )}
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {!showVoteButtons && (
+                    {!showVoteButtons && !showShareFooter && (
                       <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={handleShareReport} onCompartirHistoria={historia.compartir}>
                         <Button variant="outline" size="icon" className="size-10" aria-label="Compartir reporte" title="Compartir reporte">
                           <Share2 className="size-4" />
@@ -1026,8 +1019,8 @@ export function ReporteDetalleClient({
                   <div className="mt-3">
                     <hr className="mb-2 border-border" />
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {showVoteButtons && (
-                        <div role="group" aria-label="Acciones sobre el reporte" className="mx-auto grid w-full max-w-56 grid-cols-2 justify-items-center gap-4">
+                      {(showVoteButtons || showShareFooter) && (
+                        <div role="group" aria-label="Acciones sobre el reporte" className={`mx-auto grid w-full max-w-56 justify-items-center gap-4 ${showVoteButtons ? "grid-cols-2" : "grid-cols-1"}`}>
                           <MenuCompartir onAbrir={historia.preparar} onCompartirEnlace={handleShareReport} onCompartirHistoria={historia.compartir}>
                             <Button
                               variant="ghost"

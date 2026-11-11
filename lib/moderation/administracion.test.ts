@@ -86,8 +86,8 @@ describe("frontera administrativa", () => {
   it("lista acotada ordenada no serializa secretos ni rutas", async () => {
     const lista = await listarImagenesAdministrativas(2)
     expect(consulta.range).toHaveBeenCalledWith(40, 59)
-    expect(consulta.order.mock.calls).toContainEqual(["creado_at", { ascending: true }])
-    expect(consulta.order.mock.calls).toContainEqual(["id", { ascending: true }])
+    expect(consulta.order.mock.calls).toContainEqual(["creado_at", { ascending: false }])
+    expect(consulta.order.mock.calls).toContainEqual(["id", { ascending: false }])
     expect(consulta.select.mock.calls[0][0]).not.toContain("*")
     expect(JSON.stringify(lista)).not.toMatch(/privado|token|sha256/)
   })

@@ -25,10 +25,8 @@ import {
   informarReparacionWorkflow,
   puedeInformarReparacion,
   resolverEvidenciaReparacionWorkflow,
-  resolverImpugnacionReparacionWorkflow,
   verificarReparacionWorkflow,
   type AccionEvidenciaAdministrativa,
-  type DecisionImpugnacionReparacion,
   type TipoVerificacionReparacion,
 } from "@/lib/use-cases/reportes/evidencia-reparacion"
 import { canParticipateInCommunity, getUserRoleContext, puedeOperarCuadrillas } from "@/lib/authz/roles"
@@ -538,47 +536,5 @@ export async function resolverEvidenciaReparacionAdminAction(
     return resultado
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos resolver la evidencia.") }
-  }
-}
-
-/**
- * Acepta o descarta una impugnación pendiente (S5, S8). Aceptarla rechaza la evidencia y
- * el reporte sigue pendiente; descartarla reevalúa el umbral de confirmaciones.
- *
- * @param reporteId - Reporte de la evidencia, usado para revalidar su ficha.
- * @param verificacionId - Impugnación pendiente.
- * @param decision - «aceptada» o «descartada».
- * @param motivo - Motivo opcional de la decisión administrativa.
- * @returns Resultado durable de la impugnación, o el error en español.
- */
-export async function resolverImpugnacionReparacionAdminAction(
-  reporteId: number,
-  verificacionId: string,
-  decision: DecisionImpugnacionReparacion,
-  motivo?: string,
-) {
-  try {
-    const parsedReportId = reportIdSchema.parse(reporteId)
-    const parsedVerificacionId = evidenciaIdSchema.safeParse(verificacionId)
-    if (!parsedVerificacionId.success) return { success: false as const, error: MENSAJE_EVIDENCIA_INVALIDA }
-    if (decision !== "aceptada" && decision !== "descartada") {
-      return { success: false as const, error: "Elegí aceptar o descartar la impugnación." }
-    }
-
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user || user.is_anonymous) {
-      return { success: false as const, error: "Tenés que iniciar sesión para revisar la evidencia." }
-    }
-
-    const resultado = await resolverImpugnacionReparacionWorkflow(
-      createAdminClient(), parsedVerificacionId.data, user.id, decision, (motivo ?? "").trim() || undefined,
-    )
-    if (resultado.success) revalidatePath(`/reportes/${parsedReportId}`)
-    return resultado
-  } catch (error) {
-    return { success: false as const, error: mutationErrorMessage(error, "No pudimos resolver la impugnación.") }
   }
 }

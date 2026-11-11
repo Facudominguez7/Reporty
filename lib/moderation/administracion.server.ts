@@ -100,7 +100,7 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
   const { data, error } = await servicio.from("moderacion_imagenes")
     .select("id,reporte_id,decision,estado_publicacion,motivos,creado_at,reemplaza_foto_id,destino")
     .in("estado_publicacion", terminales ? ["publicada", "rechazada"] : ["pendiente", "reclamada", "publicando"])
-    .order("creado_at", { ascending: true }).order("id", { ascending: true }).range(indice * 20, indice * 20 + 19)
+    .order("creado_at", { ascending: false }).order("id", { ascending: false }).range(indice * 20, indice * 20 + 19)
   if (error) fallar(503)
   const reportRows = await Promise.all((data ?? []).map(async (fila) => ({
     id: fila.id, reporteId: fila.reporte_id, decision: fila.decision, estado: fila.estado_publicacion,
@@ -113,6 +113,7 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
   const petQuery = await servicio.from("mascotas_fotos_moderacion")
     .select("id,decision,estado,estado_publicacion,motivos,creado_at,mascota_id,tipo_animal")
     .in("estado", terminales ? ["aprobada", "rechazada"] : ["pendiente", "aprobada"])
+    .order("creado_at", { ascending: false }).order("id", { ascending: false })
     .range(indice * 20, indice * 20 + 19)
   if (petQuery.error) fallar(503)
   const petRows = (petQuery.data ?? []).filter((fila) => !("reporte_id" in fila) && (terminales
@@ -129,7 +130,7 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
     const { data: mascotas, error: mascotasError } = await servicio.from("mascotas_perdidas")
       .select("id,tipo_animal,descripcion,lat,lon,telefono,estado,publicada_at")
       .is("retirada_at", null).eq("moderacion_estado", "aprobada")
-      .order("publicada_at", { ascending: true }).order("id", { ascending: true }).range(indice * 20, indice * 20 + 19)
+      .order("publicada_at", { ascending: false }).order("id", { ascending: false }).range(indice * 20, indice * 20 + 19)
     if (mascotasError) fallar(503)
     editablePets = (mascotas ?? []).filter((mascota) => Number.isSafeInteger(mascota.id) && typeof mascota.publicada_at === "string").map((mascota) => ({
       id: `mascota-${mascota.id}`, mascotaId: mascota.id, reporteId: 0, decision: "APPROVED", estado: "publicada",
@@ -138,7 +139,7 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
         lon: mascota.lon, telefono: mascota.telefono, estado: mascota.estado as "perdida" | "encontrada" },
     }))
   }
-  return [...reportRows, ...petRows, ...editablePets, ...noticeRows].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id))
+  return [...reportRows, ...petRows, ...editablePets, ...noticeRows].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id))
 }
 
 /** Proyección administrativa sin email ni token del outbox. */

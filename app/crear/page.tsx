@@ -33,13 +33,13 @@ export default function CrearPage() {
               <Link
                 key={href}
                 href={href}
-                className="group flex min-h-56 flex-col items-center justify-center gap-5 rounded-3xl border border-border bg-card p-6 text-center text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-64 sm:p-8"
+                className="group flex min-h-44 flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-card p-4 text-center text-foreground shadow-sm transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-64 sm:gap-5 sm:rounded-3xl sm:p-8"
               >
-                <span className="flex size-28 items-center justify-center rounded-3xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 sm:size-36" aria-hidden="true">
-                  <Icon className="size-20 sm:size-28" />
+                <span className="flex size-20 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 sm:size-36 sm:rounded-3xl" aria-hidden="true">
+                  <Icon className="size-12 sm:size-28" />
                 </span>
                 <div className="max-w-xs space-y-1.5">
-                  <span className="block text-lg font-semibold leading-snug sm:text-xl">{title}</span>
+                  <span className="block text-base font-semibold leading-snug sm:text-xl">{title}</span>
                   <span className="block text-sm leading-5 text-muted-foreground">{description}</span>
                 </div>
               </Link>

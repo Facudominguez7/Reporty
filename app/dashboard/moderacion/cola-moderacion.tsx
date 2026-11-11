@@ -11,6 +11,18 @@ import type { ImagenAdministrativa, OperacionRevision } from "@/lib/moderation/a
 import { conciliarAvisoMascotaAction, revisarImagenAction, reintentarAvisosMascotaAction } from "./actions"
 import { EditorMascotaAdmin } from "./mascota-admin-editor"
 
+const dateFormatter = new Intl.DateTimeFormat("es-AR", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  hourCycle: "h23",
+  timeZone: "America/Argentina/Buenos_Aires",
+})
+
+function formatModerationDate(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "Fecha no disponible" : dateFormatter.format(date)
+}
+
 /** Presenta una evidencia sin rutas privadas y permite recuperar solo mediante intención explícita. */
 function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
   const [pendiente, iniciarTransicion] = useTransition()
@@ -38,7 +50,7 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
   return <Card>
     <CardHeader>
       <CardTitle>{mascota ? imagen.soloAviso ? `Aviso de estado · mascota ${imagen.tipoAnimal ?? ""} · #${imagen.mascotaId}` : `Mascota ${imagen.tipoAnimal ? `· ${imagen.tipoAnimal}` : ""} · revisión de foto` : imagen.decision !== "REJECTED" ? <Link href={`/reportes/${imagen.reporteId}`}>Reporte #{imagen.reporteId}</Link> : `Reporte #${imagen.reporteId} · retirado`}</CardTitle>
-      <CardDescription><time dateTime={imagen.fecha}>{imagen.fecha}</time></CardDescription>
+      <CardDescription><time dateTime={imagen.fecha}>{formatModerationDate(imagen.fecha)}</time></CardDescription>
       <Badge variant="secondary">{etiquetas[imagen.estado] ?? "Requiere atención"}</Badge>
     </CardHeader>
     <CardContent className="flex flex-col gap-4">

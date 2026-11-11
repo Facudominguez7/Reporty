@@ -39,7 +39,7 @@ import type {
   EvidenciaReparacionVista,
   SeccionReparacionVista,
 } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server"
-import { EvidenciaReparacion, DialogoImpugnar, ResumenReparacion, type AccionesEvidenciaReparacion } from "./evidencia-reparacion"
+import { EvidenciaReparacion, ResumenReparacion, type AccionesEvidenciaReparacion } from "./evidencia-reparacion"
 
 const EVIDENCIA_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -83,18 +83,6 @@ function renderizar(extra: Partial<SeccionReparacionVista> = {}, antes: typeof f
 /** Renderiza el formulario de evidencia tal como se ve cuando la ficha lo habilita. */
 function renderizarFormulario() {
   return renderizar({ evidencia: null, puedeInformar: true })
-}
-
-/** Renderiza el diálogo de impugnación abierto, como lo ve quien va a impugnar. */
-function renderizarDialogoImpugnar() {
-  return renderToStaticMarkup(createElement(DialogoImpugnar, {
-    abierto: true,
-    cambiandoAbierto: () => {},
-    enviando: false,
-    motivo: "",
-    onMotivo: () => {},
-    onEnviar: () => {},
-  }))
 }
 
 /** Extrae la etiqueta de apertura del botón que contiene el texto indicado. */
@@ -237,11 +225,10 @@ describe("acciones de la comunidad", () => {
     const html = renderizar()
 
     expect(html).toContain("Confirmar reparación")
-    expect(html).toContain("Impugnar")
+    expect(html).not.toContain("Impugnar")
     expect(html).not.toContain("Faltan 3 confirmaciones")
     expect(html).not.toContain("Con 3 confirmaciones el reporte pasa a Reparado")
     expect(html.indexOf("En verificación")).toBeLessThan(html.indexOf("Antes y después"))
-    expect(html).toContain("grid-cols-2")
   })
 
   it("avisa que el autor no puede confirmar su propia evidencia", () => {
@@ -289,7 +276,7 @@ describe("acciones de la comunidad", () => {
     })
 
     expect(html).toContain("Confirmar reparación")
-    expect(html).toContain("Impugnar")
+    expect(html).not.toContain("Impugnar")
     expect(html).not.toContain("operador municipal")
   })
 
@@ -302,26 +289,6 @@ describe("acciones de la comunidad", () => {
     expect(html).not.toContain("Confirmar reparación")
     expect(html).not.toContain("Impugnar")
 
-    const impugnada = renderizar({
-      evidencia: vista({ participacion: { puede: true, motivo: null, yaVerifico: "impugnacion" } }),
-    })
-    expect(impugnada).toContain("Tu impugnación está pendiente de revisión")
-    expect(impugnada).not.toContain("Impugnar")
-  })
-})
-
-describe("impugnación pendiente", () => {
-  it("avisa que la verificación está en pausa hasta que la revise un administrador", () => {
-    const html = renderizar({ evidencia: vista({ impugnacionesPendientes: 1 }) })
-
-    expect(html).toContain("Impugnación pendiente")
-    expect(html).toContain("pausa")
-    expect(html).toContain("un administrador")
-    expect(html).not.toMatch(/Diego|Sofía/)
-  })
-
-  it("no muestra el aviso cuando no hay impugnaciones pendientes", () => {
-    expect(renderizar()).not.toContain("Impugnación pendiente")
   })
 })
 
@@ -361,32 +328,6 @@ describe("frases cerradas de la reparación (S16, S17)", () => {
 
     expect(botonConTexto(html, "Enviar evidencia")).toContain("disabled")
     expect(html).toContain("Enviar evidencia")
-  })
-
-  it("pregunta «¿Por qué no está reparado?» y ofrece exactamente las frases aprobadas en orden", () => {
-    const html = renderizarDialogoImpugnar()
-
-    expect(html).toContain("¿Por qué no está reparado?")
-    expect(html).toContain("Elegí por qué no está reparado…")
-    const opciones = [...html.matchAll(/<option value="[^"]*"[^>]*>([^<]*)<\/option>/g)].map(([, etiqueta]) => etiqueta)
-    expect(opciones).toEqual([
-      "Elegí por qué no está reparado…",
-      "El problema sigue igual",
-      "Lo arreglaron solo en parte",
-      "El arreglo ya se rompió de nuevo",
-      "La foto no corresponde a este lugar",
-      "La foto no muestra el arreglo con claridad",
-    ])
-  })
-
-  it("impugna con un select y sin texto libre, con el envío deshabilitado sin frase", () => {
-    const html = renderizarDialogoImpugnar()
-
-    expect(html).toContain("<select")
-    expect(html).not.toContain("<textarea")
-    expect(html).not.toContain("caracteres")
-    expect(botonConTexto(html, "Enviar impugnación")).toContain("disabled")
-    expect(html).toContain("Enviar impugnación")
   })
 })
 
@@ -459,19 +400,14 @@ describe("carga de evidencia", () => {
   })
 })
 
-describe("diálogos sobre la hoja inferior", () => {
-  it("mantiene el diálogo de impugnación por encima del Drawer", () => {
-    const fuente = readFileSync(new URL("./evidencia-reparacion.tsx", import.meta.url), "utf8")
-
-    // El Drawer compartido usa !z-[70]: velo y contenido de la impugnación suben a 80.
-    expect(fuente).toContain('className="z-[80]"')
-    expect(fuente).toContain('overlayClassName="z-[80]"')
-  })
-
+describe("diálogo de confirmación de envío", () => {
   it("muestra la confirmación de envío por encima del Drawer", () => {
     const fuente = readFileSync(new URL("./evidencia-reparacion.tsx", import.meta.url), "utf8")
 
     expect(fuente).toContain('<DialogContent className="!z-[80]" overlayClassName="!z-[80]">')
     expect(fuente).toContain("¿Enviar evidencia de la reparación?")
+    expect(fuente).toContain("{enviando && (")
+    expect(fuente).toContain("La IA está analizando tu foto")
+    expect(fuente).toContain('aria-busy="true"')
   })
 })

@@ -2,8 +2,8 @@
 /**
  * Tarjetas de la cola administrativa de reparaciones (S8).
  *
- * Cada sub-vista decide un solo tipo de decisión: resolver impugnaciones,
- * aprobar o cancelar la revisión de reparado de una evidencia en verificación, o
+ * Cada sub-vista decide un solo tipo de decisión: aprobar o cancelar la revisión
+ * de reparado de una evidencia en verificación, o
  * revertir una reparación validada. Las tarjetas muestran la foto del «antes» y
  * del «después» para juzgar una irregularidad sin abrir el reporte (S2), y los
  * mensajes reflejan el estado real que devuelve la base sin mostrar identidades
@@ -19,15 +19,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { EvidenciaEnDecision, ImpugnacionPendiente } from "@/lib/moderation/evidencia-reparacion-admin.server"
+import type { EvidenciaEnDecision } from "@/lib/moderation/evidencia-reparacion-admin.server"
 import {
   MOTIVO_CANCELACION_MAX,
   mensajeDeEvidenciaResuelta,
-  mensajeDeImpugnacionResuelta,
   payloadDeCancelacion,
 } from "@/lib/moderation/evidencia-reparacion-mensajes"
-import type { AccionEvidenciaAdministrativa, DecisionImpugnacionReparacion } from "@/lib/use-cases/reportes/evidencia-reparacion"
-import { resolverEvidenciaColaAction, resolverImpugnacionColaAction } from "./reparaciones-actions"
+import type { AccionEvidenciaAdministrativa } from "@/lib/use-cases/reportes/evidencia-reparacion"
+import { resolverEvidenciaColaAction } from "./reparaciones-actions"
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "medium",
@@ -49,10 +48,9 @@ function EnlaceReporte({ reporteId, titulo }: { reporteId: number; titulo: strin
   )
 }
 
-/** Contadores visibles de la evidencia: confirmaciones, impugnaciones y pendientes. */function Contadores({ confirmaciones, impugnaciones, impugnacionesPendientes, umbral }: {
+/** Contador visible de confirmaciones de la evidencia. */
+function Contadores({ confirmaciones, umbral }: {
   confirmaciones: number
-  impugnaciones: number
-  impugnacionesPendientes: number
   umbral: number
 }) {
   return (
@@ -60,14 +58,6 @@ function EnlaceReporte({ reporteId, titulo }: { reporteId: number; titulo: strin
       <div>
         <dt className="text-xs text-muted-foreground">Confirmaciones</dt>
         <dd className="font-medium">{confirmaciones} de {umbral}</dd>
-      </div>
-      <div>
-        <dt className="text-xs text-muted-foreground">Impugnaciones</dt>
-        <dd className="font-medium">{impugnaciones} en total</dd>
-      </div>
-      <div>
-        <dt className="text-xs text-muted-foreground">Impugnaciones pendientes</dt>
-        <dd className="font-medium">{impugnacionesPendientes}</dd>
       </div>
     </dl>
   )
@@ -164,62 +154,6 @@ export function PanelCancelarRevision({ motivo, procesando, onCambiarMotivo, onC
   )
 }
 
-/** Tarjeta de una impugnación pendiente con sus dos decisiones posibles. */
-function TarjetaImpugnacion({ impugnacion, umbral }: { impugnacion: ImpugnacionPendiente; umbral: number }) {
-  const [procesando, iniciarTransicion] = useTransition()
-  const [mensaje, setMensaje] = useState("")
-  const router = useRouter()
-
-  function resolver(decision: DecisionImpugnacionReparacion) {
-    iniciarTransicion(async () => {
-      try {
-        const resultado = await resolverImpugnacionColaAction(impugnacion.verificacionId, decision)
-        setMensaje(resultado.success ? mensajeDeImpugnacionResuelta(resultado.data) : resultado.error)
-        if (resultado.success) router.refresh()
-      } catch {
-        setMensaje("No se pudo resolver la impugnación. Actualizá la cola antes de reintentar.")
-      }
-    })
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle><EnlaceReporte reporteId={impugnacion.reporteId} titulo={impugnacion.titulo} /></CardTitle>
-        <CardDescription>
-          Impugnación recibida el <time dateTime={impugnacion.creadoAt}>{formatDate(impugnacion.creadoAt)}</time>
-        </CardDescription>
-        <Badge variant="secondary">Impugnación pendiente</Badge>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <blockquote className="border-l-2 border-border pl-3 text-sm">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Motivo de la impugnación</p>
-          <p className="mt-1 text-foreground">{impugnacion.motivo || "Sin motivo registrado."}</p>
-        </blockquote>
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Reparación informada</p>
-          <p className="mt-1 text-sm text-foreground">{impugnacion.comentario}</p>
-        </div>
-        <Contadores
-          confirmaciones={impugnacion.confirmaciones}
-          impugnaciones={impugnacion.impugnaciones}
-          impugnacionesPendientes={impugnacion.impugnacionesPendientes}
-          umbral={umbral}
-        />
-        <p role="status" aria-live="polite" aria-atomic="true">{procesando ? "Resolviendo impugnación…" : mensaje}</p>
-      </CardContent>
-      <CardFooter className="flex flex-wrap gap-2">
-        <Button variant="destructive" disabled={procesando} onClick={() => resolver("aceptada")}>
-          Aceptar impugnación
-        </Button>
-        <Button variant="outline" disabled={procesando} onClick={() => resolver("descartada")}>
-          Descartar impugnación
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
 /** Tarjeta de una evidencia en verificación, aprobable o cancelable (S1, S2). */
 function TarjetaEvidencia({ evidencia, umbral }: { evidencia: EvidenciaEnDecision; umbral: number }) {
   const [procesando, iniciarTransicion] = useTransition()
@@ -265,8 +199,6 @@ function TarjetaEvidencia({ evidencia, umbral }: { evidencia: EvidenciaEnDecisio
         </div>
         <Contadores
           confirmaciones={evidencia.confirmaciones}
-          impugnaciones={evidencia.impugnaciones}
-          impugnacionesPendientes={evidencia.impugnacionesPendientes}
           umbral={umbral}
         />
         {cancelando ? (
@@ -339,8 +271,6 @@ function TarjetaValidada({ evidencia, umbral }: { evidencia: EvidenciaEnDecision
         </div>
         <Contadores
           confirmaciones={evidencia.confirmaciones}
-          impugnaciones={evidencia.impugnaciones}
-          impugnacionesPendientes={evidencia.impugnacionesPendientes}
           umbral={umbral}
         />
         <p role="status" aria-live="polite" aria-atomic="true">{procesando ? "Revirtiendo reparación…" : mensaje}</p>
@@ -351,17 +281,6 @@ function TarjetaValidada({ evidencia, umbral }: { evidencia: EvidenciaEnDecision
         </Button>
       </CardFooter>
     </Card>
-  )
-}
-
-/** Renderiza una página acotada de impugnaciones pendientes. */
-export function ColaImpugnaciones({ impugnaciones, umbral }: { impugnaciones: ImpugnacionPendiente[]; umbral: number }) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {impugnaciones.map((impugnacion) => (
-        <TarjetaImpugnacion key={impugnacion.verificacionId} impugnacion={impugnacion} umbral={umbral} />
-      ))}
-    </div>
   )
 }
 

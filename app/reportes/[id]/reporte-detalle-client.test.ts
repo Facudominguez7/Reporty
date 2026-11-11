@@ -191,6 +191,14 @@ describe("acciones y hojas del detalle", () => {
     expect(html).toContain("Actualizaciones y Comentarios")
   })
 
+  it("centra compartir cuando la persona ve su propio reporte", () => {
+    const html = renderizar({ reporte: { ...reporte, usuario_id: "user-1" } as unknown as ReporteDetalle })
+
+    expect(html).toContain("Compartir reporte")
+    expect(html).not.toContain("No existe")
+    expect(html).toContain('justify-items-center gap-4 grid-cols-1')
+  })
+
   it("ubica avisar a un organismo debajo de Reportado por", () => {
     const html = renderizar()
 

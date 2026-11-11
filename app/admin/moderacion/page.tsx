@@ -8,11 +8,10 @@ import {
   TAMANO_PAGINA_REPARACIONES,
   listarEvidenciasEnVerificacion,
   listarEvidenciasValidadas,
-  listarImpugnacionesPendientes,
 } from "@/lib/moderation/evidencia-reparacion-admin.server"
 import { UMBRAL_CONFIRMACIONES_REPARACION } from "@/lib/use-cases/reportes/evidencia-reparacion"
 import { ColaRevisionesReportes } from "./cola-reportes"
-import { ColaEvidenciasEnVerificacion, ColaEvidenciasValidadas, ColaImpugnaciones } from "./cola-reparaciones"
+import { ColaEvidenciasEnVerificacion, ColaEvidenciasValidadas } from "./cola-reparaciones"
 import { Card, CardContent } from "@/components/ui/card"
 
 export const dynamic = "force-dynamic"
@@ -26,7 +25,7 @@ type SearchParams = Promise<{ pagina?: string; terminales?: string; tipo?: strin
 type TipoCola = "fotos" | "reportes" | "reparaciones"
 
 /** Sub-vistas de la cola de reparaciones, separadas por tipo de decisión. */
-type VistaReparaciones = "impugnaciones" | "evidencias" | "validadas"
+type VistaReparaciones = "evidencias" | "validadas"
 
 const TAMANO_PAGINA_ANTERIOR = 20
 
@@ -42,11 +41,10 @@ function tipoDeCola(valor?: string): TipoCola {
   return "fotos"
 }
 
-/** Sub-vista de reparaciones; por defecto, las impugnaciones pendientes. */
+/** Sub-vista de reparaciones; por defecto, las evidencias en verificación. */
 function vistaDeReparaciones(valor?: string): VistaReparaciones {
-  if (valor === "evidencias") return "evidencias"
   if (valor === "validadas") return "validadas"
-  return "impugnaciones"
+  return "evidencias"
 }
 
 /** Texto de error de cada cola, sin filtrar detalles de la base. */
@@ -64,15 +62,13 @@ export default async function AdminModeracionPage({ searchParams }: { searchPara
   const terminales = tipo === "fotos" && params.terminales === "1"
   let imagenes: Awaited<ReturnType<typeof listarImagenesAdministrativas>> = []
   let reportes: Awaited<ReturnType<typeof listarRevisionesRechazoReportes>> = []
-  let impugnaciones: Awaited<ReturnType<typeof listarImpugnacionesPendientes>> = []
   let evidencias: Awaited<ReturnType<typeof listarEvidenciasEnVerificacion>> = []
   let validadas: Awaited<ReturnType<typeof listarEvidenciasValidadas>> = []
 
   try {
     if (tipo === "reparaciones") {
       if (vista === "evidencias") evidencias = await listarEvidenciasEnVerificacion(pagina)
-      else if (vista === "validadas") validadas = await listarEvidenciasValidadas(pagina)
-      else impugnaciones = await listarImpugnacionesPendientes(pagina)
+      else validadas = await listarEvidenciasValidadas(pagina)
     } else if (tipo === "reportes") reportes = await listarRevisionesRechazoReportes(pagina)
     else imagenes = await listarImagenesAdministrativas(pagina, terminales)
   } catch (error) {
@@ -87,7 +83,7 @@ export default async function AdminModeracionPage({ searchParams }: { searchPara
     if (tipo === "reportes") next.set("tipo", "reportes")
     if (tipo === "reparaciones") {
       next.set("tipo", "reparaciones")
-      if (vista !== "impugnaciones") next.set("vista", vista)
+      if (vista !== "evidencias") next.set("vista", vista)
     }
     if (nextPage > 0) next.set("pagina", String(nextPage))
     if (tipo === "fotos" && includeTerminales) next.set("terminales", "1")
@@ -98,10 +94,8 @@ export default async function AdminModeracionPage({ searchParams }: { searchPara
   const reportsHref = "/admin/moderacion?tipo=reportes"
   const repairsHref = "/admin/moderacion?tipo=reparaciones"
   const repairViewHref = (valor: VistaReparaciones) =>
-    valor === "impugnaciones" ? repairsHref : `/admin/moderacion?tipo=reparaciones&vista=${valor}`
-  const reparacionesVisibles = vista === "evidencias"
-    ? evidencias.length
-    : vista === "validadas" ? validadas.length : impugnaciones.length
+    valor === "evidencias" ? repairsHref : `/admin/moderacion?tipo=reparaciones&vista=${valor}`
+  const reparacionesVisibles = vista === "evidencias" ? evidencias.length : validadas.length
 
   return (
     <div className="space-y-6">
@@ -126,7 +120,6 @@ export default async function AdminModeracionPage({ searchParams }: { searchPara
         <section aria-labelledby="repair-review-heading" className="space-y-4">
           <nav aria-label="Vistas de reparaciones" className="flex flex-wrap items-center gap-2">
             {([
-              ["impugnaciones", "Impugnaciones"],
               ["evidencias", "En verificación"],
               ["validadas", "Validadas"],
             ] as const).map(([valor, etiqueta]) => (
@@ -137,14 +130,12 @@ export default async function AdminModeracionPage({ searchParams }: { searchPara
           </nav>
 
           <h2 id="repair-review-heading" className="text-xl font-semibold">
-            {vista === "evidencias" ? "Evidencias en verificación" : vista === "validadas" ? "Reparaciones validadas" : "Impugnaciones pendientes"}
+            {vista === "evidencias" ? "Evidencias en verificación" : "Reparaciones validadas"}
           </h2>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
             {vista === "evidencias"
               ? "Aprobá o rechazá la reparación informada. Aprobar exige la foto publicada y cierra el reporte como Reparado; rechazar lo deja pendiente y conserva sus fotos originales."
-              : vista === "validadas"
-                ? "Revertí una reparación validada si la evidencia no corresponde. El reporte vuelve a Pendiente y se descuentan los cinco puntos del autor."
-                : "Resolvé las impugnaciones de reparaciones en verificación. Aceptar rechaza la evidencia y el reporte sigue pendiente; descartar reevalúa el umbral de tres confirmaciones y puede cerrar el reporte como Reparado."}
+              : "Revertí una reparación validada si la evidencia no corresponde. El reporte vuelve a Pendiente y se descuentan los cinco puntos del autor."}
           </p>
 
           {vista === "evidencias" ? (
@@ -155,11 +146,7 @@ export default async function AdminModeracionPage({ searchParams }: { searchPara
             validadas.length
               ? <ColaEvidenciasValidadas validadas={validadas} umbral={UMBRAL_CONFIRMACIONES_REPARACION} />
               : <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No hay reparaciones validadas para revertir.</CardContent></Card>
-          ) : (
-            impugnaciones.length
-              ? <ColaImpugnaciones impugnaciones={impugnaciones} umbral={UMBRAL_CONFIRMACIONES_REPARACION} />
-              : <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">No hay impugnaciones pendientes.</CardContent></Card>
-          )}
+          ) : null}
 
           <nav aria-label="Páginas de la cola de reparaciones" className="flex items-center justify-between gap-4 text-sm">
             {pagina > 0 ? <Link className="font-medium text-primary underline-offset-4 hover:underline" href={query(pagina - 1)}>Anterior</Link> : <span />}

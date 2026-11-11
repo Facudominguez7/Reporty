@@ -41,19 +41,6 @@ type FilaReporte = {
   fotos_reporte?: ReportImageRow[] | null
 }
 
-type FilaImpugnacion = {
-  id: string
-  motivo: string | null
-  created_at: string
-  evidencias_reparacion: Relacion<{
-    id: string
-    reporte_id: number
-    comentario: string
-    estado: string
-    reportes: Relacion<FilaReporte>
-  }>
-}
-
 type FilaEvidencia = ReportImageRow & {
   id: string
   reporte_id: number
@@ -70,17 +57,6 @@ export type ContadoresVerificacion = {
   confirmaciones: number
   impugnaciones: number
   impugnacionesPendientes: number
-}
-
-/** Impugnación pendiente de una evidencia en verificación. */
-export type ImpugnacionPendiente = ContadoresVerificacion & {
-  verificacionId: string
-  evidenciaId: string
-  reporteId: number
-  titulo: string
-  comentario: string
-  motivo: string
-  creadoAt: string
 }
 
 /** Evidencia con su estado actual y los contadores que la administración necesita. */
@@ -195,48 +171,6 @@ function contadoresDe(
   evidenciaId: string,
 ): ContadoresVerificacion {
   return contadores.get(evidenciaId) ?? { confirmaciones: 0, impugnaciones: 0, impugnacionesPendientes: 0 }
-}
-
-/**
- * Impugnaciones pendientes de evidencias en verificación, de la más antigua a la
- * más reciente (S5, S8). Un reporte retirado o ya cerrado no se muestra aunque la
- * base conserve una impugnación pendiente.
- *
- * @param pagina - Página de veinte filas, con el mismo tope que las otras colas.
- * @returns Impugnaciones visibles con sus contadores; nunca identidades.
- */
-export async function listarImpugnacionesPendientes(pagina: number): Promise<ImpugnacionPendiente[]> {
-  const { servicio } = await autorizarAdministracion()
-  const { data, error } = await servicio.from("verificaciones_reparacion")
-    .select("id,evidencia_id,motivo,created_at,evidencias_reparacion!inner(id,reporte_id,comentario,estado,reportes!inner(id,titulo,estado_id,deleted_at))")
-    .eq("tipo", "impugnacion")
-    .eq("estado", "pendiente")
-    .eq("evidencias_reparacion.estado", "en_verificacion")
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true })
-    .range(...rangoDePagina(pagina))
-
-  if (error) throw new Error("No se pudieron consultar las impugnaciones de reparaciones.")
-
-  const visibles = ((data ?? []) as FilaImpugnacion[]).flatMap((fila) => {
-    const evidencia = uno(fila.evidencias_reparacion)
-    const reporte = evidencia && uno(evidencia.reportes)
-    if (!evidencia || !reporte) return []
-    if (reporte.deleted_at !== null || reporte.estado_id !== REPORT_STATE_IDS.PENDIENTE) return []
-    return [{ fila, evidencia, reporte }]
-  })
-
-  const contadores = await contarVerificaciones(servicio, [...new Set(visibles.map(({ evidencia }) => evidencia.id))])
-  return visibles.map(({ fila, evidencia, reporte }) => ({
-    verificacionId: fila.id,
-    evidenciaId: evidencia.id,
-    reporteId: reporte.id,
-    titulo: reporte.titulo,
-    comentario: evidencia.comentario,
-    motivo: fila.motivo ?? "",
-    creadoAt: fila.created_at,
-    ...contadoresDe(contadores, evidencia.id),
-  }))
 }
 
 /**
