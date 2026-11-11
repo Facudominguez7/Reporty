@@ -18,6 +18,7 @@ import {
 import { verificarCaptchaDeAccion } from "@/lib/security/turnstile-guard.server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
+import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
 
 const createReportSchema = z.object({
   titulo: z.string().trim().min(3).max(120),
@@ -130,6 +131,9 @@ export async function crearReporteAction(formData: FormData) {
       lon: formData.get("lon"),
       submissionId: formData.get("submissionId"),
     })
+
+    const textModerationError = moderateReportText(parsedInput.titulo, parsedInput.descripcion)
+    if (textModerationError) return { success: false as const, error: textModerationError }
 
     const image = obtenerImagen(formData)
     if (!image) {

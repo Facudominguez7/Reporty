@@ -5,6 +5,7 @@ import { getUserRoleContext, isGuestRole } from "@/lib/authz/roles"
 import { validatePetSubmission } from "@/lib/security/mascota-submission-guard.server"
 import { crearMascotaWorkflow } from "@/lib/use-cases/mascotas/create-pet"
 import { limpiarFotoMascotaRetirada } from "@/lib/moderation/mascotas-withdrawal.server"
+import { moderatePetText } from "@/lib/moderation/texto-determinista.server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
@@ -73,6 +74,9 @@ export async function crearMascotaAction(formData: FormData) {
       lon: numeroFormulario(formData.get("lon")),
       telefono: formData.get("telefono"),
     })
+    const textModerationError = moderatePetText(input.descripcion)
+    if (textModerationError) return { success: false as const, error: textModerationError }
+
     const image = obtenerFoto(formData)
     if (!image) return { success: false as const, error: "Adjuntá una fotografía para publicar la mascota." }
 

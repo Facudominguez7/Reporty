@@ -27,6 +27,13 @@ beforeEach(() => {
 })
 
 describe("crearReporteWorkflow", () => {
+  it("bloquea el texto ofensivo antes de guardar el reporte", async () => {
+    const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "p3lotudo" })
+    expect(result).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+    expect(dobles.obtenerDireccion).not.toHaveBeenCalled()
+  })
+
   it("guarda la dirección de las coordenadas al crear el reporte", async () => {
     await crearReporteWorkflow(supabase, entrada)
     expect(dobles.obtenerDireccion).toHaveBeenCalledWith(-27.37, -55.9)

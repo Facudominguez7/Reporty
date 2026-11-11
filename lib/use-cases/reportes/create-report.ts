@@ -13,6 +13,7 @@ import { canCreateReports, getUserRoleContext, isGuestRole } from "@/lib/authz/r
 import { moderarYGuardarImagenReporte, type ResultadoImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
+import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -49,6 +50,9 @@ export async function crearReporteWorkflow(
   if (roleResult.error || !canCreateReports(roleResult.data?.roleId)) {
     return { success: false, error: "No tenés permisos para crear reportes." }
   }
+
+  const textModerationError = moderateReportText(input.titulo, input.descripcion)
+  if (textModerationError) return { success: false, error: textModerationError }
 
   // Arranca ya para no sumar su espera a la validación de la foto; nunca lanza.
   const direccionPendiente = input.lat !== null && input.lon !== null

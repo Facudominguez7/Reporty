@@ -21,6 +21,13 @@ describe("crearMascotaWorkflow", () => {
     telefono: "112233", image: new File(["photo"], "photo.webp", { type: "image/webp" }),
   }
 
+  it("bloquea la descripción ofensiva antes de moderar o guardar la foto", async () => {
+    const result = await crearMascotaWorkflow({} as never, { ...input, descripcion: "b0ludo" })
+    expect(result).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
+    expect(validateImage).not.toHaveBeenCalled()
+    expect(moderate).not.toHaveBeenCalled()
+  })
+
   it("reports publication only when the approved photo has a pet ID", async () => {
     expect(await crearMascotaWorkflow({} as never, input)).toMatchObject({
       success: true, data: { mascotaId: 1, moderation: "APPROVED", pointsAwarded: 10 },

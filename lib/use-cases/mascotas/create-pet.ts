@@ -5,6 +5,7 @@ import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYT
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
 import { validatePetSubmission, type MascotaSubmission } from "@/lib/security/mascota-submission-guard.server"
 import { crearFotoMascotaModerada } from "@/lib/moderation/mascotas-imagen.server"
+import { moderatePetText } from "@/lib/moderation/texto-determinista.server"
 
 type Result = { success: true; data: { mascotaId: number | null; moderation: "APPROVED" | "PENDING" | "REVIEW" | "REJECTED"; pointsAwarded: number; message: string } } | { success: false; error: string }
 
@@ -24,6 +25,9 @@ export async function crearMascotaWorkflow(
     lon: input.lon,
     telefono: input.telefono,
   })
+  const textModerationError = moderatePetText(fields.descripcion)
+  if (textModerationError) return { success: false, error: textModerationError }
+
   if (!(input.image instanceof File) || input.image.size < 1) return { success: false, error: "Adjuntá una fotografía para publicar la mascota." }
   if (!isAcceptedReportImageType(input.image.type)) return { success: false, error: "La imagen debe estar en formato JPG, PNG o WebP." }
   if (input.image.size > REPORT_IMAGE_MAX_BYTES) return { success: false, error: `La imagen optimizada no puede superar los ${REPORT_IMAGE_MAX_BYTES_LABEL}.` }
