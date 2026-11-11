@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { contactHref, createContactDraft, getReportContacts, type ReportContact } from "@/lib/report-contacts/contact-actions"
@@ -14,9 +14,6 @@ export function ReportContactActions({ showHeading = true, ...props }: Props) {
   const draft = createContactDraft(props)
   const [contacts, setContacts] = useState<ReportContact[] | null>(null)
   const [failed, setFailed] = useState(false)
-  const [hasOverflow, setHasOverflow] = useState(false)
-  const listRef = useRef<HTMLUListElement>(null)
-
   useEffect(() => {
     let active = true
     getReportContacts(createClient(), props.latitude, props.longitude, props.category).then(
@@ -25,17 +22,6 @@ export function ReportContactActions({ showHeading = true, ...props }: Props) {
     )
     return () => { active = false }
   }, [props.latitude, props.longitude, props.category])
-
-  useEffect(() => {
-    const list = listRef.current
-    if (!list) return
-    const update = () => setHasOverflow(list.scrollHeight > list.clientHeight)
-    const observer = new ResizeObserver(update)
-    observer.observe(list)
-    Array.from(list.children).forEach((child) => observer.observe(child))
-    update()
-    return () => observer.disconnect()
-  }, [contacts, failed])
 
   return (
     <section className="space-y-2" aria-labelledby={showHeading ? "contact-heading" : undefined} aria-label={showHeading ? undefined : "Lista de organismos"}>
@@ -47,8 +33,7 @@ export function ReportContactActions({ showHeading = true, ...props }: Props) {
         : contacts === null ? <p role="status">Cargando contactos…</p>
         : contacts.length === 0 ? <p role="status">No hay contactos disponibles para esta ubicación y categoría.</p>
         : <>
-        {hasOverflow && <p id="contact-scroll-hint" className="text-xs font-semibold text-muted-foreground">Desplazate para ver más organismos</p>}
-        <ul ref={listRef} aria-label="Lista de organismos" aria-describedby={hasOverflow ? "contact-scroll-hint" : undefined} tabIndex={0} className="max-h-40 space-y-2 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <ul aria-label="Lista de organismos" className="space-y-2">
           {contacts.map((contact) => {
             const href = contactHref(contact.channel_type, contact.channel_value, draft, props.title)
             const action = contact.channel_type === "phone" ? "Llamar" : contact.channel_type === "whatsapp" ? "Abrir WhatsApp" : "Redactar correo"

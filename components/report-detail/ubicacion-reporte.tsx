@@ -86,7 +86,7 @@ export function FranjaUbicacion({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ubicación</p>
-        <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
+        <p className={`line-clamp-2 font-medium leading-snug text-foreground ${direccion ? "text-sm" : "text-xs"}`}>
           {!hayUbicacion
             ? "Ubicación no disponible"
             : direccion

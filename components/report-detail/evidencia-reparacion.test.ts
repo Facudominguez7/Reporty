@@ -195,11 +195,12 @@ describe("estados de la reparación", () => {
     const html = renderizar()
 
     expect(html).toContain("En verificación")
+    expect(html).not.toContain("La foto ya se publicó y la comunidad la está confirmando.")
     expect(html).toContain("2 de 3 confirmaciones")
     expect(html).toContain('role="progressbar"')
     expect(html).toContain('aria-valuenow="2"')
     expect(html).toContain('aria-valuemax="3"')
-    expect(html).toContain("Falta 1 confirmación")
+    expect(html).not.toContain("Falta 1 confirmación")
   })
 
   it("no inventa una comparación cuando la evidencia validada nunca publicó su foto", () => {
@@ -237,6 +238,10 @@ describe("acciones de la comunidad", () => {
 
     expect(html).toContain("Confirmar reparación")
     expect(html).toContain("Impugnar")
+    expect(html).not.toContain("Faltan 3 confirmaciones")
+    expect(html).not.toContain("Con 3 confirmaciones el reporte pasa a Reparado")
+    expect(html.indexOf("En verificación")).toBeLessThan(html.indexOf("Antes y después"))
+    expect(html).toContain("grid-cols-2")
   })
 
   it("avisa que el autor no puede confirmar su propia evidencia", () => {
@@ -454,12 +459,19 @@ describe("carga de evidencia", () => {
   })
 })
 
-describe("diálogo de impugnación sobre la hoja inferior", () => {
-  it("queda por encima del Drawer que muestra la evidencia", () => {
+describe("diálogos sobre la hoja inferior", () => {
+  it("mantiene el diálogo de impugnación por encima del Drawer", () => {
     const fuente = readFileSync(new URL("./evidencia-reparacion.tsx", import.meta.url), "utf8")
 
     // El Drawer compartido usa !z-[70]: velo y contenido de la impugnación suben a 80.
     expect(fuente).toContain('className="z-[80]"')
     expect(fuente).toContain('overlayClassName="z-[80]"')
+  })
+
+  it("muestra la confirmación de envío por encima del Drawer", () => {
+    const fuente = readFileSync(new URL("./evidencia-reparacion.tsx", import.meta.url), "utf8")
+
+    expect(fuente).toContain('<DialogContent className="!z-[80]" overlayClassName="!z-[80]">')
+    expect(fuente).toContain("¿Enviar evidencia de la reparación?")
   })
 })

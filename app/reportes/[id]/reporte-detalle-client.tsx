@@ -991,7 +991,7 @@ export function ReporteDetalleClient({
                   <Button
                     type="button"
                     variant="default"
-                    className="mx-auto mt-3 flex w-fit max-w-full whitespace-normal bg-black text-white hover:bg-black/90"
+                    className="mt-3 flex w-full max-w-full whitespace-normal bg-black text-white hover:bg-black/90"
                     onClick={(event) => {
                       setUrlReporte(new URL(`/reportes/${reporte.id}`, window.location.origin).toString());
                       abrirHoja("contactos", event.currentTarget);

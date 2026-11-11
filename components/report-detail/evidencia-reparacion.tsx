@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Clock,
   Flag,
+  FilePlus2,
   Images,
   MessageCircle,
   ShieldCheck,
@@ -173,9 +174,6 @@ function ComparadorAntesDespues({
           <Images className="size-4 md:size-5" aria-hidden="true" />
           <span>Antes y después</span>
         </CardTitle>
-        <CardDescription className="text-xs md:text-sm">
-          La comunidad ya puede ver la foto de la reparación.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
         <ComparadorFotos antes={antes} despues={despues} />
@@ -194,19 +192,11 @@ function ComparadorAntesDespues({
 
 /** Barra de progreso con el texto «N de M confirmaciones», nunca solo color. */
 function ProgresoConfirmaciones({ hechas, umbral }: { hechas: number; umbral: number }) {
-  const faltan = Math.max(0, umbral - hechas)
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-foreground">
-          {hechas} de {umbral} confirmaciones
-        </p>
-        {faltan > 0 && (
-          <p className="text-xs text-muted-foreground">
-            Falta{faltan === 1 ? "" : "n"} {faltan} confirmación{faltan === 1 ? "" : "es"}
-          </p>
-        )}
-      </div>
+      <p className="text-xs font-semibold text-foreground">
+        {hechas} de {umbral} confirmaciones
+      </p>
       <div
         role="progressbar"
         aria-label="Confirmaciones de la reparación"
@@ -496,13 +486,13 @@ function TarjetaEstadoEvidencia({
             {reparado ? "Reparado" : "En verificación"}
           </span>
         </CardTitle>
-        <CardDescription className="text-xs md:text-sm">
-          {reparado
-            ? (evidencia.foto
+        {reparado && (
+          <CardDescription className="text-xs md:text-sm">
+            {evidencia.foto
               ? "La reparación quedó validada y el reporte está Reparado. El antes y el después se mantienen en la ficha."
-              : "La reparación quedó validada y el reporte está Reparado. La foto de la evidencia no llegó a publicarse, así que no hay una comparación disponible.")
-            : `La foto ya se publicó y la comunidad la está confirmando. Con ${umbral} confirmaciones el reporte pasa a Reparado.`}
-        </CardDescription>
+              : "La reparación quedó validada y el reporte está Reparado. La foto de la evidencia no llegó a publicarse, así que no hay una comparación disponible."}
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
         <ProgresoConfirmaciones hechas={evidencia.confirmaciones} umbral={umbral} />
@@ -511,10 +501,10 @@ function TarjetaEstadoEvidencia({
         {!reparado && evidencia.impugnacionesPendientes > 0 && <AvisoImpugnacionPendiente />}
 
         {!reparado && participacion.puede && (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2">
             {puedeConfirmar && (
-              <Button type="button" onClick={confirmar} disabled={confirmando || impugnando}>
-                <CheckCircle2 className="mr-2 size-4" aria-hidden="true" />
+              <Button type="button" className="min-w-0 whitespace-normal px-2 text-xs leading-tight sm:text-sm" onClick={confirmar} disabled={confirmando || impugnando}>
+                <CheckCircle2 className="mr-1.5 size-4 shrink-0" aria-hidden="true" />
                 {confirmando ? "Confirmando..." : "Confirmar reparación"}
               </Button>
             )}
@@ -522,11 +512,11 @@ function TarjetaEstadoEvidencia({
               <Button
                 type="button"
                 variant="outline"
-                className="border-destructive/45 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                className="min-w-0 whitespace-normal border-destructive/45 px-2 text-xs leading-tight text-destructive hover:bg-destructive/10 hover:text-destructive sm:text-sm"
                 onClick={() => setDialogoAbierto(true)}
                 disabled={confirmando || impugnando}
               >
-                <Flag className="mr-2 size-4" aria-hidden="true" />
+                <Flag className="mr-1.5 size-4 shrink-0" aria-hidden="true" />
                 Impugnar
               </Button>
             )}
@@ -580,6 +570,7 @@ function FormularioEvidenciaReparacion({
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaReset, setCaptchaReset] = useState(0)
   const [enviando, setEnviando] = useState(false)
+  const [confirmacionAbierta, setConfirmacionAbierta] = useState(false)
   const fraseId = useId()
 
   const necesitaCaptcha = TURNSTILE_CONFIGURADO
@@ -601,10 +592,15 @@ function FormularioEvidenciaReparacion({
     setImagen(archivo)
   }
 
-  const enviar = async (event: React.FormEvent) => {
+  const solicitarEnvio = (event: React.FormEvent) => {
     event.preventDefault()
     if (!imagen || !puedeEnviar) return
+    setConfirmacionAbierta(true)
+  }
 
+  const enviar = async () => {
+    if (!imagen || !puedeEnviar) return
+    setConfirmacionAbierta(false)
     setEnviando(true)
     try {
       const optimizada = await optimizeReportImage(imagen)
@@ -642,42 +638,36 @@ function FormularioEvidenciaReparacion({
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
-        <form onSubmit={enviar} className="space-y-3">
-          <div className="space-y-2">
-            <input
-              id="evidencia-foto-camara"
-              type="file"
-              accept={REPORT_IMAGE_ACCEPT_ATTR}
-              capture="environment"
-              className="sr-only"
-              disabled={enviando}
-              onChange={(event) => elegirImagen(event.target.files?.[0] ?? null)}
-            />
-            <label
-              htmlFor="evidencia-foto-camara"
-              className="flex cursor-pointer flex-col items-center gap-1 rounded-[var(--radius)] border border-dashed border-primary/55 bg-primary/5 px-3 py-5 text-center focus-within:ring-2 focus-within:ring-ring"
-            >
-              <Camera className="size-6 text-primary" aria-hidden="true" />
-              <span className="text-sm font-semibold">Sacar la foto ahora</span>
-              <span className="text-xs text-muted-foreground">
-                JPG, PNG o WebP · hasta {Math.round(REPORT_IMAGE_MAX_SOURCE_BYTES / (1024 * 1024))} MB
-              </span>
-            </label>
-            <input
-              id="evidencia-foto-galeria"
-              type="file"
-              accept={REPORT_IMAGE_ACCEPT_ATTR}
-              className="sr-only"
-              disabled={enviando}
-              onChange={(event) => elegirImagen(event.target.files?.[0] ?? null)}
-            />
-            <label
-              htmlFor="evidencia-foto-galeria"
-              className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-pill)] border border-border bg-card px-4 text-sm font-medium focus-within:ring-2 focus-within:ring-ring"
-            >
-              <Images className="size-4" aria-hidden="true" />
-              Elegir de la galería
-            </label>
+        <form onSubmit={solicitarEnvio} className="space-y-3">
+          <div className="space-y-4">
+            <div className="rounded-md border border-dashed border-border bg-card p-6 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex size-12 items-center justify-center rounded-md border border-border bg-card">
+                  <FilePlus2 className="size-6 text-muted-foreground" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium">Agregá una foto de la reparación</p>
+                <div className="flex flex-wrap justify-center gap-2 focus-within:ring-2 focus-within:ring-ring">
+                  <Button type="button" size="sm" asChild disabled={enviando}>
+                    <label htmlFor="evidencia-foto-camara" className={enviando ? "cursor-not-allowed opacity-50" : "cursor-pointer"}>
+                      <FilePlus2 className="size-4" aria-hidden="true" />
+                      Cargar imagen
+                    </label>
+                  </Button>
+                  <input
+                    id="evidencia-foto-camara"
+                    type="file"
+                    accept={REPORT_IMAGE_ACCEPT_ATTR}
+                    capture="environment"
+                    className="sr-only"
+                    disabled={enviando}
+                    onChange={(event) => elegirImagen(event.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  1 imagen · JPG, PNG o WebP · hasta {Math.round(REPORT_IMAGE_MAX_SOURCE_BYTES / (1024 * 1024))} MB
+                </p>
+              </div>
+            </div>
             {imagen && (
               <p className="text-xs text-muted-foreground">
                 Foto elegida: {imagen.name}
@@ -730,6 +720,24 @@ function FormularioEvidenciaReparacion({
             {enviando ? "Enviando..." : "Enviar evidencia"}
           </Button>
         </form>
+        <Dialog open={confirmacionAbierta} onOpenChange={setConfirmacionAbierta}>
+          <DialogContent className="!z-[80]" overlayClassName="!z-[80]">
+            <DialogHeader>
+              <DialogTitle>¿Enviar evidencia de la reparación?</DialogTitle>
+              <DialogDescription>
+                Se enviará la foto y la información seleccionada para revisión antes de publicarse.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={enviando}>Cancelar</Button>
+              </DialogClose>
+              <Button type="button" disabled={enviando} onClick={() => { void enviar() }}>
+                Confirmar envío
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )
@@ -839,11 +847,11 @@ export function EvidenciaReparacion({ seccion, fotoAntes, acciones }: EvidenciaR
 
   return (
     <div className="flex flex-col gap-4">
-      {evidencia && evidencia.estado !== "informada" && (
-        <ComparadorAntesDespues evidencia={evidencia} fotoAntes={fotoAntes} />
-      )}
       {evidencia && (
         <TarjetaEstadoEvidencia evidencia={evidencia} umbral={seccion.umbral} acciones={acciones} />
+      )}
+      {evidencia && evidencia.estado !== "informada" && (
+        <ComparadorAntesDespues evidencia={evidencia} fotoAntes={fotoAntes} />
       )}
       {seccion.puedeInformar && (
         <FormularioEvidenciaReparacion onInformar={acciones.onInformar} />
