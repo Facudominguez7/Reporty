@@ -5,7 +5,6 @@ import Link from "next/link"
 import { InvitacionDonar } from "@/components/donaciones/invitacion-donar"
 import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { AlertCircle, Cat, CheckCircle2, CircleX, Dog, FilePlus2, LoaderCircle, MapPin, PawPrint, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -64,6 +63,7 @@ export function FormularioMascota() {
   const [optimizingImage, setOptimizingImage] = useState(false)
   const [publicPhoneConfirmed, setPublicPhoneConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
   const [moderation, setModeration] = useState<Moderation | null>(null)
   const [message, setMessage] = useState("")
   const [createdPet, setCreatedPet] = useState<{ mascotaId: number; pointsAwarded: number } | null>(null)
@@ -97,6 +97,7 @@ export function FormularioMascota() {
     setModeration(null)
     setMessage("")
     setShowResultDialog(false)
+    setError("")
     formRef.current?.reset()
   }
 
@@ -122,6 +123,7 @@ export function FormularioMascota() {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (lock.current || optimizingImage || moderation !== null) return
+    setError("")
     if (lat === null || lon === null || !image || !tipoAnimal || !descripcion.trim() || !telefono.trim() || !publicPhoneConfirmed) return
     setShowConfirmDialog(true)
   }
@@ -141,18 +143,7 @@ export function FormularioMascota() {
       payload.set("image", image)
       const result = await crearMascotaAction(payload)
       if (!result.success) {
-        const errorKind = "errorKind" in result ? result.errorKind : undefined
-        const title = errorKind === "moderation" ? "Revisá el texto"
-          : errorKind === "timeout" ? "La verificación tardó demasiado"
-          : errorKind === "verification" ? "No pudimos verificar el texto"
-          : "No se pudo publicar la mascota"
-        toast.error(title, {
-          description: errorKind === "timeout" ? "Intentá nuevamente."
-            : errorKind === "verification" ? "Intentá nuevamente más tarde." : result.error,
-          ...(result.error.includes("cuenta registrada") ? {
-            action: { label: "Iniciar sesión", onClick: () => router.push("/auth") },
-          } : {}),
-        })
+        setError(result.error)
         return
       }
       setModeration(result.data.moderation === "APPROVED" && (!Number.isSafeInteger(result.data.mascotaId) || result.data.mascotaId! <= 0) ? "PENDING" : result.data.moderation)
@@ -165,9 +156,7 @@ export function FormularioMascota() {
         router.refresh()
       }
     } catch {
-      toast.error("No se pudo publicar la mascota", {
-        description: "Revisá tu conexión e intentá nuevamente.",
-      })
+      setError("No pudimos procesar la publicación. Revisá tu conexión e intentá nuevamente.")
     } finally {
       lock.current = false
       setBusy(false)
@@ -297,6 +286,7 @@ export function FormularioMascota() {
                   {lat !== null && lon !== null ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="size-4" aria-hidden="true" />Ubicación seleccionada: {lat.toFixed(5)}, {lon.toFixed(5)}</p> : <p className="text-xs text-destructive">Seleccioná un punto en el mapa.</p>}
                 </div>
 
+                {error && <p role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />{error}{error.includes("cuenta registrada") && <> <a className="underline" href="/auth">Iniciá sesión o registrate</a>.</>}</p>}
                 {moderation === "PENDING" && <div role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4"><p className="font-semibold">Publicación pendiente</p><p className="mt-1 text-sm text-muted-foreground">{message}</p></div>}
                 {moderation === "REVIEW" && <div role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4"><p className="font-semibold">Revisión pendiente</p><p className="mt-1 text-sm text-muted-foreground">{message}</p></div>}
                 {moderation === "REJECTED" && <div role="status" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4"><p className="font-semibold text-destructive">La foto no fue aprobada</p><p className="mt-1 text-sm text-muted-foreground">{message} Podés elegir otra foto e intentar nuevamente.</p></div>}

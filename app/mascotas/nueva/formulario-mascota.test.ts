@@ -4,16 +4,6 @@ import { describe, expect, it } from "vitest"
 describe("formulario de publicación de mascota", () => {
   const source = readFileSync(new URL("./formulario-mascota.tsx", import.meta.url), "utf8")
 
-  it("shows submission failures as floating alerts with distinct moderation titles", () => {
-    expect(source).toContain('import { toast } from "sonner"')
-    expect(source).toContain('errorKind === "moderation" ? "Revisá el texto"')
-    expect(source).toContain('errorKind === "verification" ? "No pudimos verificar el texto"')
-    expect(source).toContain('toast.error(title, {')
-    expect(source).toContain('action: { label: "Iniciar sesión", onClick: () => router.push("/auth") }')
-    expect(source).not.toContain('setError(')
-    expect(source).not.toContain('{error &&')
-  })
-
   it("requires photo, species, description, coordinates and public phone disclosure", () => {
     expect(source).toContain('htmlFor="foto-mascota"')
     expect(source).toContain('aria-required="true"')

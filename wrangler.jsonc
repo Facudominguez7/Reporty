@@ -25,17 +25,9 @@
     // Cloudflare Images: re-encodes every uploaded report and pet photo (replaces sharp).
     "binding": "IMAGES"
   },
-  "ai": {
-    // Workers AI is remote in local development; the classifier's explicit budget gate stays off by default.
-    "binding": "AI",
-    "remote": true
-  },
   "triggers": {
     // Weekly audit archive: Sundays 06:00 UTC (CRON_ARCHIVO_AUDITORIA in lib/cloudflare/cron-auditoria.ts).
     "crons": ["0 6 * * SUN"]
-  },
-  "vars": {
-    "TEXT_MODERATION_FREE_BUDGET_CONFIRMED": "true"
   },
   "observability": {
     "enabled": true
