@@ -23,6 +23,16 @@ describe("formulario de publicación de mascota", () => {
     expect(source).not.toMatch(/name=["'](?:nombre|fechaPerdida|estado)["']/)
   })
 
+  it("shows image moderation outcomes and action failures as floating alerts", () => {
+    expect(source).toContain('import { toast } from "sonner"')
+    expect(source).toContain('toast.warning(')
+    expect(source).toContain('moderationResult === "REJECTED" ? "La foto no fue aprobada"')
+    expect(source).toContain('moderationResult === "REVIEW" ? "La foto quedó pendiente de revisión"')
+    expect(source).toContain('toast.error(')
+    expect(source).not.toContain("setError(")
+    expect(source).not.toContain("{error &&")
+  })
+
   it("binds only the action contract and distinguishes moderation outcomes", () => {
     expect(source).toContain('payload.set("tipoAnimal"')
     expect(source).toContain('payload.set("descripcion"')
