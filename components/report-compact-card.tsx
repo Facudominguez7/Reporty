@@ -7,12 +7,14 @@ import {
   getPriorityColor,
   getPriorityIcon,
   getStatusIcon,
-  getStatusVariant,
 } from "@/components/report-card"
-import { Badge } from "@/components/ui/badge"
+import { ChipReporte, TONO_CATEGORIA, tonoEstado } from "@/components/report-detail/chip-reporte"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { withReportesReturnTo } from "@/lib/reportes/navigation"
+
+/** Chips más chicos que los de la ficha: la tarjeta compacta tiene poco ancho a la derecha. */
+const CLASE_CHIP_TARJETA = "h-5 max-w-24 overflow-hidden gap-1 px-2 text-[10px] sm:h-6 sm:max-w-[7.5rem] sm:text-[11px] md:text-[11px] [&_svg]:size-3"
 
 type ReportCompactCardProps = {
   id: number
@@ -89,23 +91,21 @@ export function ReportCompactCard({
             </div>
 
             <div className="flex min-w-0 flex-col items-end gap-1.5">
-              <Badge
-                variant={getStatusVariant(status)}
-                className="max-w-24 gap-0.5 px-1 py-0.5 text-[8px] leading-3 sm:max-w-[7.5rem] sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px]"
-                title={status}
-              >
-                {getStatusIcon(status, "size-2.5 sm:size-3")}
-                <span className="truncate">{status}</span>
-              </Badge>
+              <ChipReporte
+                etiqueta="Estado"
+                tono={tonoEstado(status)}
+                icono={getStatusIcon(status)}
+                valor={<span className="truncate">{status}</span>}
+                className={CLASE_CHIP_TARJETA}
+              />
               {category && (
-                <Badge
-                  variant="category"
-                  className="max-w-24 gap-0.5 px-1 py-0.5 text-[8px] leading-3 sm:max-w-[7.5rem] sm:gap-1 sm:px-2 sm:py-1 sm:text-[10px]"
-                  title={category}
-                >
-                  {getCategoryIcon(category, "size-2.5 sm:size-3")}
-                  <span className="truncate">{category}</span>
-                </Badge>
+                <ChipReporte
+                  etiqueta="Categoría"
+                  tono={TONO_CATEGORIA}
+                  icono={getCategoryIcon(category)}
+                  valor={<span className="truncate">{category}</span>}
+                  className={CLASE_CHIP_TARJETA}
+                />
               )}
             </div>
 
