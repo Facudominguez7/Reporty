@@ -112,8 +112,13 @@
   }
 
   html {
-    scroll-behavior: smooth;
     background: var(--secondary);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   body {
@@ -244,8 +249,143 @@ body:not(:has(.admin-workspace)),
     @apply relative z-50 mx-auto flex w-full flex-1 flex-col rounded-[2.25rem] border border-white/70 bg-card/88 px-3 py-3 shadow-[0_22px_70px_-32px_color-mix(in_oklab,var(--foreground)_45%,transparent)] backdrop-blur-sm sm:px-6 md:w-[80%] md:py-5 lg:px-8 lg:py-7;
   }
 
+  body:not(:has(.admin-workspace)) .page-container {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .incident-shell {
     @apply overflow-visible rounded-none border-0 bg-transparent p-0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes reporty-reveal-up {
+      from {
+        opacity: 0;
+        transform: translateY(1rem);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes reporty-home-enter {
+      from {
+        opacity: 0;
+        transform: translateY(1.25rem) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    body:not(:has(.admin-workspace)) .scroll-reveal {
+      opacity: 0;
+      transform: translateY(1rem);
+      transition: opacity 520ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    body:not(:has(.admin-workspace)) .scroll-reveal-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > * {
+      animation: reporty-reveal-up 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    body:not(:has(.admin-workspace)) .incident-list > * {
+      animation: reporty-reveal-up 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > :nth-child(2),
+    body:not(:has(.admin-workspace)) .incident-list > :nth-child(2) {
+      animation-delay: 70ms;
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > :nth-child(3),
+    body:not(:has(.admin-workspace)) .incident-list > :nth-child(3) {
+      animation-delay: 140ms;
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > :nth-child(4),
+    body:not(:has(.admin-workspace)) .incident-list > :nth-child(4) {
+      animation-delay: 210ms;
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > :nth-child(5),
+    body:not(:has(.admin-workspace)) .incident-list > :nth-child(5) {
+      animation-delay: 280ms;
+    }
+
+    body:not(:has(.admin-workspace)) .welcome-screen .page-container {
+      animation: reporty-home-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    body:not(:has(.admin-workspace)) .welcome-screen .page-container > * {
+      animation: reporty-reveal-up 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    body:not(:has(.admin-workspace)) .welcome-screen .page-container > :nth-child(2) {
+      animation-delay: 90ms;
+    }
+
+    body:not(:has(.admin-workspace)) .welcome-screen .page-container > :nth-child(3) {
+      animation-delay: 160ms;
+    }
+
+    body:not(:has(.admin-workspace)) .welcome-screen .page-container > :nth-child(4) {
+      animation-delay: 230ms;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scroll-reveal,
+    .scroll-reveal-visible {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes reporty-skeleton-shimmer {
+      from {
+        background-position: 200% 0;
+      }
+      to {
+        background-position: -50% 0;
+      }
+    }
+
+    body:not(:has(.admin-workspace)) [data-skeleton] {
+      background-color: var(--muted);
+      background-image: linear-gradient(
+        105deg,
+        var(--muted) 20%,
+        color-mix(in oklab, var(--card) 72%, var(--muted)) 42%,
+        var(--muted) 64%
+      );
+      background-size: 200% 100%;
+      animation: reporty-skeleton-shimmer 1.7s ease-in-out infinite;
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > :nth-child(2) [data-skeleton] {
+      animation-delay: 100ms;
+    }
+
+    body:not(:has(.admin-workspace)) .page-container > :nth-child(3) [data-skeleton] {
+      animation-delay: 180ms;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body:not(:has(.admin-workspace)) [data-skeleton] {
+      animation: none;
+      background-image: none;
+    }
   }
 
   .incident-list {
