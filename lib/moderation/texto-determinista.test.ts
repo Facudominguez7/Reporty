@@ -27,9 +27,16 @@ describe("moderación determinista de texto", () => {
     expect(moderateText(value)).toEqual({ allowed: true })
   })
 
+  it("mantiene estricto el detector base para palabras ambiguas", () => {
+    expect(moderateText("gato").allowed).toBe(false)
+  })
+
   it("aplica el campo de descripción de mascotas", () => {
     expect(moderatePetText("Pelotudo el que se llevó mi perro")).toBe("El texto contiene lenguaje ofensivo. Corregilo antes de publicar.")
     expect(moderatePetText("Perro marrón con collar rojo")).toBeNull()
+    expect(moderatePetText("Gato perdido negro")).toBeNull()
+    expect(moderatePetText("Perra perdida con collar rojo")).toBeNull()
+    expect(moderatePetText("Rata encontrada en una jaula")).toBeNull()
   })
 
   it("aplica título y descripción de reportes", () => {
