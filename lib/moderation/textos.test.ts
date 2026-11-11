@@ -51,7 +51,7 @@ describe("moderateText", () => {
 
   it.each([
     [approved, approved],
-    [{ decision: "REJECTED", motivo: "OFF_TOPIC" }, { decision: "REJECTED", motivo: "OFF_TOPIC", error: "Describí un problema relacionado con la categoría o la mascota, sin bromas fuera de tema." }],
+    [{ decision: "REJECTED", motivo: "OFF_TOPIC" }, { decision: "REJECTED", motivo: "OFF_TOPIC", error: "El título y la descripción deben estar relacionados con la categoría o la mascota seleccionada." }],
     [{ decision: "REJECTED", motivo: "DIRECTED_INSULT" }, { decision: "REJECTED", motivo: "DIRECTED_INSULT", error: "Reescribí el texto sin insultos dirigidos a personas o grupos." }],
     [{ decision: "REJECTED", motivo: "OBSCENE" }, { decision: "REJECTED", motivo: "OBSCENE", error: "Reescribí el texto sin contenido obsceno." }],
     [{ decision: "REVIEW", motivo: "UNCERTAIN" }, { decision: "REVIEW", motivo: "UNCERTAIN", error: "No pudimos determinar si el texto es adecuado. Aclaralo e intentá nuevamente." }],
@@ -145,7 +145,7 @@ describe("moderateText", () => {
 
   it.each([
     [approved, approved],
-    [{ decision: "REJECTED", motivo: "OFF_TOPIC" }, { decision: "REJECTED", motivo: "OFF_TOPIC", error: "Describí un problema relacionado con la categoría o la mascota, sin bromas fuera de tema." }],
+    [{ decision: "REJECTED", motivo: "OFF_TOPIC" }, { decision: "REJECTED", motivo: "OFF_TOPIC", error: "El título y la descripción deben estar relacionados con la categoría o la mascota seleccionada." }],
   ])("validates structured provider responses locally", async (response, expected) => {
     run.mockResolvedValue({ response })
     await expect(moderateText(pet)).resolves.toEqual(expected)

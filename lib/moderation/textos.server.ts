@@ -22,7 +22,7 @@ export type TextModerationResult =
   | { decision: "UNAVAILABLE"; motivo: "INVALID_INPUT" | "SERVICE_UNAVAILABLE" | "TIMEOUT"; error: string }
 
 const errors = {
-  OFF_TOPIC: "Describí un problema relacionado con la categoría o la mascota, sin bromas fuera de tema.",
+  OFF_TOPIC: "El título y la descripción deben estar relacionados con la categoría o la mascota seleccionada.",
   DIRECTED_INSULT: "Reescribí el texto sin insultos dirigidos a personas o grupos.",
   OBSCENE: "Reescribí el texto sin contenido obsceno.",
   UNCERTAIN: "No pudimos determinar si el texto es adecuado. Aclaralo e intentá nuevamente.",
