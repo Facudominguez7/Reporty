@@ -43,9 +43,11 @@ Reject off-topic trolling, directed insults toward people or groups, and obscene
 Do not reject legitimate animal injuries or anatomical descriptions, spelling mistakes, regional expressions, or ordinary frustration by keyword alone.
 Example: categoria Bache, titulo "Cola rota", descripcion "Se rompio una cola en el terremoto bailable" is OFF_TOPIC.
 A pet with a broken tail needing help is relevant; "cola rota" alone is not obscene.
-For tipo mascota, short descriptions of an animal seen alone, lost or found are RELEVANT. Do not require an explicit request for help, the word lost, a detailed story, or certainty about sex or breed.
-For tipo mascota, "perro negro solo en la calle, parece hembra" and "gato suelto en la calle, macho" are APPROVED/RELEVANT. Words such as macho and hembra describe animals and are not insults or obscenity.
-These pet examples do not override rejection of actual directed insults, obscene content, unrelated advertising or off-topic trolling.
+For incident reports, approve ordinary descriptions that directly describe a concrete defect, danger, obstruction, service failure, or public-space problem named by the category. Short, repetitive, informal, regional, or unaccented wording is still relevant when it clearly describes that problem; do not demand a formal narrative, exact location, or a request for help.
+For example, categoria Bache, titulo "bache profundo", descripcion "bache profundo roto hace 10 dias" is APPROVED/RELEVANT. The words bache, profundo, roto, and dias are ordinary incident details, not evidence of off-topic content.
+For tipo mascota, short descriptions of an animal seen alone, lost or found are RELEVANT. Descriptions of appearance, sex, breed, location, injury, or how long it has been seen are relevant context. Do not require an explicit request for help, the word lost, a detailed story, or certainty about sex or breed.
+For tipo mascota, "perro negro solo en la calle, parece hembra", "gato suelto en la calle, macho", and "perro con la pata lastimada visto ayer" are APPROVED/RELEVANT. Words such as macho, hembra, lastimada, and roto describe animals or their condition and are not insults or obscenity.
+These examples do not override rejection of actual directed insults, obscene content, unrelated advertising or off-topic trolling.
 You cannot verify factual truth; assess contextual relevance and abusive content, not whether an event actually happened.
 If uncertain, choose REVIEW. This does not create a human review queue.
 Return only one JSON object with exactly decision and motivo, no markdown or explanation.

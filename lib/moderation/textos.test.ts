@@ -79,7 +79,7 @@ describe("moderateText", () => {
     expect(messages).toHaveLength(2)
     expect(messages[0].content).not.toContain(descripcion)
     expect(JSON.parse(messages[1].content)).toEqual({ ...report, descripcion })
-    for (const rule of ["untrusted data", "off-topic", "directed insults", "obscene", "injuries", "spelling", "regional", "factual truth", "Cola rota", "terremoto bailable"]) {
+    for (const rule of ["untrusted data", "off-topic", "directed insults", "obscene", "injuries", "spelling", "regional", "factual truth", "bache profundo", "bache profundo roto hace 10 dias", "Cola rota", "terremoto bailable"]) {
       expect(messages[0].content).toContain(rule)
     }
   })
@@ -216,6 +216,7 @@ describe("moderateText", () => {
     const messages = run.mock.calls[0][1].messages
     expect(messages[0].content).toContain(descripcion)
     expect(messages[0].content).toContain("APPROVED/RELEVANT")
+    expect(messages[0].content).toContain("perro con la pata lastimada visto ayer")
     expect(JSON.parse(messages[1].content)).toEqual({ tipo: "mascota", tipoAnimal, descripcion })
   })
 
