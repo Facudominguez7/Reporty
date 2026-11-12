@@ -29,9 +29,30 @@ describe('moderarImagen', () => {
     expect(llamada).toHaveBeenCalledTimes(1)
     const [url, opciones] = llamada.mock.calls[0]
     expect(url).toBe('https://api.sightengine.com/1.0/check.json')
-    expect(opciones.method).toBe('POST'); expect(opciones.redirect).toBe('error')
+    expect(opciones.method).toBe('POST'); expect(opciones.redirect).toBe('manual')
     expect(opciones.body.get('models')).toBe('nudity-2.1,weapon,gore-2.0,violence')
     expect(opciones.body.get('media')).toBeInstanceOf(Blob)
+  })
+  it('clasifica en un runtime que no implementa redirect "error" (Cloudflare Workers)', async () => {
+    // Workers lanza TypeError al construir un Request con redirect: 'error'.
+    configurar()
+    const llamada = vi.fn((_url: string, opciones: RequestInit) => opciones.redirect === 'error'
+      ? Promise.reject(new TypeError('Invalid redirect value, must be one of "follow" or "manual"'))
+      : Promise.resolve(new Response(JSON.stringify(segura()))))
+    vi.stubGlobal('fetch', llamada)
+    const resultado = await moderarImagen(new Blob(['imagen']))
+    expect(resultado.decision).toBe('APPROVED')
+    expect(resultado.motivos).not.toContain('proveedor_no_disponible')
+    expect(llamada).toHaveBeenCalledTimes(1)
+  })
+  it('no sigue una redirección del proveedor y deja la foto en revisión', async () => {
+    configurar()
+    const llamada = vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { location: 'https://otro.example/' } }))
+    vi.stubGlobal('fetch', llamada)
+    const resultado = await moderarImagen(new Blob(['imagen']))
+    expect(resultado.decision).toBe('REVIEW')
+    expect(resultado.motivos).toContain('proveedor_no_disponible')
+    expect(llamada).toHaveBeenCalledTimes(1)
   })
   it.each([429, 500, 503])('revisa HTTP %s sin reintentar', async estado => {
     configurar(); const llamada = vi.fn().mockResolvedValue(new Response(JSON.stringify({ request: { operations: 0 } }), { status: estado }))
