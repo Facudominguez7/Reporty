@@ -21,7 +21,8 @@ import { createClient } from "@/utils/supabase/server"
 import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
 
 const createReportSchema = z.object({
-  titulo: z.string().trim().min(3).max(120),
+  // Solo la categoría «Otros» envía título; en el resto lo arma el servidor.
+  titulo: z.preprocess((valor) => (valor === null || valor === "" ? undefined : valor), z.string().trim().min(3).max(120).optional()),
   descripcion: z.string().trim().min(10).max(5000),
   categoriaId: z.coerce.number({ error: "Expected number, received nan" }).refine(Number.isInteger, "Expected integer, received float").positive("Seleccioná una categoría."),
   prioridadId: z.coerce.number({ error: "Expected number, received nan" }).refine(Number.isInteger, "Expected integer, received float").positive("Seleccioná una prioridad."),
@@ -132,7 +133,7 @@ export async function crearReporteAction(formData: FormData) {
       submissionId: formData.get("submissionId"),
     })
 
-    const textModerationError = moderateReportText(parsedInput.titulo, parsedInput.descripcion)
+    const textModerationError = moderateReportText(parsedInput.titulo ?? "", parsedInput.descripcion)
     if (textModerationError) return { success: false as const, error: textModerationError }
 
     const image = obtenerImagen(formData)

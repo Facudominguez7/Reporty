@@ -136,7 +136,7 @@ describe("report contact actions", () => {
     expect(new URL(contactHref("whatsapp", "3764680021", draft, title)!).searchParams.get("text")).toBe(draft)
     const creation = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
     const detail = readFileSync(new URL("../[id]/reporte-detalle-client.tsx", import.meta.url), "utf8")
-    expect(creation).toMatch(/<ReportContactActions\s+title=\{formData.title\}/)
+    expect(creation).toMatch(/<ReportContactActions\s+title=\{createdReport.titulo\}/)
     expect(detail).toMatch(/<ReportContactActions\s+[\s\S]*?title=\{reporte.titulo\}/)
     expect(detail).not.toContain("<ReportContactDialog")
   })

@@ -28,12 +28,52 @@ beforeEach(() => {
 
 describe("crearReporteWorkflow", () => {
   it("bloquea el texto ofensivo antes de guardar el reporte", async () => {
-    const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "p3lotudo" })
+    const result = await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 7, titulo: "p3lotudo" })
     expect(result).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
     expect(dobles.crearReporte).not.toHaveBeenCalled()
     expect(dobles.obtenerDireccion).not.toHaveBeenCalled()
   })
 
+  it("bloquea una descripción ofensiva aunque el título sea automático", async () => {
+    expect(await crearReporteWorkflow(supabase, { ...entrada, descripcion: "p3lotudo el que rompió esto" })).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("arma el título con la categoría y la dirección, sin usar el título enviado", async () => {
+    const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "Cualquier cosa" })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Bache en Bolívar 1450, Posadas" }))
+    expect(result).toMatchObject({ success: true, data: { titulo: "Bache en Bolívar 1450, Posadas" } })
+  })
+  it.each([undefined, "", "ab"])("sin dirección pide un título escrito sin crear el reporte (%j)", async (titulo) => {
+    dobles.obtenerDireccion.mockResolvedValue(null)
+    expect(await crearReporteWorkflow(supabase, { ...entrada, titulo })).toEqual({
+      success: false, requiereTitulo: true,
+      error: "No pudimos obtener la dirección de ese punto. Escribí un título para el reporte y volvé a enviarlo.",
+    })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("sin dirección usa el título escrito por la persona", async () => {
+    dobles.obtenerDireccion.mockResolvedValue(null)
+    const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "  Bache frente a la escuela  " })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Bache frente a la escuela", direccion: null }))
+    expect(result).toMatchObject({ success: true, data: { titulo: "Bache frente a la escuela" } })
+  })
+  it("bloquea un título ofensivo aunque la categoría tenga título automático", async () => {
+    dobles.obtenerDireccion.mockResolvedValue(null)
+    expect(await crearReporteWorkflow(supabase, { ...entrada, titulo: "p3lotudo" })).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("en Otros conserva el título escrito por la persona", async () => {
+    await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 7, titulo: "  Explosión de cloaca  " })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Explosión de cloaca" }))
+  })
+  it.each([undefined, "", "ab"])("en Otros exige un título de al menos 3 caracteres (%j)", async (titulo) => {
+    expect(await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 7, titulo })).toEqual({ success: false, error: "En la categoría Otros escribí un título de al menos 3 caracteres." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("rechaza una categoría desconocida sin crear el reporte", async () => {
+    expect(await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 99 })).toEqual({ success: false, error: "Seleccioná una categoría válida." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
   it("guarda la dirección de las coordenadas al crear el reporte", async () => {
     await crearReporteWorkflow(supabase, entrada)
     expect(dobles.obtenerDireccion).toHaveBeenCalledWith(-27.37, -55.9)
@@ -41,7 +81,7 @@ describe("crearReporteWorkflow", () => {
   })
   it("crea el reporte igual cuando no se encuentra la dirección", async () => {
     dobles.obtenerDireccion.mockResolvedValue(null)
-    expect(await crearReporteWorkflow(supabase, entrada)).toMatchObject({ success: true })
+    expect(await crearReporteWorkflow(supabase, { ...entrada, titulo: "Bache en la esquina" })).toMatchObject({ success: true })
     expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ direccion: null }))
   })
   it("sin imagen conserva creación y puntos", async () => {
