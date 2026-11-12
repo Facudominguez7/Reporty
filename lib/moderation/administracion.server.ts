@@ -21,7 +21,6 @@ export type ImagenAdministrativa = {
   tipo?: "reporte" | "mascota"
   mascotaId?: number | null
   tipoAnimal?: string
-  mascota?: { id: number; tipoAnimal: "perro" | "gato" | "otro"; descripcion: string; lat: number; lon: number; telefono: string; estado: "perdida" | "encontrada" }
 }
 export type ResultadoRevision = { exito: boolean; mensaje: string; reporteId?: number; mascotaId?: number; imagenId?: string }
 export type EdicionMascotaAdmin = { id: number; tipoAnimal: "perro" | "gato" | "otro"; descripcion: string; lat: number; lon: number; telefono: string; estado: "perdida" | "encontrada" }
@@ -125,21 +124,8 @@ export async function listarImagenesAdministrativas(pagina: number, terminales =
     motivos: describirMotivos(fila.motivos), esReemplazo: false, tipo: "mascota" as const,
     mascotaId: fila.mascota_id, tipoAnimal: fila.tipo_animal,
   }))
-  let editablePets: ImagenAdministrativa[] = []
-  if (!terminales) {
-    const { data: mascotas, error: mascotasError } = await servicio.from("mascotas_perdidas")
-      .select("id,tipo_animal,descripcion,lat,lon,telefono,estado,publicada_at")
-      .is("retirada_at", null).eq("moderacion_estado", "aprobada")
-      .order("publicada_at", { ascending: false }).order("id", { ascending: false }).range(indice * 20, indice * 20 + 19)
-    if (mascotasError) fallar(503)
-    editablePets = (mascotas ?? []).filter((mascota) => Number.isSafeInteger(mascota.id) && typeof mascota.publicada_at === "string").map((mascota) => ({
-      id: `mascota-${mascota.id}`, mascotaId: mascota.id, reporteId: 0, decision: "APPROVED", estado: "publicada",
-      fecha: mascota.publicada_at, cargaPendiente: false, esReemplazo: false, motivos: [], tipo: "mascota" as const,
-      mascota: { id: mascota.id, tipoAnimal: mascota.tipo_animal as "perro" | "gato" | "otro", descripcion: mascota.descripcion, lat: mascota.lat,
-        lon: mascota.lon, telefono: mascota.telefono, estado: mascota.estado as "perdida" | "encontrada" },
-    }))
-  }
-  return [...reportRows, ...petRows, ...editablePets, ...noticeRows].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id))
+  // Las mascotas ya publicadas no son revisión de fotos: se editan desde su ficha.
+  return [...reportRows, ...petRows, ...noticeRows].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id))
 }
 
 /** Proyección administrativa sin email ni token del outbox. */

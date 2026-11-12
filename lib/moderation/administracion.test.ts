@@ -97,6 +97,11 @@ describe("frontera administrativa", () => {
     await listarImagenesAdministrativas(0, true)
     expect(consulta.in).toHaveBeenCalledWith("estado_publicacion", ["publicada", "rechazada"])
   })
+  it("no muestra mascotas ya publicadas en la cola activa de fotos", async () => {
+    const lista = await listarImagenesAdministrativas(0)
+    expect(lista.some((imagen) => imagen.estado === "publicada")).toBe(false)
+    expect(consulta.eq).not.toHaveBeenCalledWith("moderacion_estado", "aprobada")
+  })
   it("muestra motivos reales sin filtrar códigos desconocidos", async () => {
     fila.motivos = ["contenido_ambiguo_armas_violencia_o_lesiones", "proveedor_no_disponible", "secreto-falso"]
     const lista = await listarImagenesAdministrativas(0)
