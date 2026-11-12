@@ -39,4 +39,20 @@ describe("proxy", () => {
 
     expect(mocks.updateSession).toHaveBeenCalledTimes(3)
   })
+
+  it("no consulta la sesión en las páginas públicas que se sirven como HTML estático", async () => {
+    for (const path of ["/", "/terminos", "/privacidad", "/crear"]) {
+      const response = await proxy(request(path))
+
+      expect(response.headers.get("x-middleware-next")).toBe("1")
+    }
+    expect(mocks.updateSession).not.toHaveBeenCalled()
+  })
+
+  it("sigue refrescando la sesión en las rutas que la leen, aunque se parezcan a las públicas", async () => {
+    const rutas = ["/mapa", "/reportes", "/donar", "/terminos/otra", "/crear-algo", "/dashboard"]
+    for (const path of rutas) await proxy(request(path))
+
+    expect(mocks.updateSession).toHaveBeenCalledTimes(rutas.length)
+  })
 })
