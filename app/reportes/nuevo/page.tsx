@@ -157,6 +157,8 @@ export default function NuevoReportePage() {
   const [isLocatingLocation, setIsLocatingLocation] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // El servidor no encontró la dirección del punto: la persona escribe el título y reenvía.
+  const [tituloPorFaltaDeDireccion, setTituloPorFaltaDeDireccion] = useState(false)
   // True once the form holds its challenge token and the report is sent to the server.
   const [isPublishing, setIsPublishing] = useState(false)
   const [isOptimizingImage, setIsOptimizingImage] = useState(false)
@@ -333,8 +335,9 @@ export default function NuevoReportePage() {
   const locationIsValid =
     formData.lat !== null && formData.lon !== null && isWithinReportCoverage(formData.lat, formData.lon)
 
-  // Solo «Otros» pide título; en el resto lo arma el servidor con la categoría y la dirección.
-  const pideTitulo = formData.category !== "" && requiereTituloManual(Number(formData.category))
+  // «Otros» siempre pide título; el resto solo cuando el servidor no encontró la dirección.
+  const esOtros = formData.category !== "" && requiereTituloManual(Number(formData.category))
+  const pideTitulo = esOtros || tituloPorFaltaDeDireccion
   const tituloAutomatico = formData.category !== "" ? armarTituloReporte(Number(formData.category), null) : null
 
   const canSubmitReport =
@@ -414,7 +417,21 @@ export default function NuevoReportePage() {
     if (!open) router.push("/mapa")
   }
 
+  /**
+   * Muestra el error de un envío rechazado y, si el servidor pidió título por falta de
+   * dirección, habilita el campo para que la persona lo escriba y reenvíe.
+   *
+   * @param fallo - Respuesta fallida de la creación del reporte.
+   */
+  const avisarFalloDeEnvio = (fallo: { error: string; requiereTitulo?: boolean }) => {
+    if (fallo.requiereTitulo) setTituloPorFaltaDeDireccion(true)
+    toast.error(fallo.requiereTitulo ? "Falta el título del reporte" : "Error al crear el reporte", {
+      description: fallo.error,
+    })
+  }
+
   const startNewReport = () => {
+    setTituloPorFaltaDeDireccion(false)
     setFormData((prev) => ({
       ...prev,
       title: "",
@@ -487,9 +504,7 @@ export default function NuevoReportePage() {
         // Siteverify consumed the token: the retry needs a new challenge, but the report
         // and everything already written in the form stay exactly as they were.
         requestNewCaptcha()
-        toast.error("Error al crear el reporte", {
-          description: result.error,
-        })
+        avisarFalloDeEnvio(result)
         return
       }
 
@@ -715,7 +730,7 @@ export default function NuevoReportePage() {
                   {formData.category === "" && (
                     <p className="text-xs font-medium text-destructive">Seleccioná una categoría.</p>
                   )}
-                  {tituloAutomatico && (
+                  {tituloAutomatico && !pideTitulo && (
                     <p className="text-xs text-muted-foreground">
                       Título automático: {tituloAutomatico} en la dirección que marques en el mapa.
                     </p>
@@ -725,13 +740,18 @@ export default function NuevoReportePage() {
                       <Label htmlFor="title">Título del reporte *</Label>
                       <Input
                         id="title"
-                        placeholder="Ej: Pérdida de cloaca en la vereda"
+                        autoFocus={!esOtros}
+                        placeholder={esOtros ? "Ej: Pérdida de cloaca en la vereda" : "Ej: Bache frente a la escuela 12"}
                         maxLength={120}
                         value={formData.title}
                         onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                         required
                       />
-                      <p className="text-xs text-muted-foreground">En «Otros» contanos en pocas palabras cuál es el problema.</p>
+                      <p className="text-xs text-muted-foreground">
+                        {esOtros
+                          ? "En «Otros» contanos en pocas palabras cuál es el problema."
+                          : "No pudimos obtener la dirección de ese punto: escribí un título que ayude a ubicar el problema."}
+                      </p>
                       {formData.title.trim().length > 0 && formData.title.trim().length < 3 && (
                         <p className="text-xs text-destructive">El título debe tener al menos 3 caracteres.</p>
                       )}

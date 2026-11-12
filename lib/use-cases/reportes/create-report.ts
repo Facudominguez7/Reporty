@@ -18,10 +18,24 @@ import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
 
 type MutationResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string }
+  | { success: false; error: string; requiereTitulo?: true }
+
+/** Respuesta cuando falta la dirección: el formulario muestra el campo título y se reenvía. */
+const MENSAJE_TITULO_SIN_DIRECCION =
+  "No pudimos obtener la dirección de ese punto. Escribí un título para el reporte y volvé a enviarlo."
+
+/**
+ * Indica si un título escrito por la persona tiene un largo aceptable.
+ *
+ * @param titulo - Título ya recortado.
+ * @returns `true` si tiene entre 3 y el máximo de caracteres.
+ */
+function tituloEscritoValido(titulo: string): boolean {
+  return titulo.length >= 3 && titulo.length <= TITULO_REPORTE_MAX
+}
 
 export type CreateReportWorkflowInput = Omit<CrearReporteParams, "titulo" | "direccion"> & {
-  /** Solo se usa en la categoría «Otros»; en el resto el título se arma solo. */
+  /** Se usa en la categoría «Otros» o cuando no se encuentra la dirección; si no, el título se arma solo. */
   titulo?: string | null
   image?: File | null
   imageThumbnail?: File | null
@@ -47,7 +61,8 @@ export type CreateReportWorkflowResult = {
  * si Nominatim falla o tarda, el reporte se crea con `direccion` en null.
  *
  * El título se arma con la categoría y la dirección («Bache en Bolívar 1450, Posadas»);
- * solo en la categoría «Otros» se usa el título que escribió la persona.
+ * se usa el título que escribió la persona en la categoría «Otros» o cuando no hay dirección.
+ * Sin dirección ni título escrito, el reporte no se crea y se pide el título (`requiereTitulo`).
  */
 export async function crearReporteWorkflow(
   supabase: SupabaseClient,
@@ -59,15 +74,17 @@ export async function crearReporteWorkflow(
     return { success: false, error: "No tenés permisos para crear reportes." }
   }
 
-  const tituloManual = requiereTituloManual(input.categoriaId) ? (input.titulo ?? "").trim() : null
-  if (tituloManual !== null && (tituloManual.length < 3 || tituloManual.length > TITULO_REPORTE_MAX)) {
+  const tituloEscrito = (input.titulo ?? "").trim()
+  const esOtros = requiereTituloManual(input.categoriaId)
+  if (esOtros && !tituloEscritoValido(tituloEscrito)) {
     return { success: false, error: "En la categoría Otros escribí un título de al menos 3 caracteres." }
   }
-  if (tituloManual === null && armarTituloReporte(input.categoriaId, null) === null) {
+  if (!esOtros && armarTituloReporte(input.categoriaId, null) === null) {
     return { success: false, error: "Seleccioná una categoría válida." }
   }
 
-  const textModerationError = moderateReportText(tituloManual ?? "", input.descripcion)
+  // El título escrito puede terminar publicado (Otros o sin dirección): siempre se modera.
+  const textModerationError = moderateReportText(tituloEscrito, input.descripcion)
   if (textModerationError) return { success: false, error: textModerationError }
 
   // Arranca ya para no sumar su espera a la validación de la foto; nunca lanza.
@@ -82,7 +99,11 @@ export async function crearReporteWorkflow(
     await validateUploadedReportImage(input.image)
   }
   const direccion = await direccionPendiente
-  const titulo = tituloManual ?? (armarTituloReporte(input.categoriaId, direccion) as string)
+  let titulo: string
+  if (esOtros) titulo = tituloEscrito
+  else if (direccion) titulo = armarTituloReporte(input.categoriaId, direccion) as string
+  else if (tituloEscritoValido(tituloEscrito)) titulo = tituloEscrito
+  else return { success: false, requiereTitulo: true, error: MENSAJE_TITULO_SIN_DIRECCION }
   const reporte = await crearReporte(supabase, { ...input, titulo, direccion })
 
   let imageModeration = input.image
