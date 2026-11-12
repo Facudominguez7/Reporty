@@ -1,12 +1,13 @@
 /** Contratos de creación, autorización y puntos independientes de la fotografía. */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { SupabaseClient } from "@supabase/supabase-js"
-const dobles = vi.hoisted(() => ({ crearReporte: vi.fn(), sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), moderarYGuardarImagenReporte: vi.fn(), subirImagenReporte: vi.fn(), obtenerDireccion: vi.fn() }))
+const dobles = vi.hoisted(() => ({ crearReporte: vi.fn(), sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), moderarYGuardarImagenReporte: vi.fn(), subirImagenReporte: vi.fn(), obtenerDireccion: vi.fn(), notificarOrganismos: vi.fn() }))
 vi.mock("@/lib/geocodificacion/direccion-inversa", () => ({ obtenerDireccion: dobles.obtenerDireccion }))
 vi.mock("@/database/queries/reportes/nuevo", () => ({ crearReporte: dobles.crearReporte, subirImagenReporte: dobles.subirImagenReporte }))
 vi.mock("@/database/queries/puntos", () => ({ sumarPuntos: dobles.sumarPuntos, PUNTOS: { CREAR_REPORTE: 10 } }))
 vi.mock("@/lib/authz/roles", async (original) => ({ ...await original<typeof import("@/lib/authz/roles")>(), getUserRoleContext: dobles.getUserRoleContext }))
 vi.mock("@/lib/moderation/imagenes-reporte.server", () => ({ moderarYGuardarImagenReporte: dobles.moderarYGuardarImagenReporte }))
+vi.mock("./notificar-organismos", () => ({ notificarOrganismosDeReporte: dobles.notificarOrganismos }))
 import { crearReporteWorkflow } from "./create-report"
 const rpc = vi.fn()
 const leerReporte = vi.fn()
@@ -24,6 +25,7 @@ beforeEach(() => {
   leerReporte.mockReset().mockResolvedValue({ data: { deleted_at: null }, error: null })
   dobles.sumarPuntos.mockResolvedValue({ success: true })
   dobles.moderarYGuardarImagenReporte.mockResolvedValue({ estado: "REVIEW", publicada: false, motivos: ["Pendiente"], advertencias: [] })
+  dobles.notificarOrganismos.mockResolvedValue([])
 })
 
 describe("crearReporteWorkflow", () => {
@@ -131,6 +133,29 @@ describe("crearReporteWorkflow", () => {
   it("tipo inválido conserva error sin crear reporte", async () => {
     await expect(crearReporteWorkflow(supabase, { ...entrada, image: new File(["x"], "x.svg", { type: "image/svg+xml" }) })).rejects.toThrow("JPG, PNG o WebP")
     expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("reporte publicado avisa a los organismos del directorio y expone los correos enviados", async () => {
+    dobles.notificarOrganismos.mockResolvedValue(["movilidadurbana@posadas.gov.ar"])
+    const result = await crearReporteWorkflow(supabase, entrada)
+    expect(dobles.notificarOrganismos).toHaveBeenCalledWith(supabase, expect.objectContaining({
+      reporteId: 7,
+      titulo: "Bache en Bolívar 1450, Posadas",
+      categoriaId: 1,
+      descripcion: "Frente a la plaza",
+      lat: -27.37,
+      lon: -55.9,
+    }))
+    expect(result).toMatchObject({ success: true, data: { correosEnviados: ["movilidadurbana@posadas.gov.ar"] } })
+  })
+  it.each([
+    { nombre: "foto rechazada", estado: "REJECTED" as const },
+    { nombre: "retiro administrativo concurrente", estado: "APPROVED" as const, retirado: true },
+  ])("$nombre no avisa a organismos", async ({ estado, retirado }) => {
+    const bytes = new Uint8Array(24); bytes.set([137,80,78,71,13,10,26,10]); bytes[19] = 1; bytes[23] = 1
+    if (retirado) leerReporte.mockResolvedValue({ data: { deleted_at: "retirado" }, error: null })
+    dobles.moderarYGuardarImagenReporte.mockResolvedValue({ estado, publicada: false, motivos: ["x"], advertencias: [] })
+    await crearReporteWorkflow(supabase, { ...entrada, image: new File([bytes], "x.png", { type: "image/png" }) })
+    expect(dobles.notificarOrganismos).not.toHaveBeenCalled()
   })
   it.each(["REJECTED", "REVIEW", "ERROR_PRIVADO", "APPROVED"])("%s usa ledger y devuelve estado seguro", async (estado) => {
     // Encabezado aceptado históricamente; el módulo confiable simulado realiza el decode real.

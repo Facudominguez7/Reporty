@@ -15,6 +15,7 @@ import { moderarYGuardarImagenReporte, type ResultadoImagenReporte } from "@/lib
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
 import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
+import { notificarOrganismosDeReporte } from "./notificar-organismos"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -51,6 +52,8 @@ export type CreateReportWorkflowResult = {
   imageModeration: ResultadoImagenReporte | null
   pointsAwarded: number
   isGuest: boolean
+  /** Correos de organismos a los que salió el aviso automático; vacío si no se avisó a nadie. */
+  correosEnviados: string[]
 }
 
 /**
@@ -139,6 +142,51 @@ export async function crearReporteWorkflow(
     }
   }
 
+  // El aviso a los organismos del directorio es best-effort: la creación ya quedó confirmada y un
+  // fallo de correo no la invalida. Sólo se avisa cuando el reporte sigue publicado.
+  if (imageModeration?.estado !== "REJECTED") {
+    try {
+      await notificarOrganismosDeReporte(supabase, {
+        reporteId: reporte.id,
+        titulo,
+        categoriaId: input.categoriaId,
+        descripcion: input.descripcion,
+        lat: input.lat,
+        lon: input.lon,
+      })
+    } catch {
+      // El reporte ya existe; el aviso automático es opcional y no se reintenta acá.
+    }
+  }
+
+  if (imageModeration?.estado !== "REJECTED") {
+    let correosEnviados: string[] = []
+    try {
+      correosEnviados = await notificarOrganismosDeReporte(supabase, {
+        reporteId: reporte.id,
+        titulo,
+        categoriaId: input.categoriaId,
+        descripcion: input.descripcion,
+        lat: input.lat,
+        lon: input.lon,
+      })
+    } catch {
+      // El reporte ya existe; el aviso automático es opcional y no se reintenta acá.
+    }
+    return {
+      success: true,
+      data: {
+        reportId: reporte.id,
+        titulo,
+        imageUploaded,
+        imageModeration,
+        pointsAwarded,
+        isGuest,
+        correosEnviados,
+      },
+    }
+  }
+
   return {
     success: true,
     data: {
@@ -148,6 +196,7 @@ export async function crearReporteWorkflow(
       imageModeration,
       pointsAwarded,
       isGuest,
+      correosEnviados: [],
     },
   }
 }

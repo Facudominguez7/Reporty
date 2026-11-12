@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { sendAdminReviewNotificationEmail, sendCommentNotificationEmail, sendCrewAssignedEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail, sendRepairReviewCancelledEmail } from "./report-notifications"
+import { sendAdminReviewNotificationEmail, sendCommentNotificationEmail, sendCrewAssignedEmail, sendOrganismoNotificationEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail, sendRepairReviewCancelledEmail } from "./report-notifications"
 import { ROLE_IDS } from "@/lib/authz/catalog"
 
 const mocks = vi.hoisted(() => ({ send: vi.fn() }))
@@ -55,6 +55,27 @@ const expectNewStyle = (html: string) => {
 }
 
 describe("report notification emails", () => {
+  it("envía el aviso de nuevo reporte al organismo del directorio con idempotencia por contacto", async () => {
+    await sendOrganismoNotificationEmail({
+      destinatario: "movilidadurbana@posadas.gov.ar",
+      organizacion: "Movilidad Urbana",
+      reporteId: 42,
+      reporteTitulo: "Semaforo en Bolívar 1450, Posadas",
+      categoria: "Semaforo",
+      descripcion: "El semáforo quedó en rojo fijo.",
+      contactoId: 9,
+    })
+    const email = sentEmail()
+    expect(email.to).toEqual(["movilidadurbana@posadas.gov.ar"])
+    expect(email.subject).toContain("Semaforo en Bolívar 1450, Posadas")
+    expect(email.html).toContain("Movilidad Urbana")
+    expect(email.html).toContain("Semaforo")
+    expect(email.html).toContain("El semáforo quedó en rojo fijo.")
+    expect(email.html).toContain("https://reporty.com.ar/reportes/42")
+    expect(email.text).toContain("https://reporty.com.ar/reportes/42")
+    expect(mocks.send.mock.calls[0][1]).toEqual({ idempotencyKey: "organismo-aviso/42/9" })
+  })
+
   beforeEach(() => {
     vi.resetAllMocks()
     vi.stubEnv("RESEND_API_KEY", "test-key")
