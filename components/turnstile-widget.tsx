@@ -323,6 +323,33 @@ const TURNSTILE_SCRIPT_POLL_MS = 50
 
 export type TurnstileStatus = "idle" | "verified" | "error" | "unavailable"
 
+/**
+ * Espera máxima por un desafío que no entregó token. Un desafío sano aparece en 1-2 s y en
+ * redes móviles lentas en 3-5 s; pasado este límite se ofrece el reintento. Mostrarlo de más
+ * sólo agrega un botón, mientras que no mostrarlo deja la recarga de la página como única salida.
+ */
+export const TURNSTILE_DESAFIO_DEMORADO_MS = 6_000
+
+/** Pista que acompaña al reintento cuando el desafío quedó en blanco sin informar un error. */
+export const copyDesafioDemorado = "¿No aparece la verificación? Tocá «Reintentar la verificación»."
+
+/**
+ * Avisa cuando el desafío no entregó un token dentro del límite. Cloudflare puede quedar en
+ * blanco después de un `reset()` (visto en iPhone) sin llamar a `error-callback`, y el widget
+ * quedaba "idle" sin ninguna salida.
+ *
+ * @param alDemorarse - Se llama una vez cuando vence el límite.
+ * @param limiteMs - Espera máxima; por defecto `TURNSTILE_DESAFIO_DEMORADO_MS`.
+ * @returns Función que cancela la vigilancia.
+ */
+export function vigilarDesafioDemorado(
+  alDemorarse: () => void,
+  limiteMs = TURNSTILE_DESAFIO_DEMORADO_MS,
+): () => void {
+  const temporizador = setTimeout(alDemorarse, limiteMs)
+  return () => clearTimeout(temporizador)
+}
+
 /** Texto de cada estado; los formularios y las pruebas leen el mismo texto que muestra el widget. */
 export const copyDeEstadoTurnstile: Record<TurnstileStatus, string> = {
   idle: "Verificación de seguridad",
@@ -336,12 +363,13 @@ export const copyDeEstadoTurnstile: Record<TurnstileStatus, string> = {
 /**
  * Cómo continúa el reintento según el estado actual de la verificación.
  *
- * - `resetear-desafio`: hay un desafío montado, así que sólo hace falta un token nuevo.
- * - `remontar-desafio`: la API está cargada pero el render falló, así que se reusa el contenedor.
+ * - `remontar-desafio`: la API está cargada; el desafío se quita y se vuelve a dibujar en el
+ *   mismo contenedor. Aunque haya un desafío montado no se usa `reset()`, porque un reset puede
+ *   dejar la caja en blanco sin avisar ningún error.
  * - `reiniciar-espera`: la API nunca llegó (script lento o todavía en vuelo), así que la espera
  *   acotada arranca de nuevo en vez de dejar el widget sin salida.
  */
-export type ReintentoDeVerificacion = "resetear-desafio" | "remontar-desafio" | "reiniciar-espera"
+export type ReintentoDeVerificacion = "remontar-desafio" | "reiniciar-espera"
 
 /**
  * Decide qué hace el botón de reintento sin tocar el estado de React.
@@ -357,20 +385,20 @@ export function decidirReintentoDeVerificacion({
   tieneDesafio: boolean
   apiLista: boolean
 }): ReintentoDeVerificacion {
-  if (tieneDesafio) return "resetear-desafio"
-  return apiLista ? "remontar-desafio" : "reiniciar-espera"
+  return tieneDesafio || apiLista ? "remontar-desafio" : "reiniciar-espera"
 }
 
 /**
- * El reintento se ofrece siempre que la verificación no esté resuelta: un error interno o un
- * script que nunca llegó. El segundo caso dejaba al widget sin más recuperación que recargar
- * la página entera.
+ * El reintento se ofrece siempre que la verificación no esté resuelta: un error interno, un
+ * script que nunca llegó o un desafío que quedó esperando sin entregar un token. Esos casos
+ * dejaban al widget sin más recuperación que recargar la página entera.
  *
  * @param status - Estado actual del widget.
+ * @param desafioDemorado - Si venció la espera de `vigilarDesafioDemorado`.
  * @returns Si hay que renderizar el control de reintento.
  */
-export function mostrarReintentoDeVerificacion(status: TurnstileStatus): boolean {
-  return status === "error" || status === "unavailable"
+export function mostrarReintentoDeVerificacion(status: TurnstileStatus, desafioDemorado = false): boolean {
+  return status === "error" || status === "unavailable" || (status === "idle" && desafioDemorado)
 }
 
 /** Opciones de la espera acotada; el efecto del widget sólo pasa la señal de cancelación. */
@@ -504,6 +532,8 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
   const [mountAttempt, setMountAttempt] = useState(0)
   // Lo incrementa el botón de reintento cuando la API nunca llegó: reinicia la espera acotada.
   const [waitAttempt, setWaitAttempt] = useState(0)
+  // Se activa cuando el desafío pasó demasiado tiempo sin entregar un token.
+  const [desafioDemorado, setDesafioDemorado] = useState(false)
   const statusId = useId()
 
   useEffect(() => {
@@ -546,6 +576,7 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
       callbacks: {
         onToken: (token) => {
           onTokenChangeRef.current(token)
+          setDesafioDemorado(false)
           setStatus(token ? "verified" : "idle")
         },
         onError: () => {
@@ -573,8 +604,16 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
     if (resetSignal === lastResetSignalRef.current) return
     lastResetSignalRef.current = resetSignal
     setStatus("idle")
+    setDesafioDemorado(false)
     handleRef.current?.reset()
   }, [resetSignal])
+
+  // Mientras se espera un token, una caja que Cloudflare dejó en blanco no avisa ningún error:
+  // vencido el límite se ofrece el reintento. Cada reset o remontaje reinicia la vigilancia.
+  useEffect(() => {
+    if (!scriptReady || status !== "idle") return
+    return vigilarDesafioDemorado(() => setDesafioDemorado(true))
+  }, [status, scriptReady, mountAttempt, resetSignal])
 
   const retry = () => {
     const accion = decidirReintentoDeVerificacion({
@@ -583,14 +622,10 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
     })
 
     setStatus("idle")
-
-    if (accion === "resetear-desafio") {
-      handleRef.current?.reset()
-      return
-    }
+    setDesafioDemorado(false)
 
     if (accion === "remontar-desafio") {
-      // El desafío nunca se renderizó: se monta de nuevo en vez de resetear nada.
+      // Se quita el desafío (si lo había) y se dibuja de nuevo: un reset podía no redibujar nada.
       setMountAttempt((attempt) => attempt + 1)
       return
     }
@@ -627,9 +662,9 @@ export function TurnstileWidget({ onTokenChange, resetSignal, action, className 
               : "text-xs text-muted-foreground"
           }
         >
-          {copyDeEstadoTurnstile[status]}
+          {status === "idle" && desafioDemorado ? copyDesafioDemorado : copyDeEstadoTurnstile[status]}
         </p>
-        {mostrarReintentoDeVerificacion(status) && (
+        {mostrarReintentoDeVerificacion(status, desafioDemorado) && (
           <Button type="button" variant="outline" size="sm" onClick={retry}>
             Reintentar la verificación
           </Button>
