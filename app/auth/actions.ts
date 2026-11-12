@@ -274,6 +274,20 @@ export async function iniciarSesionOAuth(formData: FormData): Promise<void> {
  *  - o un objeto vacío en caso de que la sesión se cree y se redirija al inicio.
  * Además, si el registro crea una sesión activa, la función revalida la caché del layout raíz y redirige a `/`.
  */
+const MENSAJE_CORREO_YA_REGISTRADO =
+  "Ese correo ya tiene una cuenta en Reporty. Iniciá sesión o recuperá tu contraseña."
+
+/**
+ * Detecta la respuesta que Supabase da a un registro repetido de un correo ya confirmado:
+ * devuelve un usuario ofuscado con `identities: []` y no envía ningún correo.
+ *
+ * @param usuario - Usuario devuelto por `auth.signUp`.
+ * @returns `true` si el correo ya pertenece a una cuenta existente.
+ */
+function correoYaRegistrado(usuario: { identities?: unknown[] | null } | null | undefined): boolean {
+  return Array.isArray(usuario?.identities) && usuario.identities.length === 0
+}
+
 export async function signup(_prevState: AuthFormState | void, formData: FormData): Promise<AuthFormState> {
   const bloqueoCaptcha = bloqueoPorCaptchaSinConfigurar()
 
@@ -317,6 +331,10 @@ export async function signup(_prevState: AuthFormState | void, formData: FormDat
 
   if (error) {
     return { error: mensajeErrorRegistro(error) }
+  }
+
+  if (correoYaRegistrado(signUpData?.user)) {
+    return { error: MENSAJE_CORREO_YA_REGISTRADO }
   }
 
   if (!signUpData?.session) {
