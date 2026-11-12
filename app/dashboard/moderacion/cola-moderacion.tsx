@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import type { ImagenAdministrativa, OperacionRevision } from "@/lib/moderation/administracion.server"
 import { conciliarAvisoMascotaAction, revisarImagenAction, reintentarAvisosMascotaAction } from "./actions"
-import { EditorMascotaAdmin } from "./mascota-admin-editor"
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", {
   dateStyle: "medium",
@@ -57,7 +56,6 @@ function TarjetaRevision({ imagen }: { imagen: ImagenAdministrativa }) {
       {!terminal && !imagenAusente ? <Image unoptimized src={`/api/moderacion/imagenes/${imagen.id}`} width={640} height={480} alt={`Evidencia privada ${mascota ? "de mascota" : `del reporte ${imagen.reporteId}`}, pendiente de decisión administrativa`} className="max-h-80 w-full rounded-md object-contain" onError={() => marcarAusente(true)} /> : null}
       {imagenAusente || imagen.cargaPendiente ? <p role="status">Imagen no disponible o carga no confirmada. Solo se puede aprobar si el servidor verifica los bytes privados; si faltan, rechazá la solicitud.</p> : null}
       <ul className="list-disc pl-5 text-sm text-muted-foreground">{imagen.motivos?.map((motivo) => <li key={motivo}>{motivo}</li>)}</ul>
-      {imagen.mascota && !imagen.soloAviso ? <EditorMascotaAdmin mascota={imagen.mascota} /> : null}
       {imagen.avisoMascota ? <p role="status" className="text-sm">Aviso: {imagen.avisoMascota.conciliadoAt ? `aceptación verificada y conciliada el ${imagen.avisoMascota.conciliadoAt}` : imagen.avisoMascota.conciliacion ? "aceptación incierta; requiere verificación manual, no se reenvía" : imagen.avisoMascota.estado}. Intentos: {imagen.avisoMascota.intentos}.</p> : null}
       {mascota && imagen.mascotaId && imagen.avisoMascota && !imagen.avisoMascota.conciliadoAt ? <Button variant="outline" disabled={pendiente || imagen.avisoMascota.conciliacion} onClick={() => iniciarTransicion(async () => { const resultado = await reintentarAvisosMascotaAction(imagen.mascotaId!); actualizarMensaje(resultado.mensaje); router.refresh() })}>Reintentar avisos de estado pendientes</Button> : null}
       {reclamada ? <p className="text-sm">Una clasificación pudo interrumpirse. Recuperar invalida su token y devuelve la foto a revisión humana; no vuelve a consumir proveedor. No recuperes trabajo activo.</p> : null}
