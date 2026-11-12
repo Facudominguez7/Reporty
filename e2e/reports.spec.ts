@@ -91,7 +91,8 @@ test.describe("reports", () => {
 
     await page.getByRole("link", { name: "Ver el reporte" }).click()
     await expect(page.getByText(titulo, { exact: true })).toBeVisible()
-    const image = page.getByAltText("Imagen 1 del reporte")
+    // The alt text also names the author and the date: "Foto 1 del reporte, publicada por …".
+    const image = page.getByAltText(/^Foto 1 del reporte/)
     await expect(image).toBeVisible()
     await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0)
   })
@@ -119,13 +120,13 @@ test.describe("reports", () => {
     await expect(page.getByText(titulo).first()).toBeVisible()
     expect(reporte.usuario_id).toBeTruthy()
 
-    for (const name of ["Reparado", "No existe"]) {
-      await page.goto(`/reportes/${reporte.id}`)
-      await page.getByRole("group", { name: "Votar sobre el reporte" }).getByRole("button", { name, exact: true }).click()
-      const dialog = page.getByRole("alertdialog")
-      await expect(dialog.getByText("Para votar necesitás iniciar sesión con una cuenta.")).toBeVisible()
-      await dialog.getByRole("button", { name: "Entendido" }).click()
-    }
+    // "No existe" is the only vote left: a repair is reported with photo evidence instead.
+    // A guest still cannot vote and is asked to sign in.
+    await page.goto(`/reportes/${reporte.id}`)
+    await page.getByRole("group", { name: "Acciones sobre el reporte" }).getByRole("button", { name: "No existe", exact: true }).click()
+    const dialog = page.getByRole("alertdialog")
+    await expect(dialog.getByText("Para votar necesitás iniciar sesión con una cuenta.")).toBeVisible()
+    await dialog.getByRole("button", { name: "Entendido" }).click()
   })
 
   test("a rejected verification keeps the form data and the retry publishes the report", async ({ page, testData }) => {
