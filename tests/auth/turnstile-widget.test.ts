@@ -494,11 +494,53 @@ describe("reintento de la verificación", () => {
     expect(decidirReintentoDeVerificacion({ tieneDesafio: false, apiLista: true })).toBe("remontar-desafio")
   })
 
-  it("resetea el desafío existente sin volver a montarlo", async () => {
+  it("remonta el desafío existente en vez de resetearlo, porque un reset puede no redibujar nada", async () => {
     const { decidirReintentoDeVerificacion } = await importWidget(TURNSTILE_TEST_SITE_KEY)
 
-    expect(decidirReintentoDeVerificacion({ tieneDesafio: true, apiLista: true })).toBe("resetear-desafio")
-    expect(decidirReintentoDeVerificacion({ tieneDesafio: true, apiLista: false })).toBe("resetear-desafio")
+    expect(decidirReintentoDeVerificacion({ tieneDesafio: true, apiLista: true })).toBe("remontar-desafio")
+    expect(decidirReintentoDeVerificacion({ tieneDesafio: true, apiLista: false })).toBe("remontar-desafio")
+  })
+
+  it("ofrece el reintento cuando el desafío quedó en espera sin entregar un token", async () => {
+    const { mostrarReintentoDeVerificacion } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    expect(mostrarReintentoDeVerificacion("idle", true)).toBe(true)
+    expect(mostrarReintentoDeVerificacion("verified", true)).toBe(false)
+    expect(mostrarReintentoDeVerificacion("error", false)).toBe(true)
+  })
+
+  it("avisa que el desafío se demoró sólo después del límite y se puede cancelar", async () => {
+    vi.useFakeTimers()
+    const { vigilarDesafioDemorado, TURNSTILE_DESAFIO_DEMORADO_MS } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+    const alDemorarse = vi.fn()
+
+    vigilarDesafioDemorado(alDemorarse)
+    await vi.advanceTimersByTimeAsync(TURNSTILE_DESAFIO_DEMORADO_MS - 1)
+    expect(alDemorarse).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(alDemorarse).toHaveBeenCalledTimes(1)
+
+    const cancelado = vi.fn()
+    const cancelar = vigilarDesafioDemorado(cancelado)
+    cancelar()
+    await vi.advanceTimersByTimeAsync(TURNSTILE_DESAFIO_DEMORADO_MS * 2)
+    expect(cancelado).not.toHaveBeenCalled()
+  })
+
+  it("explica qué hacer cuando el desafío no aparece", async () => {
+    const { copyDesafioDemorado } = await importWidget(TURNSTILE_TEST_SITE_KEY)
+
+    expect(copyDesafioDemorado).toBe("¿No aparece la verificación? Tocá «Reintentar la verificación».")
+  })
+
+  it("vigila el desafío mientras espera un token y muestra el reintento cuando se demora", async () => {
+    const { readFileSync } = await import("node:fs")
+    const codigo = readFileSync(new URL("../../components/turnstile-widget.tsx", import.meta.url), "utf8")
+
+    expect(codigo).toMatch(/if \(!scriptReady \|\| status !== "idle"\) return/)
+    expect(codigo).toContain("return vigilarDesafioDemorado(() => setDesafioDemorado(true))")
+    expect(codigo).toContain("}, [status, scriptReady, mountAttempt, resetSignal])")
+    expect(codigo).toContain("mostrarReintentoDeVerificacion(status, desafioDemorado)")
   })
 
   it("ofrece el botón de reintento también cuando el script no llegó", async () => {
@@ -531,7 +573,7 @@ describe("reintento de la verificación", () => {
     expect(codigo).toMatch(/esperarApiTurnstile\(\{[^}]*signal/) // la espera se puede cancelar
     expect(codigo).toMatch(/setWaitAttempt\(/)
     expect(codigo).toContain("}, [scriptReady, waitAttempt])")
-    expect(codigo).toContain("mostrarReintentoDeVerificacion(status)")
+    expect(codigo).toContain("mostrarReintentoDeVerificacion(status, desafioDemorado)")
     expect(codigo).toContain('type="button" variant="outline" size="sm" onClick={retry}')
   })
 })
