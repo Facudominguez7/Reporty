@@ -24,7 +24,9 @@ export async function moderarImagen(archivo: Blob): Promise<ResultadoModeracion>
       temporizador = setTimeout(() => { controlador.abort(); rechazar(new Error('plazo_agotado')) }, 8000)
     })
     const consulta = (async (): Promise<ResultadoModeracion> => {
-      const respuesta = await fetch('https://api.sightengine.com/1.0/check.json', { method: 'POST', body: formulario, redirect: 'error', signal: controlador.signal, cache: 'no-store' })
+      // Cloudflare Workers no implementa redirect 'error' (lanza TypeError): con 'manual'
+      // una redirección llega como respuesta no-ok y se trata como proveedor no disponible.
+      const respuesta = await fetch('https://api.sightengine.com/1.0/check.json', { method: 'POST', body: formulario, redirect: 'manual', signal: controlador.signal, cache: 'no-store' })
       const datos: unknown = await respuesta.json()
       if (!respuesta.ok) {
         const consumo = consumoModeracion(datos)
