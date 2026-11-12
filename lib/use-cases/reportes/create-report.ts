@@ -9,6 +9,7 @@ import {
   type CrearReporteParams,
 } from "@/database/queries/reportes/nuevo"
 import { obtenerDireccion } from "@/lib/geocodificacion/direccion-inversa"
+import { TITULO_REPORTE_MAX, armarTituloReporte, requiereTituloManual } from "@/lib/reportes/titulo-automatico"
 import { canCreateReports, getUserRoleContext, isGuestRole } from "@/lib/authz/roles"
 import { moderarYGuardarImagenReporte, type ResultadoImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
@@ -19,7 +20,9 @@ type MutationResult<T> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-export type CreateReportWorkflowInput = CrearReporteParams & {
+export type CreateReportWorkflowInput = Omit<CrearReporteParams, "titulo" | "direccion"> & {
+  /** Solo se usa en la categoría «Otros»; en el resto el título se arma solo. */
+  titulo?: string | null
   image?: File | null
   imageThumbnail?: File | null
   /** Identidad anónima verificada en sesión; se combina con el rol de base de datos. */
@@ -28,6 +31,8 @@ export type CreateReportWorkflowInput = CrearReporteParams & {
 
 export type CreateReportWorkflowResult = {
   reportId: number
+  /** Título con el que quedó guardado el reporte. */
+  titulo: string
   imageUploaded: boolean
   imageModeration: ResultadoImagenReporte | null
   pointsAwarded: number
@@ -40,6 +45,9 @@ export type CreateReportWorkflowResult = {
  *
  * La dirección se busca en paralelo con la validación de la imagen y nunca bloquea:
  * si Nominatim falla o tarda, el reporte se crea con `direccion` en null.
+ *
+ * El título se arma con la categoría y la dirección («Bache en Bolívar 1450, Posadas»);
+ * solo en la categoría «Otros» se usa el título que escribió la persona.
  */
 export async function crearReporteWorkflow(
   supabase: SupabaseClient,
@@ -51,7 +59,15 @@ export async function crearReporteWorkflow(
     return { success: false, error: "No tenés permisos para crear reportes." }
   }
 
-  const textModerationError = moderateReportText(input.titulo, input.descripcion)
+  const tituloManual = requiereTituloManual(input.categoriaId) ? (input.titulo ?? "").trim() : null
+  if (tituloManual !== null && (tituloManual.length < 3 || tituloManual.length > TITULO_REPORTE_MAX)) {
+    return { success: false, error: "En la categoría Otros escribí un título de al menos 3 caracteres." }
+  }
+  if (tituloManual === null && armarTituloReporte(input.categoriaId, null) === null) {
+    return { success: false, error: "Seleccioná una categoría válida." }
+  }
+
+  const textModerationError = moderateReportText(tituloManual ?? "", input.descripcion)
   if (textModerationError) return { success: false, error: textModerationError }
 
   // Arranca ya para no sumar su espera a la validación de la foto; nunca lanza.
@@ -65,7 +81,9 @@ export async function crearReporteWorkflow(
     if (input.image.size > REPORT_IMAGE_MAX_BYTES) throw new Error(`La imagen optimizada no puede superar los ${REPORT_IMAGE_MAX_BYTES_LABEL}.`)
     await validateUploadedReportImage(input.image)
   }
-  const reporte = await crearReporte(supabase, { ...input, direccion: await direccionPendiente })
+  const direccion = await direccionPendiente
+  const titulo = tituloManual ?? (armarTituloReporte(input.categoriaId, direccion) as string)
+  const reporte = await crearReporte(supabase, { ...input, titulo, direccion })
 
   let imageModeration = input.image
     ? await moderarYGuardarImagenReporte(supabase, { reporteId: reporte.id, propietarioId: input.usuarioId, image: input.image })
@@ -104,6 +122,7 @@ export async function crearReporteWorkflow(
     success: true,
     data: {
       reportId: reporte.id,
+      titulo,
       imageUploaded,
       imageModeration,
       pointsAwarded,

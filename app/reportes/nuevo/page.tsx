@@ -33,6 +33,7 @@ import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/lo
 import { REPORT_IMAGE_ACCEPT_ATTR } from "@/lib/media/report-images"
 import { buscarUbicacionPrecisa, esUbicacionAproximada } from "@/lib/geolocalizacion/ubicacion-precisa"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
+import { armarTituloReporte, requiereTituloManual } from "@/lib/reportes/titulo-automatico"
 import { createReportImageThumbnail, optimizeReportImage } from "@/lib/media/optimize-report-image"
 import { toast } from "sonner"
 import { 
@@ -80,6 +81,8 @@ function getGuestSessionErrorMessage(error: AuthError | null) {
 
 type CreatedReport = {
   reportId: number
+  /** Título con el que el servidor guardó el reporte. */
+  titulo: string
   isGuest: boolean
   pointsAwarded: number
   imageFailed: boolean
@@ -330,10 +333,14 @@ export default function NuevoReportePage() {
   const locationIsValid =
     formData.lat !== null && formData.lon !== null && isWithinReportCoverage(formData.lat, formData.lon)
 
+  // Solo «Otros» pide título; en el resto lo arma el servidor con la categoría y la dirección.
+  const pideTitulo = formData.category !== "" && requiereTituloManual(Number(formData.category))
+  const tituloAutomatico = formData.category !== "" ? armarTituloReporte(Number(formData.category), null) : null
+
   const canSubmitReport =
     (!needsCaptcha || captchaToken !== null) &&
     !captchaNoDisponible &&
-    formData.title.trim().length >= 3 &&
+    (!pideTitulo || formData.title.trim().length >= 3) &&
     formData.description.trim().length >= 10 &&
     formData.category !== "" &&
     formData.priority !== "" &&
@@ -345,7 +352,7 @@ export default function NuevoReportePage() {
     !isOptimizingImage
 
   const missingFields = [
-    formData.title.trim().length >= 3 ? null : "título",
+    !pideTitulo || formData.title.trim().length >= 3 ? null : "título",
     formData.description.trim().length >= 10 ? null : "descripción",
     formData.category !== "" ? null : "categoría",
     formData.priority !== "" ? null : "prioridad",
@@ -456,7 +463,7 @@ export default function NuevoReportePage() {
       }
 
       const payload = new FormData()
-      payload.set("titulo", formData.title)
+      if (pideTitulo) payload.set("titulo", formData.title)
       payload.set("descripcion", formData.description)
       payload.set("categoriaId", formData.category)
       payload.set("prioridadId", formData.priority)
@@ -513,6 +520,7 @@ export default function NuevoReportePage() {
       setShowResultDialog(true)
       setCreatedReport({
         reportId: result.data.reportId,
+        titulo: result.data.titulo,
         isGuest: result.data.isGuest,
         pointsAwarded: result.data.pointsAwarded,
         imageFailed,
@@ -605,7 +613,7 @@ export default function NuevoReportePage() {
             )}
             {createdReport.imageApproved && !createdReport.withdrawn && formData.lat !== null && formData.lon !== null && (
               <ReportContactActions
-                title={formData.title}
+                title={createdReport.titulo}
                 category={categorias.find((category) => String(category.id) === formData.category)?.nombre ?? ""}
                 description={formData.description}
                 latitude={formData.lat}
@@ -662,24 +670,6 @@ export default function NuevoReportePage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title">Título del Reporte *</Label>
-                <Input
-                  id="title"
-                  placeholder="Ej: Bache en Av. Quaranta"
-                  value={formData.title}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  required
-                />
-                {formData.title.trim().length > 0 && formData.title.trim().length < 3 && (
-                  <p className="text-xs text-destructive">El título debe tener al menos 3 caracteres.</p>
-                )}
-                {formData.title.trim().length === 0 && (
-                  <p className="text-xs text-destructive">Completá el título del reporte.</p>
-                )}
-              </div>
-
               {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="description">Descripción Detallada *</Label>
@@ -724,6 +714,31 @@ export default function NuevoReportePage() {
                   </Select>
                   {formData.category === "" && (
                     <p className="text-xs font-medium text-destructive">Seleccioná una categoría.</p>
+                  )}
+                  {tituloAutomatico && (
+                    <p className="text-xs text-muted-foreground">
+                      Título automático: {tituloAutomatico} en la dirección que marques en el mapa.
+                    </p>
+                  )}
+                  {pideTitulo && (
+                    <div className="space-y-2 pt-2">
+                      <Label htmlFor="title">Título del reporte *</Label>
+                      <Input
+                        id="title"
+                        placeholder="Ej: Pérdida de cloaca en la vereda"
+                        maxLength={120}
+                        value={formData.title}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">En «Otros» contanos en pocas palabras cuál es el problema.</p>
+                      {formData.title.trim().length > 0 && formData.title.trim().length < 3 && (
+                        <p className="text-xs text-destructive">El título debe tener al menos 3 caracteres.</p>
+                      )}
+                      {formData.title.trim().length === 0 && (
+                        <p className="text-xs text-destructive">Completá el título del reporte.</p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -939,7 +954,8 @@ export default function NuevoReportePage() {
                 <p>Revisá la información antes de publicar el reporte.</p>
                 <div className="space-y-2 rounded-xl border border-border/70 bg-muted/60 p-3 text-sm">
                   <div>
-                  <span className="font-medium text-muted-foreground">Título:</span> {formData.title}
+                  <span className="font-medium text-muted-foreground">Título:</span>{" "}
+                  {pideTitulo ? formData.title : `${tituloAutomatico ?? ""} en la dirección del mapa (automático)`}
                   </div>
                   <div>
                     <span className="font-medium text-muted-foreground">Categoría:</span>{" "}

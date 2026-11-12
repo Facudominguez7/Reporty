@@ -28,12 +28,38 @@ beforeEach(() => {
 
 describe("crearReporteWorkflow", () => {
   it("bloquea el texto ofensivo antes de guardar el reporte", async () => {
-    const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "p3lotudo" })
+    const result = await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 7, titulo: "p3lotudo" })
     expect(result).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
     expect(dobles.crearReporte).not.toHaveBeenCalled()
     expect(dobles.obtenerDireccion).not.toHaveBeenCalled()
   })
 
+  it("bloquea una descripción ofensiva aunque el título sea automático", async () => {
+    expect(await crearReporteWorkflow(supabase, { ...entrada, descripcion: "p3lotudo el que rompió esto" })).toEqual({ success: false, error: "El texto contiene lenguaje ofensivo. Corregilo antes de publicar." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("arma el título con la categoría y la dirección, sin usar el título enviado", async () => {
+    const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "Cualquier cosa" })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Bache en Bolívar 1450, Posadas" }))
+    expect(result).toMatchObject({ success: true, data: { titulo: "Bache en Bolívar 1450, Posadas" } })
+  })
+  it("usa solo la categoría como título cuando no se encuentra la dirección", async () => {
+    dobles.obtenerDireccion.mockResolvedValue(null)
+    await crearReporteWorkflow(supabase, { ...entrada, titulo: undefined })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Bache" }))
+  })
+  it("en Otros conserva el título escrito por la persona", async () => {
+    await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 7, titulo: "  Explosión de cloaca  " })
+    expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Explosión de cloaca" }))
+  })
+  it.each([undefined, "", "ab"])("en Otros exige un título de al menos 3 caracteres (%j)", async (titulo) => {
+    expect(await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 7, titulo })).toEqual({ success: false, error: "En la categoría Otros escribí un título de al menos 3 caracteres." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+  it("rechaza una categoría desconocida sin crear el reporte", async () => {
+    expect(await crearReporteWorkflow(supabase, { ...entrada, categoriaId: 99 })).toEqual({ success: false, error: "Seleccioná una categoría válida." })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
   it("guarda la dirección de las coordenadas al crear el reporte", async () => {
     await crearReporteWorkflow(supabase, entrada)
     expect(dobles.obtenerDireccion).toHaveBeenCalledWith(-27.37, -55.9)

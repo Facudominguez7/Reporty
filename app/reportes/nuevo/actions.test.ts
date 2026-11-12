@@ -128,6 +128,12 @@ describe("crearReporteAction", () => {
     await crearReporteAction(formulario())
     expect(dobles.release).toHaveBeenCalledTimes(1)
   })
+  it.each([["sin el campo", null], ["vacío", ""]])("crea el reporte con el título %s: lo arma el servidor", async (_caso, valor) => {
+    const datos = formulario()
+    if (valor === null) datos.delete("titulo"); else datos.set("titulo", valor)
+    expect(await crearReporteAction(datos)).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
+    expect(dobles.workflow.mock.calls[0][1].titulo).toBeUndefined()
+  })
   it("rejects a location outside the municipalities before creating a client", async () => {
     const formData = new FormData()
     formData.set("titulo", "Bache en la calle")
