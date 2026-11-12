@@ -89,6 +89,8 @@ type CreatedReport = {
   withdrawn: boolean
   imageMessage: string
   imageApproved: boolean
+  /** Correos de organismos notificados automáticamente; vacío si no se avisó a nadie. */
+  correosEnviados: string[]
   createdDate: string
 }
 
@@ -542,6 +544,7 @@ export default function NuevoReportePage() {
         withdrawn,
         imageMessage,
         imageApproved: canShowReportContacts(result.data.imageModeration?.estado, withdrawn),
+        correosEnviados: result.data.correosEnviados,
         createdDate: new Date().toLocaleDateString("es-AR"),
       })
       // Refresh server components so the navigation reflects the new guest session.
@@ -625,6 +628,11 @@ export default function NuevoReportePage() {
             )}
             {createdReport.imageFailed && (
               <p role="status" className="text-sm text-muted-foreground">{createdReport.imageMessage}</p>
+            )}
+            {!createdReport.withdrawn && createdReport.correosEnviados.length > 0 && (
+              <p role="status" className="text-sm text-muted-foreground">
+                Se envió correo a: {createdReport.correosEnviados.join(", ")}
+              </p>
             )}
             {createdReport.imageApproved && !createdReport.withdrawn && formData.lat !== null && formData.lon !== null && (
               <ReportContactActions

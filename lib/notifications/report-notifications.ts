@@ -52,6 +52,19 @@ type CrewAssignedEmailParams = {
   detalle?: string | null;
 };
 
+type OrganismoEmailParams = {
+  /** Dirección de correo del canal del organismo en `report_contact_directory`. */
+  destinatario: string;
+  organizacion: string;
+  reporteId: number;
+  reporteTitulo: string;
+  /** Nombre de categoría tal como está en el directorio (sin tildes). */
+  categoria: string;
+  descripcion: string | null | undefined;
+  /** Id del canal de contacto; particiona la clave de idempotencia por destinatario. */
+  contactoId: number;
+};
+
 type AdminReviewEmailParams = {
   supabase: SupabaseClient;
   tipo: "foto" | "reporte";
@@ -290,6 +303,59 @@ export async function sendAdminReviewNotificationEmail({ supabase, tipo, reviewI
       text: plainText([descripcion, `Reporte: ${reporteTitulo}`, `Abrir cola de revisión: ${reviewUrl}`]),
     }, { idempotencyKey: `admin-review/${tipo}/${reviewId}/${admin.id}` });
   }));
+}
+
+/**
+ * Envía el aviso de nuevo reporte al organismo responsable, con la misma plantilla que el resto
+ * de los correos de este módulo. La idempotencia se participa por reporte y por canal de contacto,
+ * así un reintento nunca duplica el aviso a un organismo ya notificado.
+ */
+export async function sendOrganismoNotificationEmail({
+  destinatario,
+  organizacion,
+  reporteId,
+  reporteTitulo,
+  categoria,
+  descripcion,
+  contactoId,
+}: OrganismoEmailParams) {
+  const resend = getResendClient();
+  const reportUrl = `${getAppUrl()}/reportes/${reporteId}`;
+  const asunto = `Nuevo reporte de ${categoria}: ${reporteTitulo}`;
+
+  return resend.emails.send({
+    from: SENDER,
+    to: [destinatario],
+    subject: asunto,
+    html: renderEmailLayout({
+      assetBaseUrl: getAppUrl(),
+      title: "Nuevo reporte ciudadano",
+      kicker: "Aviso automático",
+      preheader: `${organizacion}: se cargó un reporte de ${categoria} en Reporty.`,
+      heading: asunto,
+      body: [
+        emailParagraph(`Un vecino cargó un reporte de <strong style="color:${EMAIL_COLORS.foreground};">${escapeHtml(categoria)}</strong> en Reporty para su revisión:`),
+        emailPanel({
+          eyebrow: `Reporte N.º ${reporteId}`,
+          title: reporteTitulo,
+          content: [
+            emailField("Organismo", escapeHtml(organizacion)),
+            emailField("Categoría", escapeHtml(categoria)),
+            descripcion ? emailField("Descripción", escapeHtml(descripcion)) : "",
+          ].join("\n"),
+        }),
+        emailButton("Ver reporte completo", reportUrl),
+        emailParagraph("Este aviso fue generado automáticamente por Reporty a partir de un reporte ciudadano."),
+      ].join("\n"),
+    }),
+    text: plainText([
+      `Nuevo reporte de ${categoria}: ${reporteTitulo}`,
+      `Organismo: ${organizacion}`,
+      descripcion && `Descripción: ${descripcion}`,
+      `Ver reporte completo: ${reportUrl}`,
+      "Este aviso fue generado automáticamente por Reporty a partir de un reporte ciudadano.",
+    ]),
+  }, { idempotencyKey: `organismo-aviso/${reporteId}/${contactoId}` });
 }
 
 export async function sendCrewAssignedEmail({
