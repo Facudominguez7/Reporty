@@ -39,12 +39,16 @@ async function heavyPhoto(page: Page) {
   return { name: "bache.jpg", mimeType: "image/jpeg", buffer: Buffer.from(base64, "base64") }
 }
 
-/** Fills the new-report form; the location is the point clicked in the middle of the map. */
+/**
+ * Fills the new-report form; the location is the point clicked in the middle of the map.
+ * It uses the "Otros" category, the only one with a typed title, so each test can find its
+ * report by a unique title (every other category gets "<Category> en <address>").
+ */
 async function fillReportForm(page: Page, titulo: string) {
-  await page.getByLabel("Título del Reporte *").fill(titulo)
   await page.getByLabel("Descripción Detallada *").fill("Pozo grande que ocupa medio carril.")
   await page.getByRole("combobox").click()
-  await page.getByRole("option", { name: "Bache" }).click()
+  await page.getByRole("option", { name: "Otros" }).click()
+  await page.getByLabel("Título del reporte *").fill(titulo)
   await page.getByRole("group", { name: "Prioridad *" }).getByRole("button", { name: "Media" }).click()
   await page.locator(".leaflet-container").click()
   await expect(page.getByText(/Ubicación seleccionada:/)).toBeVisible()
@@ -87,7 +91,8 @@ test.describe("reports", () => {
 
     await page.getByRole("link", { name: "Ver el reporte" }).click()
     await expect(page.getByText(titulo, { exact: true })).toBeVisible()
-    const image = page.getByAltText("Imagen 1 del reporte")
+    // The alt text also names the author and the date: "Foto 1 del reporte, publicada por …".
+    const image = page.getByAltText(/^Foto 1 del reporte/)
     await expect(image).toBeVisible()
     await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0)
   })
@@ -115,13 +120,13 @@ test.describe("reports", () => {
     await expect(page.getByText(titulo).first()).toBeVisible()
     expect(reporte.usuario_id).toBeTruthy()
 
-    for (const name of ["Reparado", "No existe"]) {
-      await page.goto(`/reportes/${reporte.id}`)
-      await page.getByRole("group", { name: "Votar sobre el reporte" }).getByRole("button", { name, exact: true }).click()
-      const dialog = page.getByRole("alertdialog")
-      await expect(dialog.getByText("Para votar necesitás iniciar sesión con una cuenta.")).toBeVisible()
-      await dialog.getByRole("button", { name: "Entendido" }).click()
-    }
+    // "No existe" is the only vote left: a repair is reported with photo evidence instead.
+    // A guest still cannot vote and is asked to sign in.
+    await page.goto(`/reportes/${reporte.id}`)
+    await page.getByRole("group", { name: "Acciones sobre el reporte" }).getByRole("button", { name: "No existe", exact: true }).click()
+    const dialog = page.getByRole("alertdialog")
+    await expect(dialog.getByText("Para votar necesitás iniciar sesión con una cuenta.")).toBeVisible()
+    await dialog.getByRole("button", { name: "Entendido" }).click()
   })
 
   test("a rejected verification keeps the form data and the retry publishes the report", async ({ page, testData }) => {
@@ -142,7 +147,7 @@ test.describe("reports", () => {
     await expect(page.getByText("Error al crear el reporte")).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText("La verificación falló o venció.", { exact: false })).toBeVisible()
     // A rejected challenge never discards what was already typed or attached.
-    await expect(page.getByLabel("Título del Reporte *")).toHaveValue(titulo)
+    await expect(page.getByLabel("Título del reporte *")).toHaveValue(titulo)
     await expect(page.getByLabel("Descripción Detallada *")).toHaveValue("Pozo grande que ocupa medio carril.")
     await expect(page.getByAltText("Preview 1")).toBeVisible()
 
