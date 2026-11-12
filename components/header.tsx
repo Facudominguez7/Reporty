@@ -1,10 +1,15 @@
-import { createClient } from "@/utils/supabase/server"
+"use client"
+
 import { HeaderClient } from "./header-client"
+import { useUsuarioDeSesion } from "./header-sesion"
 
-export default async function Header() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getUser()
-  const user = data?.user
-
-  return <HeaderClient user={user} />
+/**
+ * Encabezado global. La sesión se lee en el navegador (`useUsuarioDeSesion`) y no en el servidor,
+ * para que las páginas públicas (inicio, términos, privacidad) se sirvan como HTML estático en
+ * vez de renderizarse en el worker en cada visita.
+ *
+ * @returns El encabezado con el enlace de cuenta que corresponde a la sesión.
+ */
+export default function Header() {
+  return <HeaderClient user={useUsuarioDeSesion()} />
 }
