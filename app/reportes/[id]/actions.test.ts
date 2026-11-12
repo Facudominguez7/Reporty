@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), revalidatePath: vi.fn(),
   crearComentario: vi.fn(), votarNoExiste: vi.fn(), votarReparado: vi.fn(),
   informarReparacion: vi.fn(), verificarReparacion: vi.fn(),
-  resolverEvidencia: vi.fn(), resolverImpugnacion: vi.fn(),
+  resolverEvidencia: vi.fn(),
 }))
 vi.mock("@/utils/supabase/server", () => ({ createClient: mocks.createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }))
@@ -24,9 +24,8 @@ vi.mock("@/lib/use-cases/reportes/evidencia-reparacion", async (importOriginal) 
   informarReparacionWorkflow: mocks.informarReparacion,
   verificarReparacionWorkflow: mocks.verificarReparacion,
   resolverEvidenciaReparacionWorkflow: mocks.resolverEvidencia,
-  resolverImpugnacionReparacionWorkflow: mocks.resolverImpugnacion,
 }))
-import { actualizarReporteAdminAction, cambiarEstadoAdminAction, confirmarReparacionAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, impugnarReparacionAction, informarReparacionAction, quitarFotoReporteAdminAction, reemplazarFotoReporteAdminAction, resolverEvidenciaReparacionAdminAction, resolverImpugnacionReparacionAdminAction, votarNoExisteAction, votarReparadoAction } from "./actions"
+import { actualizarReporteAdminAction, cambiarEstadoAdminAction, confirmarReparacionAction, crearComentarioAction, eliminarComentarioAdminAction, eliminarComentarioPropioAction, eliminarReporteAdminAction, eliminarReportePropioAction, impugnarReparacionAction, informarReparacionAction, quitarFotoReporteAdminAction, reemplazarFotoReporteAdminAction, resolverEvidenciaReparacionAdminAction, votarNoExisteAction, votarReparadoAction } from "./actions"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -356,7 +355,6 @@ describe("acciones de voto sin CAPTCHA", () => {
 })
 
 const EVIDENCIA_ID = "11111111-1111-4111-8111-111111111111"
-const IMPUGNACION_ID = "22222222-2222-4222-8222-222222222222"
 const TOKEN_DE_EVIDENCIA = "tok-evidencia-1234"
 const FRASE = "  taparon_el_bache_con_asfalto_nuevo  "
 const MENSAJE_SIN_SESION = "Tenés que iniciar sesión para informar una reparación."
@@ -598,13 +596,6 @@ describe("acciones administrativas de evidencia", () => {
         cerrado: true, revertido: false, confirmaciones: 1, impugnaciones: 0, impugnacionesPendientes: 0,
       },
     })
-    mocks.resolverImpugnacion.mockResolvedValue({
-      success: true,
-      data: {
-        accion: "descartada", repetida: false, evidenciaEstado: "en_verificacion", reporteEstadoId: 1,
-        cerrado: false, revertido: false, confirmaciones: 1, impugnaciones: 1, impugnacionesPendientes: 0,
-      },
-    })
   })
 
   it("aprueba una evidencia y revalida el reporte", async () => {
@@ -620,21 +611,10 @@ describe("acciones administrativas de evidencia", () => {
     expect(mocks.resolverEvidencia).toHaveBeenCalledWith({}, EVIDENCIA_ID, "admin-1", "revertir", undefined)
   })
 
-  it("resuelve una impugnación pendiente", async () => {
-    await resolverImpugnacionReparacionAdminAction(7, IMPUGNACION_ID, "descartada", "  Sigue igual  ")
-
-    expect(mocks.resolverImpugnacion).toHaveBeenCalledWith({}, IMPUGNACION_ID, "admin-1", "descartada", "Sigue igual")
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
-  })
-
   it("rechaza acciones administrativas desconocidas sin abrir sesión", async () => {
     expect(await resolverEvidenciaReparacionAdminAction(7, EVIDENCIA_ID, "publicar" as never)).toEqual({
       success: false,
       error: "Acción administrativa inválida.",
-    })
-    expect(await resolverImpugnacionReparacionAdminAction(7, IMPUGNACION_ID, "ignorada" as never)).toEqual({
-      success: false,
-      error: "Elegí aceptar o descartar la impugnación.",
     })
     expect(mocks.createClient).not.toHaveBeenCalled()
   })
