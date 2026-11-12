@@ -1,0 +1,90 @@
+{
+  "packageId": "ar.com.reporty.app",
+  "host": "reporty.com.ar",
+  "name": "Reporty",
+  "launcherName": "Reporty",
+  "display": "standalone",
+  "displayOverride": [
+    "standalone",
+    "fullscreen",
+    "minimal-ui",
+    "browser"
+  ],
+  "themeColor": "#2e7d5b",
+  "themeColorDark": "#2e7d5b",
+  "navigationColor": "#2e7d5b",
+  "navigationColorDark": "#2e7d5b",
+  "navigationDividerColor": "#2e7d5b",
+  "navigationDividerColorDark": "#2e7d5b",
+  "backgroundColor": "#2e7d5b",
+  "enableNotifications": false,
+  "startUrl": "/mapa",
+  "iconUrl": "https://reporty.com.ar/favicon_io/android-chrome-512x512.png",
+  "maskableIconUrl": "https://reporty.com.ar/favicon_io/maskable-icon-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "../twa-config/reporty-upload-key.jks",
+    "alias": "reporty"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "appVersion": "1.0.0",
+  "minSdkVersion": 23,
+  "orientation": "default",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "webManifestUrl": "https://reporty.com.ar/favicon_io/site.webmanifest",
+  "shortcuts": [
+    {
+      "name": "Mapa",
+      "shortName": "Mapa",
+      "url": "https://reporty.com.ar/mapa",
+      "icons": [
+        {
+          "src": "https://reporty.com.ar/favicon_io/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "chosenIconUrl": "https://reporty.com.ar/favicon_io/android-chrome-192x192.png"
+    },
+    {
+      "name": "Reportes",
+      "shortName": "Reportes",
+      "url": "https://reporty.com.ar/reportes",
+      "icons": [
+        {
+          "src": "https://reporty.com.ar/favicon_io/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "chosenIconUrl": "https://reporty.com.ar/favicon_io/android-chrome-192x192.png"
+    },
+    {
+      "name": "Crear reporte",
+      "shortName": "Nuevo reporte",
+      "url": "https://reporty.com.ar/reportes/nuevo",
+      "icons": [
+        {
+          "src": "https://reporty.com.ar/favicon_io/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ],
+      "chosenIconUrl": "https://reporty.com.ar/favicon_io/android-chrome-192x192.png"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "fingerprints": [],
+  "generatorApp": "Bubblewrap",
+  "serviceAccountJsonFile": null
+}

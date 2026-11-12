@@ -60,3 +60,16 @@ design/**/.screenshots/
 .open-next
 .wrangler
 .dev.vars*
+
+# Android TWA (Bubblewrap): claves, certificados y artefactos de compilación
+android/**/.gradle/
+android/**/build/
+android/**/local.properties
+android/twa/app/release/
+android/twa-config/*.jks
+android/twa-config/*.keystore
+*.jks
+*.keystore
+*.apk
+*.aab
+keystore.properties
