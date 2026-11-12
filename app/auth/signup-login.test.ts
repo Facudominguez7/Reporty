@@ -135,6 +135,33 @@ describe("signup", () => {
     )
   })
 
+  it("tells the user the email already has an account when Supabase returns no identities", async () => {
+    // Supabase answers a repeated signup of a confirmed email with an obfuscated user and
+    // `identities: []`, and sends no email.
+    mocks.signUp.mockResolvedValueOnce({
+      data: { session: null, user: { id: "u1", identities: [] } },
+      error: null,
+    })
+
+    await expect(signup(undefined, signupForm())).resolves.toEqual({
+      error: "Ese correo ya tiene una cuenta en Reporty. Iniciá sesión o recuperá tu contraseña.",
+    })
+    expect(mocks.redirect).not.toHaveBeenCalled()
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("keeps asking to confirm the email when the new user has an identity", async () => {
+    mocks.signUp.mockResolvedValueOnce({
+      data: { session: null, user: { id: "u1", identities: [{ id: "i1" }] } },
+      error: null,
+    })
+
+    await expect(signup(undefined, signupForm())).resolves.toEqual({
+      message:
+        "Te enviamos un correo de confirmación. Revisa tu bandeja de entrada y sigue el enlace para activar tu cuenta.",
+    })
+  })
+
   it("asks to confirm the email when Supabase does not open a session", async () => {
     mocks.signUp.mockResolvedValueOnce({ data: { session: null, user: { id: "u1" } }, error: null })
 
