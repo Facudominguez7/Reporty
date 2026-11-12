@@ -21,6 +21,13 @@
       "service": "reporty"
     }
   ],
+  "r2_buckets": [
+    {
+      // OpenNext incremental cache (open-next.config.ts): prerendered pages and unstable_cache data.
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "reporty-next-cache"
+    }
+  ],
   "images": {
     // Cloudflare Images: re-encodes every uploaded report and pet photo (replaces sharp).
     "binding": "IMAGES"
