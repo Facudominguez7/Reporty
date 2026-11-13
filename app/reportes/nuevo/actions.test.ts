@@ -9,11 +9,12 @@ const { createClient, createAdminClient } = vi.hoisted(() => ({
 vi.mock("@/utils/supabase/server", () => ({ createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient }))
 
-const dobles = vi.hoisted(() => ({ workflow: vi.fn(), claim: vi.fn(), release: vi.fn() }))
+const dobles = vi.hoisted(() => ({ workflow: vi.fn(), claim: vi.fn(), release: vi.fn(), notify: vi.fn() }))
+vi.mock("@/lib/use-cases/reportes/notificar-organismos", () => ({ notificarOrganismosDeReporte: dobles.notify }))
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }))
 vi.mock("@/lib/use-cases/reportes", () => ({ crearReporteWorkflow: dobles.workflow, mutationErrorMessage: (e: Error) => e.message }))
 vi.mock("@/lib/security/report-submission-guard.server", () => ({ claimReportSubmission: dobles.claim, releaseReportSubmission: dobles.release, hashClientIp: () => "ip-sintetica", reportSubmissionClaimMessage: () => "Envío duplicado" }))
-import { crearReporteAction } from "./actions"
+import { crearReporteAction, avisarOrganismosAction } from "./actions"
 
 
 /** Construye un envío válido que no requiere datos reales. */
@@ -124,6 +125,38 @@ describe("crearReporteAction", () => {
     })
     expect(createClient).not.toHaveBeenCalled()
     expect(createAdminClient).not.toHaveBeenCalled()
+  })
+})
+
+describe("avisarOrganismosAction", () => {
+  const report = { usuario_id: "persona", deleted_at: null, estado_id: 1, titulo: "Bache", categoria_id: 1, descripcion: "Calle rota", lat: -27.37, lon: -55.9 }
+  function db(row: (Omit<typeof report, "deleted_at"> & { deleted_at: string | null }) | null = report, photos = [{ id: 1 }]) {
+    const reportQuery = { eq: vi.fn(() => reportQuery), single: vi.fn(async () => ({ data: row, error: null })) }
+    const photoQuery = { eq: vi.fn(() => photoQuery), maybeSingle: vi.fn(async () => ({ data: photos[0] ?? null, error: null })) }
+    createAdminClient.mockReturnValue({ from: vi.fn((table: string) => ({ select: vi.fn(() => table === "reportes" ? reportQuery : photoQuery) })) })
+    return { reportQuery, photoQuery }
+  }
+  it("only sends on an explicit request for an owned published report", async () => {
+    db(); dobles.notify.mockResolvedValue(["institucion@example.com"])
+    expect(await avisarOrganismosAction(7)).toEqual({ success: true, correosEnviados: ["institucion@example.com"] })
+    expect(dobles.notify).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reporteId: 7, titulo: "Bache" }))
+  })
+  it.each([
+    ["missing", null], ["another owner", { ...report, usuario_id: "otro" }],
+    ["withdrawn", { ...report, deleted_at: "now" }], ["rejected", { ...report, estado_id: 3 }],
+  ])("rejects %s without dispatch", async (_label, row) => {
+    db(row); expect((await avisarOrganismosAction(7)).success).toBe(false)
+    expect(dobles.notify).not.toHaveBeenCalled()
+  })
+  it("rejects unpublished images and invalid IDs", async () => {
+    db(report, []); expect((await avisarOrganismosAction(7)).success).toBe(false)
+    expect((await avisarOrganismosAction(-1)).success).toBe(false)
+    expect(dobles.notify).not.toHaveBeenCalled()
+  })
+  it("rejects missing sessions, including a lost guest session", async () => {
+    db(); createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } })
+    expect((await avisarOrganismosAction(7)).success).toBe(false)
+    expect(dobles.notify).not.toHaveBeenCalled()
   })
 })
 

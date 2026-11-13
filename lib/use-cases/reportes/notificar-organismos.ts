@@ -83,6 +83,9 @@ export async function notificarOrganismosDeReporte(
     ),
   )
   return contactos
-    .filter((_, indice) => resultados[indice]?.status === "fulfilled")
+    .filter((_, indice) => {
+      const resultado = resultados[indice]
+      return resultado?.status === "fulfilled" && !resultado.value?.error && Boolean(resultado.value?.data)
+    })
     .map((contacto) => contacto.channel_value)
 }

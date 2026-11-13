@@ -70,8 +70,8 @@ describe("notificarOrganismosDeReporte", () => {
     expect(dobles.sendOrganismo).toHaveBeenCalledWith(expect.objectContaining({ destinatario: "otro@posadas.gov.ar" }))
   })
 
-  it("un fallo de envío no bloquea los demás avisos y sólo lista los enviados", async () => {
-    dobles.sendOrganismo.mockRejectedValueOnce(new Error("RESEND_API_KEY is not configured"))
+  it("un fallo de envío no bloquea los demás avisos y sólo lista los confirmados", async () => {
+    dobles.sendOrganismo.mockResolvedValueOnce({ data: null, error: new Error("provider error") })
     const supabase = directorio([contactoEmail, { ...contactoEmail, id: 5, channel_value: "otro@posadas.gov.ar" }]) as unknown as SupabaseClient
     await expect(notificarOrganismosDeReporte(supabase, entrada)).resolves.toEqual(["otro@posadas.gov.ar"])
     expect(dobles.sendOrganismo).toHaveBeenCalledTimes(2)
