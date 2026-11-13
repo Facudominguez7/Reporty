@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { HojaReporte } from "@/components/report-detail/hojas-reporte"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { MapPin, Send, CheckCircle2, CircleX, Info, FilePlus2, LoaderCircle } from "lucide-react"
+import { MapPin, Send, Info, FilePlus2, LoaderCircle } from "lucide-react"
 import Link from "next/link"
 import { InvitacionDonar } from "@/components/donaciones/invitacion-donar"
 import { PUNTOS } from "@/database/queries/puntos"
@@ -545,24 +545,16 @@ export default function NuevoReportePage() {
     return (
       <div className="page-shell flex items-center justify-center px-4">
         <Button type="button" variant="outline" onClick={() => setShowResultDialog(true)}>Ver resultado del reporte</Button>
-        <Dialog open={showResultDialog} onOpenChange={handleResultDialogOpenChange}>
-          <DialogContent className="gap-3">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 pr-8">
-              {createdReport.withdrawn ? (
-                <CircleX className="size-5 text-destructive" aria-hidden="true" />
-              ) : (
-                <CheckCircle2 className="size-5 text-primary" aria-hidden="true" />
-              )}
-              {createdReport.withdrawn ? "Reporte retirado" : "Reporte registrado en Reporty"}
-            </DialogTitle>
-            <DialogDescription>
-              {createdReport.withdrawn ? "El reporte no está disponible y no otorga puntos."
-                : createdReport.pointsAwarded > 0
-                ? `Gracias por ayudar a tu ciudad. Sumaste ${createdReport.pointsAwarded} puntos.`
-                : "Gracias por ayudar a tu ciudad. Ya podés seguir su estado."}
-            </DialogDescription>
-          </DialogHeader>
+        <HojaReporte
+          abierta={showResultDialog}
+          cambiandoAbierta={handleResultDialogOpenChange}
+          titulo={createdReport.withdrawn ? "Reporte retirado" : "Reporte registrado en Reporty"}
+          descripcion={createdReport.withdrawn ? "El reporte no está disponible y no otorga puntos."
+            : createdReport.pointsAwarded > 0
+            ? `Gracias por ayudar a tu ciudad. Sumaste ${createdReport.pointsAwarded} puntos.`
+            : "Gracias por ayudar a tu ciudad. Ya podés seguir su estado."}
+          etiquetaCerrar="Cerrar resultado del reporte"
+        >
           <div className="space-y-3">
             {createdReport.isGuest && !createdReport.withdrawn && (
               <p className="rounded-xl border border-border/70 bg-muted/60 p-3 text-[0.7rem] text-muted-foreground">
@@ -618,8 +610,7 @@ export default function NuevoReportePage() {
               </Button>
             )}
           </div>
-          </DialogContent>
-        </Dialog>
+        </HojaReporte>
       </div>
     )
   }
