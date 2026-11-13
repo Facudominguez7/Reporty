@@ -10,7 +10,7 @@ const RUTA_CUADRILLAS = '/dashboard/cuadrillas'
  * que refrescarla acá sólo gastaría CPU y una llamada a Supabase en cada visita. Una ruta que
  * empiece a leer la sesión (o que tenga server actions) tiene que salir de esta lista.
  */
-const RUTAS_ESTATICAS_SIN_SESION = new Set(['/', '/terminos', '/privacidad', '/crear'])
+const RUTAS_ESTATICAS_SIN_SESION = new Set(['/', '/terminos', '/privacidad', '/eliminar-cuenta', '/crear'])
 
 /**
  * Corre antes de cada ruta: apaga las rutas de cuadrillas deshabilitadas, deja pasar sin sesión

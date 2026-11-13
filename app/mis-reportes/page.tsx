@@ -10,6 +10,7 @@ import { LinkEmailForm } from "@/components/guest-account/link-email-form"
 import { SetPasswordForm } from "@/components/guest-account/set-password-form"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { ReportCompactCard } from "@/components/report-compact-card"
+import { EliminarCuentaSection } from "@/components/cuenta/eliminar-cuenta-section"
 import { SignOutSection } from "@/components/sign-out-section"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -184,6 +185,7 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
         )}
 
         {isGuest && <SignOutSection guest />}
+        {isGuest && <EliminarCuentaSection invitado />}
       </div>
     </div>
   )

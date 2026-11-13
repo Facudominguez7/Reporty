@@ -9,6 +9,11 @@ vi.mock("@/components/sign-out-section", async () => {
   return { SignOutSection: ({ guest }: { guest: boolean }) => createElement("button", null, guest ? "Cerrar sesión" : "Salir") }
 })
 
+vi.mock("@/components/cuenta/eliminar-cuenta-section", async () => {
+  const { createElement } = await import("react")
+  return { EliminarCuentaSection: () => createElement("button", null, "Eliminar cuenta") }
+})
+
 import Page from "./page"
 
 beforeEach(() => {
@@ -25,4 +30,15 @@ it("shows sign-out only on the authenticated guest reports page", async () => {
   mocks.getUser.mockResolvedValue({ data: { user: { id: "account", is_anonymous: false } } })
   const accountHtml = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }))
   expect(accountHtml).not.toContain("Cerrar sesión")
+})
+
+it("offers account deletion only to guests, after sign-out", async () => {
+  mocks.getUser.mockResolvedValue({ data: { user: { id: "guest", is_anonymous: true } } })
+  const guestHtml = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }))
+  expect(guestHtml).toContain("Eliminar cuenta")
+  expect(guestHtml.indexOf("Cerrar sesión")).toBeLessThan(guestHtml.indexOf("Eliminar cuenta"))
+
+  mocks.getUser.mockResolvedValue({ data: { user: { id: "account", is_anonymous: false } } })
+  const accountHtml = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }))
+  expect(accountHtml).not.toContain("Eliminar cuenta")
 })
