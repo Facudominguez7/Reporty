@@ -209,7 +209,7 @@ describe("acciones y hojas del detalle", () => {
     const html = renderizar()
 
     expect(html).toContain('id="report-contribution"')
-    expect(html).toContain('data-turnstile="comentar_reporte"')
+    expect(html).not.toContain("data-turnstile")
   })
 
   it("no muestra compositor inline a invitados ni en reportes cerrados", () => {

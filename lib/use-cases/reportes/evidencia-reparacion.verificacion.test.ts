@@ -16,7 +16,6 @@ const piezas = vi.hoisted(() => ({
   createClient: vi.fn(),
   createAdminClient: vi.fn(),
   revalidatePath: vi.fn(),
-  captcha: vi.fn(),
   rol: { actual: 2 as number | null, error: null as unknown },
 }))
 vi.mock("@/lib/notifications/report-notifications", () => ({
@@ -32,10 +31,6 @@ vi.mock("@/lib/authz/roles", async (original) => ({
 vi.mock("@/utils/supabase/server", () => ({ createClient: piezas.createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: piezas.createAdminClient }))
 vi.mock("next/cache", () => ({ revalidatePath: piezas.revalidatePath }))
-vi.mock("@/lib/security/turnstile-guard.server", () => ({
-  verificarCaptchaDeAccion: piezas.captcha,
-  MENSAJE_CAPTCHA_NO_DISPONIBLE: "sin captcha",
-}))
 
 import { prepararImagenReporte } from "@/lib/media/preparar-imagen-reporte.server"
 import { moderarYGuardarImagenEvidenciaReparacion, moderarYGuardarImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
@@ -234,7 +229,6 @@ beforeEach(() => {
   piezas.rol.actual = 2
   piezas.rol.error = null
   piezas.moderarImagen.mockResolvedValue({ decision: "APPROVED", motivos: [], operaciones: 2, proveedor: "sintetico" })
-  piezas.captcha.mockResolvedValue({ ok: true })
   piezas.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
 })
 
@@ -381,10 +375,9 @@ describe("S2/S12 · el fallo de carga privada nunca se informa como éxito", () 
 })
 
 describe("S12/S15 · autorización del lado del servidor en cada acción", () => {
-  it("sin sesión no se sube nada y no se verifica captcha", async () => {
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
+  it("sin sesión no se sube nada", async () => {
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto())
     expect(resultado).toEqual({ success: false, error: "Tenés que iniciar sesión para informar una reparación." })
-    expect(piezas.captcha).not.toHaveBeenCalled()
     expect(piezas.createAdminClient).not.toHaveBeenCalled()
   })
 
@@ -396,9 +389,8 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
   ])("rechaza informar con %s", async (_caso, usuario, rol) => {
     piezas.rol.actual = rol
     piezas.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: usuario } }) } })
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto())
     expect(resultado).toEqual({ success: false, error: MENSAJE_CUENTA_REPARACION_REQUERIDA })
-    expect(piezas.captcha).not.toHaveBeenCalled()
     expect(piezas.createAdminClient).not.toHaveBeenCalled()
   })
 
@@ -412,26 +404,11 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
       cola: colaPendiente("0".repeat(64)),
     })
     piezas.createAdminClient.mockReturnValue(d.supabase)
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto())
     expect(resultado).toEqual({ success: false, error: "El reporte ya está cerrado o no está disponible para informar una reparación." })
-    expect(piezas.captcha).toHaveBeenCalled()
     const [nombre, parametros] = d.rpc.mock.calls[0] as [string, Fila]
     expect(nombre).toBe("crear_evidencia_reparacion")
     expect(parametros).toMatchObject({ p_autor_id: "admin" })
-  })
-
-  it("con sesión válida pero captcha rechazado no se escribe nada", async () => {
-    piezas.createClient.mockResolvedValue({
-      auth: { getUser: async () => ({ data: { user: { id: "persona", is_anonymous: false, email_confirmed_at: "2025-01-01T00:00:00Z" } } }) },
-    })
-    const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
-    piezas.createAdminClient.mockReturnValue(d.supabase)
-    piezas.captcha.mockResolvedValue({ ok: false, tipo: "rechazada", motivo: "invalid", mensaje: "Captcha inválido." })
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", await foto(), "token")
-    expect(resultado).toEqual({ success: false, error: "Captcha inválido." })
-    expect(piezas.captcha).toHaveBeenCalledWith({ token: "token", expectedAction: "informar_reparacion" })
-    expect(d.rpc).not.toHaveBeenCalled()
-    expect(d.eventos.filter((e) => e.startsWith("subir:"))).toEqual([])
   })
 
   it("valida la imagen real antes de crear la evidencia: bytes basura con MIME de PNG no llegan a la RPC", async () => {
@@ -441,7 +418,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     const basura = new File([new TextEncoder().encode("no soy una imagen")], "falsa.png", { type: "image/png" })
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", basura, "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", basura)
     expect(resultado.success).toBe(false)
     expect(d.rpc).not.toHaveBeenCalled()
   })
@@ -453,7 +430,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     const gif = new File([new Uint8Array([0x47, 0x49, 0x46])], "a.gif", { type: "image/gif" })
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", gif, "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", gif)
     expect(resultado).toEqual({ success: false, error: "La imagen debe estar en formato JPG, PNG o WebP." })
     expect(d.rpc).not.toHaveBeenCalled()
   })
@@ -465,7 +442,7 @@ describe("S12/S15 · autorización del lado del servidor en cada acción", () =>
     const d = doble({ crear: rechazoActivo, cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
     const enorme = new File([new Uint8Array(200 * 1024)], "grande.png", { type: "image/png" })
-    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", enorme, "token")
+    const resultado = await informarReparacionAction(7, "taparon_el_bache_con_asfalto_nuevo", enorme)
     expect(resultado).toEqual({ success: false, error: "La imagen optimizada no puede superar los 100 KB." })
     expect(d.rpc).not.toHaveBeenCalled()
   })
@@ -581,7 +558,7 @@ describe("S12 · la identidad se toma de la sesión, no del cliente", () => {
     })
     const d = doble({ crear: () => ({ data: null, error: { code: "PRE04", message: "límite" } }), cola: colaPendiente("0".repeat(64)) })
     piezas.createAdminClient.mockReturnValue(d.supabase)
-    const resultado = await informarReparacionAction(7, "  taparon_el_bache_con_asfalto_nuevo  ", await foto(), "token")
+    const resultado = await informarReparacionAction(7, "  taparon_el_bache_con_asfalto_nuevo  ", await foto())
     expect(resultado).toEqual({ success: false, error: "Alcanzaste el límite de 3 evidencias de reparación por día." })
     const [nombre, parametros] = d.rpc.mock.calls[0] as [string, Fila]
     expect(nombre).toBe("crear_evidencia_reparacion")

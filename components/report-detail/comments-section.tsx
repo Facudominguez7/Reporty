@@ -22,7 +22,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,19 +35,6 @@ import {
   mergeReportActivity,
 } from "@/lib/reportes/aportes";
 import { getUsernameFromRelation } from "@/lib/identity/display";
-import {
-  MENSAJE_CAPTCHA_NO_DISPONIBLE,
-  TURNSTILE_CONFIGURADO,
-  TURNSTILE_NO_DISPONIBLE,
-  TurnstileWidget,
-} from "@/components/turnstile-widget";
-import { debeAvisarVerificacionVencida } from "./verificacion-de-aporte";
-
-/**
- * Action que Turnstile vincula al aporte público. `app/reportes/[id]/actions.ts` verifica el
- * mismo valor con Siteverify, así un token emitido para otro formulario no sirve acá.
- */
-const ACCION_CAPTCHA_COMENTARIO = "comentar_reporte";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -80,10 +66,7 @@ export type CommentsSectionProps = {
   reportOwnerId: string | null;
   isAdmin: boolean;
   isClosed: boolean;
-  onSubmitComment: (
-    content: string,
-    captchaToken: string | null,
-  ) => Promise<CommentSubmitResult>;
+  onSubmitComment: (content: string) => Promise<CommentSubmitResult>;
   onDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
   onAdminDeleteComment: (commentId: number) => Promise<CommentDeleteResult>;
 };
@@ -106,35 +89,7 @@ export function CommentsSection({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [adminDeleteDialogOpen, setAdminDeleteDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
-
-  // Toda publicación se verifica en el servidor, así que cada aporte resuelve un challenge.
-  const needsCaptcha = TURNSTILE_CONFIGURADO;
-  // Producción sin configuración completa nunca publica sin protección.
-  const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE;
-  const canPublish =
-    Boolean(newComment) &&
-    !isSubmitting &&
-    !captchaNoDisponible &&
-    (!needsCaptcha || captchaToken !== null);
-  // El widget queda detrás del diálogo: si el token vence con el diálogo abierto, se explica ahí.
-  const verificacionVencida = debeAvisarVerificacionVencida({
-    exigeVerificacion: needsCaptcha,
-    verificacionNoDisponible: captchaNoDisponible,
-    token: captchaToken,
-    publicando: isSubmitting,
-  });
-
-  /**
-   * Olvida el token que se acaba de consumir y pide un challenge nuevo, así un reintento nunca
-   * envía un token ya usado. El aporte elegido se conserva: el fallo no borra el formulario.
-   */
-  const requestNewCaptcha = () => {
-    if (!needsCaptcha) return;
-    setCaptchaToken(null);
-    setCaptchaResetSignal((signal) => signal + 1);
-  };
+  const canPublish = Boolean(newComment) && !isSubmitting;
 
   const pathname = usePathname();
   const selectedComment = comments.find(
@@ -165,7 +120,7 @@ export function CommentsSection({
 
     setIsSubmitting(true);
     try {
-      const result = await onSubmitComment(newComment.trim(), captchaToken);
+      const result = await onSubmitComment(newComment.trim());
       if (!result.success) {
         toast.error("Error al publicar la actualización", {
           description: result.error || "Por favor, intentá nuevamente",
@@ -190,8 +145,6 @@ export function CommentsSection({
         description: "Por favor, intenta nuevamente",
       });
     } finally {
-      // El intento consumió el token, haya publicado o no: el siguiente necesita otro.
-      requestNewCaptcha();
       setIsSubmitting(false);
       setPublishDialogOpen(false);
     }
@@ -265,22 +218,6 @@ export function CommentsSection({
           </option>
         ))}
       </select>
-      {captchaNoDisponible && (
-        <Alert variant="destructive">
-          <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
-          <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
-        </Alert>
-      )}
-      {needsCaptcha && !captchaNoDisponible && (
-        <div className="space-y-1">
-          <p className="text-sm font-medium">Verificación de seguridad</p>
-          <TurnstileWidget
-            onTokenChange={setCaptchaToken}
-            resetSignal={captchaResetSignal}
-            action={ACCION_CAPTCHA_COMENTARIO}
-          />
-        </div>
-      )}
       <div className="flex justify-end">
         <Button type="submit" size="sm" className="h-9 max-w-full" disabled={!canPublish}>
           <Send className="mr-1.5 size-3 md:mr-2 md:size-4" />
@@ -456,15 +393,6 @@ export function CommentsSection({
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {verificacionVencida && (
-            <Alert variant="destructive">
-              <AlertTitle>La verificación de seguridad venció</AlertTitle>
-              <AlertDescription>
-                Tocá Cancelar y completá de nuevo la verificación del formulario.
-                Tu actualización elegida se conserva.
-              </AlertDescription>
-            </Alert>
-          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>
               Cancelar

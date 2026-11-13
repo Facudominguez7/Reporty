@@ -45,6 +45,13 @@ import dynamic from "next/dynamic"
 import { avisarOrganismosAction, crearReporteAction } from "./actions"
 import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
 import { PageTitleBar } from "@/components/page-title-bar"
+import {
+  MENSAJE_CAPTCHA_NO_DISPONIBLE,
+  TURNSTILE_CONFIGURADO,
+  TURNSTILE_NO_DISPONIBLE,
+  TurnstileWidget,
+} from "@/components/turnstile-widget"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ReportContactActions } from "@/components/report-contact-actions"
 import { canShowReportContacts } from "@/lib/report-contacts/eligibility"
 
@@ -151,6 +158,8 @@ export default function NuevoReportePage() {
   const [isOptimizingImage, setIsOptimizingImage] = useState(false)
   // Idempotency key for this form submission; the server rejects duplicates.
   const [submissionId, setSubmissionId] = useState(() => crypto.randomUUID())
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaResetSignal, setCaptchaResetSignal] = useState(0)
   const [createdReport, setCreatedReport] = useState<CreatedReport | null>(null)
   const [showResultDialog, setShowResultDialog] = useState(false)
   const [isSendingInstitutionEmail, setIsSendingInstitutionEmail] = useState(false)
@@ -313,6 +322,11 @@ export default function NuevoReportePage() {
   }
 
   const isGuestMode = !user || user.is_anonymous === true
+  // Turnstile only protects the guest sign-in: a visitor without a session solves it so
+  // Supabase Auth can create the anonymous session. Existing sessions never see it.
+  const needsCaptcha = TURNSTILE_CONFIGURADO && !user
+  // Production without complete Turnstile configuration never creates a guest unprotected.
+  const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE && !user
 
   const locationIsValid =
     formData.lat !== null && formData.lon !== null && isWithinReportCoverage(formData.lat, formData.lon)
@@ -323,6 +337,9 @@ export default function NuevoReportePage() {
   const tituloAutomatico = formData.category !== "" ? armarTituloReporte(Number(formData.category), null) : null
 
   const canSubmitReport =
+    // Solo quien no tiene sesión necesita el token para abrir la sesión de invitado.
+    (!needsCaptcha || captchaToken !== null) &&
+    !captchaNoDisponible &&
     (!pideTitulo || formData.title.trim().length >= 3) &&
     formData.description.trim().length >= 10 &&
     formData.category !== "" &&
@@ -341,6 +358,7 @@ export default function NuevoReportePage() {
     formData.priority !== "" ? null : "prioridad",
     formData.images.length > 0 ? null : "fotografía",
     formData.lat !== null && formData.lon !== null ? null : "ubicación",
+    !needsCaptcha || captchaToken !== null ? null : "verificación de seguridad",
   ].filter(Boolean) as string[]
 
   const estadoDeEnvio = isPublishing
@@ -348,23 +366,46 @@ export default function NuevoReportePage() {
     : "Verificando seguridad..."
 
   /**
+   * Forgets the token that was just consumed and asks Cloudflare for a new challenge, so a
+   * retry never sends an already used token.
+   */
+  const requestNewCaptcha = () => {
+    if (!needsCaptcha) return
+    setCaptchaToken(null)
+    setCaptchaResetSignal((signal) => signal + 1)
+  }
+
+  /**
+   * Guarda el token del challenge que habilita la sesión de invitado.
+   *
+   * @param token - Token emitido por Turnstile, o `null` cuando expiró o falló.
+   */
+  const handleCaptchaToken = (token: string | null) => {
+    setCaptchaToken(token)
+  }
+
+  /**
    * Creates the anonymous guest session from the browser, only at submit time and only
    * when there is no session. Running it client-side makes Supabase Auth apply its
    * per-IP anonymous sign-in limit and CAPTCHA to the visitor, not to the server.
    *
-   * That call consumes the current challenge token, so it is invalidated here: the report
-   * creation must prove itself with a different one.
+   * That call consumes the current challenge token, so it is invalidated here. The report
+   * creation itself is not verified with Turnstile.
    */
   const ensureGuestSession = async () => {
-    const { data, error } = await supabase.auth.signInAnonymously()
+    const { data, error } = await supabase.auth.signInAnonymously(
+      captchaToken ? { options: { captchaToken } } : undefined,
+    )
 
     if (error || !data.user) {
+      requestNewCaptcha()
       toast.error("Error al crear el reporte", {
         description: getGuestSessionErrorMessage(error),
       })
       return null
     }
 
+    requestNewCaptcha()
     setUser(data.user)
     return data.user
   }
@@ -430,7 +471,8 @@ export default function NuevoReportePage() {
     try {
       setIsSubmitting(true)
 
-      // Reutilizar la sesión; crear una invitada solo si no existe.
+      // Reutilizar la sesión; crear una invitada solo si no existe. Esa creación es el único
+      // paso que exige el challenge de Turnstile.
       if (!user && !(await ensureGuestSession())) {
         return
       }
@@ -448,11 +490,12 @@ export default function NuevoReportePage() {
         payload.set("image", formData.images[0])
       }
 
-      // El token ya está listo: desde acá el servidor lo verifica y puede tardar en analizar la fotografía.
+      // Desde acá el servidor puede tardar en analizar la fotografía.
       setIsPublishing(true)
       const result = await crearReporteAction(payload)
 
       if (!result.success) {
+        // The report and everything already written in the form stay exactly as they were.
         avisarFalloDeEnvio(result)
         return
       }
@@ -866,6 +909,23 @@ export default function NuevoReportePage() {
                   </div>
                 )}
               </div>
+
+              {captchaNoDisponible && (
+                <Alert variant="destructive">
+                  <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
+                  <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
+                </Alert>
+              )}
+
+              {needsCaptcha && (
+                <div className="space-y-2">
+                  <Label>Verificación de seguridad</Label>
+                  <TurnstileWidget
+                    onTokenChange={handleCaptchaToken}
+                    resetSignal={captchaResetSignal}
+                  />
+                </div>
+              )}
 
               {/* Submit Button */}
               <div className="flex gap-4 pt-4">
