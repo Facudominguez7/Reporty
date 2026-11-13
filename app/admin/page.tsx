@@ -58,7 +58,8 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+      {/* grid-cols-1 = minmax(0, 1fr): sin esto, un título largo con truncate ensancha la columna y desborda en el celular. */}
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-3"><div><CardTitle className="text-lg">Últimos reportes</CardTitle><p className="text-sm text-muted-foreground">Los cinco casos publicados más recientes.</p></div><Link href="/admin/reportes" className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline">Ver todos <ArrowRight className="size-4" /></Link></CardHeader>
           <CardContent>
