@@ -45,22 +45,8 @@ import dynamic from "next/dynamic"
 import { crearReporteAction } from "./actions"
 import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
 import { PageTitleBar } from "@/components/page-title-bar"
-import {
-  MENSAJE_CAPTCHA_NO_DISPONIBLE,
-  TURNSTILE_CONFIGURADO,
-  TURNSTILE_NO_DISPONIBLE,
-  TurnstileWidget,
-  createTurnstileTokenFeed,
-} from "@/components/turnstile-widget"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ReportContactActions } from "@/components/report-contact-actions"
 import { canShowReportContacts } from "@/lib/report-contacts/eligibility"
-
-/**
- * Turnstile action bound to report creation; `app/reportes/nuevo/actions.ts` verifies the
- * same value through Siteverify, so a test asserts both literals cannot drift.
- */
-const ACCION_CAPTCHA_CREACION = "crear_reporte"
 
 /** Maps Supabase Auth errors from the guest sign-in to user-facing messages. */
 function getGuestSessionErrorMessage(error: AuthError | null) {
@@ -161,15 +147,10 @@ export default function NuevoReportePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   // El servidor no encontró la dirección del punto: la persona escribe el título y reenvía.
   const [tituloPorFaltaDeDireccion, setTituloPorFaltaDeDireccion] = useState(false)
-  // True once the form holds its challenge token and the report is sent to the server.
   const [isPublishing, setIsPublishing] = useState(false)
   const [isOptimizingImage, setIsOptimizingImage] = useState(false)
   // Idempotency key for this form submission; the server rejects duplicates.
   const [submissionId, setSubmissionId] = useState(() => crypto.randomUUID())
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const [captchaResetSignal, setCaptchaResetSignal] = useState(0)
-  // Buffers the challenge token so a guest can wait for the fresh one its report needs.
-  const [captchaFeed] = useState(createTurnstileTokenFeed)
   const [createdReport, setCreatedReport] = useState<CreatedReport | null>(null)
   const [showResultDialog, setShowResultDialog] = useState(false)
   // Synchronous guard against double clicks before React re-renders the disabled button.
@@ -329,10 +310,6 @@ export default function NuevoReportePage() {
   }
 
   const isGuestMode = !user || user.is_anonymous === true
-  // Every creation is verified on the server, so registered people also solve the challenge.
-  const needsCaptcha = TURNSTILE_CONFIGURADO
-  // Production without complete Turnstile configuration never submits unprotected.
-  const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE
 
   const locationIsValid =
     formData.lat !== null && formData.lon !== null && isWithinReportCoverage(formData.lat, formData.lon)
@@ -343,8 +320,6 @@ export default function NuevoReportePage() {
   const tituloAutomatico = formData.category !== "" ? armarTituloReporte(Number(formData.category), null) : null
 
   const canSubmitReport =
-    (!needsCaptcha || captchaToken !== null) &&
-    !captchaNoDisponible &&
     (!pideTitulo || formData.title.trim().length >= 3) &&
     formData.description.trim().length >= 10 &&
     formData.category !== "" &&
@@ -363,30 +338,11 @@ export default function NuevoReportePage() {
     formData.priority !== "" ? null : "prioridad",
     formData.images.length > 0 ? null : "fotografía",
     formData.lat !== null && formData.lon !== null ? null : "ubicación",
-    !needsCaptcha || captchaToken !== null ? null : "verificación de seguridad",
   ].filter(Boolean) as string[]
 
-  // Until the report is sent, the only pending step is the challenge token.
   const estadoDeEnvio = isPublishing
     ? (formData.images.length > 0 ? "Procesando fotografía..." : "Enviando...")
     : "Verificando seguridad..."
-
-  /**
-   * Forgets the token that was just consumed and asks Cloudflare for a new challenge, so a
-   * retry never sends an already used token.
-   */
-  const requestNewCaptcha = () => {
-    if (!needsCaptcha) return
-    captchaFeed.invalidate()
-    setCaptchaToken(null)
-    setCaptchaResetSignal((signal) => signal + 1)
-  }
-
-  /** Feeds the challenge token to the form and to the two-step guest flow. */
-  const handleCaptchaToken = (token: string | null) => {
-    captchaFeed.offer(token)
-    setCaptchaToken(token)
-  }
 
   /**
    * Creates the anonymous guest session from the browser, only at submit time and only
@@ -397,19 +353,15 @@ export default function NuevoReportePage() {
    * creation must prove itself with a different one.
    */
   const ensureGuestSession = async () => {
-    const { data, error } = await supabase.auth.signInAnonymously(
-      captchaToken ? { options: { captchaToken } } : undefined,
-    )
+    const { data, error } = await supabase.auth.signInAnonymously()
 
     if (error || !data.user) {
-      requestNewCaptcha()
       toast.error("Error al crear el reporte", {
         description: getGuestSessionErrorMessage(error),
       })
       return null
     }
 
-    requestNewCaptcha()
     setUser(data.user)
     return data.user
   }
@@ -455,29 +407,8 @@ export default function NuevoReportePage() {
     try {
       setIsSubmitting(true)
 
-      // Reutilizar la sesión; crear una invitada solo si no existe. Esa creación consume
-      // el token actual, así que el reporte necesita otro distinto.
-      const creaSessionInvitada = !user && needsCaptcha
-
-      if (creaSessionInvitada) {
-        // El segundo challenge vive detrás de este diálogo: si Cloudflare pide interacción,
-        // la persona tiene que poder verlo y resolverlo en el formulario.
-        setShowConfirmDialog(false)
-      }
-
+      // Reutilizar la sesión; crear una invitada solo si no existe.
       if (!user && !(await ensureGuestSession())) {
-        return
-      }
-
-      // A guest already used its token to sign in; Cloudflare usually answers the second
-      // challenge without interaction, so for most people the extra step is invisible.
-      const tokenDeCreacion = creaSessionInvitada ? await captchaFeed.waitForFreshToken() : captchaToken
-
-      if (needsCaptcha && !tokenDeCreacion) {
-        requestNewCaptcha()
-        toast.error("Error al crear el reporte", {
-          description: "Completá la verificación de seguridad y volvé a intentarlo.",
-        })
         return
       }
 
@@ -490,10 +421,6 @@ export default function NuevoReportePage() {
       payload.set("lon", String(formData.lon))
       payload.set("submissionId", submissionId)
 
-      if (tokenDeCreacion) {
-        payload.set("captcha_token", tokenDeCreacion)
-      }
-
       if (formData.images[0]) {
         payload.set("image", formData.images[0])
       }
@@ -503,15 +430,9 @@ export default function NuevoReportePage() {
       const result = await crearReporteAction(payload)
 
       if (!result.success) {
-        // Siteverify consumed the token: the retry needs a new challenge, but the report
-        // and everything already written in the form stay exactly as they were.
-        requestNewCaptcha()
         avisarFalloDeEnvio(result)
         return
       }
-
-      // The report consumed this token: another report from this form needs a new challenge.
-      requestNewCaptcha()
 
       const imageFailed = formData.images.length > 0 && !result.data.imageUploaded
       const withdrawn = result.data.imageModeration?.estado === "REJECTED"
@@ -552,7 +473,6 @@ export default function NuevoReportePage() {
 
     } catch (error) {
       console.error("Error inesperado:", error)
-      requestNewCaptcha()
       toast.error("Error al crear el reporte", {
         description: "Por favor, intenta nuevamente."
       })
@@ -910,24 +830,6 @@ export default function NuevoReportePage() {
                   </div>
                 )}
               </div>
-
-              {captchaNoDisponible && (
-                <Alert variant="destructive">
-                  <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
-                  <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
-                </Alert>
-              )}
-
-              {needsCaptcha && (
-                <div className="space-y-2">
-                  <Label>Verificación de seguridad</Label>
-                  <TurnstileWidget
-                    onTokenChange={handleCaptchaToken}
-                    resetSignal={captchaResetSignal}
-                    action={ACCION_CAPTCHA_CREACION}
-                  />
-                </div>
-              )}
 
               {/* Submit Button */}
               <div className="flex gap-4 pt-4">

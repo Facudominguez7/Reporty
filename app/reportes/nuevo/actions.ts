@@ -15,7 +15,6 @@ import {
   releaseReportSubmission,
   reportSubmissionClaimMessage,
 } from "@/lib/security/report-submission-guard.server"
-import { verificarCaptchaDeAccion } from "@/lib/security/turnstile-guard.server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
@@ -55,65 +54,6 @@ async function resolveReportActor(sessionClient: SupabaseClient): Promise<Report
   return { success: true, user }
 }
 
-/**
- * Turnstile action bound to every report creation. `components/turnstile-widget.tsx` renders
- * the challenge with the same value through `app/reportes/nuevo/page.tsx`, so a token issued
- * for another protected form can never be replayed here; a test asserts both sides match.
- */
-const ACCION_CAPTCHA_CREACION = "crear_reporte"
-
-/**
- * Same copy as `MENSAJE_CAPTCHA_NO_DISPONIBLE` in `components/turnstile-widget.tsx`;
- * `tests/reportes/turnstile-report.test.ts` asserts both are identical.
- */
-const MENSAJE_CAPTCHA_NO_DISPONIBLE =
-  "La verificación de seguridad no está disponible en este momento. Por seguridad no podemos procesar el formulario; si el problema continúa, contactá a la administración de Reporty."
-
-/**
- * Producción nunca acepta un envío con el challenge apagado en silencio. La política vive en
- * el guard; acá solo decide qué tan grave es la falta de configuración al registrar el error.
- */
-const esProduccion = () => process.env.NODE_ENV === "production"
-
-/** Reads the single-use token the form attached to this submission. */
-function obtenerCaptcha(formData: FormData): string | undefined {
-  const token = formData.get("captcha_token")
-  return typeof token === "string" && token.length > 0 && token.length <= 2048 ? token : undefined
-}
-
-/**
- * Proves that a person, not a script, is submitting the report. It runs before the
- * submission is claimed and before any costly image work, so a rejected token neither
- * consumes the idempotency key nor the hourly limits: the retry only solves a new
- * challenge. Both registered and guest identities go through it, and the token consumed
- * by the guest `signInAnonymously()` call can never be reused here.
- *
- * La política vive en `lib/security/turnstile-guard.server.ts` junto con el resto de las
- * operaciones protegidas; acá solo se traduce el resultado al texto que ve la persona.
- *
- * @param formData - Submission carrying the single-use `captcha_token`.
- * @returns Error copy to return, or `null` when the creation may continue.
- */
-async function verificarCaptchaDeCreacion(formData: FormData): Promise<string | null> {
-  const resultado = await verificarCaptchaDeAccion({
-    token: obtenerCaptcha(formData),
-    expectedAction: ACCION_CAPTCHA_CREACION,
-  })
-
-  if (resultado.ok) return null
-  if (resultado.tipo === "rechazada") return resultado.mensaje
-
-  // Nunca se degrada en silencio: el secreto vive solo en el servidor, así que una
-  // configuración incompleta bloquea la operación en vez de confiar en el token del cliente.
-  // En producción es una caída del servicio; fuera de ella, una configuración a medio terminar.
-  console.error(
-    esProduccion()
-      ? "Turnstile no está configurado en producción: la creación de reportes quedó bloqueada hasta completar NEXT_PUBLIC_TURNSTILE_SITE_KEY y TURNSTILE_SECRET_KEY."
-      : "Turnstile no está configurado: la creación de reportes quedó bloqueada hasta completar NEXT_PUBLIC_TURNSTILE_SITE_KEY y TURNSTILE_SECRET_KEY.",
-  )
-  return MENSAJE_CAPTCHA_NO_DISPONIBLE
-}
-
 /** Extrae el archivo sin leer bytes; toda validación costosa ocurre después de autorizar el rol. */
 function obtenerImagen(formData: FormData) {
   const imagen = formData.get("image")
@@ -146,11 +86,6 @@ export async function crearReporteAction(formData: FormData) {
 
     if (!actor.success) {
       return { success: false as const, error: actor.error }
-    }
-
-    const captchaError = await verificarCaptchaDeCreacion(formData)
-    if (captchaError) {
-      return { success: false as const, error: captchaError }
     }
 
     const adminClient = createAdminClient()

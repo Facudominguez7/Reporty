@@ -1,4 +1,4 @@
-/** Pruebas de la frontera de sesión, la verificación Turnstile y el control de envíos de la acción. */
+/** Pruebas de la frontera de sesión y el control de envíos de la acción. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const { createClient, createAdminClient } = vi.hoisted(() => ({
@@ -15,48 +15,17 @@ vi.mock("@/lib/use-cases/reportes", () => ({ crearReporteWorkflow: dobles.workfl
 vi.mock("@/lib/security/report-submission-guard.server", () => ({ claimReportSubmission: dobles.claim, releaseReportSubmission: dobles.release, hashClientIp: () => "ip-sintetica", reportSubmissionClaimMessage: () => "Envío duplicado" }))
 import { crearReporteAction } from "./actions"
 
-const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
-// Secretos de prueba oficiales de Cloudflare (sin guión), válidos solo fuera de producción.
-const SECRETO_PRUEBA = "1x0000000000000000000000000000000AA"
-const TOKEN_DE_REPORTE = "tok-reporte-1234"
-const MENSAJE_TOKEN_RECHAZADO = "La verificación falló o venció. Completá la verificación y volvé a intentarlo."
-const MENSAJE_VERIFICACION_FALLIDA = "La verificación falló. Volvé a intentarlo."
-const MENSAJE_RED = "No pudimos contactar la verificación. Volvé a intentarlo en unos segundos."
-const MENSAJE_CAPTCHA_NO_DISPONIBLE =
-  "La verificación de seguridad no está disponible en este momento. Por seguridad no podemos procesar el formulario; si el problema continúa, contactá a la administración de Reporty."
-
-/** Respuesta controlada de Siteverify: nunca se resuelve un challenge real en las pruebas. */
-function siteverify(overrides: Record<string, unknown> = {}) {
-  const llamada = vi.fn().mockResolvedValue(
-    new Response(
-      JSON.stringify({ success: true, hostname: "reporty.com.ar", action: "crear_reporte", "error-codes": [], ...overrides }),
-      { status: 200 },
-    ),
-  )
-  vi.stubGlobal("fetch", llamada)
-  return llamada
-}
-
-/** Configuración de Turnstile válida para desarrollo y pruebas. */
-function configurarTurnstile() {
-  vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA")
-  vi.stubEnv("TURNSTILE_SECRET_KEY", SECRETO_PRUEBA)
-  vi.stubEnv("TURNSTILE_ALLOWED_HOSTNAMES", "reporty.com.ar")
-}
 
 /** Construye un envío válido que no requiere datos reales. */
 function formulario() {
   const datos = new FormData()
   for (const [clave, valor] of Object.entries({ titulo: "Bache", descripcion: "Frente a la plaza principal", categoriaId: "1", prioridadId: "1", lat: "-27.37", lon: "-55.9", submissionId: "e1a3f644-9c40-4a40-9000-000000000001" })) datos.set(clave, valor)
-  datos.set("captcha_token", TOKEN_DE_REPORTE)
   datos.set("image", new File(["foto"], "reporte.png", { type: "image/png" }))
   return datos
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  configurarTurnstile()
-  siteverify()
   createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "persona", is_anonymous: false } } }) } })
   createAdminClient.mockReturnValue({})
   dobles.claim.mockResolvedValue("ok")
@@ -149,8 +118,6 @@ describe("crearReporteAction", () => {
     formData.set("lat", "-27.32")
     formData.set("lon", "-55.89")
     formData.set("submissionId", "e1a3f644-9c40-4a40-9000-000000000001")
-    formData.set("captcha_token", TOKEN_DE_REPORTE)
-
     await expect(crearReporteAction(formData)).resolves.toEqual({
       success: false,
       error: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria.",
@@ -160,120 +127,20 @@ describe("crearReporteAction", () => {
   })
 })
 
-describe("crearReporteAction — verificación Turnstile del envío final", () => {
-  it("exige un token válido y lo verifica contra Siteverify con la action de creación", async () => {
-    const llamada = siteverify()
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
-
-    expect(llamada).toHaveBeenCalledOnce()
-    const [url, opciones] = llamada.mock.calls[0]
-    expect(url).toBe(SITEVERIFY_URL)
-    expect(opciones.body.get("secret")).toBe(SECRETO_PRUEBA)
-    expect(opciones.body.get("response")).toBe(TOKEN_DE_REPORTE)
-    expect(opciones.body.has("remoteip")).toBe(false)
-  })
-
-  it("rechaza un envío directo a la acción sin token antes de reservar el envío", async () => {
-    const llamada = siteverify()
+describe("crearReporteAction — sin verificación Turnstile", () => {
+  it("acepta un envío autenticado sin token de seguridad", async () => {
     const datos = formulario()
-    datos.delete("captcha_token")
-
-    expect(await crearReporteAction(datos)).toEqual({ success: false, error: MENSAJE_TOKEN_RECHAZADO })
-    expect(llamada).not.toHaveBeenCalled()
-    expect(dobles.claim).not.toHaveBeenCalled()
-    expect(dobles.release).not.toHaveBeenCalled()
-    expect(dobles.workflow).not.toHaveBeenCalled()
-  })
-
-  it("rechaza un token reutilizado o vencido sin crear el reporte", async () => {
-    siteverify({ success: false, "error-codes": ["timeout-or-duplicate"] })
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_TOKEN_RECHAZADO })
-    expect(createAdminClient).not.toHaveBeenCalled()
-    expect(dobles.claim).not.toHaveBeenCalled()
-    expect(dobles.workflow).not.toHaveBeenCalled()
-  })
-
-  it("rechaza un token emitido para otro hostname", async () => {
-    siteverify({ hostname: "malicioso.example" })
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_VERIFICACION_FALLIDA })
-    expect(dobles.claim).not.toHaveBeenCalled()
-  })
-
-  it("rechaza un token emitido para otra action", async () => {
-    siteverify({ action: "otra_action" })
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_VERIFICACION_FALLIDA })
-    expect(dobles.claim).not.toHaveBeenCalled()
-  })
-
-  it("falla cerrada ante un error de red de Cloudflare", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")))
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_RED })
-    expect(dobles.claim).not.toHaveBeenCalled()
-  })
-
-  it("en producción falla cerrada sin verificar si falta la configuración", async () => {
-    vi.stubEnv("NODE_ENV", "production")
-    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "")
-    vi.stubEnv("TURNSTILE_SECRET_KEY", "")
-    const llamada = siteverify()
-    const errores = vi.spyOn(console, "error").mockImplementation(() => {})
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_CAPTCHA_NO_DISPONIBLE })
-    expect(llamada).not.toHaveBeenCalled()
-    expect(dobles.claim).not.toHaveBeenCalled()
-    expect(dobles.workflow).not.toHaveBeenCalled()
-    expect(errores).toHaveBeenCalled()
-  })
-
-  it("en producción falla cerrada también cuando solo falta el secreto", async () => {
-    vi.stubEnv("NODE_ENV", "production")
-    vi.stubEnv("TURNSTILE_SECRET_KEY", "")
-    vi.spyOn(console, "error").mockImplementation(() => {})
-    const llamada = siteverify()
-
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_CAPTCHA_NO_DISPONIBLE })
-    expect(llamada).not.toHaveBeenCalled()
-    expect(dobles.claim).not.toHaveBeenCalled()
-  })
-
-  it("fuera de producción sin configuración no exige un challenge que el formulario no puede mostrar", async () => {
-    vi.stubEnv("NODE_ENV", "development")
-    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "")
-    vi.stubEnv("TURNSTILE_SECRET_KEY", "")
-    const llamada = siteverify()
-    const datos = formulario()
-    datos.delete("captcha_token")
 
     expect(await crearReporteAction(datos)).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
-    expect(llamada).not.toHaveBeenCalled()
     expect(dobles.claim).toHaveBeenCalledOnce()
+    expect(dobles.workflow).toHaveBeenCalledOnce()
   })
 
-  it("exige el token también para una sesión de invitado", async () => {
+  it("acepta también el envío de una sesión invitada sin token de seguridad", async () => {
     createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "invitado", is_anonymous: true } } }) } })
-    siteverify({ success: false, "error-codes": ["invalid-input-response"] })
 
-    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: MENSAJE_TOKEN_RECHAZADO })
-    expect(dobles.claim).not.toHaveBeenCalled()
-    expect(dobles.workflow).not.toHaveBeenCalled()
-  })
-
-  it("permite reintentar con un token nuevo y sin consumir el envío del intento fallido", async () => {
-    siteverify({ success: false, "error-codes": ["timeout-or-duplicate"] })
-    expect(await crearReporteAction(formulario())).toMatchObject({ success: false })
-
-    siteverify()
-    const reintento = formulario()
-    reintento.set("captcha_token", "tok-segundo-intento")
-
-    expect(await crearReporteAction(reintento)).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
-    // El primer intento no reservó el envío: el reintento con token nuevo no es un duplicado.
+    expect(await crearReporteAction(formulario())).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
     expect(dobles.claim).toHaveBeenCalledOnce()
-    expect(dobles.release).not.toHaveBeenCalled()
+    expect(dobles.workflow).toHaveBeenCalledOnce()
   })
 })
