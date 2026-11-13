@@ -73,6 +73,7 @@ describe("report notification emails", () => {
     expect(email.html).toContain("El semáforo quedó en rojo fijo.")
     expect(email.html).toContain("https://reporty.com.ar/reportes/42")
     expect(email.text).toContain("https://reporty.com.ar/reportes/42")
+    expect(email.text).toContain("a pedido de quien creó el reporte")
     expect(mocks.send.mock.calls[0][1]).toEqual({ idempotencyKey: "organismo-aviso/42/9" })
   })
 

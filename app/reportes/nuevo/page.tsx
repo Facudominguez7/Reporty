@@ -42,7 +42,7 @@ import {
   verificarPuedeCrearReporte
 } from "@/database/queries/reportes/nuevo"
 import dynamic from "next/dynamic"
-import { crearReporteAction } from "./actions"
+import { avisarOrganismosAction, crearReporteAction } from "./actions"
 import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { ReportContactActions } from "@/components/report-contact-actions"
@@ -75,7 +75,7 @@ type CreatedReport = {
   withdrawn: boolean
   imageMessage: string
   imageApproved: boolean
-  /** Correos de organismos notificados automáticamente; vacío si no se avisó a nadie. */
+  /** Correos de organismos notificados a pedido de la persona. */
   correosEnviados: string[]
   createdDate: string
 }
@@ -153,8 +153,11 @@ export default function NuevoReportePage() {
   const [submissionId, setSubmissionId] = useState(() => crypto.randomUUID())
   const [createdReport, setCreatedReport] = useState<CreatedReport | null>(null)
   const [showResultDialog, setShowResultDialog] = useState(false)
-  // Synchronous guard against double clicks before React re-renders the disabled button.
+  const [isSendingInstitutionEmail, setIsSendingInstitutionEmail] = useState(false)
+  const [institutionEmailChoice, setInstitutionEmailChoice] = useState<boolean | null>(null)
+  // Synchronous guards against double clicks before React re-renders disabled buttons.
   const submitLockRef = useRef(false)
+  const institutionEmailLockRef = useRef(false)
 
   const supabase = createClient()
   const router = useRouter()
@@ -371,6 +374,26 @@ export default function NuevoReportePage() {
     if (!open) router.push("/mapa")
   }
 
+  const notifyInstitutions = async () => {
+    if (!createdReport || institutionEmailLockRef.current) return
+    institutionEmailLockRef.current = true
+    setIsSendingInstitutionEmail(true)
+    try {
+      const result = await avisarOrganismosAction(createdReport.reportId)
+      if (!result.success) {
+        toast.error("No se pudo enviar el correo", { description: result.error })
+        return
+      }
+      setCreatedReport((report) => report ? { ...report, correosEnviados: result.correosEnviados } : report)
+      setInstitutionEmailChoice(true)
+    } catch {
+      toast.error("No se pudo enviar el correo", { description: "Intentá nuevamente." })
+    } finally {
+      institutionEmailLockRef.current = false
+      setIsSendingInstitutionEmail(false)
+    }
+  }
+
   /**
    * Muestra el error de un envío rechazado y, si el servidor pidió título por falta de
    * dirección, habilita el campo para que la persona lo escriba y reenvíe.
@@ -455,6 +478,7 @@ export default function NuevoReportePage() {
           : "¡Reporte creado exitosamente!",
       )
 
+      setInstitutionEmailChoice(null)
       setShowResultDialog(true)
       setCreatedReport({
         reportId: result.data.reportId,
@@ -554,6 +578,25 @@ export default function NuevoReportePage() {
                 Se envió correo a: {createdReport.correosEnviados.join(", ")}
               </p>
             )}
+            {createdReport.imageApproved && !createdReport.withdrawn && institutionEmailChoice === null && (
+              <div className="rounded-xl border border-border/70 bg-muted/40 p-4 text-center">
+                <p className="text-sm font-medium">¿Querés avisar a la institución responsable?</p>
+                <p className="mt-1 text-xs text-muted-foreground">El reporte se enviará solo si elegís hacerlo.</p>
+                <div className="mt-3 flex justify-center gap-2">
+                  <Button type="button" size="sm" onClick={notifyInstitutions} disabled={isSendingInstitutionEmail}>
+                    {isSendingInstitutionEmail ? "Enviando…" : "Sí, enviar"}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => setInstitutionEmailChoice(false)} disabled={isSendingInstitutionEmail}>
+                    No, gracias
+                  </Button>
+                </div>
+              </div>
+            )}
+            {createdReport.imageApproved && !createdReport.withdrawn && institutionEmailChoice !== null && createdReport.correosEnviados.length === 0 && (
+              <p role="status" className="text-center text-sm text-muted-foreground">
+                {institutionEmailChoice ? "No se encontró una institución disponible para avisar." : "No se envió ningún correo."}
+              </p>
+            )}
             {createdReport.imageApproved && !createdReport.withdrawn && formData.lat !== null && formData.lon !== null && (
               <ReportContactActions
                 title={createdReport.titulo}
@@ -565,16 +608,9 @@ export default function NuevoReportePage() {
                 reportUrl={`${window.location.origin}/reportes/${createdReport.reportId}`}
               />
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <Button asChild size="sm" className={`min-w-0 whitespace-normal [overflow-wrap:anywhere] text-center ${createdReport.withdrawn ? "col-span-2" : ""}`}>
-                <Link href="/mis-reportes">
-                  Ver mis reportes
-                </Link>
-              </Button>
-              {!createdReport.withdrawn && <Button asChild variant="outline" size="sm" className="min-w-0 whitespace-normal [overflow-wrap:anywhere] text-center">
-                <Link href={`/reportes/${createdReport.reportId}`}>Ver el reporte</Link>
-              </Button>}
-            </div>
+            {!createdReport.withdrawn && <Button asChild variant="outline" size="sm" className="w-full min-w-0 whitespace-normal [overflow-wrap:anywhere] text-center">
+              <Link href={`/reportes/${createdReport.reportId}`}>Ver el reporte</Link>
+            </Button>}
             {!createdReport.withdrawn && <InvitacionDonar />}
             {(!createdReport.imageApproved || createdReport.withdrawn) && (
               <Button type="button" variant="ghost-bordered" className="w-full" onClick={startNewReport}>

@@ -1,8 +1,6 @@
 /**
- * Aviso automático por correo a los organismos del directorio de contactos cuando se publica un
- * reporte. Es best-effort: el llamador (`crearReporteWorkflow`) ya confirmó la creación y un fallo
- * de correo no debe afectarla, por lo que los errores de envío se tragan por contacto y los de
- * consulta se propagan para que el llamador decida.
+ * Aviso a pedido del autor a los organismos del directorio tras publicar el reporte.
+ * Los fallos por destinatario no bloquean al resto; si todos fallan, se informa al autor.
  */
 import "server-only"
 
@@ -42,7 +40,7 @@ export type AvisoOrganismoInput = {
  * escalamiento (prioridad 3, p. ej. Defensoría con otros canales): ese sigue siendo una opción
  * manual de seguimiento.
  *
- * @param supabase - Cliente de sesión; el directorio es de lectura pública.
+ * @param supabase - Cliente de servidor; el directorio es de lectura pública.
  * @param input - Datos ya confirmados del reporte creado.
  * @returns Correos de los organismos a los que salió el aviso.
  */

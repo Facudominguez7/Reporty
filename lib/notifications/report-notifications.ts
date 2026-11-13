@@ -330,7 +330,7 @@ export async function sendOrganismoNotificationEmail({
     html: renderEmailLayout({
       assetBaseUrl: getAppUrl(),
       title: "Nuevo reporte ciudadano",
-      kicker: "Aviso automático",
+      kicker: "Aviso solicitado",
       preheader: `${organizacion}: se cargó un reporte de ${categoria} en Reporty.`,
       heading: asunto,
       body: [
@@ -345,7 +345,7 @@ export async function sendOrganismoNotificationEmail({
           ].join("\n"),
         }),
         emailButton("Ver reporte completo", reportUrl),
-        emailParagraph("Este aviso fue generado automáticamente por Reporty a partir de un reporte ciudadano."),
+        emailParagraph("Este aviso fue enviado a pedido de quien creó el reporte ciudadano en Reporty."),
       ].join("\n"),
     }),
     text: plainText([
@@ -353,7 +353,7 @@ export async function sendOrganismoNotificationEmail({
       `Organismo: ${organizacion}`,
       descripcion && `Descripción: ${descripcion}`,
       `Ver reporte completo: ${reportUrl}`,
-      "Este aviso fue generado automáticamente por Reporty a partir de un reporte ciudadano.",
+      "Este aviso fue enviado a pedido de quien creó el reporte ciudadano en Reporty.",
     ]),
   }, { idempotencyKey: `organismo-aviso/${reporteId}/${contactoId}` });
 }
