@@ -47,8 +47,8 @@ export const POSADAS_MIN_ZOOM = 13
 export const MAP_MAX_ZOOM = 18
 
 export const INITIAL_MAP_VIEW_CONFIG: InitialMapViewConfig = {
-  defaultCenter: [-27.3676, -55.8961],
-  defaultZoom: 14,
+  defaultCenter: [-27.37055362199836, -55.896518427953964],
+  defaultZoom: 13,
   singlePointZoom: 14,
   minZoom: POSADAS_MIN_ZOOM,
   maxZoom: MAP_MAX_ZOOM,
