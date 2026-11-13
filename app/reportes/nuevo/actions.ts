@@ -7,6 +7,7 @@ import { headers } from "next/headers"
 import { ZodError, z } from "zod"
 
 import { crearReporteWorkflow, mutationErrorMessage } from "@/lib/use-cases/reportes"
+import { notificarOrganismosDeReporte } from "@/lib/use-cases/reportes/notificar-organismos"
 import { isAnonymousUser } from "@/lib/authz/roles"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import {
@@ -61,6 +62,36 @@ function obtenerImagen(formData: FormData) {
 }
 
 /** Crea el reporte con sesión y claim válidos, sin confiar en miniaturas enviadas por el cliente. */
+export async function avisarOrganismosAction(reporteId: number) {
+  if (!Number.isSafeInteger(reporteId) || reporteId <= 0) return { success: false as const, error: "El reporte no es válido." }
+
+  try {
+    const sessionClient = await createClient()
+    const actor = await resolveReportActor(sessionClient)
+    if (!actor.success) return { success: false as const, error: actor.error }
+
+    const adminClient = createAdminClient()
+    const { data: reporte, error } = await adminClient.from("reportes")
+      .select("usuario_id,deleted_at,estado_id,titulo,categoria_id,descripcion,lat,lon")
+      .eq("id", reporteId).single()
+    if (error || !reporte || reporte.usuario_id !== actor.user.id || reporte.deleted_at || reporte.estado_id !== 1) {
+      return { success: false as const, error: "El reporte ya no está disponible para avisar al organismo." }
+    }
+
+    const { data: foto, error: fotoError } = await adminClient.from("fotos_reporte")
+      .select("id").eq("reporte_id", reporteId).maybeSingle()
+    if (fotoError || !foto) return { success: false as const, error: "La fotografía todavía no está publicada." }
+
+    const correosEnviados = await notificarOrganismosDeReporte(adminClient, {
+      reporteId, titulo: reporte.titulo, categoriaId: reporte.categoria_id,
+      descripcion: reporte.descripcion, lat: reporte.lat, lon: reporte.lon,
+    })
+    return { success: true as const, correosEnviados }
+  } catch {
+    return { success: false as const, error: "No pudimos avisar al organismo. Intentá nuevamente." }
+  }
+}
+
 export async function crearReporteAction(formData: FormData) {
   try {
     const parsedInput = createReportSchema.parse({

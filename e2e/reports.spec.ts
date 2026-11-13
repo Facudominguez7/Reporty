@@ -97,7 +97,7 @@ test.describe("reports", () => {
     await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0)
   })
 
-  test("a visitor without an account reports as a guest and finds it in Mis reportes", async ({ page, testData }) => {
+  test("a guest can decline the institution notice after reporting", async ({ page, testData }) => {
     const titulo = `Bache de invitado ${uniqueTag()}`
 
     // The guest choice precedes the anonymous session, which is created on click.
@@ -115,9 +115,10 @@ test.describe("reports", () => {
     await expect(page.getByText("Reportaste como invitado.", { exact: false })).toBeVisible()
     const reporte = await testData.trackReportByTitle(titulo)
 
-    await page.getByRole("link", { name: "Ver mis reportes" }).click()
-    await expect(page).toHaveURL(/\/mis-reportes$/)
-    await expect(page.getByText(titulo).first()).toBeVisible()
+    await expect(page.getByText("¿Querés avisar a la institución responsable?")).toBeVisible()
+    await expect(page.getByRole("link", { name: "Ver mis reportes" })).toHaveCount(0)
+    await page.getByRole("button", { name: "No, gracias" }).click()
+    await expect(page.getByRole("status").getByText("No se envió ningún correo.")).toBeVisible()
     expect(reporte.usuario_id).toBeTruthy()
 
     // "No existe" is the only vote left: a repair is reported with photo evidence instead.

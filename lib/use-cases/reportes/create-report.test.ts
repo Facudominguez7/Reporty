@@ -134,18 +134,10 @@ describe("crearReporteWorkflow", () => {
     await expect(crearReporteWorkflow(supabase, { ...entrada, image: new File(["x"], "x.svg", { type: "image/svg+xml" }) })).rejects.toThrow("JPG, PNG o WebP")
     expect(dobles.crearReporte).not.toHaveBeenCalled()
   })
-  it("reporte publicado avisa a los organismos del directorio y expone los correos enviados", async () => {
-    dobles.notificarOrganismos.mockResolvedValue(["movilidadurbana@posadas.gov.ar"])
+  it("la creación no envía correos a organismos automáticamente", async () => {
     const result = await crearReporteWorkflow(supabase, entrada)
-    expect(dobles.notificarOrganismos).toHaveBeenCalledWith(supabase, expect.objectContaining({
-      reporteId: 7,
-      titulo: "Bache en Bolívar 1450, Posadas",
-      categoriaId: 1,
-      descripcion: "Frente a la plaza",
-      lat: -27.37,
-      lon: -55.9,
-    }))
-    expect(result).toMatchObject({ success: true, data: { correosEnviados: ["movilidadurbana@posadas.gov.ar"] } })
+    expect(dobles.notificarOrganismos).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ success: true, data: { correosEnviados: [] } })
   })
   it.each([
     { nombre: "foto rechazada", estado: "REJECTED" as const },
