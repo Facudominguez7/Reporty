@@ -35,6 +35,6 @@ describe("dispararArchivoAuditoria", () => {
   it("mantiene la programación semanal del cron de Hostinger con la sintaxis de Cloudflare", () => {
     // Cloudflare numera los días del 1 al 7 y rechaza "0" como domingo.
     expect(CRON_ARCHIVO_AUDITORIA).toBe("0 6 * * SUN")
-    expect(readFileSync("wrangler.jsonc", "utf8")).toContain(`"crons": ["${CRON_ARCHIVO_AUDITORIA}"]`)
+    expect(readFileSync("wrangler.jsonc", "utf8")).toContain(`"crons": ["${CRON_ARCHIVO_AUDITORIA}", "0 13 * * *"]`)
   })
 })
