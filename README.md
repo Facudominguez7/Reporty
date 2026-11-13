@@ -215,11 +215,8 @@ sequenceDiagram
    R2_BUCKET_NAME=reporty-audit-archive
    AUDIT_ARCHIVE_CRON_SECRET=
    AUDIT_HOT_DAYS=180
-   # Cloudflare Turnstile (ver docs/turnstile.md). Claves de prueba oficiales para desarrollo:
+   # Cloudflare Turnstile (ver docs/turnstile.md). Site key de prueba oficial para desarrollo:
    NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
-   TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
-   # Con las claves de prueba Siteverify responde example.com; en producción: reporty.com.ar
-   TURNSTILE_ALLOWED_HOSTNAMES=example.com
    # Donaciones con Mercado Pago (ver docs/donaciones.md). En desarrollo, credenciales de prueba.
    # Nunca uses NEXT_PUBLIC_ para estos valores.
    MERCADOPAGO_ACCESS_TOKEN=
@@ -245,7 +242,7 @@ sequenceDiagram
 - **Unitarias:** `pnpm test` (Vitest).
 - **De punta a punta:** `pnpm run test:e2e` (Playwright). Recorren los flujos principales en una build de producción contra el Supabase local, nunca contra producción:
   1. Levantar Supabase local con `pnpm run db:start` (ver `supabase/README.md`).
-  2. Ejecutar `pnpm run test:e2e`. La primera vez compila la app y la sirve en el puerto 3100; los correos de autenticación quedan en el Mailpit del Supabase local y los de notificación en un Resend falso del puerto 3199, así que no se envía ningún correo real. Turnstile corre de verdad con la site key de prueba oficial, y el servidor verifica los tokens contra un Siteverify falso del puerto 3198 (`TURNSTILE_SITEVERIFY_URL`, que solo acepta loopback). La limpieza de datos necesita `psql` en el PATH.
+  2. Ejecutar `pnpm run test:e2e`. La primera vez compila la app y la sirve en el puerto 3100; los correos de autenticación quedan en el Mailpit del Supabase local y los de notificación en un Resend falso del puerto 3199, así que no se envía ningún correo real. Turnstile corre de verdad con la site key de prueba oficial en los formularios de autenticación. La limpieza de datos necesita `psql` en el PATH.
   3. Para ver el navegador mientras corren: `E2E_HEADED=1 pnpm run test:e2e`.
 
   Usan el Google Chrome instalado (no descargan navegadores). Cada prueba borra los usuarios, reportes y fotos que creó, aunque falle. Si una prueba falla, su traza queda en `test-results/` y se abre con `npx playwright show-trace <ruta>/trace.zip`.

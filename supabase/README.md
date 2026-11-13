@@ -114,10 +114,7 @@ Environment variables (no secrets in the repo):
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Production | Public Turnstile site key, baked into the build. Outside production, unset hides the widget; in production the protected forms fail closed without it. |
-| `TURNSTILE_SECRET_KEY` | Production | Server-only Turnstile secret for report and comment verification. Production rejects Cloudflare's dummy secrets. |
-| `TURNSTILE_ALLOWED_HOSTNAMES` | Production | Comma-separated hostnames accepted from Siteverify (`reporty.com.ar`). |
-| `TURNSTILE_SITEVERIFY_URL` | E2E only | Loopback fake Siteverify; any non-loopback value fails every verification. |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Production | Public Turnstile site key, baked into the build. Outside production, unset hides the widget; in production the auth forms fail closed without it. |
 | `REPORT_RATE_LIMIT_SALT` | Recommended | Server-only salt used to hash client IPs for report rate limiting. |
 
 Anonymous users are never cleaned up automatically. If needed, an operator can delete stale guests manually (this keeps their reports, setting `reportes.usuario_id` to null):

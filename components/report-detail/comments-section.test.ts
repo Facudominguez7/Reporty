@@ -78,14 +78,14 @@ describe("compositor de aportes dentro de la sección", () => {
 
     expect(contar(html, "<select")).toBe(1)
     expect(html).toContain("Publicar</span>")
-    expect(html).toContain('data-turnstile="comentar_reporte"')
+    expect(html).not.toContain("data-turnstile")
   })
 
   it("no muestra el compositor en reportes cerrados", () => {
     const html = renderizar({ isClosed: true })
 
     expect(contar(html, "<select")).toBe(0)
-    expect(html).not.toContain('data-turnstile="comentar_reporte"')
+    expect(html).not.toContain("data-turnstile")
   })
 
   it("respeta el cierre del reporte también cuando la hoja está abierta", () => {

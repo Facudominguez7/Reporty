@@ -356,10 +356,9 @@ export function ReporteDetalleClient({
   const informarEvidenciaReparacion = async (
     fraseClave: string,
     imagen: File,
-    captchaToken: string | null,
   ): Promise<ResultadoAccionReparacion> => {
     if (!reporte) return { success: false, error: "No pudimos informar la reparación." };
-    return informarReparacionAction(reporte.id, fraseClave, imagen, captchaToken);
+    return informarReparacionAction(reporte.id, fraseClave, imagen);
   };
 
   const accionesReparacion: AccionesEvidenciaReparacion = {
@@ -1078,7 +1077,7 @@ export function ReporteDetalleClient({
               reportOwnerId={reporte.usuario_id}
               isAdmin={isAdmin}
               isClosed={Boolean(isReporteCerrado)}
-              onSubmitComment={(content, captchaToken) => crearComentarioAction(reporte.id, content, captchaToken)}
+              onSubmitComment={(content) => crearComentarioAction(reporte.id, content)}
               onDeleteComment={async (commentId) => {
                 const result = await eliminarComentarioPropioAction(commentId)
                 return result.success ? { success: true } : { success: false, error: String(result.error || "") }

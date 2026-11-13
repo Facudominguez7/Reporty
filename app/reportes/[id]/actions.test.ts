@@ -171,14 +171,9 @@ it("preserves invalid contribution feedback before external work", async () => {
   expect(mocks.createAdminClient).not.toHaveBeenCalled()
 })
 
-const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 // Secretos de prueba oficiales de Cloudflare (sin guión), válidos solo fuera de producción.
 const SECRETO_PRUEBA = "1x0000000000000000000000000000000AA"
-const TOKEN_DE_COMENTARIO = "tok-comentario-1234"
 const APORTE = "problema_sigue_igual"
-const MENSAJE_TOKEN_RECHAZADO = "La verificación falló o venció. Completá la verificación y volvé a intentarlo."
-const MENSAJE_CAPTCHA_NO_DISPONIBLE =
-  "La verificación de seguridad no está disponible en este momento. Por seguridad no podemos procesar el formulario; si el problema continúa, contactá a la administración de Reporty."
 
 /** Respuesta controlada de Siteverify para la action de comentarios. */
 function siteverify(overrides: Record<string, unknown> = {}) {
@@ -208,77 +203,25 @@ function sesionConRol(rol: number | null, anonimo = false, id = "ciudadano-1", e
   })
 }
 
-describe("crearComentarioAction — verificación Turnstile", () => {
+describe("crearComentarioAction sin CAPTCHA", () => {
   beforeEach(() => {
     configurarTurnstile()
-    siteverify()
     sesionConRol(2)
     mocks.createAdminClient.mockReturnValue({})
     mocks.crearComentario.mockResolvedValue({ success: true, data: { comment: { id: 11, contenido: "El problema sigue igual" }, pointsAwarded: 2 } })
   })
 
-  it("verifica el token con la action de comentarios y después ejecuta el workflow", async () => {
+  it("publica el aporte sin consultar Siteverify aunque Turnstile esté configurado", async () => {
     const llamada = siteverify()
 
-    const resultado = await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)
-
-    expect(resultado).toMatchObject({ success: true })
-    expect(llamada).toHaveBeenCalledOnce()
-    const [url, opciones] = llamada.mock.calls[0]
-    expect(url).toBe(SITEVERIFY_URL)
-    expect(opciones.body.get("secret")).toBe(SECRETO_PRUEBA)
-    expect(opciones.body.get("response")).toBe(TOKEN_DE_COMENTARIO)
+    expect(await crearComentarioAction(7, APORTE)).toMatchObject({ success: true })
+    expect(llamada).not.toHaveBeenCalled()
     expect(mocks.crearComentario).toHaveBeenCalledOnce()
     expect(mocks.crearComentario.mock.calls[0].slice(1)).toEqual([7, "ciudadano-1", APORTE])
   })
 
-  it("rechaza un comentario enviado directamente a la acción sin token", async () => {
-    const llamada = siteverify()
-
-    const resultado = await crearComentarioAction(7, APORTE)
-
-    expect(resultado).toEqual({ success: false, error: MENSAJE_TOKEN_RECHAZADO })
-    expect(llamada).not.toHaveBeenCalled()
-    expect(mocks.crearComentario).not.toHaveBeenCalled()
-    expect(mocks.createAdminClient).not.toHaveBeenCalled()
-  })
-
-  it("rechaza un token inválido o reutilizado sin publicar ni otorgar puntos", async () => {
-    siteverify({ success: false, "error-codes": ["timeout-or-duplicate"] })
-
-    const resultado = await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)
-
-    expect(resultado).toEqual({ success: false, error: MENSAJE_TOKEN_RECHAZADO })
-    expect(mocks.crearComentario).not.toHaveBeenCalled()
-    expect(mocks.createAdminClient).not.toHaveBeenCalled()
-  })
-
-  it("rechaza un token emitido para otra action, como la de creación de reportes", async () => {
-    siteverify({ action: "crear_reporte" })
-
-    expect(await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)).toEqual({
-      success: false,
-      error: "La verificación falló. Volvé a intentarlo.",
-    })
-    expect(mocks.crearComentario).not.toHaveBeenCalled()
-  })
-
-  it("en producción sin configuración falla cerrada sin ejecutar el workflow", async () => {
+  it("en producción sin configuración de Turnstile sigue publicando", async () => {
     vi.stubEnv("NODE_ENV", "production")
-    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "")
-    vi.stubEnv("TURNSTILE_SECRET_KEY", "")
-    const llamada = siteverify()
-
-    expect(await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)).toEqual({
-      success: false,
-      error: MENSAJE_CAPTCHA_NO_DISPONIBLE,
-    })
-    expect(llamada).not.toHaveBeenCalled()
-    expect(mocks.crearComentario).not.toHaveBeenCalled()
-  })
-
-  it("fuera de producción sin site key mantiene el comentario tal como funcionaba", async () => {
-    vi.stubEnv("NODE_ENV", "development")
     vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "")
     vi.stubEnv("TURNSTILE_SECRET_KEY", "")
     const llamada = siteverify()
@@ -288,37 +231,24 @@ describe("crearComentarioAction — verificación Turnstile", () => {
     expect(mocks.crearComentario).toHaveBeenCalledOnce()
   })
 
-  it("rechaza a un invitado antes de verificar cualquier token", async () => {
+  it("rechaza a un invitado sin publicar", async () => {
     sesionConRol(2, true, "invitado-1")
-    const llamada = siteverify()
 
-    expect(await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)).toEqual({
+    expect(await crearComentarioAction(7, APORTE)).toEqual({
       success: false,
       error: "Vinculá tu correo para comentar y votar. Como invitado podés crear y seguir tus reportes.",
     })
-    expect(llamada).not.toHaveBeenCalled()
     expect(mocks.crearComentario).not.toHaveBeenCalled()
   })
 
-  it("rechaza a un visitante sin sesión antes de verificar cualquier token", async () => {
+  it("rechaza a un visitante sin sesión sin publicar", async () => {
     mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
-    const llamada = siteverify()
 
-    expect(await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)).toEqual({
+    expect(await crearComentarioAction(7, APORTE)).toEqual({
       success: false,
       error: "Tenés que iniciar sesión para comentar.",
     })
-    expect(llamada).not.toHaveBeenCalled()
     expect(mocks.crearComentario).not.toHaveBeenCalled()
-  })
-
-  it("permite reintentar con un token nuevo después de un rechazo", async () => {
-    siteverify({ success: false, "error-codes": ["timeout-or-duplicate"] })
-    expect(await crearComentarioAction(7, APORTE, TOKEN_DE_COMENTARIO)).toMatchObject({ success: false })
-
-    siteverify()
-    expect(await crearComentarioAction(7, APORTE, "tok-segundo-intento")).toMatchObject({ success: true })
-    expect(mocks.crearComentario).toHaveBeenCalledOnce()
   })
 })
 
@@ -355,7 +285,6 @@ describe("acciones de voto sin CAPTCHA", () => {
 })
 
 const EVIDENCIA_ID = "11111111-1111-4111-8111-111111111111"
-const TOKEN_DE_EVIDENCIA = "tok-evidencia-1234"
 const FRASE = "  taparon_el_bache_con_asfalto_nuevo  "
 const MENSAJE_SIN_SESION = "Tenés que iniciar sesión para informar una reparación."
 const MENSAJE_CUENTA_REPARACION =
@@ -373,7 +302,7 @@ function fotoEvidencia() {
   return new File([new Uint8Array([1, 2, 3, 4])], "reparado.png", { type: "image/png" })
 }
 
-describe("informarReparacionAction — evidencia con moderación y Turnstile", () => {
+describe("informarReparacionAction — evidencia con moderación, sin CAPTCHA", () => {
   beforeEach(() => {
     configurarTurnstile()
     siteverifyEvidencia()
@@ -389,7 +318,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     mocks.createClient.mockResolvedValue({ auth: { getUser: async () => ({ data: { user: null } }) } })
     const llamada = siteverifyEvidencia()
 
-    expect(await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia())).toEqual({
       success: false,
       error: MENSAJE_SIN_SESION,
     })
@@ -402,11 +331,11 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     [2, false, null, "correo sin confirmar"],
     [5, false, "2026-01-01T00:00:00.000Z", "rol invitado"],
     [4, false, "2026-01-01T00:00:00.000Z", "operador"],
-  ])("rechaza %s/%s/%s (%s) antes del CAPTCHA", async (rol, anonimo, correo, _caso) => {
+  ])("rechaza %s/%s/%s (%s) antes de cualquier escritura", async (rol, anonimo, correo, _caso) => {
     sesionConRol(rol as number, anonimo as boolean, "cuenta-1", correo as string | null)
     const llamada = siteverifyEvidencia()
 
-    expect(await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia())).toEqual({
       success: false,
       error: MENSAJE_CUENTA_REPARACION,
     })
@@ -417,7 +346,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
   it("permite que administración informe la reparación (L21)", async () => {
     sesionConRol(1, false, "admin-1")
 
-    await expect(informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA))
+    await expect(informarReparacionAction(7, FRASE, fotoEvidencia()))
       .resolves.toMatchObject({ success: true })
     expect(mocks.informarReparacion).toHaveBeenCalledWith({}, 7, "admin-1", {
       frase: "taparon_el_bache_con_asfalto_nuevo",
@@ -425,16 +354,13 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     })
   })
 
-  it("verifica el token con la action de la evidencia y después ejecuta el workflow", async () => {
+  it("informa la evidencia sin consultar Siteverify aunque Turnstile esté configurado", async () => {
     const llamada = siteverifyEvidencia()
 
-    const resultado = await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)
+    const resultado = await informarReparacionAction(7, FRASE, fotoEvidencia())
 
     expect(resultado).toMatchObject({ success: true })
-    expect(llamada).toHaveBeenCalledOnce()
-    const [url, opciones] = llamada.mock.calls[0]
-    expect(url).toBe(SITEVERIFY_URL)
-    expect(opciones.body.get("response")).toBe(TOKEN_DE_EVIDENCIA)
+    expect(llamada).not.toHaveBeenCalled()
     expect(mocks.informarReparacion).toHaveBeenCalledOnce()
     expect(mocks.informarReparacion).toHaveBeenCalledWith({}, 7, "ciudadano-1", {
       frase: "taparon_el_bache_con_asfalto_nuevo",
@@ -443,24 +369,12 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/reportes/7")
   })
 
-  it("rechaza un envío directo sin token sin moderar la foto", async () => {
-    const llamada = siteverifyEvidencia()
-
-    expect(await informarReparacionAction(7, FRASE, fotoEvidencia())).toEqual({
-      success: false,
-      error: "La verificación falló o venció. Completá la verificación y volvé a intentarlo.",
-    })
-    expect(llamada).not.toHaveBeenCalled()
-    expect(mocks.informarReparacion).not.toHaveBeenCalled()
-    expect(mocks.createAdminClient).not.toHaveBeenCalled()
-  })
-
   it("valida la frase elegida y la foto antes de abrir la sesión", async () => {
-    expect(await informarReparacionAction(7, "   ", fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, "   ", fotoEvidencia())).toEqual({
       success: false,
       error: MENSAJE_FRASE,
     })
-    expect(await informarReparacionAction(7, FRASE, "no es un archivo" as unknown as File, TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, "no es un archivo" as unknown as File)).toEqual({
       success: false,
       error: "Adjuntá una fotografía de la reparación.",
     })
@@ -472,10 +386,10 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
     ["taparon_el_bache", "clave inexistente"],
     ["Taparon el bache con asfalto nuevo", "etiqueta en vez de clave"],
     ["Bache tapado y señalizado", "texto libre"],
-  ])("rechaza %j (%s) antes del CAPTCHA, la moderación y la RPC (S16)", async (frase) => {
+  ])("rechaza %j (%s) antes de cualquier escritura, la moderación y la RPC (S16)", async (frase) => {
     const llamada = siteverifyEvidencia()
 
-    expect(await informarReparacionAction(7, frase, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, frase, fotoEvidencia())).toEqual({
       success: false,
       error: MENSAJE_FRASE,
     })
@@ -487,7 +401,7 @@ describe("informarReparacionAction — evidencia con moderación y Turnstile", (
   it("informa el rechazo del workflow sin revalidar", async () => {
     mocks.informarReparacion.mockResolvedValue({ success: false, error: "Alcanzaste el límite de 3 evidencias de reparación por día." })
 
-    expect(await informarReparacionAction(7, FRASE, fotoEvidencia(), TOKEN_DE_EVIDENCIA)).toEqual({
+    expect(await informarReparacionAction(7, FRASE, fotoEvidencia())).toEqual({
       success: false,
       error: "Alcanzaste el límite de 3 evidencias de reparación por día.",
     })

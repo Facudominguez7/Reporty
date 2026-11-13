@@ -1,10 +1,8 @@
 # Cloudflare Turnstile en Reporty (issue #188)
 
 Turnstile (plan gratuito, modo Managed) separa a las personas de los scripts en las
-operaciones que crean cuentas, sesiones o contenido. La autorización, la RLS y los límites de
-frecuencia siguen funcionando igual: el CAPTCHA es una capa más, no los reemplaza.
-
-## Qué protege y quién verifica cada token
+operaciones de autenticación: registro, inicio de sesión e ingreso como invitado. La autorización, la RLS y los límites de
+frecuencia siguen funcionando igual: el CAPTCHA es una ## Qué protege y quién verifica cada token
 
 | Operación | Dónde | Verifica |
 |---|---|---|
@@ -12,20 +10,20 @@ frecuencia siguen funcionando igual: el CAPTCHA es una capa más, no los reempla
 | Registro | `app/auth/actions.ts` (`signUp`) | Supabase Auth |
 | Ingreso como invitado | `app/auth/page.tsx` y `app/reportes/nuevo/page.tsx` (`signInAnonymously`, desde el navegador) | Supabase Auth |
 | Recuperación de contraseña | `app/auth/actions.ts` (`resetPasswordForEmail`) | Supabase Auth |
-| Creación de reportes (registrados e invitados) | `app/reportes/nuevo/actions.ts`, action `crear_reporte` | Servidor de Reporty con Siteverify |
-| Comentarios | `app/reportes/[id]/actions.ts`, action `comentar_reporte` | Servidor de Reporty con Siteverify |
 
-Cada token se usa una sola vez. Un invitado consume un token al abrir su sesión anónima y el
-reporte pide otro; Cloudflare suele resolver ese segundo challenge sin interacción.
+Reporty no verifica tokens en su propio servidor: no existe ninguna llamada a Siteverify.
+La recuperación de contraseña sigue mostrando el challenge porque el CAPTCHA de Supabase Auth
+es global: con la protección activa, Supabase rechaza `resetPasswordForEmail` sin token.
 
-La verificación del servidor (`lib/security/turnstile.server.ts`) usa el endpoint oficial,
-valida formato y longitud del token, exige `success`, el hostname permitido y la action, tiene
-un timeout de 10 s y falla cerrada ante cualquier error. Nunca registra tokens ni claves.
+En `/reportes/nuevo` el challenge solo aparece para quien no tiene sesión: el token abre la
+sesión de invitado y el reporte se envía sin verificación adicional. Una persona con sesión
+(registrada o invitada) nunca ve el challenge.
 
-### Excluidos a propósito
+### Sin CAPTCHA a propósito
 
-- **Votos**: ya tienen un voto por persona y reporte, una RPC exclusiva del service role y los
-  inserts directos revocados. Un CAPTCHA por voto agregaría fricción sin ganancia real.
+- **Creación de reportes, comentarios y evidencia de reparación**: dependen de la sesión, de
+  los roles, de la moderación y de los límites de frecuencia existentes.
+- **Votos**: un voto por persona y reporte, con RPC exclusiva del service role.
 - **Vincular el correo de un invitado** (`updateUser`): el SDK no acepta `captchaToken` en esa
   llamada y requiere una sesión existente.
 - **Google OAuth**: el proveedor ya hace su propia protección.
@@ -37,20 +35,14 @@ un timeout de 10 s y falla cerrada ante cualquier error. Nunca registra tokens n
 | Variable | Dónde | Valor en producción |
 |---|---|---|
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Pública; se incrusta en el build | Site key del widget |
-| `TURNSTILE_SECRET_KEY` | Solo servidor | Secret key del widget |
-| `TURNSTILE_ALLOWED_HOSTNAMES` | Solo servidor | `reporty.com.ar` (nunca `localhost`) |
-| `TURNSTILE_SITEVERIFY_URL` | Solo E2E | Vacía. Cualquier valor que no sea loopback bloquea todas las verificaciones; en producción también las bloquea si algún hostname permitido no es loopback |
 
-En producción (`NODE_ENV=production`) las tres primeras son obligatorias: si falta alguna, los
-formularios protegidos muestran «La verificación de seguridad no está disponible…» y no
-envían nada. Producción también rechaza las claves de prueba de Cloudflare.
+La secret key se carga solo en Supabase (ver abajo); la app ya no la necesita. En producción
+sin site key, los formularios de autenticación muestran «La verificación de seguridad no está
+disponible…» y no envían nada.
 
-Claves de prueba oficiales para desarrollo:
+Site key de prueba oficial para desarrollo: `1x00000000000000000000AA` (siempre aprueba).
 
-- Site key `1x00000000000000000000AA` y secret `1x0000000000000000000000000000000AA`: siempre aprueban.
-- Con esas claves Siteverify responde `hostname: "example.com"` y sin action, así que en
-  desarrollo `TURNSTILE_ALLOWED_HOSTNAMES=example.com`. La action solo se omite fuera de
-  producción, con secreto de prueba y con la marca `result_with_testing_key` de Cloudflare.
+testing_key` de Cloudflare.
 
 ## Crear el widget gratuito en Cloudflare
 
@@ -69,34 +61,19 @@ proveedor **Turnstile**, y pegá la misma **Secret Key**.
 Esa opción es global: desde que se activa, login, registro, ingreso como invitado y
 recuperación de contraseña exigen un token válido. Por eso va **después** del despliegue.
 
-## Despliegue en Hostinger (orden recomendado)
-
-1. Cargá las tres variables de producción en la configuración de entorno de la app Node.js.
-   `NEXT_PUBLIC_TURNSTILE_SITE_KEY` tiene que existir cuando se construye la app; si cambia,
-   hay que reconstruir.
-2. Desplegá. Con Supabase CAPTCHA todavía apagado, Auth ignora los tokens y el servidor ya
-   verifica reportes y comentarios.
-3. Probá en `https://reporty.com.ar`: ingreso, registro, invitado, recuperación, crear un
-   reporte y comentar.
-4. Recién entonces activá el CAPTCHA de Supabase y repetí esas pruebas.
-
-No hay una Content Security Policy configurada (ni en `next.config.mjs` ni en el proxy). Si se
-agrega una, tiene que permitir `https://challenges.cloudflare.com` en `script-src` y `frame-src`.
-
 ## Pruebas
 
-- Unitarias (Vitest): `lib/security/turnstile.server.test.ts`, `tests/auth/turnstile-widget.test.ts`,
-  `tests/reportes/turnstile-report.test.ts`, `app/auth/signup-login.test.ts`,
-  `app/reportes/nuevo/actions.test.ts` y `app/reportes/[id]/actions.test.ts`.
-- E2E (Playwright): build de producción con la site key de prueba y un Siteverify falso en
-  `e2e/support/fake-siteverify.mjs` (puerto 3198). Puede rechazar la próxima verificación y
-  cambiar la action devuelta (`e2e/support/siteverify.ts`). Nunca se resuelven challenges reales.
+- Unitarias (Vitest): `tests/auth/turnstile-widget.test.ts`, `tests/reportes/turnstile-report.test.ts`,
+  `app/auth/signup-login.test.ts`, `app/reportes/nuevo/actions.test.ts` y
+  `app/reportes/[id]/actions.test.ts`.
+- E2E (Playwright): build de producción con la site key de prueba oficial; Supabase local no
+  exige CAPTCHA, así que nunca se resuelven challenges reales.
 
 ## Riesgos pendientes
 
-- La protección de Auth depende de activar el CAPTCHA en Supabase; hasta entonces, solo los
-  reportes y los comentarios quedan verificados por el servidor.
-- Si el script de Cloudflare no carga (bloqueadores, red), los formularios protegidos muestran
-  «No pudimos cargar la verificación de seguridad…» y no se pueden enviar.
-- Siteverify no recibe la IP del cliente (`remoteip` es opcional). Agregarla solo tiene sentido
-  si se confirma una cabecera de IP confiable detrás del CDN de Hostinger.
+- La protección depende de tener activo el CAPTCHA en Supabase.
+- Si el script de Cloudflare no carga (bloqueadores, red), los formularios de autenticación
+  muestran «No pudimos cargar la verificación de seguridad…» y no se pueden enviar.
+
+No hay una Content Security Policy configurada. Si se agrega una, tiene que permitir
+`https://challenges.cloudflare.com` en `script-src` y `frame-src`.

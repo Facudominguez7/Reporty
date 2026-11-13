@@ -30,7 +30,6 @@ import {
   type TipoVerificacionReparacion,
 } from "@/lib/use-cases/reportes/evidencia-reparacion"
 import { canParticipateInCommunity, getUserRoleContext, puedeOperarCuadrillas } from "@/lib/authz/roles"
-import { verificarCaptchaDeAccion } from "@/lib/security/turnstile-guard.server"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
@@ -83,46 +82,13 @@ function mutationErrorMessage(error: unknown, fallback: string) {
 const GUEST_COMMUNITY_ERROR = "Vinculá tu correo para comentar y votar. Como invitado podés crear y seguir tus reportes."
 
 /**
- * Action que Turnstile vincula al aporte público. `components/report-detail/comments-section.tsx`
- * renderiza el challenge con el mismo valor, así un token emitido para otro formulario no
- * puede reutilizarse acá. Las votaciones quedan sin CAPTCHA: ya exigen identidad permanente y
- * un único voto por reporte.
- */
-const ACCION_CAPTCHA_COMENTARIO = "comentar_reporte"
-
-/**
- * Action que Turnstile vincula al formulario de evidencia de reparación. El widget de la
- * ficha del reporte debe emitir el token con este mismo valor, así un token de otro
- * formulario no sirve para subir una fotografía (S12).
- */
-const ACCION_CAPTCHA_INFORMAR_REPARACION = "informar_reparacion"
-
-/**
- * Exige la verificación anti bots del aporte público. Se ejecuta después de autorizar a quien
- * comenta y antes del workflow, así un token rechazado no publica, no suma puntos ni envía la
- * notificación al dueño del reporte.
- *
- * @param captchaToken - Token de un solo uso emitido por el challenge del formulario.
- * @returns Texto de error a devolver, o `null` cuando el aporte puede publicarse.
- */
-async function verificarCaptchaDeComentario(captchaToken: string | null | undefined): Promise<string | null> {
-  const resultado = await verificarCaptchaDeAccion({
-    token: captchaToken,
-    expectedAction: ACCION_CAPTCHA_COMENTARIO,
-  })
-
-  return resultado.ok ? null : resultado.mensaje
-}
-
-/**
  * Publica un aporte de la comunidad en un reporte.
  *
  * @param reporteId - Reporte que recibe el aporte.
  * @param aporte - Clave del aporte elegido en el formulario de actualizaciones.
- * @param captchaToken - Token Turnstile del challenge resuelto para esta publicación.
  * @returns Aporte creado y puntos otorgados, o el error en español que se muestra en el formulario.
  */
-export async function crearComentarioAction(reporteId: number, aporte: string, captchaToken?: string | null) {
+export async function crearComentarioAction(reporteId: number, aporte: string) {
   try {
     const parsedReportId = reportIdSchema.parse(reporteId)
     const parsedAporte = parseAporteKey(contributionSchema.parse(aporte))
@@ -141,10 +107,6 @@ export async function crearComentarioAction(reporteId: number, aporte: string, c
       return { success: false as const, error: GUEST_COMMUNITY_ERROR }
     }
 
-    const captchaError = await verificarCaptchaDeComentario(captchaToken)
-    if (captchaError) {
-      return { success: false as const, error: captchaError }
-    }
 
     return await crearComentarioWorkflow(createAdminClient(), parsedReportId, user.id, parsedAporte)
   } catch (error) {
@@ -389,21 +351,18 @@ async function sesionParaReparaciones(mensajeSinSesion: string) {
 /**
  * Informa una reparación con su fotografía y la frase elegida de la lista (S1, S16).
  * La foto pasa por la validación de archivo y por el sistema de moderación existente,
- * con verificación anti bots; el reporte no cambia de estado por subir la foto (S2).
- * Una frase que no está en el catálogo se rechaza antes de la sesión, del CAPTCHA y de
- * cualquier escritura.
+ * y el reporte no cambia de estado por subir la foto (S2). Una frase que no está en el
+ * catálogo se rechaza antes de la sesión y de cualquier escritura.
  *
  * @param reporteId - Reporte que se informa como reparado.
  * @param frase - Clave de la frase del catálogo elegida en el formulario.
  * @param image - Fotografía ya optimizada en el navegador.
- * @param captchaToken - Token Turnstile del challenge resuelto para esta carga.
  * @returns Evidencia creada con su estado visible, o el error en español.
  */
 export async function informarReparacionAction(
   reporteId: number,
   frase: string,
   image: File,
-  captchaToken?: string | null,
 ) {
   try {
     const parsedReportId = reportIdSchema.parse(reporteId)
@@ -417,12 +376,6 @@ export async function informarReparacionAction(
 
     const sesion = await sesionParaReparaciones("Tenés que iniciar sesión para informar una reparación.")
     if ("error" in sesion) return { success: false as const, error: sesion.error }
-
-    const captcha = await verificarCaptchaDeAccion({
-      token: captchaToken,
-      expectedAction: ACCION_CAPTCHA_INFORMAR_REPARACION,
-    })
-    if (!captcha.ok) return { success: false as const, error: captcha.mensaje }
 
     const resultado = await informarReparacionWorkflow(createAdminClient(), parsedReportId, sesion.usuario.id, {
       frase: parsedFrase.data,

@@ -29,7 +29,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -47,12 +46,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  MENSAJE_CAPTCHA_NO_DISPONIBLE,
-  TURNSTILE_CONFIGURADO,
-  TURNSTILE_NO_DISPONIBLE,
-  TurnstileWidget,
-} from "@/components/turnstile-widget"
 import {
   REPORT_IMAGE_ACCEPT_ATTR,
   REPORT_IMAGE_MAX_SOURCE_BYTES,
@@ -74,13 +67,6 @@ dayjs.extend(timezone)
 
 const ZONA_HORARIA = "America/Argentina/Buenos_Aires"
 
-/**
- * Action que Turnstile vincula al formulario de evidencia. `app/reportes/[id]/actions.ts`
- * verifica el mismo valor con Siteverify, así un token de otro formulario no sirve para
- * informar una reparación (S12).
- */
-const ACCION_CAPTCHA_INFORMAR_REPARACION = "informar_reparacion"
-
 /** Estilo compartido por los dos desplegables de frases, igual al de «¿Qué novedad tenés?». */
 const ESTILO_SELECT_FRASE =
   "min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
@@ -91,11 +77,7 @@ export type ResultadoAccionReparacion = { success: boolean; error?: string }
 /** Acciones server-side que la ficha delega; el cliente nunca decide el resultado. */
 export type AccionesEvidenciaReparacion = {
   onConfirmar: () => Promise<ResultadoAccionReparacion>
-  onInformar: (
-    fraseClave: string,
-    imagen: File,
-    captchaToken: string | null,
-  ) => Promise<ResultadoAccionReparacion>
+  onInformar: (fraseClave: string, imagen: File) => Promise<ResultadoAccionReparacion>
 }
 
 export type EvidenciaReparacionProps = {
@@ -397,26 +379,11 @@ function FormularioEvidenciaReparacion({
   const router = useRouter()
   const [imagen, setImagen] = useState<File | null>(null)
   const [frase, setFrase] = useState("")
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const [captchaReset, setCaptchaReset] = useState(0)
   const [enviando, setEnviando] = useState(false)
   const [confirmacionAbierta, setConfirmacionAbierta] = useState(false)
   const fraseId = useId()
 
-  const necesitaCaptcha = TURNSTILE_CONFIGURADO
-  const captchaNoDisponible = TURNSTILE_NO_DISPONIBLE
-  const puedeEnviar = Boolean(imagen)
-    && frase.length > 0
-    && !enviando
-    && !captchaNoDisponible
-    && (!necesitaCaptcha || captchaToken !== null)
-
-  /** Vuelve a pedir un challenge: el token anterior se consumió en el intento. */
-  const pedirNuevoCaptcha = () => {
-    if (!necesitaCaptcha) return
-    setCaptchaToken(null)
-    setCaptchaReset((valor) => valor + 1)
-  }
+  const puedeEnviar = Boolean(imagen) && frase.length > 0 && !enviando
 
   const elegirImagen = (archivo: File | null) => {
     setImagen(archivo)
@@ -434,7 +401,7 @@ function FormularioEvidenciaReparacion({
     setEnviando(true)
     try {
       const optimizada = await optimizeReportImage(imagen)
-      const resultado = await onInformar(frase, optimizada.file, captchaToken)
+      const resultado = await onInformar(frase, optimizada.file)
       if (!resultado.success) {
         toast.error(resultado.error ?? "No pudimos informar la reparación.")
         return
@@ -453,7 +420,6 @@ function FormularioEvidenciaReparacion({
           : "No pudimos informar la reparación.",
       )
     } finally {
-      pedirNuevoCaptcha()
       setEnviando(false)
     }
   }
@@ -527,23 +493,6 @@ function FormularioEvidenciaReparacion({
               La foto pasa por la moderación de siempre antes de publicarse.
             </p>
           </div>
-
-          {captchaNoDisponible && (
-            <Alert variant="destructive">
-              <AlertTitle>Verificación de seguridad no disponible</AlertTitle>
-              <AlertDescription>{MENSAJE_CAPTCHA_NO_DISPONIBLE}</AlertDescription>
-            </Alert>
-          )}
-          {necesitaCaptcha && !captchaNoDisponible && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Verificación de seguridad</p>
-              <TurnstileWidget
-                onTokenChange={setCaptchaToken}
-                resetSignal={captchaReset}
-                action={ACCION_CAPTCHA_INFORMAR_REPARACION}
-              />
-            </div>
-          )}
 
           <Button type="submit" className="w-full" disabled={!puedeEnviar}>
             <MessageCircle className="mr-2 size-4" aria-hidden="true" />

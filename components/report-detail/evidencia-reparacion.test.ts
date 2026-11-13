@@ -381,7 +381,7 @@ describe("resumen de la reparación sobre el contenido", () => {
 })
 
 describe("carga de evidencia", () => {
-  it("ofrece un formulario mínimo con cámara, frase de la lista y verificación anti bots", () => {
+  it("ofrece un formulario mínimo con cámara, frase de la lista y sin verificación anti bots", () => {
     const html = renderizarFormulario()
 
     expect(html).toContain("¿Ya lo arreglaron? Informá la reparación")
@@ -391,7 +391,7 @@ describe("carga de evidencia", () => {
     expect(html).not.toMatch(/maxlength="500"/i)
     expect(html).toContain("Enviar evidencia")
     expect(html).toContain("moderación")
-    expect(html).toContain('data-turnstile="informar_reparacion"')
+    expect(html).not.toContain("data-turnstile")
   })
 
   it("no ofrece el formulario cuando el reporte ya está reparado o hay evidencia activa", () => {
