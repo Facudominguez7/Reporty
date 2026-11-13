@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "03-palabra-que-sube.html",
+  "handoffs": {
+    "03-palabra-que-sube.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-12T23:54:10.342Z",
+      "startedAt": "2026-11-12T23:54:34.602Z",
+      "implementedAt": "2026-11-13T00:00:23.498Z",
+      "note": "Implementada en el stack real: components/intro-entrada.tsx (overlay client), lib/intro/entrada.ts (regla una vez por sesión + reduced motion, testada), clase .intro-entrada en globals.css y montaje en /mapa. Verificada con Playwright: aparece → se desmonta a ~2.9 s → segunda carga la salta.",
+      "previewUrl": "http://127.0.0.1:3000/mapa"
+    }
+  }
+}

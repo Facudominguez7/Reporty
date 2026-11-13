@@ -1,186 +1,67 @@
-# Sistema de diseño de Reporty
+# Reporty — Design System
 
-Sinopsis del sistema real del proyecto, capturado solo desde fuentes del repo. No incluye
-valores inventados: cada entrada nombra el archivo donde se encontró.
+Fuente única de tokens: `app/globals.css` (Tailwind v4, `@theme inline`). Sync regenerado al diseñar `intro-app/`.
 
-**Fuentes leídas**
+## Colores
 
-| Fuente | Aporte |
+| Token | Valor (oklch) | Uso |
+| --- | --- | --- |
+| `--background` | `94.463% 0.00213 14.416` | Blanco cálido de fondo de superficie |
+| `--foreground` | `0.19 0.01 95` | Texto principal (carbón cálido) |
+| `--card` / `--card-foreground` | `1 0 0` / `0.19 0.01 95` | Superficies de tarjeta |
+| `--primary` | `0.57 0.12 157` | Verde marca (≈ `#2e7d5b`, coincide con `themeColor` TWA) |
+| `--primary-foreground` | `0.985 0 0` | Texto sobre verde |
+| `--secondary` / `--secondary-foreground` | `#000000` / `#ffffff` | Fondo raíz `html` y barra de estado/navegación (negro) |
+| `--muted` / `--muted-foreground` | `96.115% 0.00011 271.152` / `0.45 0.028 157` | Fondos neutros y texto secundario verdoso |
+| `--accent` / `--accent-foreground` | `0.93 0.03 157` / `0.3 0.05 157` | Verde muy claro |
+| `--destructive` (+ `-foreground`) | `0.57 0.18 25` / `0.985 0 0` | Peligro |
+| `--border` / `--input` | `78.892% 0.00009 271.152` / `96.416% 0.00011 271.152` | Bordes y campos |
+| `--ring` | `0.62 0.08 230` | Foco |
+| `--surface-subtle` | `94.007% 0.00011 271.152` | Sutil sobre tarjeta |
+| `--semantic-info` | `0.56 0.11 240` | Informativo / ranking-points / heat-low |
+| `--semantic-success` | `0.57 0.12 157` | Igual al primario |
+| `--semantic-warning` | `0.72 0.13 85` | Advertencia / heat-medium |
+| `--semantic-danger` | `0.57 0.18 25` | Igual al destructive / heat-high / priority-high |
+| `--semantic-admin` | `0.5 0.1 285` | Violeta admin / category-accent |
+| `--pet-type` | `0.48 0.17 330` | Fucsia tipo mascota |
+| `--ranking-first/second/third` | `0.76 0.14 84` / `0.66 0.01 250` / `0.61 0.09 50` | Oro / plata / bronce |
+
+Alias semánticos: `--priority-high|medium|low`, `--map-heat-high|medium|low|neutral`, `--map-marker-stroke|foreground`.
+
+## Tipografía
+
+- `--font-sans: var(--font-geist-sans)` — **Geist Sans** (fuente del sistema del proyecto; en artboards usar pila system-ui).
+- `font-feature-settings: "cv02","cv03","cv04","cv11"` en `body`.
+- Escalas usadas: `.page-meta-label` (xs semibold uppercase tracking 0.14em), `.section-title` (2xl–4xl semibold tracking-tight), `.section-eyebrow` (0.7rem semibold uppercase tracking 0.18em).
+
+## Espaciado y radios
+
+- `--radius: 0.75rem` — único radio base; `radius-sm|md|lg|xl` todos apuntan a `0.75rem`.
+- `--radius-pill: 999px` para píldoras (eyebrow, section-heading).
+- Radios especiales de composición: `.page-container` y welcome usan `rounded-[2.25rem]`.
+- Navegación inferior reserva `--bottom-nav-space: calc(4rem + env(safe-area-inset-bottom))`.
+
+## Sombras
+
+- `--elevation-soft: 0 10px 30px color-mix(foreground 12%)`.
+- `--card-shadow: 7px 7px 12px color-mix(foreground 20%)` — sombra offset característica (`.card-shadow`).
+
+## Componentes y reglas
+
+- `.page-container`: tarjeta madre redondeada `2.25rem`, borde `white/70`, `bg-card/88`, `sm:px-6 md:w-[80%]`, sombra profunda difusa; en móvil sin backdrop-filter.
+- Fondo global: imagen de mapa (`/mapas/mapaMobile.webp` móvil, `mapaDesktop.webp` ≥768px) tras un velo blanco 30–55% (`body::after` en móvil con `.app-header`).
+- `.section-heading-icon`: círculo `size-9` verde con icono blanco.
+- Tonos por tarjeta: `.tone-info|success|warning|danger-card` = fondo `color-mix` 10% + borde 25%.
+- `.incident-list`: grilla 1 col móvil → 2 xl:3, gap 3–4.
+- Mapa: controles Leaflet con fondo `--card`, borde `--border`, radio `--radius`, zoom 2.5rem.
+
+## Animación (prefers-reduced-motion: no-preference)
+
+| Keyframes | Valores |
 | --- | --- |
-| `app/globals.css` | tokens `:root`, puente `@theme inline`, clases de componente (`auth-shell`, `page-container`, `card-shadow`, tonos semánticos) |
-| `app/layout.tsx` | familia tipográfica Geist Sans (`GeistSans.variable` → `--font-geist-sans`) |
-| `components.json` | shadcn/ui estilo `new-york`, base neutra, variables CSS activas, iconos Lucide |
-| `components/ui/button.tsx` | variantes y tamaños de botón |
-| `components/ui/card.tsx` | estructura y elevación de tarjeta |
-| `components/ui/input.tsx`, `components/ui/label.tsx` | campos de formulario |
-| `components/ui/tabs.tsx` | pestañas tipo píldora |
-| `components/ui/alert.tsx` | avisos |
-| `components/turnstile-widget.tsx` | widget de verificación y sus microcopias de estado |
-
----
-
-## 1. Color
-
-39 tokens de color en `:root` (`app/globals.css`). Todos se consumen como variables; ningún
-componente escribe valores de color literales.
-
-### 1.1 Base y superficies (19)
-
-| Token | Valor | Uso |
-| --- | --- | --- |
-| `--background` | `oklch(94.463% 0.00213 14.416)` | fondo neutro claro fuera de las superficies |
-| `--foreground` | `oklch(0.19 0.01 95)` | texto principal |
-| `--card` | `oklch(1 0 0)` | superficie de tarjeta |
-| `--card-foreground` | `oklch(0.19 0.01 95)` | texto sobre tarjeta |
-| `--popover` | `oklch(1 0 0)` | superficie flotante |
-| `--popover-foreground` | `oklch(0.19 0.01 95)` | texto sobre flotante |
-| `--primary` | `oklch(0.57 0.12 157)` | acción principal, enlaces, acentos verdes |
-| `--primary-foreground` | `oklch(0.985 0 0)` | texto sobre primario |
-| `--secondary` | `#000000` | barra negra, pestaña activa, botón flotante |
-| `--secondary-foreground` | `#ffffff` | texto sobre negro |
-| `--muted` | `oklch(96.115% 0.00011 271.152)` | fondo de hover y bloques suaves |
-| `--muted-foreground` | `oklch(0.45 0.028 157)` | texto secundario, placeholders, iconos |
-| `--accent` | `oklch(0.93 0.03 157)` | realce verde claro |
-| `--accent-foreground` | `oklch(0.3 0.05 157)` | texto sobre realce |
-| `--destructive` | `oklch(0.57 0.18 25)` | error y acciones destructivas |
-| `--destructive-foreground` | `oklch(0.985 0 0)` | texto sobre destructivo |
-| `--border` | `oklch(78.892% 0.00009 271.152)` | bordes de tarjeta, campo y separadores |
-| `--input` | `oklch(96.416% 0.00011 271.152)` | relleno interno de campos y listas de pestañas |
-| `--ring` | `oklch(0.62 0.08 230)` | anillo de foco visible (azul) |
-
-### 1.2 Semánticos y superficie sutil (6)
-
-| Token | Valor | Uso |
-| --- | --- | --- |
-| `--surface-subtle` | `oklch(94.007% 0.00011 271.152)` | bloque apenas más oscuro que la tarjeta |
-| `--semantic-info` | `oklch(0.56 0.11 240)` | información, puntos de ranking |
-| `--semantic-success` | `oklch(0.57 0.12 157)` | éxito (mismo verde que primario) |
-| `--semantic-warning` | `oklch(0.72 0.13 85)` | advertencia |
-| `--semantic-danger` | `oklch(0.57 0.18 25)` | peligro (mismo valor que destructivo) |
-| `--semantic-admin` | `oklch(0.5 0.1 285)` | rol administrador, acento de categoría |
-
-### 1.3 Ranking, prioridad y mapa (14)
-
-| Token | Valor |
-| --- | --- |
-| `--ranking-first` | `oklch(0.76 0.14 84)` |
-| `--ranking-second` | `oklch(0.66 0.01 250)` |
-| `--ranking-third` | `oklch(0.61 0.09 50)` |
-| `--ranking-points` | `var(--semantic-info)` |
-| `--priority-high` | `var(--semantic-danger)` |
-| `--priority-medium` | `oklch(0.72 0.16 55)` |
-| `--priority-low` | `var(--semantic-info)` |
-| `--category-accent` | `var(--semantic-admin)` |
-| `--map-heat-high` | `var(--semantic-danger)` |
-| `--map-heat-medium` | `var(--semantic-warning)` |
-| `--map-heat-low` | `var(--semantic-info)` |
-| `--map-heat-neutral` | `var(--muted-foreground)` |
-| `--map-marker-stroke` | `var(--card)` |
-| `--map-marker-foreground` | `var(--card)` |
-
----
-
-## 2. Tipografía
-
-| Entrada | Valor | Fuente |
-| --- | --- | --- |
-| Familia | Geist Sans, expuesta como `--font-geist-sans` y consumida por `--font-sans` en `@theme inline` | `app/layout.tsx`, `app/globals.css` |
-| Fallback del sistema | el proyecto no declara otras familias; Geist se sirve desde el paquete `geist/font/sans` (sin URL externa) | `app/layout.tsx` |
-| Antialiasing | `antialiased` en `body`, con `font-feature-settings: "cv02","cv03","cv04","cv11"` | `app/globals.css` |
-
-### Escala observada
-
-| Rol | Clases | Fuente |
-| --- | --- | --- |
-| Etiqueta meta | `text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground` | `app/globals.css` (`.page-meta-label`) |
-| Ayuda / estado | `text-xs text-muted-foreground` | `app/auth/page.tsx`, `components/turnstile-widget.tsx` |
-| Cuerpo secundario | `text-sm leading-6 text-muted-foreground` | `app/globals.css` (`.section-copy`, `CardDescription`) |
-| Cuerpo medio (desktop) | `md:text-base` | `app/globals.css` (`.section-copy`) |
-| Título de tarjeta | `text-xl font-semibold tracking-tight leading-tight` | `app/auth/page.tsx`, `components/ui/card.tsx` |
-| Título de sección | `text-2xl md:text-3xl lg:text-4xl font-semibold tracking-tight` | `app/globals.css` (`.section-title`) |
-| Separador con texto | `text-xs uppercase tracking-[0.2em] text-muted-foreground` | `app/auth/page.tsx` |
-| Eyebrow de sección | `text-[0.7rem] font-semibold uppercase tracking-[0.18em]` | `app/globals.css` (`.section-eyebrow`) |
-| Pesos usados | `font-medium`, `font-semibold` | `components/ui/button.tsx`, `components/ui/label.tsx`, `components/ui/card.tsx` |
-
----
-
-## 3. Espaciado, radio y elevación
-
-| Grupo | Token | Valor | Fuente |
-| --- | --- | --- | --- |
-| Radio base | `--radius` | `0.75rem` | `app/globals.css` |
-| Radio derivado | `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl` | `var(--radius)` (los cuatro) | `app/globals.css` |
-| Radio píldora | `--radius-pill` | `999px` | `app/globals.css` |
-| Radio de contenedor de página | `rounded-[2.25rem]` | `36px` | `app/globals.css` (`.page-container`) |
-| Sombra de tarjeta | `--card-shadow` | `7px 7px 12px color-mix(in oklab, var(--foreground) 20%, transparent)` | `app/globals.css` |
-| Sombra suave | `--elevation-soft` | `0 10px 30px color-mix(in oklab, var(--foreground) 12%, transparent)` | `app/globals.css` |
-| Sombra de contenedor | `shadow-[0_22px_70px_-32px_color-mix(in_oklab,var(--foreground)_45%,transparent)]` | — | `app/globals.css` (`.page-container`) |
-| Espacio de navegación inferior | `--bottom-nav-space` | `calc(4rem + env(safe-area-inset-bottom))` | `app/globals.css` |
-| Espaciado de formulario | `space-y-4` (campos), `space-y-5` (bloques), `space-y-2` (etiqueta + control) | — | `app/auth/page.tsx` |
-| Padding de tarjeta | `Card` `py-4`, `CardHeader` `px-5`, `CardContent` `px-5` | — | `components/ui/card.tsx` |
-
----
-
-## 4. Reglas de componentes
-
-### Botón (`components/ui/button.tsx`)
-
-- Base: `inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium`,
-  altura mínima por tamaño, `disabled:opacity-50 disabled:pointer-events-none`.
-- Foco: `focus-visible:ring-2 ring-ring ring-offset-2 ring-offset-background`.
-- Variantes en uso real: `default` (`bg-primary text-primary-foreground`), `outline`
-  (`border-border bg-background text-foreground hover:bg-muted`), `muted` (iconos dentro de
-  campos), `secondary`, `neutral`, `filter`, `floating`, `ghost`.
-- Tamaños: `default` `min-h-10 px-4`, `sm` `min-h-9`, `lg` `min-h-11`, `icon` `size-10`,
-  `icon-sm` `size-8`.
-- Un botón de envío deshabilitado nunca cambia su etiqueta: sigue diciendo `Ingresar`.
-
-### Tarjeta (`components/ui/card.tsx`)
-
-- `bg-card text-card-foreground flex flex-col gap-4 rounded-[var(--radius)] border border-border py-4 shadow-[var(--card-shadow)]`.
-- La sombra desplazada (7px/7px) es la firma visual del sistema: no se reemplaza por sombras difusas.
-- `CardTitle` `leading-tight font-semibold tracking-tight`; `CardDescription` `text-sm text-muted-foreground leading-6`.
-
-### Campo de texto (`components/ui/input.tsx`) y etiqueta (`components/ui/label.tsx`)
-
-- `Input`: `min-h-10 rounded-[var(--radius-md)] border-input bg-input px-3 py-2 text-sm`.
-- Foco: `focus-visible:border-foreground focus-visible:ring-2 ring-ring ring-offset-2`.
-- Error: `aria-invalid:ring-destructive/20 aria-invalid:border-destructive`.
-- Icono decorativo dentro del campo a la izquierda con `pl-10`; acción de ojo a la derecha con `pr-10`.
-- `Label`: `text-sm font-medium`, siempre asociada por `htmlFor`.
-
-### Pestañas (`components/ui/tabs.tsx`)
-
-- Lista: `inline-flex rounded-[var(--radius-pill)] border border-border bg-input p-1 card-shadow`.
-- Disparador activo: `data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground` (negro sobre blanco).
-- Disparador inactivo: texto `--foreground` sobre `--input`, `min-h-9`.
-
-### Aviso (`components/ui/alert.tsx`)
-
-- `rounded-lg border px-4 py-3 text-sm`; variante `destructive`: texto en `--destructive` sobre `--card`.
-- `AlertTitle` `font-medium tracking-tight` en una línea; `AlertDescription` `text-sm`.
-
-### Cáscara de autenticación (`app/globals.css`)
-
-- `.auth-shell`: columna flex, centrada en el eje seguro, `overflow-y: auto`, fondo de mapa
-  (`--map-background`) cubierto con un degradado blanco `0.3 → 0.55`.
-- La tarjeta se limita a `max-w-md` (`28rem`) y lleva `px-4 py-6` de respiro.
-- `.page-container`: `rounded-[2.25rem] border-white/70 bg-card/88 backdrop-blur-sm`, ancho `80%` desde `md`.
-
-### Verificación de seguridad (`components/turnstile-widget.tsx`)
-
-- El widget se monta en un contenedor `min-h-[65px]` y se apoya en una línea de estado
-  `text-xs` (`role="status"`, `aria-live="polite"`).
-- Microcopias reales: `Verificación de seguridad` (en reposo),
-  `Verificación de seguridad completada.` (con token),
-  `No pudimos completar la verificación de seguridad.` (error),
-  `No pudimos cargar la verificación de seguridad. Revisá tu conexión y recargá la página.` (sin script).
-- En error aparece un botón `outline` `sm` con `Reintentar la verificación`.
-- El token es de un solo uso: tras cada intento se pide un desafío nuevo (`resetSignal`).
-- El envío permanece deshabilitado mientras no haya token.
-
-### Contraste y foco
-
-- Todos los controles interactivos llevan anillo `--ring` de 2 px con separación de 2 px.
-- Texto secundario `--muted-foreground` sobre `--card` blanco: contraste AA verificado en las
-  artboards (relación usada por el sistema, no se oscurece ni se aclara).
+| `reporty-reveal-up` | `opacity 0→1`, `translateY(1rem)→0`, 520–600 ms `cubic-bezier(0.22,1,0.36,1)` |
+| `reporty-home-enter` | `translateY(1.25rem) scale(0.985)→0/1`, 700 ms, mismo easing (welcome) |
+| Stagger de entrada | delays en cascada 70–280 ms (hijos de `.page-container` / `.incident-list`) |
+| `reporty-skeleton-shimmer` | gradiente 105°, 1.7 s infinito (delays 100/180 ms) |
+| `.scroll-reveal` | transición 520 ms al entrar en viewport |
+| Splash TWA nativo | fondo `#2e7d5b`, fade `splashScreenFadeOutDuration: 300` ms |

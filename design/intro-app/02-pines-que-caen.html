@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>02 — Pines que caen</title>
+<style>
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{font-family:system-ui,sans-serif;width:412px;height:917px;overflow:hidden;background:#000;position:relative}
+  /* ---- Capa final: mapa ---- */
+  .final{position:absolute;inset:0;background:#f2f0ef}
+  .final svg{width:100%;height:100%;display:block}
+  /* ---- Intro sobre negro (como el html raíz del proyecto) ---- */
+  .intro{position:absolute;inset:0;background:#000;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;
+    animation:elevar .8s cubic-bezier(.65,0,.35,1) 2.4s both}
+  .tarjeta{width:248px;height:328px;border-radius:24px;background:#0e1613;position:relative;overflow:hidden;
+    box-shadow:7px 7px 12px rgb(255 255 255/.08), inset 0 0 0 1px rgb(255 255 255/.14)}
+  .tarjeta svg{width:100%;height:100%}
+  .pin{position:absolute;left:0;top:0;animation:caer .55s cubic-bezier(.22,1,.36,1) both}
+  .palabra{color:#fafdfb;font-size:2.4rem;font-weight:700;letter-spacing:-.03em;animation:aparecer .6s cubic-bezier(.22,1,.36,1) 1.7s both}
+  .paso{color:#9fb3aa;font-size:.85rem;letter-spacing:.18em;text-transform:uppercase;font-weight:600;animation:aparecer .6s cubic-bezier(.22,1,.36,1) 1.9s both}
+  .paso b{color:#7fbf9f}
+  @keyframes caer{from{opacity:0;transform:translateY(-90px) scale(.6)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes aparecer{from{opacity:0;transform:translateY(1rem)}to{opacity:1;transform:translateY(0)}}
+  @keyframes elevar{to{transform:translateY(-100%)}}
+  @media (prefers-reduced-motion: reduce){
+    .intro{display:none}
+  }
+  .replay{position:absolute;right:12px;bottom:88px;z-index:9;background:rgb(255 255 255/.14);color:#fff;border:1px solid rgb(255 255 255/.4);
+    border-radius:999px;padding:8px 14px;font:inherit;font-size:.8rem;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="final" aria-hidden="true">
+    <svg viewBox="0 0 412 917" preserveAspectRatio="xMidYMid slice" role="presentation">
+      <rect width="412" height="917" fill="#e9f0e4"/>
+      <path d="M0 300 Q120 250 200 300 T412 280 V917 H0 Z" fill="#bfe0ea" opacity=".85"/>
+      <g stroke="#dcd8cf" stroke-width="5" fill="none" opacity=".9">
+        <path d="M20 420 H380"/><path d="M60 500 H350"/><path d="M110 580 H390"/>
+        <path d="M140 380 L120 700"/><path d="M250 360 L270 720"/>
+      </g>
+      <g fill="#7fbf9f"><circle cx="90" cy="470" r="9"/><circle cx="205" cy="520" r="11"/><circle cx="300" cy="450" r="8"/></g>
+    </svg>
+  </div>
+
+  <div class="intro" id="intro" role="img" aria-label="Entrada de Reporty sobre fondo negro: los pines de reportes caen y forman un mapa, la tarjeta se eleva y aparece el mapa real">
+    <div class="tarjeta" id="tarjeta" aria-hidden="true">
+      <svg viewBox="0 0 248 328" role="presentation">
+        <rect width="248" height="328" fill="#12201a"/>
+        <g stroke="#1f3830" stroke-width="3" fill="none">
+          <path d="M10 90 H238"/><path d="M22 160 H226"/><path d="M40 240 H208"/>
+          <path d="M80 20 V308"/><path d="M170 20 V308"/>
+        </g>
+        <path d="M0 250 Q60 235 120 250 T248 244 V328 H0 Z" fill="#173a46"/>
+      </svg>
+      <span class="pin" style="left:26px;top:52px;animation-delay:.25s"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-11.4A7 7 0 1 0 5 10.6C5 15.5 12 22 12 22Z" fill="#7fbf9f"/><circle cx="12" cy="10" r="2.4" fill="#0e1613"/></svg></span>
+      <span class="pin" style="left:118px;top:92px;animation-delay:.5s"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-11.4A7 7 0 1 0 5 10.6C5 15.5 12 22 12 22Z" fill="#c9a03e"/><circle cx="12" cy="10" r="2.4" fill="#0e1613"/></svg></span>
+      <span class="pin" style="left:64px;top:158px;animation-delay:.75s"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-11.4A7 7 0 1 0 5 10.6C5 15.5 12 22 12 22Z" fill="#d64943"/><circle cx="12" cy="10" r="2.4" fill="#0e1613"/></svg></span>
+      <span class="pin" style="left:160px;top:196px;animation-delay:1s"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-11.4A7 7 0 1 0 5 10.6C5 15.5 12 22 12 22Z" fill="#7fbf9f"/><circle cx="12" cy="10" r="2.4" fill="#0e1613"/></svg></span>
+      <span class="pin" style="left:104px;top:238px;animation-delay:1.2s"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-11.4A7 7 0 1 0 5 10.6C5 15.5 12 22 12 22Z" fill="#c9a03e"/><circle cx="12" cy="10" r="2.4" fill="#0e1613"/></svg></span>
+    </div>
+    <p class="palabra">Reporty</p>
+    <p class="paso"><b>312</b> reportes activos hoy</p>
+  </div>
+
+  <button class="replay" onclick="repetir()">Repetir animación</button>
+<script>
+  function repetir(){
+    const nodos=document.querySelectorAll('#intro, #intro .pin, #intro .palabra, #intro .paso');
+    nodos.forEach(el=>{el.style.animation='none';void el.offsetWidth;el.style.animation='';});
+  }
+</script>
+</body>
+</html>
