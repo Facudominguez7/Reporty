@@ -36,6 +36,11 @@ const EMPTY_DATA: CommunityPageData = {
 
 /** Community numbers are public and identical for every visitor, so a short cache is safe. */
 const COMMUNITY_REVALIDATE_SECONDS = 60
+const EXCLUDED_COMMUNITY_CONTRIBUTOR_IDS = new Set([
+  "6949c7cc-cf4c-41d0-8b7a-baf2ed151150",
+  "0aeac4be-56a4-4bf3-9a30-a530ad484b17",
+  "bd9e54a7-7649-41da-a14e-72c42f44b449",
+])
 
 /**
  * Loads the community page data with the anon role and caches it between requests.
@@ -93,7 +98,7 @@ const loadComunidadPageData = unstable_cache(
 
     const contributors = contributorIds
       // Guests (role 5) report like anyone else but do not take part in the ranking.
-      .filter((id) => !profilesById.get(id)?.es_invitado)
+      .filter((id) => !profilesById.get(id)?.es_invitado && !EXCLUDED_COMMUNITY_CONTRIBUTOR_IDS.has(id))
       .map((id) => {
         const profile = profilesById.get(id)
         return {
