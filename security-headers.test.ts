@@ -8,7 +8,7 @@ describe("security headers", () => {
   })
 
   it("sends the baseline security headers on every route", async () => {
-    const rules = (await nextConfig.headers()) ?? []
+    const rules = (await nextConfig.headers?.()) ?? []
     const global = rules.find((rule: { source: string }) => rule.source === "/:path*")
     expect(global).toBeDefined()
     const headers = Object.fromEntries(
@@ -24,7 +24,7 @@ describe("security headers", () => {
   })
 
   it("cachea inmutablemente los chunks estáticos con hash, sin aflojar seguridad", async () => {
-    const rules = (await nextConfig.headers()) ?? []
+    const rules = (await nextConfig.headers?.()) ?? []
     const estaticos = rules.find((rule: { source: string }) => rule.source === "/_next/static/:path*")
 
     expect(estaticos).toBeDefined()
@@ -40,7 +40,7 @@ describe("security headers", () => {
   })
 
   it("mantiene la exclusión de cache solo para assets inmutables", async () => {
-    const rules = (await nextConfig.headers()) ?? []
+    const rules = (await nextConfig.headers?.()) ?? []
     // El HTML dinámico (/mapa) no recibe cache inmutable.
     const html = rules.find((rule: { source: string }) => rule.source === "/:path*")
     const cabecerasHtml = Object.fromEntries(
