@@ -153,6 +153,10 @@ describe("avisarOrganismosAction", () => {
     expect((await avisarOrganismosAction(-1)).success).toBe(false)
     expect(dobles.notify).not.toHaveBeenCalled()
   })
+  it("reports delivery failure rather than claiming no institution exists", async () => {
+    db(); dobles.notify.mockRejectedValue(new Error("provider unavailable"))
+    expect(await avisarOrganismosAction(7)).toEqual({ success: false, error: "No pudimos avisar al organismo. Intentá nuevamente." })
+  })
   it("rejects missing sessions, including a lost guest session", async () => {
     db(); createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } })
     expect((await avisarOrganismosAction(7)).success).toBe(false)

@@ -77,6 +77,12 @@ describe("notificarOrganismosDeReporte", () => {
     expect(dobles.sendOrganismo).toHaveBeenCalledTimes(2)
   })
 
+  it("reports an error when all available recipient sends fail", async () => {
+    dobles.sendOrganismo.mockResolvedValue({ data: null, error: new Error("provider unavailable") })
+    const supabase = directorio([contactoEmail]) as unknown as SupabaseClient
+    await expect(notificarOrganismosDeReporte(supabase, entrada)).rejects.toThrow("No se pudo enviar el aviso a ningún organismo.")
+  })
+
   it("sin cobertura municipal no consulta el directorio ni envía nada", async () => {
     dobles.resolveMunicipio.mockReturnValue(null)
     const supabase = directorio([contactoEmail]) as unknown as SupabaseClient

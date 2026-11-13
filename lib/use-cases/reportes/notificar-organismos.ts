@@ -82,10 +82,12 @@ export async function notificarOrganismosDeReporte(
       }),
     ),
   )
-  return contactos
+  const enviados = contactos
     .filter((_, indice) => {
       const resultado = resultados[indice]
       return resultado?.status === "fulfilled" && !resultado.value?.error && Boolean(resultado.value?.data)
     })
     .map((contacto) => contacto.channel_value)
+  if (!enviados.length) throw new Error("No se pudo enviar el aviso a ningún organismo.")
+  return enviados
 }
