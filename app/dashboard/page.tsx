@@ -271,7 +271,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </section>
 
         <SignOutSection fullWidth />
-        <EliminarCuentaSection />
+        {/* Las cuentas de administrador no se eliminan desde la app (la RPC también lo impide). */}
+        {!isAdminRole(data.roleId) && <EliminarCuentaSection />}
       </div>
     </div>
   )
