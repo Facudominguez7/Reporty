@@ -506,6 +506,96 @@ body:not(:has(.admin-workspace)),
     border: 1px solid var(--border) !important;
   }
 
+  /* Intro de entrada (design/intro-app/03-palabra-que-sube.html): el componente cliente
+     solo se monta sin movimiento reducido, así que las animaciones no necesitan
+     su propio media query; la clase base solo compone el plano de fondo. */
+  .intro-entrada {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background:
+      linear-gradient(to bottom, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.55)),
+      var(--background);
+  }
+
+  body:has(.intro-entrada) {
+    overflow: hidden;
+  }
+
+  .intro-entrada .intro-icono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1.25rem;
+    background: var(--primary);
+    margin-bottom: 1.625rem;
+  }
+
+  .intro-entrada .intro-letras {
+    display: flex;
+    font-size: 3.4rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: var(--foreground);
+  }
+
+  .intro-entrada .intro-letras > span {
+    display: inline-block;
+  }
+
+  .intro-entrada .intro-subrayado {
+    width: 10.5rem;
+    height: 7px;
+    border-radius: var(--radius-pill);
+    background: var(--primary);
+    margin-top: 0.875rem;
+    transform-origin: left center;
+  }
+
+  .intro-entrada .intro-lema {
+    margin-top: 1.125rem;
+    color: var(--accent-foreground);
+    font-size: 0.95rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes reporty-intro-salida {
+      to {
+        opacity: 0;
+        transform: translateY(-6%) scale(1.02);
+      }
+    }
+
+    @keyframes reporty-intro-trazo {
+      from {
+        transform: scaleX(0);
+      }
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    .intro-entrada {
+      animation: reporty-intro-salida 800ms cubic-bezier(0.65, 0, 0.35, 1) 2.05s both;
+    }
+
+    .intro-entrada .intro-anim {
+      animation: reporty-reveal-up 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .intro-entrada .intro-anim-trazo {
+      animation: reporty-intro-trazo 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+  }
+
+
+
   /* Miniatura decorativa de la franja: sus créditos no entran en 80 px y el mapa
      real con atribución vive en la hoja de ubicación y en el mapa completo. */
   [data-vista-previa-ubicacion] .leaflet-control-attribution {
