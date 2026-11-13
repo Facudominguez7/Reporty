@@ -223,7 +223,30 @@ en Chrome del teléfono → menú → "Añadir a pantalla de inicio" para probar
   <b>Antes de empezar</b> — Necesitás una cuenta de Google Play Console (pago único de <strong>USD 25</strong>) y la
   verificación de identidad de Google. La primera revisión de una app nueva suele tardar de <strong>1 a 7 días</strong>.
   Todas las URLs que declaremos (privacidad, términos) deben existir y estar accesibles antes del envío.
+  <br><br>
+  <b>Si la cuenta es de Organización</b> (una entidad legal detrás del proyecto), además necesitás un
+  <strong>número D-U-N-S</strong> de Dun &amp; Bradstreet. Es gratuito y puede tardar <strong>hasta ~28 días</strong>:
+  arrancá ese trámite hoy, porque el resto de los pasos no dependen de él.
+  Si la cuenta es Personal, no hace falta DUNS, pero Google exige una prueba cerrada (closed testing) con
+  <strong>~12 testers por 14 días</strong> para las apps nuevas de cuentas personales antes de poder publicar en producción.
 </div>
+
+<h3><span class="paso">0</span>Número D-U-N-S (solo cuenta organizacion)</h3>
+<p>Google verifica la entidad con el número D-U-N-S de <strong>Dun &amp; Bradstreet</strong> (identificador de 9 dígitos
+que confirma que la organización existe como entidad legal). El trámite es <strong>gratuito</strong>: nadie legitimo cobra
+por dártelo; si un sitio pide pago por el número, es un intermediario innecesario.</p>
+<ol>
+  <li><strong>Buscá primero si ya existe:</strong> D&amp;B indexa organizaciones automáticamente desde fuentes
+      públicas. Consultá en <code>dnb.com</code> (o el buscador de lookup de Apple, que sirve igual) con la
+      <em>razón social legal exacta</em> de la entidad.</li>
+  <li><strong>Pedilo en el portal argentino de D&amp;B</strong> (<code>dnbregistered-ar.com</code>) si no existe aún,
+      completando los datos <strong>exactamente como figuran en AFIP/CUIT</strong>: razón social, domicilio fiscal,
+      teléfono con una persona que pueda responder, y email del dominio de la entidad. Si D&amp;B no logra validar el
+      domicilio o el teléfono, el trámite se estanca: tené a alguien atento esos días.</li>
+  <li><strong>Cargalo en Play Console</strong> cuando llegue: el perfil de pagos de Google pide el número, el nombre de
+      la organización y su domicilio, y deben <strong>coincidir exactamente</strong> con el registro de D&amp;B.</li>
+</ol>
+<p class="pend">☐ Número D-U-N-S en mano (o solicitud enviada y en seguimiento)</p>
 
 <h3><span class="paso">1</span>Decidir el package definitivo</h3>
 <p>El proyecto usa <code>ar.com.reporty.app</code>. <strong>Es la última decisión barata:</strong> después de la primera
