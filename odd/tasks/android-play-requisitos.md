@@ -30,3 +30,4 @@ Assumptions (marked, not user-requested): administrators (rol 1) cannot self-del
 - **L4** Separate pending request (not in this feature): "el automata dejo pasar la palabra ebrio".
 - **L5** Verification: full suite 2831 passed, 5 failed (baseline failures in mascotas resultado-navegacion and report-contact-actions, already failing before this branch); lint 0 errors; no new tsc errors. Local DB was behind (migrations after 20261110120300); dry-run applied them inside the same rolled-back transaction.
 - **L6** Route: all tasks inline (no Writer trigger reason). High-risk items 1 (irreversible data deletion) and 2 (auth identity) → independent verifier at feature end.
+- **L7** (2026-11-13) "crea la pr de esto y aplica la migracion en produccion". PR #255 (single PR incl. feat/entrada-app-intro commits, per user choice "Una sola PR"). Migration applied to production via MCP as version 20261113151507 after verifying identical FK set (46) and required columns.
