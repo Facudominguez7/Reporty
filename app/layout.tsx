@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 import Header from "@/components/header";
 import { EnlacesLegales } from "@/components/legal/enlaces-legales";
+import { RegistroServiceWorker } from "@/components/registro-service-worker";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { Toaster } from "@/components/ui/sonner";
 import { gaIdFromEnv } from "@/lib/analytics/google-analytics";
@@ -52,6 +53,7 @@ export default function RootLayout({
         <ScrollReveal />
         <main id="main-content" className="app-main">{children}<EnlacesLegales /></main>
         <Toaster richColors position="top-center" />
+        <RegistroServiceWorker />
       </body>
       {gaId && <GoogleAnalytics gaId={gaId} />}
     </html>

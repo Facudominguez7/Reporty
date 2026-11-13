@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#2e7d5b" />
+    <title>Sin conexión · Reporty</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fondo: #f6f8f7;
+        --texto: #1c2622;
+        --suave: #5b6b64;
+        --marca: #2e7d5b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fondo: #121816;
+          --texto: #e8efec;
+          --suave: #9fb0a8;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px 16px;
+        background: var(--fondo);
+        color: var(--texto);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+      }
+      main { max-width: 22rem; }
+      img { width: 72px; height: 72px; border-radius: 18px; }
+      h1 { font-size: 1.375rem; margin: 20px 0 8px; }
+      p { color: var(--suave); line-height: 1.5; margin: 0 0 24px; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        color: #fff;
+        background: var(--marca);
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 24px;
+        cursor: pointer;
+      }
+      button:focus-visible { outline: 3px solid var(--marca); outline-offset: 3px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/favicon_io/android-chrome-192x192.png" alt="" />
+      <h1>Estás sin conexión</h1>
+      <p>Revisá tu conexión a internet. Cuando vuelva, Reporty se carga de nuevo.</p>
+      <button type="button" onclick="location.reload()">Reintentar</button>
+    </main>
+    <script>
+      window.addEventListener("online", () => location.reload())
+    </script>
+  </body>
+</html>

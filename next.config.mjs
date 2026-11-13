@@ -55,6 +55,11 @@ const nextConfig = {
       // Sin esta regla, la cabecera global los dejaba en no-store y cada visita
       // re-descargaba todo el JS (enlentecía el primer paint del TWA/PWA). Next no
       // hereda las cabeceras entre reglas que matchean la misma URL: se repiten aqui.
+      // El navegador tiene que revalidar sw.js en cada visita para recibir las nuevas versiones.
+      {
+        source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache' }, ...cabecerasSeguridad],
+      },
       {
         source: '/_next/static/:path*',
         headers: [
