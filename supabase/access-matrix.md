@@ -60,6 +60,14 @@ Supabase anonymous users use the `authenticated` Postgres role, so a valid user 
 | Comment and vote | No | Yes | `canParticipateInCommunity` in server actions + restrictive vote RLS |
 | Dashboard / crew operations | No | By role | Role checks (role 5 is in no staff list); guests are redirected to `/mis-reportes` |
 
+
+## Account deletion (migration `20261113120000_eliminar_cuenta_usuario.sql`)
+
+- `public.eliminar_cuenta_usuario(p_usuario uuid)` is `SECURITY DEFINER`, executable only by `service_role` (revoked from `public`, `anon`, `authenticated`).
+- Called only from `app/cuenta/actions.ts`, which takes the user id from the session (`server.ts`), never from the client, and requires the typed confirmation `ELIMINAR`.
+- Deletes, in one transaction, the user's reports, pets, moderation rows, repair evidence (including third-party evidence and verifications on the user's reports), point and notice rows, then `auth.users` (profiles cascade). Raises `administrador_no_eliminable` for `rol_id = 1`.
+- Returns the orphaned Storage objects (`reportes`, `reportes-pendientes`); the use case removes them after commit.
+- Kept on purpose: `donaciones` (`usuario_id` set null) and `audit_events` plus its R2 archive.
 - `private.sync_profile_from_auth_user()` gives anonymous users `rol_id = 5` and promotes `5 → 2` only when `auth.users.is_anonymous` becomes false (verified email or linked identity). Other roles are never changed.
 - Visitors without a session who open `/reportes/nuevo` are redirected to `/auth?next=/reportes/nuevo`, where they choose to sign in/register or "Continuar como invitado" (`/reportes/nuevo?modo=invitado`, see `lib/routes/guest-report.ts`). Choosing guest mode creates no identity by itself.
 - The anonymous session is created only by the browser on the new-report page (`signInAnonymously`), at submit time and only without an existing session, so Supabase's per-IP anonymous sign-in limit and CAPTCHA apply to the visitor's IP. `crearReporteAction` never creates identities: it requires a validated session.
