@@ -71,6 +71,33 @@ describe("datosHistoriaReporte", () => {
     expect(datos.direccion).toBe("Bolívar 1450, Posadas")
     expect(datos.llamado).toBe("Mirá el reporte y sumá tu aporte en")
   })
+
+  it("no repite la dirección debajo cuando el título ya la incluye", () => {
+    const datos = datosHistoriaReporte({
+      titulo: "Alumbrado en Gobernador Barreyro 5840, Posadas",
+      prioridad: "Media",
+      estado: "Pendiente",
+      categoria: "Alumbrado",
+      direccion: "Gobernador Barreyro 5840, Posadas",
+      fotoUrl: null,
+    })
+
+    expect(datos.titulo).toBe("Alumbrado en Gobernador Barreyro 5840, Posadas")
+    expect(datos.direccion).toBeNull()
+  })
+
+  it("tampoco la repite si el título sólo nombra la calle, sin importar mayúsculas ni tildes", () => {
+    const datos = datosHistoriaReporte({
+      titulo: "Bache en BOLIVAR 1450",
+      prioridad: "Alta",
+      estado: "Pendiente",
+      categoria: "Bache",
+      direccion: "Bolívar 1450, Posadas",
+      fotoUrl: null,
+    })
+
+    expect(datos.direccion).toBeNull()
+  })
 })
 
 describe("datosHistoriaMascota", () => {
