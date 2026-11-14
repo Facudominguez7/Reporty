@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils"
 import { getUserInitials } from "@/lib/identity/display"
 import { PageTitleBar } from "@/components/page-title-bar"
 import { EliminarCuentaSection } from "@/components/cuenta/eliminar-cuenta-section"
+import { NombreUsuarioSection } from "@/components/cuenta/nombre-usuario-section"
 import { SignOutSection } from "@/components/sign-out-section"
 
 type DashboardPageProps = {
@@ -146,6 +147,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <MapaCalorZonas zonas={data.zonasCalientes} height="500px" />
           </section>
 
+          <NombreUsuarioSection nombreActual={data.user.username} />
           <SignOutSection fullWidth />
           {/* Las cuentas de administrador no se eliminan desde la app (la RPC también lo impide). */}
           {!isAdminRole(data.roleId) && <EliminarCuentaSection />}
@@ -272,6 +274,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           )}
         </section>
 
+        <NombreUsuarioSection nombreActual={data.user.username} />
         <SignOutSection fullWidth />
         {/* Las cuentas de administrador no se eliminan desde la app (la RPC también lo impide). */}
         {!isAdminRole(data.roleId) && <EliminarCuentaSection />}

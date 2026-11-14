@@ -25,6 +25,14 @@ vi.mock("@/components/cuenta/eliminar-cuenta-section", async () => {
   return { EliminarCuentaSection: () => createElement("button", null, "Eliminar cuenta") }
 })
 
+vi.mock("@/components/cuenta/nombre-usuario-section", async () => {
+  const { createElement } = await import("react")
+  return {
+    NombreUsuarioSection: ({ nombreActual }: { nombreActual: string | null }) =>
+      createElement("p", null, `Nombre de usuario: ${nombreActual}`),
+  }
+})
+
 import DashboardPage from "./page"
 
 /**
@@ -36,7 +44,7 @@ import DashboardPage from "./page"
  */
 async function renderizar(roleId: number, isAnalyticsDashboard: boolean) {
   mocks.datos.mockResolvedValue({
-    user: { id: "u1", email: "u@example.com" },
+    user: { id: "u1", email: "u@example.com", username: "vecino" },
     roleId,
     isAnalyticsDashboard,
     profile: { username: "vecino", puntos: 0 },
@@ -62,5 +70,17 @@ describe("eliminar cuenta en Mi cuenta", () => {
 
   it("no lo ve el administrador", async () => {
     expect(await renderizar(1, true)).not.toContain("Eliminar cuenta")
+  })
+})
+
+describe("nombre de usuario en Mi cuenta", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("el ciudadano ve su nombre de usuario actual para poder cambiarlo", async () => {
+    expect(await renderizar(2, false)).toContain("Nombre de usuario: vecino")
+  })
+
+  it("el interesado también lo ve en la vista de analíticas", async () => {
+    expect(await renderizar(3, true)).toContain("Nombre de usuario: vecino")
   })
 })

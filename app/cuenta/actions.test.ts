@@ -20,7 +20,7 @@ vi.mock("@/lib/authz/roles", async (importOriginal) => ({
 }))
 
 import { CONFIRMACION_ELIMINAR_CUENTA } from "@/lib/cuenta/eliminacion"
-import { eliminarCuentaAction } from "./actions"
+import { actualizarNombreUsuarioAction, eliminarCuentaAction } from "./actions"
 
 describe("eliminarCuentaAction", () => {
   beforeEach(() => {
@@ -94,5 +94,87 @@ describe("eliminarCuentaAction", () => {
     mocks.signOut.mockRejectedValue(new Error("sin sesión"))
 
     expect(await eliminarCuentaAction("ELIMINAR")).toEqual({ success: true })
+  })
+})
+
+describe("actualizarNombreUsuarioAction", () => {
+  const eq = vi.fn()
+  const update = vi.fn(() => ({ eq }))
+  const from = vi.fn(() => ({ update }))
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "u1", is_anonymous: false } } })
+    mocks.getUserRoleContext.mockResolvedValue({ data: { roleId: 2 }, error: null })
+    mocks.createAdminClient.mockReturnValue({ from } as never)
+    eq.mockResolvedValue({ error: null })
+  })
+
+  it("guarda el nombre normalizado en el perfil de la sesión actual y refresca las páginas", async () => {
+    expect(await actualizarNombreUsuarioAction("  Vecina_Posadas ")).toEqual({ success: true, nombre: "vecina_posadas" })
+
+    expect(from).toHaveBeenCalledWith("profiles")
+    expect(update).toHaveBeenCalledWith({ username: "vecina_posadas" })
+    expect(eq).toHaveBeenCalledWith("id", "u1")
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/", "layout")
+  })
+
+  it("exige una sesión", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+
+    expect(await actualizarNombreUsuarioAction("vecina_posadas")).toEqual({
+      success: false,
+      error: "Tenés que iniciar sesión para cambiar tu nombre de usuario.",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("rechaza a los invitados", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "g1", is_anonymous: true } } })
+
+    expect(await actualizarNombreUsuarioAction("vecina_posadas")).toEqual({
+      success: false,
+      error: "Creá una cuenta para elegir tu nombre de usuario.",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("rechaza un formato inválido o un nombre reservado sin llegar a la base", async () => {
+    expect(await actualizarNombreUsuarioAction("ab")).toEqual({
+      success: false,
+      error: "Usá entre 3 y 30 caracteres: letras sin tildes, números o guion bajo (no al principio ni al final).",
+    })
+    expect(await actualizarNombreUsuarioAction("municipalidad_posadas")).toEqual({
+      success: false,
+      error: "Ese nombre no está permitido: no puede hacerse pasar por Reporty ni por un organismo.",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("rechaza nombres ofensivos sin llegar a la base", async () => {
+    expect(await actualizarNombreUsuarioAction("pelotudo")).toEqual({
+      success: false,
+      error: "Ese nombre de usuario contiene lenguaje ofensivo. Elegí otro.",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("avisa cuando el nombre ya lo usa otra persona", async () => {
+    eq.mockResolvedValue({ error: { code: "23505", message: "duplicate key value violates unique constraint" } })
+
+    expect(await actualizarNombreUsuarioAction("vecina_posadas")).toEqual({
+      success: false,
+      error: "Ese nombre de usuario ya está en uso. Elegí otro.",
+    })
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("informa un error genérico si la base falla por otro motivo", async () => {
+    eq.mockResolvedValue({ error: { code: "XX000", message: "boom" } })
+
+    expect(await actualizarNombreUsuarioAction("vecina_posadas")).toEqual({
+      success: false,
+      error: "No pudimos guardar tu nombre de usuario. Probá de nuevo.",
+    })
   })
 })
