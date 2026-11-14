@@ -52,6 +52,13 @@ const sections: LegalSection[] = [
     content: (
       <ul>
         <li>Usá datos reales y cuidá tu contraseña: lo que se haga con tu cuenta es tu responsabilidad.</li>
+        <li>
+          Tu nombre de usuario se crea automáticamente al registrarte y es público: se muestra en tus reportes, tus
+          comentarios y el ranking. Si entrás con Google, se arma a partir del nombre de tu cuenta de Google; si te registrás
+          con email, a partir de la parte de tu email que está antes de la «@» (el resto de tu email nunca se muestra). Se
+          escribe en minúsculas y sin tildes, y si ya existe se le agrega un número. Si querés cambiarlo, escribinos a{" "}
+          <ContactEmail /> y lo modificamos.
+        </li>
         <li>Tu nombre de usuario no puede ser ofensivo ni hacerse pasar por otra persona o por un organismo.</li>
         <li>Una cuenta es personal. No crees cuentas para inflar votos o puntos.</li>
       </ul>

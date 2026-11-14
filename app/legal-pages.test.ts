@@ -22,6 +22,17 @@ describe("privacy policy page", () => {
     }
   })
 
+  it("names Cloudflare as the site host and keeps Hostinger only for the contact mailbox", () => {
+    expect(privacidad).toContain("<strong>Cloudflare:</strong> alojamiento del sitio")
+    expect(privacidad).not.toContain("<strong>Hostinger:</strong> alojamiento del sitio")
+    expect(privacidad).toContain("<strong>Hostinger:</strong> casilla de correo de contacto")
+  })
+
+  it("explains that the public username is generated from the Google name or the part of the email before the @", () => {
+    expect(privacidad).toContain("nombre de tu cuenta de Google")
+    expect(privacidad).toContain("antes de la «@»")
+  })
+
   it("explains what donation data is kept, that Mercado Pago processes the payment and that donations are not public", () => {
     expect(privacidad).toContain("<strong>Tus donaciones:</strong>")
     expect(privacidad).toContain("<strong>Mercado Pago:</strong>")
@@ -51,6 +62,13 @@ describe("terms page", () => {
     expect(terminos).toContain("Facundo Diaz Dominguez")
     expect(terminos).toContain("Octavio Duarte")
     expect(terminos).toContain('href="mailto:contacto@reporty.com.ar"')
+  })
+
+  it("tells users where their public username comes from and how to change it", () => {
+    expect(terminos).toContain("Tu nombre de usuario se crea automáticamente")
+    expect(terminos).toContain("nombre de tu cuenta de Google")
+    expect(terminos).toContain("antes de la «@»")
+    expect(terminos).toContain("Si querés cambiarlo")
   })
 
   it("says Reporty is not an official municipal channel and links to the privacy policy", () => {
