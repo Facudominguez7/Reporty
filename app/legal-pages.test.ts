@@ -31,6 +31,7 @@ describe("privacy policy page", () => {
   it("explains that the public username is generated from the Google name or the part of the email before the @", () => {
     expect(privacidad).toContain("nombre de tu cuenta de Google")
     expect(privacidad).toContain("antes de la «@»")
+    expect(privacidad).toContain("podés cambiarlo desde")
   })
 
   it("explains what donation data is kept, that Mercado Pago processes the payment and that donations are not public", () => {
@@ -68,7 +69,7 @@ describe("terms page", () => {
     expect(terminos).toContain("Tu nombre de usuario se crea automáticamente")
     expect(terminos).toContain("nombre de tu cuenta de Google")
     expect(terminos).toContain("antes de la «@»")
-    expect(terminos).toContain("Si querés cambiarlo")
+    expect(terminos).toContain("Podés cambiarlo cuando quieras desde")
   })
 
   it("says Reporty is not an official municipal channel and links to the privacy policy", () => {
