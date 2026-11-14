@@ -20,6 +20,8 @@ export type DashboardPageData = {
   user: {
     id: string
     email: string | null
+    /** Nombre de usuario público (`profiles.username`), editable desde «Mi cuenta». */
+    username: string | null
   } | null
   isAnalyticsDashboard: boolean
   /** Rol persistido del usuario (`profiles.rol_id`), para decidir qué accesos operativos mostrar. */
@@ -32,6 +34,13 @@ export type DashboardPageData = {
   zonasCalientes: ZonaConReportes[]
 }
 
+/**
+ * Reúne los datos de «Mi cuenta» para la persona de la sesión: rol, puntos, reportes propios y
+ * nombre de usuario.
+ *
+ * @param filtros - Filtros de la lista de reportes propios.
+ * @returns Los datos de la página, con `user: null` si no hay sesión.
+ */
 export async function getDashboardPageData(
   filtros: Pick<FiltrosReportes, "search" | "categoria" | "estado" | "prioridad"> = {},
 ): Promise<DashboardPageData> {
@@ -56,13 +65,15 @@ export async function getDashboardPageData(
 
   const { data: roleContext } = await getUserRoleContext(supabase, user.id)
   // Role-specific analytics live in /admin; /dashboard is the personal dashboard for every authenticated role.
-  const [{ puntos }, { data: userReports }] = await Promise.all([
+  const [{ puntos }, { data: userReports }, { data: perfil }] = await Promise.all([
     getPuntosUsuario(supabase, user.id),
     getDashboardUserReports(user.id, filtros),
+    // Cada persona puede leer su propio perfil (RLS de `profiles`).
+    supabase.from("profiles").select("username").eq("id", user.id).maybeSingle(),
   ])
 
   return {
-    user: { id: user.id, email: user.email ?? null },
+    user: { id: user.id, email: user.email ?? null, username: perfil?.username ?? null },
     isAnalyticsDashboard: false,
     roleId: roleContext?.roleId ?? null,
     puntos,
