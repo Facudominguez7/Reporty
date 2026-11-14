@@ -1,0 +1,104 @@
+# Validación del proyecto Android TWA y la PWA de Reporty.
+# Corre solo cuando cambian archivos relevantes. No publica en Google Play ni
+# despliega nada: valida configuraciones y compila sin secretos cuando puede.
+
+name: Android TWA y PWA
+
+on:
+  pull_request:
+    paths:
+      - "android/**"
+      - "public/favicon_io/**"
+      - "public/sw.js"
+      - "public/offline.html"
+      - "public/.well-known/**"
+      - "lib/pwa/**"
+      - "scripts/android-twa/**"
+      - ".github/workflows/android-twa.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "public/favicon_io/**"
+      - "public/sw.js"
+      - "public/offline.html"
+      - "public/.well-known/**"
+
+jobs:
+  validacion-web-pwa:
+    name: Validar manifiesto y Service Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # Los tests de lib/pwa ejecutan public/sw.js en un entorno simulado (solo cachea
+      # /_next/static, nunca HTML, API, POST ni otros orígenes) y validan el manifiesto.
+      - name: Validar manifiesto y Service Worker (tests de lib/pwa)
+        run: pnpm exec vitest run lib/pwa
+
+      - name: Validar assetlinks.json si existe (nunca huellas ficticias)
+        run: |
+          if [ -f public/.well-known/assetlinks.json ]; then
+            node -e '
+              const a = JSON.parse(require("fs").readFileSync("public/.well-known/assetlinks.json", "utf8"));
+              if (!Array.isArray(a) || a.length === 0) throw new Error("assetlinks.json vacío");
+              for (const e of a) {
+                if (e.target?.namespace !== "android_app") throw new Error("namespace inválido");
+                for (const f of e.target.sha256_cert_fingerprints ?? []) {
+                  if (/REEMPLAZAR|FALSO|EXAMPLE/i.test(f)) throw new Error("Huella ficticia en assetlinks.json");
+                  if (f.replace(/:/g, "").length !== 64) throw new Error("Huella SHA-256 inválida");
+                }
+              }
+              console.log("assetlinks.json válido con", a.length, "huella(s).");
+            '
+          else
+            echo "Sin assetlinks.json todavía (se genera con huellas reales; ver docs/android-twa.md)."
+          fi
+
+  validacion-android:
+    name: Validar proyecto Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Verificar configuración del proyecto
+        run: |
+          test -f android/twa/twa-manifest.json || { echo "Falta twa-manifest.json"; exit 1; }
+          test -f android/twa/gradlew || { echo "Falta gradlew"; exit 1; }
+          node -e '
+            const m = JSON.parse(require("fs").readFileSync("android/twa/twa-manifest.json", "utf8"));
+            if (m.packageId !== "com.reporty.app") throw new Error("packageId inesperado: " + m.packageId);
+            if (m.host !== "reporty.com.ar") throw new Error("host inesperado: " + m.host);
+            console.log("twa-manifest.json OK:", m.packageId, "->", m.host);
+          '
+
+      - name: Compilar sin firmar (verificación de build, no distribución)
+        working-directory: android/twa
+        run: |
+          chmod +x gradlew
+          # Firma con un keystore efímero generado en CI: nunca se commitea ni se usa para producción.
+          keytool -genkeypair -v -keystore /tmp/ci-efimero.jks -alias ci -keyalg RSA -keysize 2048 \
+            -validity 1 -storepass cifakey -keypass cifakey \
+            -dname "CN=CI, OU=CI, O=Reporty, L=CABA, ST=CABA, C=AR"
+          ./gradlew bundleRelease assembleRelease \
+            -Pandroid.injected.signing.store=/tmp/ci-efimero.jks \
+            -Pandroid.injected.signing.store.password=cifakey \
+            -Pandroid.injected.signing.key.alias=ci \
+            -Pandroid.injected.signing.key.password=cifakey
+          echo "AAB y APK generados en CI (solo verificación, no se publican)."

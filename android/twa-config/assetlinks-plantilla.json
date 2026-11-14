@@ -1,0 +1,15 @@
+{
+  "$comentario": "PLANTILLA — NO PUBLICAR. Copiar a public/.well-known/assetlinks.json solo con huellas SHA-256 reales. Cada entrada sha256 FUE generada con: keytool -list -v -keystore <archivo> -alias <alias> | grep SHA-256. Ver docs/android-twa.md § Digital Asset Links.",
+  "entradas_pendientes": [
+    {
+      "rol": "upload-key (local, para APK/AAB firmados con la clave de subida)",
+      "package": "com.reporty.app",
+      "sha256": "REEMPLAZAR_CON_HUELLA_REAL"
+    },
+    {
+      "rol": "google-play-app-signing (huella que asigna Google Play Console → Configuración → Firma de apps)",
+      "package": "com.reporty.app",
+      "sha256": "REEMPLAZAR_CON_HUELLA_REAL"
+    }
+  ]
+}

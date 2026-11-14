@@ -8,9 +8,12 @@ describe("security headers", () => {
   })
 
   it("sends the baseline security headers on every route", async () => {
-    const rules = await nextConfig.headers()
+    const rules = (await nextConfig.headers?.()) ?? []
     const global = rules.find((rule: { source: string }) => rule.source === "/:path*")
-    const headers = Object.fromEntries(global.headers.map((header: { key: string; value: string }) => [header.key.toLowerCase(), header.value]))
+    expect(global).toBeDefined()
+    const headers = Object.fromEntries(
+      (global?.headers ?? []).map((header: { key: string; value: string }) => [header.key.toLowerCase(), header.value]),
+    )
 
     expect(headers["x-content-type-options"]).toBe("nosniff")
     expect(headers["x-frame-options"]).toBe("DENY")
@@ -21,12 +24,12 @@ describe("security headers", () => {
   })
 
   it("cachea inmutablemente los chunks estáticos con hash, sin aflojar seguridad", async () => {
-    const rules = await nextConfig.headers()
+    const rules = (await nextConfig.headers?.()) ?? []
     const estaticos = rules.find((rule: { source: string }) => rule.source === "/_next/static/:path*")
 
     expect(estaticos).toBeDefined()
     const cabeceras = Object.fromEntries(
-      estaticos.headers.map((header: { key: string; value: string }) => [
+      (estaticos?.headers ?? []).map((header: { key: string; value: string }) => [
         header.key.toLowerCase(),
         header.value,
       ]),
@@ -37,11 +40,11 @@ describe("security headers", () => {
   })
 
   it("mantiene la exclusión de cache solo para assets inmutables", async () => {
-    const rules = await nextConfig.headers()
+    const rules = (await nextConfig.headers?.()) ?? []
     // El HTML dinámico (/mapa) no recibe cache inmutable.
     const html = rules.find((rule: { source: string }) => rule.source === "/:path*")
     const cabecerasHtml = Object.fromEntries(
-      html.headers.map((header: { key: string; value: string }) => [
+      (html?.headers ?? []).map((header: { key: string; value: string }) => [
         header.key.toLowerCase(),
         header.value,
       ]),

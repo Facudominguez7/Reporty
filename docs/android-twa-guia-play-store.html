@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reporty Android · Guía técnica y publicación en Google Play</title>
+<style>
+  :root {
+    --verde: #2e7d5b;
+    --verde-oscuro: #1f5c42;
+    --verde-claro: #e7f2ed;
+    --texto: #1c2b24;
+    --gris: #5b6b63;
+    --borde: #d8e4de;
+    --amarillo: #b45309;
+    --amarillo-fondo: #fef3c7;
+    --rojo: #b91c1c;
+    --rojo-fondo: #fee2e2;
+    --azul-fondo: #dbeafe;
+    --azul: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--texto);
+    background: #f6faf8;
+    line-height: 1.6;
+  }
+  .contenedor { max-width: 900px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  header.hero {
+    background: linear-gradient(135deg, var(--verde), var(--verde-oscuro));
+    color: #fff; border-radius: 16px; padding: 2.5rem 2rem; margin-bottom: 2rem;
+  }
+  header.hero h1 { margin: 0 0 .5rem; font-size: 1.7rem; }
+  header.hero p { margin: 0; opacity: .92; }
+  h2 {
+    font-size: 1.3rem; margin: 2.5rem 0 .75rem; padding-bottom: .35rem;
+    border-bottom: 2px solid var(--verde-claro); color: var(--verde-oscuro);
+  }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; color: var(--texto); }
+  code, pre { font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: .875em; }
+  code { background: var(--verde-claro); padding: .1em .35em; border-radius: 5px; }
+  pre {
+    background: #14211b; color: #d7e7df; padding: 1rem 1.15rem; border-radius: 10px;
+    overflow-x: auto; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  .comentario { color: #7fa895; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--borde); padding: .55rem .7rem; text-align: left; vertical-align: top; }
+  th { background: var(--verde-claro); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfdfc; }
+  .caja {
+    border-radius: 10px; padding: .9rem 1.1rem; margin: 1rem 0; font-size: .94rem;
+  }
+  .caja-info    { background: var(--azul-fondo); border-left: 4px solid var(--azul); }
+  .caja-atencion{ background: var(--amarillo-fondo); border-left: 4px solid var(--amarillo); }
+  .caja-peligro { background: var(--rojo-fondo); border-left: 4px solid var(--rojo); }
+  .caja b:first-child { display: inline-block; margin-bottom: .15rem; }
+  .check { color: var(--verde); font-weight: 700; }
+  .pend  { color: var(--amarillo); font-weight: 700; }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding: .45rem 0 .45rem 2rem; position: relative; border-bottom: 1px dashed var(--borde); }
+  .checklist li::before {
+    content: ""; position: absolute; left: 0; top: .7rem; width: 1.1rem; height: 1.1rem;
+    border: 2px solid var(--gris); border-radius: 4px; background: #fff;
+  }
+  .paso {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    background: var(--verde); color: #fff; font-weight: 700; font-size: .85rem;
+    margin-right: .45rem;
+  }
+  .archivo {
+    font-size: .85rem; color: var(--gris); margin: 1.2rem 0 .4rem;
+    font-weight: 600; letter-spacing: .02em;
+  }
+  footer { margin-top: 3rem; color: var(--gris); font-size: .85rem; border-top: 1px solid var(--borde); padding-top: 1rem; }
+  nav.indice {
+    background: #fff; border: 1px solid var(--borde); border-radius: 12px; padding: 1.1rem 1.4rem;
+  }
+  nav.indice ol { margin: .3rem 0; padding-left: 1.3rem; }
+  nav.indice a { color: var(--verde-oscuro); text-decoration: none; }
+  nav.indice a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="contenedor">
+
+<header class="hero">
+  <h1>Reporty Android — Guía completa</h1>
+  <p>Qué se implementó, cómo probarlo y todo lo que tenés que configurar en Google para publicar en Play Store.</p>
+  <p style="margin-top:.6rem; font-size:.9rem;">Rama <code style="background:rgba(255,255,255,.15); color:#fff;">feat/android-twa-bubblewrap</code> · PR <strong>#253</strong> · Package <strong>com.reporty.app</strong></p>
+</header>
+
+<nav class="indice">
+  <strong>Índice</strong>
+  <ol>
+    <li><a href="#hecho">Qué se hizo (resumen técnico)</a></li>
+    <li><a href="#archivos">Archivos creados y modificados</a></li>
+    <li><a href="#verificado">Qué ya está verificado</a></li>
+    <li><a href="#probar">Cómo probarlo en esta PC y en tu teléfono</a></li>
+    <li><a href="#play">Publicar en Google Play: guía paso a paso</a></li>
+    <li><a href="#riesgos">Riesgos y decisiones pendientes</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<h2 id="hecho">1 · Qué se hizo (resumen técnico)</h2>
+
+<p>
+Reporty ahora existe como aplicación Android <strong>sin escribir ni una línea de código Android nativo</strong>.
+La app es una <strong>Trusted Web Activity (TWA)</strong>: una cápsula Android mínima que abre
+<code>https://reporty.com.ar/mapa</code> en Chrome a pantalla completa. Todo lo que ves en la app
+(mapa, reportes, login, fotos, donaciones) es el mismo sitio web de siempre, servido por Cloudflare Workers.
+</p>
+
+<table>
+  <tr><th>Componente</th><th>Qué es</th><th>Estado</th></tr>
+  <tr><td><strong>PWA</strong></td><td>Manifiesto web completo: nombre, íconos normales y maskable, atajos (Mapa, Reportes, Crear reporte), color de marca</td><td><span class="check">✓ Hecho</span></td></tr>
+  <tr><td><strong>Service Worker</strong></td><td>Caché <em>solo</em> de estáticos propios (JS/CSS con hash, íconos, mapas). Nunca cachea APIs, sesiones ni fotos privadas. Página offline propia</td><td><span class="check">✓ Hecho</span></td></tr>
+  <tr><td><strong>Proyecto Android</strong></td><td><code>android/twa/</code> generado con Bubblewrap. Package <code>com.reporty.app</code>, targetSdk 36, minSdk 24, Gradle 8.11.1, AGP 8.9.1</td><td><span class="check">✓ Hecho</span></td></tr>
+  <tr><td><strong>Permisos de ubicación</strong></td><td>Delegación TWA habilitada: el aviso web de geolocalización se convierte en permiso Android nativo. <code>buscarUbicacionPrecisa()</code> no cambió</td><td><span class="check">✓ Configurado</span></td></tr>
+  <tr><td><strong>Digital Asset Links</strong></td><td>Mecanismo que prueba a Chrome que la app y el dominio son del mismo dueño (quita la barra de URL). Generador listo, falta la huella real</td><td><span class="pend">⏳ Falta certificado</span></td></tr>
+  <tr><td><strong>CI (GitHub Actions)</strong></td><td>Workflow que valida manifiesto, SW y assetlinks, y compila APK/AAB en cada PR</td><td><span class="check">✓ Hecho</span></td></tr>
+  <tr><td><strong>Documentación</strong></td><td><code>docs/android-twa.md</code> en el repo con comandos reales y reproducibles</td><td><span class="check">✓ Hecho</span></td></tr>
+</table>
+
+<div class="caja caja-info">
+  <b>La consecuencia práctica:</b> cada mejora que subas a producción (Cloudflare) se refleja en la app Android
+  <em>sin publicar una versión nueva</em>. Solo recompilás el APK/AAB si cambiás íconos, nombre, versión o permisos nativos.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="archivos">2 · Archivos creados y modificados</h2>
+
+<div class="archivo">PUBLIC/ — LO QUE SIRVE TU WEB</div>
+<table>
+  <tr><th>Archivo</th><th>Para qué</th></tr>
+  <tr><td><code>public/favicon_io/site.webmanifest</code></td><td>Manifiesto PWA reescrito: <code>id</code>, <code>start_url=/mapa</code>, <code>display=standalone</code>, colores <code>#2e7d5b</code>, 4 íconos (2 maskable), 3 shortcuts</td></tr>
+  <tr><td><code>public/favicon_io/maskable-icon-192.png / -512.png</code></td><td>Íconos con margen de seguridad para el recorte circular de Android. Generados desde tu favicon con el script de abajo (regenerable)</td></tr>
+  <tr><td><code>public/sw.js</code></td><td>Service Worker. Lista blanca estricta: <code>/_next/static/</code>, <code>/favicon_io/</code>, <code>/mapas/</code>. Todo lo demás pasa a la red sin caché</td></tr>
+  <tr><td><code>public/offline.html</code></td><td>Pantalla "Sin conexión" cuando no hay red. No muestra datos viejos que puedan confundir</td></tr>
+</table>
+
+<div class="archivo">APP/ COMPONENTS/ — CÓDIGO</div>
+<table>
+  <tr><th>Archivo</th><th>Para qué</th></tr>
+  <tr><td><code>components/pwa/registro-service-worker.tsx</code></td><td>Client Component que registra el SW después de hidratar. Sin <code>skipWaiting</code>: la actualización aplica al cerrar la app, para no cortar sesiones</td></tr>
+  <tr><td><code>app/layout.tsx</code></td><td>Una línea: monta el registro del SW en el layout raíz</td></tr>
+  <tr><td><code>scripts/android-twa/generar-iconos-maskable.mjs</code></td><td>Regenera los íconos maskable con sharp (<code>node scripts/android-twa/generar-iconos-maskable.mjs</code>)</td></tr>
+  <tr><td><code>scripts/android-twa/generar-assetlinks.mjs</code></td><td>Genera <code>public/.well-known/assetlinks.json</code> a partir de huellas <strong>reales</strong>. Se niega a publicar si no le pasás huellas válidas (no inventa nada)</td></tr>
+</table>
+
+<div class="archivo">ANDROID/ — LA APP</div>
+<table>
+  <tr><th>Archivo</th><th>Para qué</th></tr>
+  <tr><td><code>android/twa/</code></td><td>Proyecto Android completo versionado (build.gradle, manifest, recursos, íconos generados)</td></tr>
+  <tr><td><code>android/twa/twa-manifest.json</code></td><td>Configuración fuente de la TWA: package, dominio, íconos, versión, shortcuts. Editar este archivo + <code>bubblewrap update</code> regenera todo</td></tr>
+  <tr><td><code>android/twa-config/assetlinks-plantilla.json</code></td><td>Plantilla documentada (fuera de <code>public/</code> a propósito, para no publicar huellas de mentira)</td></tr>
+</table>
+
+<div class="archivo">INFRA</div>
+<table>
+  <tr><th>Archivo</th><th>Para qué</th></tr>
+  <tr><td><code>.github/workflows/android-twa.yml</code></td><td>CI: valida manifiesto, SW, assetlinks y compila AAB/APK con keystore efímero. No publica nada</td></tr>
+  <tr><td><code>docs/android-twa.md</code></td><td>Documentación técnica completa en el repo</td></tr>
+  <tr><td><code>.gitignore</code></td><td>Ahora excluye keystore, certificados, APK/AAB y carpetas build</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="verificado">3 · Qué ya está verificado</h2>
+
+<table>
+  <tr><th>Prueba</th><th>Dónde</th><th>Resultado</th></tr>
+  <tr><td><code>pnpm lint</code></td><td>CI local</td><td><span class="check">✓ 0 errores</span></td></tr>
+  <tr><td><code>npx tsc --noEmit</code></td><td>CI local</td><td>2 errores <strong>preexistentes en main</strong> (verificados compilando main aparte: no son de esta rama)</td></tr>
+  <tr><td><code>pnpm test</code> (2799 tests)</td><td>CI local</td><td>2793 ✓ · 5 fallan, los mismos 5 fallan en main (preexistentes)</td></tr>
+  <tr><td>Manifiesto + íconos + shortcuts responden 200</td><td>Playwright</td><td><span class="check">✓</span></td></tr>
+  <tr><td>Service Worker se registra, activa y cachea solo estáticos</td><td>Playwright (navegador real)</td><td><span class="check">✓ estado "activated"</span></td></tr>
+  <tr><td>APK debug compila (6,5 MB)</td><td>Gradle local</td><td><span class="check">✓</span></td></tr>
+  <tr><td>App abre el mapa Leaflet con marcadores y clusters</td><td><strong>Emulador Android 36</strong></td><td><span class="check">✓ capturas</span></td></tr>
+  <tr><td>Login Google / email / invitado y <strong>Turnstile verifica</strong> dentro de la TWA</td><td>Emulador</td><td><span class="check">✓</span></td></tr>
+  <tr><td>Botón Atrás minimiza la app (no abre navegador)</td><td>Emulador</td><td><span class="check">✓</span></td></tr>
+  <tr><td>GPS de teléfono real, cámara, Mercado Pago en dispositivo</td><td>—</td><td><span class="pend">⏳ requiere teléfono físico</span></td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="probar">4 · Cómo probarlo en esta PC y en tu teléfono</h2>
+
+<h3>Emulador (ya instalado en esta PC)</h3>
+<pre><code><span class="comentario"># Encender el emulador (Pixel 6, Android 36)</span>
+~/tools/android-sdk/emulator/emulator -avd reporty-test &
+
+<span class="comentario"># Instalar o actualizar la app</span>
+~/tools/android-sdk/platform-tools/adb install -r \
+  ~/Documentos/JackeMate-twa/android/twa/app/build/outputs/apk/debug/app-debug.apk
+
+<span class="comentario"># Ver logs de la app</span>
+~/tools/android-sdk/platform-tools/adb logcat | grep -i reporty</code></pre>
+<p>El APK quedó compilado en <code>~/Documentos/JackeMate-twa/android/twa/app/build/outputs/apk/debug/app-debug.apk</code>.</p>
+
+<h3>Tu teléfono físico (la prueba que importa de verdad)</h3>
+<ol>
+  <li>En el teléfono: <em>Ajustes → Acerca del teléfono</em>, tocá 7 veces "Número de compilación" para activar el modo desarrollador.</li>
+  <li><em>Opciones de desarrollador → Depuración USB</em>: activada.</li>
+  <li>Conectá el cable, aceptá el diálogo de confianza en el teléfono.</li>
+  <li><code>~/tools/android-sdk/platform-tools/adb devices</code> debe listar tu equipo (aparece un diálogo de autorización la primera vez).</li>
+  <li><code>adb install -r app-debug.apk</code> y abrí "Reporty" como cualquier app.</li>
+  <li>Probá específicamente: <strong>GPS de alta precisión</strong> (crear reporte con ubicación), <strong>cámara</strong> (foto directa y selector), <strong>Google OAuth</strong>, <strong>donaciones Mercado Pago</strong> y abrir un link de Reporty desde WhatsApp (debe abrir la app, no el navegador).</li>
+</ol>
+
+<h3>PWA en el navegador (sin APK)</h3>
+<p>En Chrome desktop, con el dev server corriendo: DevTools (F12) → <em>Application → Manifest</em> y <em>Service Workers</em>;
+en la barra de direcciones aparece el botón <em>Instalar</em>. También podés abrir <code>https://reporty.com.ar</code>
+en Chrome del teléfono → menú → "Añadir a pantalla de inicio" para probar el manifiesto antes del deploy del APK.</p>
+
+<!-- ============================================================ -->
+<h2 id="play">5 · Publicar en Google Play: guía paso a paso</h2>
+
+<div class="caja caja-atencion">
+  <b>Antes de empezar</b> — Necesitás una cuenta de Google Play Console (pago único de <strong>USD 25</strong>) y la
+  verificación de identidad de Google. La primera revisión de una app nueva suele tardar de <strong>1 a 7 días</strong>.
+  Todas las URLs que declaremos (privacidad, términos) deben existir y estar accesibles antes del envío.
+  <br><br>
+  <b>Si la cuenta es de Organización</b> (una entidad legal detrás del proyecto), además necesitás un
+  <strong>número D-U-N-S</strong> de Dun &amp; Bradstreet. Es gratuito y puede tardar <strong>hasta ~28 días</strong>:
+  arrancá ese trámite hoy, porque el resto de los pasos no dependen de él.
+  Si la cuenta es Personal, no hace falta DUNS, pero Google exige una prueba cerrada (closed testing) con
+  <strong>~12 testers por 14 días</strong> para las apps nuevas de cuentas personales antes de poder publicar en producción.
+</div>
+
+<h3><span class="paso">0</span>Número D-U-N-S (solo cuenta organizacion)</h3>
+<p>Google verifica la entidad con el número D-U-N-S de <strong>Dun &amp; Bradstreet</strong> (identificador de 9 dígitos
+que confirma que la organización existe como entidad legal). El trámite es <strong>gratuito</strong>: nadie legitimo cobra
+por dártelo; si un sitio pide pago por el número, es un intermediario innecesario.</p>
+<ol>
+  <li><strong>Buscá primero si ya existe:</strong> D&amp;B indexa organizaciones automáticamente desde fuentes
+      públicas. Consultá en <code>dnb.com</code> (o el buscador de lookup de Apple, que sirve igual) con la
+      <em>razón social legal exacta</em> de la entidad.</li>
+  <li><strong>Pedilo en el portal argentino de D&amp;B</strong> (<code>dnbregistered-ar.com</code>) si no existe aún,
+      completando los datos <strong>exactamente como figuran en AFIP/CUIT</strong>: razón social, domicilio fiscal,
+      teléfono con una persona que pueda responder, y email del dominio de la entidad. Si D&amp;B no logra validar el
+      domicilio o el teléfono, el trámite se estanca: tené a alguien atento esos días.</li>
+  <li><strong>Cargalo en Play Console</strong> cuando llegue: el perfil de pagos de Google pide el número, el nombre de
+      la organización y su domicilio, y deben <strong>coincidir exactamente</strong> con el registro de D&amp;B.</li>
+</ol>
+<p class="pend">☐ Número D-U-N-S en mano (o solicitud enviada y en seguimiento)</p>
+
+<h3><span class="paso">1</span>Decidir el package definitivo</h3>
+<p>El proyecto usa <code>com.reporty.app</code>. <strong>Es la última decisión barata:</strong> después de la primera
+subida a Play, el package no se puede cambiar jamás (una nueva app sería un listado distinto con 0 instalaciones heredadas).
+Si preferís otro identificador, es el momento: se cambia <code>packageId</code> en <code>android/twa/twa-manifest.json</code>,
+<code>NAME</code> en el script de assetlinks, y se regenera con <code>bubblewrap update</code>.</p>
+<p>✔ Confirmado: <code>com.reporty.app</code></p>
+
+<h3><span class="paso">2</span>Crear la cuenta y la app en Play Console</h3>
+<ol>
+  <li>Entrá a <code>play.google.com/console</code> con la cuenta de Google del proyecto.</li>
+  <li>Pagá el registro único (USD 25) y completá la verificación de identidad.</li>
+  <li><em>Crear app</em>: Nombre <strong>Reporty</strong>, idioma <strong>Español (Argentina)</strong>,
+      tipo <strong>Aplicación</strong>, gratis/paga: <strong>Gratuita</strong> (las donaciones Mercado Pago son contenido, no app paga).</li>
+  <li>Aceptá las declaraciones de Content Guidelines y exportación (si aplica).</li>
+</ol>
+
+<h3><span class="paso">3</span>Generar la clave de firma (upload key)</h3>
+<p>Es la llave privada con la que firmás lo que subís. <strong>Se genera una vez y se guarda con cuidado:</strong>
+si la perdés sin App Signing activado, no podés actualizar la app nunca más.</p>
+<pre><code><span class="comentario"># En esta PC (JDK ya instalado). Pedirá una contraseña y datos del certificado.</span>
+~/tools/jdk17/bin/keytool -genkeypair -v \
+  -keystore ~/reporty-upload-key.jks \
+  -alias reporty -keyalg RSA -keysize 2048 -validity 10000
+
+<span class="comentario"># Guardar la contraseña en un gestor de contraseñas. El archivo .jks NUNCA va al repo
+# (el .gitignore de la rama ya lo excluye).</span></code></pre>
+<p class="pend">☐ Generar keystore real y guardar contraseña en gestor de secretos</p>
+
+<h3><span class="paso">4</span>Habilitar Play App Signing</h3>
+<p>Cuando subas el primer AAB (paso 7), Play Console te ofrece <strong>Play App Signing</strong>: aceptalo.
+Google guarda la clave de distribución y la tuya pasa a ser solo de subida. Así, si perdés el keystore, se recupera.</p>
+<p class="pend">☐ Play App Signing activado al subir el primer AAB</p>
+
+<h3><span class="paso">5</span>Compilar el AAB firmado</h3>
+<pre><code>cd ~/Documentos/JackeMate-twa/android/twa
+
+<span class="comentario"># Conectar la clave generada en el paso 3: Bubblewrap la pide la primera vez
+# (ruta del keystore y contraseñas). Luego:</span>
+export JAVA_HOME=~/tools/jdk17
+bubblewrap build   <span class="comentario"># genera app-release-bundle.aab y APK firmado</span></code></pre>
+<p>Alternativa con Gradle directo: <code>./gradlew bundleRelease assembleRelease</code> firmado vía propiedades
+<code>-Pandroid.injected.signing.*</code> (así lo hace el CI, mirá <code>.github/workflows/android-twa.yml</code>).</p>
+
+<h3><span class="paso">6</span>Obtener la huella SHA-256 y publicar Digital Asset Links</h3>
+<p><strong>Hay DOS huellas que importan:</strong></p>
+<table>
+  <tr><th>Certificado</th><th>Dónde se ve</th><th>Cuándo se usa</th></tr>
+  <tr><td><strong>Upload key</strong> (el .jks tuyo)</td><td><code>keytool -list -v -keystore ~/reporty-upload-key.jks -alias reporty | grep SHA256</code></td><td>Probar la TWA en desarrollo ahora</td></tr>
+  <tr><td><strong>App Signing Key</strong> (la de Google)</td><td>Play Console → <em>Configuración → Firma de apps → Certificado de firma de la app</em> (aparece recién después del primer AAB)</td><td>Que la app publicada verifique el dominio</td></tr>
+</table>
+<p>Con ellas, generás el archivo que Google Chrome necesita para quitarte la barra de URL:</p>
+<pre><code><span class="comentario"># Huella local (para pruebas) + huella de Play (para producción). Ambas.</span>
+cd ~/Documentos/JackeMate-twa
+node scripts/android-twa/generar-assetlinks.mjs \
+  --keystore ~/reporty-upload-key.jks --alias reporty \
+  --huella XX:YY:...:ZZ   <span class="comentario"># la de Play App Signing, cuando exista</span>
+
+<span class="comentario"># Esto crea public/.well-known/assetlinks.json → commitear y desplegar
+# como siempre (Cloudflare). Verificar luego:</span>
+curl -s https://reporty.com.ar/.well-known/assetlinks.json | node -e \
+  "process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d)))"</code></pre>
+<div class="caja caja-info">
+  <b>Cómo comprobar que la verificación anduvo:</b> reinstalá el APK en el emulador/teléfono con el dominio ya desplegado.
+  Si la barra con "reporty.com.ar" desaparece y la app queda a pantalla completa, la vinculación funciona.
+  También: <code>adb shell pm verify-app-links --re-verify com.reporty.app</code> y luego
+  <code>adb shell pm get-app-links com.reporty.app</code>.
+</div>
+<p class="pend">☐ assetlinks.json con huella real desplegado en producción</p>
+
+<h3><span class="paso">7</span>Subir el AAB a un track de prueba</h3>
+<p>No publiques directo a producción. Play Console → <em>Probar → Prueba cerrada</em>:</p>
+<ol>
+  <li>Creá el track, subí <code>app-release-bundle.aab</code>.</li>
+  <li>Creá una lista de correos de testers (¡vos mismo!) y compartí el link de opt-in.</li>
+  <li>Instalá desde el link y probá unos días. Las actualizaciones posteriores: subís AAB nuevo con <code>appVersionCode</code> incrementado en <code>twa-manifest.json</code>.</li>
+</ol>
+
+<h3><span class="paso">8</span>Ficha de la tienda (Store listing)</h3>
+<table>
+  <tr><th>Requisito</th><th>Detalle</th></tr>
+  <tr><td>Nombre de la app</td><td>Reporty (máx. 30 caracteres)</td></tr>
+  <tr><td>Descripción corta</td><td>Máx. 80 caracteres. Ej: <em>"Reportá problemas urbanos y mascotas perdidas en tu ciudad"</em></td></tr>
+  <tr><td>Descripción completa</td><td>Máx. 4000 caracteres</td></tr>
+  <tr><td>Ícono 512×512</td><td>PNG de 32 bits. Podés usar <code>public/favicon_io/android-chrome-512x512.png</code></td></tr>
+  <tr><td>Gráfico destacado</td><td><strong>1024×500</strong> obligatorio (hay que diseñarlo; no se genera del repo)</td></tr>
+  <tr><td>Capturas</td><td>Mínimo 2, recomendado 4–8 de teléfono (16:9 o 9:16). Podés sacarlas del emulador con <code>adb exec-out screencap -p &gt; captura.png</code></td></tr>
+  <tr><td>Categoría</td><td>Sugerida: <em>Productividad</em> o <em>Casa y hogar</em>; evaluar también <em>Social</em></td></tr>
+</table>
+
+<h3><span class="paso">9</span>Declaraciones obligatorias (Política de la app)</h3>
+<table>
+  <tr><th>Declaración</th><th>Qué declarar para Reporty</th></tr>
+  <tr><td><strong>Privacy Policy</strong></td><td>URL pública obligatoria. Verificar que <code>reporty.com.ar</code> tenga la política accesible (¿existe la página? si no, es un pendiente de la web)</td></tr>
+  <tr><td><strong>Data Safety</strong></td><td>Declarar: datos recolectados = <em>ubicación precisa</em> (crear reportes), <em>fotos</em>, <em>email</em> (cuenta), <em>diagnóstico</em> si GA está activo. Indicar si se comparten (Supabase/infra no cuenta como "sharing" si es procesamiento), si es opcional, y si se puede borrar</td></tr>
+  <tr><td><strong>Ubicación</strong></td><td>Como la app usa la ubicación <em>para funcionalidad central</em>, completar la declaración de permisos de ubicación si el formulario lo pide. La TWA usa el permiso nativo delegado: no hay permiso extra en el manifest que justificar</td></tr>
+  <tr><td><strong>Clasificación de contenido</strong></td><td>Cuestionario IARC. Para Reporty: contenido generado por usuarios, sin violencia/grafía adulta → expectativa "Todos"/"3+"</td></tr>
+  <tr><td><strong>Anuncios</strong></td><td>"No contiene anuncios" (Mercado Pago es donación, no publicidad)</td></tr>
+  <tr><td><strong>Público objetivo</strong></td><td>Si declarás <em>menores de 13</em> como audiencia → políticas extra (no conviene: declarar 13+). <strong>Nota:</strong> las TWA son incompatibles con el programa Families</td></tr>
+  <tr><td><strong>Noticias</strong></td><td>Declarar que no es app de noticias</td></tr>
+  <tr><td><strong>COVID-19</strong></td><td>No aplica</td></tr>
+  <tr><td><strong>Gobierno</strong></td><td>Si es app de un gobierno/ciudad, se puede declarar (Posadas). Es opcional pero puede ayudar en la revisión</td></tr>
+  <tr><td><strong>Cuenta eliminada / Eliminación de datos</strong></td><td><span class="pend">PUNTO CRÍTICO</span> — ver sección 6</td></tr>
+</table>
+
+<h3><span class="paso">10</span>Contenido generado por usuarios (UGC)</h3>
+<p>Reporty publica reportes, fotos y comentarios de usuarios. Google exige demostrar:</p>
+<ul>
+  <li><strong>Política de contenido</strong> visible en la app/web (términos y condiciones deben prohibir contenido ofensivo, con URL pública — ya existe <code>/terminos</code>? verificar).</li>
+  <li><strong>Moderación</strong>: Reporty ya la tiene (moderación de textos e imágenes, fila admin, auditoría). En la ficha, mencionarla ayuda a pasar la revisión.</li>
+  <li><strong>Mecanismo de denuncia</strong>: verificar que cualquier reporte/comentario tenga botón "denunciar" accesible. <span class="pend">Verificar en la web</span></li>
+  <li><strong>Mecanismo de bloqueo</strong>: Play pide que el usuario pueda bloquear a otro usuario. <span class="pend">Si no existe, es un pendiente real de la web antes de publicar</span></li>
+</ul>
+
+<h3><span class="paso">11</span>Enviar a revisión y publicar</h3>
+<p>Con todo completo: <em>Publicación → Producción → Nueva versión</em>, subir el AAB, notas de versión ("Primera versión de Reporty para Android"), y <em>Enviar para revisión</em>. La primera revisión toma días; luego las siguientes, horas.</p>
+
+<!-- ============================================================ -->
+<h2 id="riesgos">6 · Riesgos y decisiones pendientes</h2>
+
+<div class="caja caja-peligro">
+  <b>Crítico — Eliminación de cuentas.</b> Google exige que toda app con cuentas ofrezca borrado de cuenta
+  desde la app y una URL web de solicitud. Hoy la política de Reporty contempla borrado <em>por email</em>.
+  Opciones: (a) implementar auto-eliminación desde la web (pantalla de cuenta → "Eliminar cuenta" con confirmación),
+  (b) al menos, armar una página web pública <code>/eliminar-cuenta</code> que guíe la solicitud y linkearla en Play Console.
+  Sin esto la revisión puede rechazar la app. <strong>Es lo único con potencial de bloquear la publicación.</strong>
+</div>
+
+<table>
+  <tr><th>Riesgo / pendiente</th><th>Impacto</th><th>Acción</th></tr>
+  <tr><td>Sin <code>assetlinks.json</code> real</td><td>La app muestra barra de URL (funciona, pero no es la experiencia final)</td><td>Pasos 3, 4 y 6 de esta guía</td></tr>
+  <tr><td>Gráfico destacado 1024×500 no existe</td><td>Bloquea el envío</td><td>Diseñar (se puede pedir al canvas de diseño)</td></tr>
+  <tr><td>Página de política de privacidad: verificar URL viva</td><td>Bloquea el envío si falta</td><td>Revisar <code>reporty.com.ar</code>; crear página si no existe</td></tr>
+  <tr><td>Bloqueo de usuarios / denuncia de comentarios</td><td>Riesgo de rechazo por política UGC</td><td>Auditar la web; si falta, implementar en Next.js antes de publicar</td></tr>
+  <tr><td>Mercado Pago en TWA</td><td>Los redirects de pago deben volver a la TWA</td><td>Probar en teléfono físico con una donación real pequeña antes del envío</td></tr>
+  <tr><td>Errores de tsc y 5 tests preexistentes en main</td><td>No afectan esta rama, pero conviene limpiarlos aparte</td><td>Fixes separados en otros PRs</td></tr>
+</table>
+
+<div class="caja caja-info">
+  <b>Orden sugerido de trabajo</b>
+  <ol style="margin:.4rem 0 0; padding-left:1.2rem;">
+    <li>Implementar eliminación de cuenta desde la web (crítico).</li>
+    <li>Verificar/crear página de privacidad y términos accesibles.</li>
+    <li>Generar keystore → primer AAB → Play App Signing.</li>
+    <li>Obtener ambas huellas → assetlinks.json → deploy Cloudflare → probar TWA fullscreen en teléfono.</li>
+    <li>Diseñar gráfico destacado + capturas → completar Data Safety → envío a prueba cerrada.</li>
+  </ol>
+</div>
+
+<footer>
+  Generado como parte de la implementación de Reporty Android (TWA + Bubblewrap) ·
+  PR #253 <code>feat/android-twa-bubblewrap</code> · Detalle técnico adicional en <code>docs/android-twa.md</code> del repo.
+</footer>
+
+</div>
+</body>
+</html>
