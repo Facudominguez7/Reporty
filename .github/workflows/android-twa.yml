@@ -12,6 +12,7 @@ on:
       - "public/sw.js"
       - "public/offline.html"
       - "public/.well-known/**"
+      - "lib/pwa/**"
       - "scripts/android-twa/**"
       - ".github/workflows/android-twa.yml"
   push:
@@ -30,29 +31,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validar JSON del manifiesto PWA
-        run: |
-          node -e '
-            const m = JSON.parse(require("fs").readFileSync("public/favicon_io/site.webmanifest", "utf8"));
-            const obligatorios = ["name", "short_name", "id", "start_url", "scope", "display", "icons"];
-            for (const k of obligatorios) if (!(k in m)) throw new Error(`Falta ${k} en site.webmanifest`);
-            if (!m.icons.some(i => i.purpose === "maskable")) throw new Error("Falta icono maskable");
-            if (!m.start_url.startsWith("/")) throw new Error("start_url debe ser absoluto dentro del scope");
-            console.log("Manifiesto PWA válido:", m.icons.length, "iconos,", m.shortcuts.length, "shortcuts");
-          '
+      - uses: pnpm/action-setup@v4
 
-      - name: Validar Service Worker (sintaxis y límites de caché)
-        run: |
-          node --check public/sw.js
-          node -e '
-            const sw = require("fs").readFileSync("public/sw.js", "utf8");
-            if (!/PREFIJOS_CACHEABLES\s*=\s*\[/.test(sw)) throw new Error("SW sin lista blanca de prefijos cacheables");
-            // Prohibido cachear APIs, Supabase, autenticación o Server Actions.
-            for (const prohibido of ["/api/", "supabase", "/auth", "auth.ts", "Server Action"]) {
-              if (/['"'"'"]\/?_?next\/static\/.*' + prohibido + '/.test(sw)) throw new Error("Caché insegura: " + prohibido);
-            }
-            console.log("Service Worker OK: solo estáticos, sin datos de sesión.");
-          '
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # Los tests de lib/pwa ejecutan public/sw.js en un entorno simulado (solo cachea
+      # /_next/static, nunca HTML, API, POST ni otros orígenes) y validan el manifiesto.
+      - name: Validar manifiesto y Service Worker (tests de lib/pwa)
+        run: pnpm exec vitest run lib/pwa
 
       - name: Validar assetlinks.json si existe (nunca huellas ficticias)
         run: |
@@ -91,7 +83,7 @@ jobs:
           test -f android/twa/gradlew || { echo "Falta gradlew"; exit 1; }
           node -e '
             const m = JSON.parse(require("fs").readFileSync("android/twa/twa-manifest.json", "utf8"));
-            if (m.packageId !== "ar.com.reporty.app") throw new Error("packageId inesperado: " + m.packageId);
+            if (m.packageId !== "com.reporty.app") throw new Error("packageId inesperado: " + m.packageId);
             if (m.host !== "reporty.com.ar") throw new Error("host inesperado: " + m.host);
             console.log("twa-manifest.json OK:", m.packageId, "->", m.host);
           '
