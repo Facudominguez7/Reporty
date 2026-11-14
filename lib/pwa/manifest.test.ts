@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import sharp from "sharp"
 import { describe, expect, it } from "vitest"
 
 const rutaPublica = (ruta: string) => fileURLToPath(new URL(`../../public${ruta}`, import.meta.url))
@@ -46,4 +47,23 @@ describe("manifest web de Reporty", () => {
       for (const icono of atajo.icons) expect(existsSync(rutaPublica(icono.src))).toBe(true)
     }
   })
+
+  it.each(["/favicon_io/maskable-icon-512x512.png", "/favicon_io/maskable-icon-192x192.png"])(
+    "%s tiene fondo verde opaco y el logo dentro de la zona segura",
+    async (ruta) => {
+      // Bubblewrap pone blanco detrás del ícono adaptativo: un fondo transparente esconde el logo.
+      const { data, info } = await sharp(rutaPublica(ruta)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const centro = info.width / 2
+      const radioSeguro = info.width * 0.4
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          const i = (y * info.width + x) * info.channels
+          expect(data[i + 3]).toBe(255)
+          if (Math.hypot(x + 0.5 - centro, y + 0.5 - centro) > radioSeguro) {
+            expect([data[i], data[i + 1], data[i + 2]]).toEqual([0x2e, 0x7d, 0x5b])
+          }
+        }
+      }
+    },
+  )
 })

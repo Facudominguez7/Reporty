@@ -1,10 +1,13 @@
 /**
  * Genera los iconos maskable (192 y 512) a partir del favicon PNG existente.
  *
- * Elije glyph transparente:192 y 512: al des-mezclar el favicon (composición sobre negro),
- * el trazo del pin pasa a blanco y la «R» toma el verde de marca muestreado; sin
- * fondo: el color del splash o del launcher se ve a través. El glyph queda centrado
- * dentro de la zona segura maskable (círculo central de ~66 % del lienzo).
+ * Des-mezcla el favicon (composición sobre negro) para obtener el glyph (pin + «R») y lo
+ * dibuja en blanco sobre un fondo sólido verde de marca, de borde a borde. El fondo tiene
+ * que ser opaco: el ícono adaptativo que arma Bubblewrap pone blanco detrás, así que un
+ * maskable transparente dejaba el pin blanco invisible en el escritorio de Android.
+ * El mismo PNG se usa como ícono del splash de la TWA, sobre el mismo verde, así que el
+ * logo aparece sin recuadro. El glyph queda centrado dentro de la zona segura maskable
+ * (círculo central del 80 % del lienzo).
  *
  * Uso: node scripts/android-twa/generar-iconos-maskable.mjs
  */
@@ -25,60 +28,21 @@ try {
 
 /** Alto del glyph dentro del lienzo de 512: deja margen al recorte circular. */
 const ALTO_GLYPH = 300;
-/** Umbral de relación entre canales para considerar un píxel del trazo verde del pin. */
-const UMBRAL_VERDE = 1.35;
+
+/** Verde de marca del splash y del theme color de la TWA (#2e7d5b). */
+const FONDO = { r: 0x2e, g: 0x7d, b: 0x5b, alpha: 1 };
 
 /** Lee el favicon como RGBA crudo a resolución nativa (512x512). */
 const { data, info } = await sharp(origen).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 const { width: ancho, height: alto, channels } = info;
 
-/**
- * Devuelve el verde de marca muestreado del trazo del pin (des-mezclado sobre negro).
- *
- * @returns {number[]} Terna RGB del verde original.
- */
-function muestrearVerde() {
-  for (let y = 0; y < alto; y += 4) {
-    for (let x = 0; x < ancho; x += 4) {
-      const i = (y * ancho + x) * channels;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const alfaCanal = Math.max(r, g, b);
-      if (g > 180 && g > r * 1.6 && g > b * 1.6 && alfaCanal > 0) {
-        return [Math.round((r * 255) / alfaCanal), Math.round((g * 255) / alfaCanal), Math.round((b * 255) / alfaCanal)];
-      }
-    }
-  }
-  return [6, 255, 147];
-}
-
-const verde = muestrearVerde();
-
-/** Glyph des-mezclado: mismo tamaño que el origen, canal alfa = canal máximo. */
+/** Glyph des-mezclado en blanco: mismo tamaño que el origen, canal alfa = canal máximo. */
 const glyph = Buffer.alloc(ancho * alto * 4);
 for (let p = 0; p < ancho * alto; p++) {
   const i = p * channels;
-  const r = data[i];
-  const g = data[i + 1];
-  const b = data[i + 2];
-  const alfa = Math.max(r, g, b);
   const o = p * 4;
-  if (alfa === 0) {
-    glyph[o] = glyph[o + 1] = glyph[o + 2] = glyph[o + 3] = 0;
-    continue;
-  }
-  const esTrazoPin = g > (r * 255) / alfa * UMBRAL_VERDE && g > (b * 255) / alfa * UMBRAL_VERDE;
-  if (esTrazoPin) {
-    glyph[o] = 255;
-    glyph[o + 1] = 255;
-    glyph[o + 2] = 255;
-  } else {
-    glyph[o] = verde[0];
-    glyph[o + 1] = verde[1];
-    glyph[o + 2] = verde[2];
-  }
-  glyph[o + 3] = alfa;
+  glyph[o] = glyph[o + 1] = glyph[o + 2] = 255;
+  glyph[o + 3] = Math.max(data[i], data[i + 1], data[i + 2]);
 }
 
 /** Bounding box del glyph a partir del alfa. */
@@ -105,9 +69,9 @@ const contenido = await sharp(glyph, { raw: { width: ancho, height: alto, channe
   .png()
   .toBuffer();
 
-/** Lienzo 512 transparente con el glyph centrado, escalado después a 192. */
+/** Lienzo 512 verde opaco con el glyph centrado, escalado después a 192. */
 const lienzo512 = await sharp({
-  create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  create: { width: 512, height: 512, channels: 4, background: FONDO },
 })
   .composite([{ input: contenido, gravity: "center" }])
   .png()
