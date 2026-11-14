@@ -72,4 +72,5 @@ android/twa-config/*.keystore
 *.keystore
 *.apk
 *.aab
+*.idsig
 keystore.properties
