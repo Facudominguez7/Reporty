@@ -19,7 +19,7 @@
   "backgroundColor": "#2e7d5b",
   "enableNotifications": true,
   "startUrl": "/mapa",
-  "iconUrl": "https://reporty.com.ar/favicon_io/android-chrome-512x512.png",
+  "iconUrl": "https://reporty.com.ar/favicon_io/maskable-icon-512x512.png",
   "maskableIconUrl": "https://reporty.com.ar/favicon_io/maskable-icon-512x512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
