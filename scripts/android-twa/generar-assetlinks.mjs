@@ -9,9 +9,14 @@
  *   node scripts/android-twa/generar-assetlinks.mjs \
  *     --keystore ruta/al/keystore.jks --alias reporty [--keystore-pass ENV:NOMBRE_VAR]
  *
- *   # Desde huellas conocidas (una o varias, hex sin separadores):
+ *   # Desde huellas conocidas (una o varias, hex con dos puntos):
  *   node scripts/android-twa/generar-assetlinks.mjs \
  *     --huella AA:BB:... --huella CC:DD:...
+ *
+ *   # Para la app publicada en Play hacen falta DOS huellas: la de la clave de firma
+ *   # de Google (Play Console → Integridad de la app) y la de la upload key.
+ *
+ * Opcional: --salida ruta/archivo.json para escribir en otro lugar (lo usan las pruebas).
  *
  * El archivo se escribe solo si hay al menos una huella válida. Con el paquete
  * por defecto `com.reporty.app` (definitivo tras la primera publicación,
@@ -33,8 +38,11 @@ const DOMINIO = "reporty.com.ar";
 /**
  * Lee argumentos de línea de comandos en pares --clave valor / --bandera.
  *
+ * Una clave repetida (por ejemplo, varias --huella) acumula sus valores en un arreglo
+ * en vez de pisar el anterior.
+ *
  * @param {string[]} argv Argumentos de proceso.
- * @returns {Map<string, string | boolean>} Mapa clave → valor.
+ * @returns {Map<string, string | boolean | Array<string | boolean>>} Mapa clave → valor.
  */
 function parsearArgs(argv) {
   const args = new Map();
@@ -42,7 +50,8 @@ function parsearArgs(argv) {
     if (argv[i].startsWith("--")) {
       const clave = argv[i].slice(2);
       const valor = argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : true;
-      args.set(clave, valor);
+      if (!args.has(clave)) args.set(clave, valor);
+      else args.set(clave, [].concat(args.get(clave), valor));
     }
   }
   return args;
@@ -98,7 +107,7 @@ if (args.get("huella")) {
       console.error(`Huella con formato inválido: ${h}`);
       process.exit(1);
     }
-    huellas.add(h);
+    huellas.add(h.toUpperCase());
   }
 }
 
@@ -110,17 +119,23 @@ if (huellas.size === 0) {
   process.exit(1);
 }
 
-const assetlinks = [...huellas].map((sha256) => ({
-  relation: ["delegate_permission/common.handle_all_urls"],
-  target: {
-    namespace: "android_app",
-    package_name: PAQUETE,
-    sha256_cert_fingerprints: [sha256],
+// Una sola declaración con todas las huellas: Android acepta el certificado si coincide con cualquiera.
+const assetlinks = [
+  {
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: PAQUETE,
+      sha256_cert_fingerprints: [...huellas],
+    },
   },
-}));
+];
 
-const destino = path.join(raizRepo, "public/.well-known/assetlinks.json");
+const destino =
+  typeof args.get("salida") === "string"
+    ? path.resolve(args.get("salida"))
+    : path.join(raizRepo, "public/.well-known/assetlinks.json");
 fs.mkdirSync(path.dirname(destino), { recursive: true });
 fs.writeFileSync(destino, JSON.stringify(assetlinks, null, 2) + "\n");
-console.log(`Escrito ${path.relative(raizRepo, destino)} con ${huellas.size} huella(s) para ${PAQUETE}.`);
+console.log(`Escrito ${destino} con ${huellas.size} huella(s) para ${PAQUETE}.`);
 console.log(`Verificá luego: https://${DOMINIO}/.well-known/assetlinks.json`);
