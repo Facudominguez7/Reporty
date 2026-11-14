@@ -132,8 +132,32 @@ export type DatosHistoria = {
  */
 export const SITIO_HISTORIA = "reporty.com.ar"
 
+/** Pasa un texto a minúsculas, sin tildes y con espacios simples, para compararlo. */
+function normalizarParaComparar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/**
+ * Indica si el título ya nombra la dirección (completa o sólo la calle, antes de la
+ * primera coma), como los títulos sugeridos «Alumbrado en <dirección>».
+ *
+ * @param titulo - Título del reporte.
+ * @param direccion - Dirección guardada del reporte.
+ */
+export function tituloIncluyeDireccion(titulo: string, direccion: string): boolean {
+  const tituloNormalizado = normalizarParaComparar(titulo)
+  const calle = normalizarParaComparar(direccion.split(",")[0] ?? "")
+  return calle.length > 0 && tituloNormalizado.includes(calle)
+}
+
 /**
  * Datos de la historia de un reporte: prioridad, estado y categoría como chips.
+ * Si el título ya nombra la dirección, no la repite debajo con el pin.
  *
  * @param reporte - Nombres tal como llegan de la base y la dirección guardada.
  */
@@ -152,7 +176,7 @@ export function datosHistoriaReporte(reporte: {
       { texto: reporte.estado, tono: tonoHexEstado(reporte.estado) },
       { texto: reporte.categoria, tono: COLORES.categoria },
     ],
-    direccion: reporte.direccion,
+    direccion: reporte.direccion && !tituloIncluyeDireccion(reporte.titulo, reporte.direccion) ? reporte.direccion : null,
     detalle: null,
     fotoUrl: reporte.fotoUrl,
     llamado: "Mirá el reporte y sumá tu aporte en",
@@ -280,8 +304,24 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
   }
   y += 84 + 40
 
+  // Se miden los textos antes de dibujar para que la foto ocupe el espacio que sobra
+  // y no quede un hueco vacío arriba del recuadro verde.
+  const pie = { y: tarjeta.y + tarjeta.h - 48 - 170, h: 170 }
+  ctx.font = `700 64px ${fuente}`
+  const lineasTitulo = partirEnLineas(datos.titulo, (t) => ctx.measureText(t).width, interior.w, 2)
+  ctx.font = `500 38px ${fuente}`
+  const lineaDireccion = datos.direccion
+    ? partirEnLineas(datos.direccion, (t) => ctx.measureText(t).width, interior.w - 48, 1)[0]
+    : null
+  ctx.font = `400 38px ${fuente}`
+  const lineasDetalle =
+    !lineaDireccion && datos.detalle ? partirEnLineas(datos.detalle, (t) => ctx.measureText(t).width, interior.w, 2) : []
+  const altoTextos =
+    64 + 36 + lineasTitulo.length * 76 + 12 + (lineaDireccion ? 50 : lineasDetalle.length * 50)
+  const espacioFoto = pie.y - 40 - y - 40 - altoTextos
+
   // Foto del reporte (o un bloque del color primario si no tiene).
-  const altoFoto = 700
+  const altoFoto = Math.max(560, Math.min(820, espacioFoto))
   ctx.save()
   rectanguloRedondeado(ctx, interior.x, y, interior.w, altoFoto, 32)
   ctx.clip()
@@ -306,29 +346,27 @@ export async function generarImagenHistoria(datos: DatosHistoria, fuente: string
   ctx.fillStyle = COLORES.texto
   ctx.textBaseline = "top"
   ctx.font = `700 64px ${fuente}`
-  for (const linea of partirEnLineas(datos.titulo, (t) => ctx.measureText(t).width, interior.w, 2)) {
+  for (const linea of lineasTitulo) {
     ctx.fillText(linea, interior.x, y)
     y += 76
   }
   y += 12
 
-  if (datos.direccion) {
+  if (lineaDireccion) {
     dibujarPin(ctx, interior.x + 14, y + 18, COLORES.primario)
     ctx.fillStyle = COLORES.secundario
     ctx.font = `500 38px ${fuente}`
-    const [direccion] = partirEnLineas(datos.direccion, (t) => ctx.measureText(t).width, interior.w - 48, 1)
-    ctx.fillText(direccion, interior.x + 48, y)
-  } else if (datos.detalle) {
+    ctx.fillText(lineaDireccion, interior.x + 48, y)
+  } else {
     ctx.fillStyle = COLORES.secundario
     ctx.font = `400 38px ${fuente}`
-    for (const linea of partirEnLineas(datos.detalle, (t) => ctx.measureText(t).width, interior.w, 2)) {
+    for (const linea of lineasDetalle) {
       ctx.fillText(linea, interior.x, y)
       y += 50
     }
   }
 
   // Llamado a la acción al pie de la tarjeta.
-  const pie = { y: tarjeta.y + tarjeta.h - 48 - 170, h: 170 }
   rectanguloRedondeado(ctx, interior.x, pie.y, interior.w, pie.h, 32)
   ctx.fillStyle = COLORES.primario
   ctx.fill()
