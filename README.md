@@ -88,9 +88,7 @@ flowchart LR
 Reporty/
 ├── app/                          # App Router de Next.js
 │   ├── api/                      # API Routes
-│   │   ├── reportes/             # Paginación de reportes
-│   │   ├── send-notification/    # Notificación por nuevo comentario
-│   │   └── send-status-notification/  # Notificación por cambio de estado
+│   │   └── reportes/             # Paginación de reportes
 │   ├── auth/                     # Páginas de autenticación
 │   │   ├── confirm/              # Confirmación de email
 │   │   └── page.tsx              # Login/Registro
@@ -159,9 +157,9 @@ sequenceDiagram
 
     Note over U,R: Nuevo Comentario
     U->>C: Agregar comentario
-    C->>S: Guardar comentario
-    C->>A: POST /api/send-notification
-    A->>R: Enviar email al owner
+    C->>P: Server action crearComentarioAction
+    P->>S: Guardar comentario
+    P->>R: Enviar email al owner
     R-->>U: Email recibido
 ```
 
