@@ -41,7 +41,7 @@ describe("proxy", () => {
   })
 
   it("no consulta la sesión en las páginas públicas que se sirven como HTML estático", async () => {
-    for (const path of ["/", "/terminos", "/privacidad", "/crear"]) {
+    for (const path of ["/", "/terminos", "/privacidad", "/eliminar-cuenta", "/crear"]) {
       const response = await proxy(request(path))
 
       expect(response.headers.get("x-middleware-next")).toBe("1")

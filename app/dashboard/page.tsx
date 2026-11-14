@@ -20,6 +20,7 @@ import { cuadrillasHabilitadas } from "@/lib/features"
 import { cn } from "@/lib/utils"
 import { getUserInitials } from "@/lib/identity/display"
 import { PageTitleBar } from "@/components/page-title-bar"
+import { EliminarCuentaSection } from "@/components/cuenta/eliminar-cuenta-section"
 import { SignOutSection } from "@/components/sign-out-section"
 
 type DashboardPageProps = {
@@ -146,6 +147,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </section>
 
           <SignOutSection fullWidth />
+          {/* Las cuentas de administrador no se eliminan desde la app (la RPC también lo impide). */}
+          {!isAdminRole(data.roleId) && <EliminarCuentaSection />}
         </div>
       </div>
     )
@@ -270,6 +273,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </section>
 
         <SignOutSection fullWidth />
+        {/* Las cuentas de administrador no se eliminan desde la app (la RPC también lo impide). */}
+        {!isAdminRole(data.roleId) && <EliminarCuentaSection />}
       </div>
     </div>
   )

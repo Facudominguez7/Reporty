@@ -17,6 +17,7 @@ import { filtrarMascotasMapa } from "./filtros-mascotas-mapa"
 import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { MascotasOnboardingModal, OnboardingModal } from "@/components/onboarding-modal"
+import { IntroEntrada } from "@/components/intro-entrada"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
@@ -181,6 +182,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
   return (
     <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
       <div className="relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
+      <IntroEntrada />
       <OnboardingModal />
       <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">

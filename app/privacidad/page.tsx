@@ -175,8 +175,11 @@ const sections: LegalSection[] = [
         <p>Guardamos los datos de tu cuenta mientras la tengas.</p>
         <p>
           Cuando eliminás un reporte, deja de verse de inmediato, pero lo conservamos en nuestra base de datos como registro y
-          para prevenir abusos. Si querés que lo borremos de forma definitiva, o que eliminemos tu cuenta, escribinos a{" "}
-          <ContactEmail />.
+          para prevenir abusos. Si querés que lo borremos de forma definitiva, escribinos a <ContactEmail />.
+        </p>
+        <p>
+          Podés eliminar tu cuenta cuando quieras desde la app: se borran tus datos y todo lo que publicaste. En{" "}
+          <Link href="/eliminar-cuenta">Eliminar tu cuenta</Link> explicamos los pasos y qué datos se conservan.
         </p>
         <p>
           Si una foto o un texto se elimina por no cumplir los términos, podemos conservarlo junto con los datos asociados

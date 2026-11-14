@@ -1,1 +1,40 @@
-{"name":"Reporty","short_name":"Reporty","icons":[{"src":"/favicon_io/android-chrome-192x192.png","sizes":"192x192","type":"image/png"},{"src":"/favicon_io/android-chrome-512x512.png","sizes":"512x512","type":"image/png"}],"theme_color":"#ffffff","background_color":"#ffffff","display":"standalone"}
+{
+  "id": "/",
+  "name": "Reporty",
+  "short_name": "Reporty",
+  "description": "Encontrá problemas de la ciudad en el mapa o contá qué está pasando en tu barrio. Reportes ciudadanos de Posadas, Misiones.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "/mapa",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#2e7d5b",
+  "background_color": "#2e7d5b",
+  "categories": ["government", "utilities", "social"],
+  "icons": [
+    { "src": "/favicon_io/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon_io/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/favicon_io/maskable-icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon_io/maskable-icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mapa",
+      "short_name": "Mapa",
+      "url": "/mapa",
+      "icons": [{ "src": "/favicon_io/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Reportes",
+      "short_name": "Reportes",
+      "url": "/reportes",
+      "icons": [{ "src": "/favicon_io/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Crear reporte",
+      "short_name": "Nuevo reporte",
+      "url": "/reportes/nuevo",
+      "icons": [{ "src": "/favicon_io/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

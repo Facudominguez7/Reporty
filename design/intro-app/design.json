@@ -1,0 +1,10 @@
+{
+  "title": "Intro de entrada en la app (Teléfono)",
+  "brief": "Pantalla de entrada animada de Reporty dentro de la app (se ve al abrir la TWA en el teléfono, tras el splash nativo verde #2e7d5b). Debe fundirse con el mapa (startUrl /mapa) y respetar los tokens de design/system.md.",
+  "feature": null,
+  "artboards": [
+    { "file": "01-burbuja-que-revela.html", "title": "Burbuja que revela", "tradeoff": "Continuidad perfecta con el splash nativo verde; el círculo que se abre es elegante pero agrega ~2.6 s antes del mapa", "width": 412, "height": 917 },
+    { "file": "02-pines-que-caen.html", "title": "Pines que caen", "tradeoff": "Cuenta la historia del producto (reportes pueblan el mapa) sobre el negro del html raíz; es la más larga y la más llamativa", "width": 412, "height": 917 },
+    { "file": "03-palabra-que-sube.html", "title": "Palabra que sube", "tradeoff": "La más rápida y sobria (reutiliza el easing reveal-up del sistema); menos impacto emocional que las otras", "width": 412, "height": 917 }
+  ]
+}

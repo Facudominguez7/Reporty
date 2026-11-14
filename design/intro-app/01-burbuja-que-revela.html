@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>01 — Burbuja que revela</title>
+<style>
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{font-family:system-ui,sans-serif;width:412px;height:917px;overflow:hidden;background:#2e7d5b;position:relative}
+  /* ---- Capa pantalla final (mapa) ---- */
+  .final{position:absolute;inset:0;background:#f2f0ef;display:flex;flex-direction:column}
+  .mapa{position:absolute;inset:0}
+  .mapa svg{width:100%;height:100%;display:block}
+  /* Micro-UI del mapa (marco de referencia, no parte de la guía visual) */
+  .mark{position:relative;z-index:2;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}
+  .mark .logo{display:inline-flex;align-items:center;gap:8px;font-weight:700;color:#2b2a26}
+  /* ---- Capa intro (verde) ---- */
+  .intro{position:absolute;inset:0;background:#2e7d5b;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;
+    clip-path:circle(150% at 50% 50%);
+    animation:cierre 1.1s cubic-bezier(.65,0,.35,1) 1.5s both}
+  .badge{width:132px;height:132px;border-radius:36px;background:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 30px rgb(0 30 15 / .25);animation:aparecer .7s cubic-bezier(.22,1,.36,1) .15s both}
+  .badge svg{width:76px;height:76px}
+  .palabra{color:#fafdfb;font-size:2.6rem;font-weight:700;letter-spacing:-.03em;animation:aparecer .7s cubic-bezier(.22,1,.36,1) .45s both}
+  .lema{color:#cfe6da;font-size:.95rem;animation:aparecer .7s cubic-bezier(.22,1,.36,1) .65s both}
+  .onda{position:absolute;left:50%;top:50%;width:132px;height:132px;border-radius:36px;border:2px solid rgb(255 255 255/.55);
+    animation:ondas 1.6s ease-out 1.05s 2 both}
+  @keyframes aparecer{from{opacity:0;transform:translateY(1rem) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes ondas{from{opacity:.9;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(2.6)}}
+  @keyframes cierre{to{clip-path:circle(0% at 50% 46%)}}
+  @media (prefers-reduced-motion: reduce){
+    .intro,.onda{display:none}
+    .badge{opacity:1;transform:none}
+  }
+  /* Botón de repetición para revisar la pieza en el canvas */
+  .replay{position:absolute;right:12px;bottom:88px;z-index:9;background:rgb(0 0 0/.55);color:#fff;border:1px solid rgb(255 255 255/.4);
+    border-radius:999px;padding:8px 14px;font:inherit;font-size:.8rem;cursor:pointer}
+</style>
+</head>
+<body>
+  <div class="final" aria-hidden="true">
+    <div class="mapa">
+      <svg viewBox="0 0 412 917" preserveAspectRatio="xMidYMid slice" role="presentation">
+        <rect width="412" height="917" fill="#e9f0e4"/>
+        <path d="M0 300 Q120 250 200 300 T412 280 V917 H0 Z" fill="#bfe0ea" opacity=".85"/>
+        <path d="M0 330 Q140 285 240 330 T412 315" fill="none" stroke="#a5cfd9" stroke-width="3"/>
+        <g stroke="#dcd8cf" stroke-width="5" fill="none" opacity=".9">
+          <path d="M20 420 H380"/><path d="M60 500 H350"/><path d="M110 580 H390"/>
+          <path d="M140 380 L120 700"/><path d="M250 360 L270 720"/>
+        </g>
+        <g fill="#7fbf9f">
+          <circle cx="90" cy="470" r="9"/><circle cx="205" cy="520" r="11"/><circle cx="300" cy="450" r="8"/>
+          <circle cx="160" cy="640" r="8"/><circle cx="330" cy="620" r="9"/>
+        </g>
+      </svg>
+    </div>
+    <div class="mark">
+      <span class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z" fill="#2e7d5b"/><circle cx="12" cy="10" r="2.6" fill="#fff"/></svg> Reporty</span>
+      <span style="font-size:.8rem;color:#6f8a7e">Posadas</span>
+    </div>
+  </div>
+
+  <div class="intro" id="intro" role="img" aria-label="Pantalla de entrada de Reporty: logo sobre fondo verde que se abre en círculo hacia el mapa">
+    <div class="badge">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-6.9 8-12.2A8 8 0 1 0 4 9.8C4 15.1 12 22 12 22Z" fill="#2e7d5b"/><circle cx="12" cy="9.4" r="3.1" fill="#fff"/></svg>
+    </div>
+    <span class="onda" id="onda"></span>
+    <p class="palabra">Reporty</p>
+    <p class="lema">Tu ciudad, reportada y reparada</p>
+  </div>
+
+  <button class="replay" onclick="repetir()">Repetir animación</button>
+<script>
+  function repetir(){
+    const intro=document.getElementById('intro'), onda=document.getElementById('onda');
+    for(const el of [intro,onda]){el.style.animation='none';void el.offsetWidth;el.style.animation='';}
+  }
+</script>
+</body>
+</html>
