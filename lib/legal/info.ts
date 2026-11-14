@@ -4,4 +4,4 @@ export const LEGAL_RESPONSABLES = ["Ing. Facundo Diaz Dominguez", "Ing. Octavio 
 export const LEGAL_CONTACT_EMAIL = "contacto@reporty.com.ar"
 
 /** Update this date whenever the text of either legal page changes. */
-export const LEGAL_UPDATED_AT = "10 de noviembre de 2026"
+export const LEGAL_UPDATED_AT = "14 de noviembre de 2026"

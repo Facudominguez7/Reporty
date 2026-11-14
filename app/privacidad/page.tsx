@@ -36,8 +36,10 @@ const sections: LegalSection[] = [
     content: (
       <ul>
         <li>
-          <strong>Datos de tu cuenta:</strong> email, nombre de usuario y contraseña. La contraseña la guarda cifrada nuestro
-          proveedor de autenticación: nadie del equipo puede verla. Si entrás como invitado, se crea una cuenta sin email que
+          <strong>Datos de tu cuenta:</strong> email, nombre de usuario y contraseña. Tu nombre de usuario, que es público, se
+          crea automáticamente: si entrás con Google, a partir del nombre de tu cuenta de Google; si te registrás con email, a
+          partir de la parte de tu email que está antes de la «@». La contraseña la guarda cifrada nuestro proveedor de
+          autenticación: nadie del equipo puede verla. Si entrás como invitado, se crea una cuenta sin email que
           podés vincular a uno más adelante.
         </li>
         <li>
@@ -112,7 +114,11 @@ const sections: LegalSection[] = [
             <strong>Supabase:</strong> base de datos, autenticación y almacenamiento de las fotos.
           </li>
           <li>
-            <strong>Hostinger:</strong> alojamiento del sitio.
+            <strong>Cloudflare:</strong> alojamiento del sitio, protección contra bots en el acceso a tu cuenta (Turnstile),
+            procesamiento de las fotos que subís y archivo de los registros de seguridad.
+          </li>
+          <li>
+            <strong>Hostinger:</strong> casilla de correo de contacto, donde recibimos los mensajes que nos enviás.
           </li>
           <li>
             <strong>Resend:</strong> envío de los emails de aviso y de acceso a tu cuenta.

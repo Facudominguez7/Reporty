@@ -19,7 +19,9 @@ describe("manifest web de Reporty", () => {
     expect(manifest.lang).toBe("es-AR")
     expect(manifest.dir).toBe("ltr")
     expect(manifest.description).toMatch(/Posadas/)
-    expect(manifest.categories).toContain("government")
+    // Reporty es una iniciativa ciudadana independiente, no una app de gobierno.
+    expect(manifest.categories).not.toContain("government")
+    expect(manifest.categories).toEqual(expect.arrayContaining(["utilities", "social"]))
   })
 
   it("mantiene los colores de marca", () => {

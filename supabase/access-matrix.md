@@ -34,10 +34,7 @@ Compatibility-first rollout target for the current Reporty flows.
 
 ## Route trust boundaries in this batch
 
-| Route | Caller | Authorization model | Untrusted payload removed |
-|---|---|---|---|
-| `POST /api/send-notification` | Authenticated session after comment creation | Session user is resolved server-side; owner email/title/usernames are fetched from DB | `ownerEmail`, `ownerUsername`, `commenterUsername`, `reporteTitulo` |
-| `POST /api/send-status-notification` | Authenticated admin session after state transition | Session user + DB-backed admin role check; owner email/title/state label are fetched server-side | `ownerEmail`, `ownerUsername`, `reporteTitulo`, arbitrary state label |
+The former `POST /api/send-notification` and `POST /api/send-status-notification` routes were removed: comment and status emails are sent only from server-side workflows (`lib/use-cases/reportes/detail-mutations.ts`), never from a client-callable route.
 
 ## Rollout notes
 
