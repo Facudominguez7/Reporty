@@ -172,7 +172,7 @@ Verificar en el dispositivo: mapa Leaflet, GPS de alta precisión, selector de f
 3. Subir el AAB firmado con la upload key.
 4. Copiar la huella SHA-256 del App Signing Key y regenerar `assetlinks.json` con ambas huellas (upload + App Signing).
 5. Completar: Data Safety, declaración de permisos de ubicación, política de contenido generado por usuarios (reportes, fotos, comentarios con moderación existente), método de eliminación de cuenta (hoy por email; documentado en la política de privacidad), enlaces a términos y privacidad, y declaración de donaciones vía Mercado Pago.
-6. **No automatizar publicación en esta etapa.**
+6. Las versiones siguientes se publican solas con GitHub Actions (ver «Publicación automática»).
 
 ## Actualización del proyecto Android
 
@@ -188,6 +188,23 @@ cd android/twa
 bubblewrap update
 bubblewrap build
 ```
+
+## Publicación automática
+
+`.github/workflows/android-play-publicar.yml` compila, firma y sube el AAB a Google Play cuando un merge a `main` toca `android/twa/**`. También se puede lanzar a mano desde la pestaña Actions («Run workflow»).
+
+- Los cambios de la web **no** generan versión nueva: la app abre `reporty.com.ar` y los muestra sola.
+- El workflow compila el proyecto Gradle commiteado. Regenerarlo sigue siendo local: `bubblewrap update` también sube el `versionCode`. Si el `versionCode` no cambió, Play rechaza la subida y el job falla.
+- Por defecto sube a la pista `internal` como borrador (`draft`), que es obligatorio mientras la app no está publicada. Después se cambia con las variables de repositorio `PLAY_TRACK` y `PLAY_RELEASE_STATUS` (`completed`).
+
+Configuración, una sola vez, en GitHub → Settings → Environments → `google-play` → Secrets:
+
+| Secreto | Valor |
+|---|---|
+| `ANDROID_UPLOAD_KEYSTORE_BASE64` | `base64 -w0 android/twa-config/reporty-upload-key.jks` |
+| `ANDROID_UPLOAD_KEYSTORE_PASSWORD` | contraseña del keystore |
+| `ANDROID_UPLOAD_KEY_PASSWORD` | contraseña de la clave `reporty` |
+| `PLAY_SERVICE_ACCOUNT_JSON` | JSON de una cuenta de servicio de Google Cloud, invitada en Play Console → Usuarios y permisos con permiso para publicar versiones de `com.reporty.app` |
 
 ## Relación con Cloudflare Workers
 
