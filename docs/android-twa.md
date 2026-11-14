@@ -8,7 +8,7 @@ Cómo Reporty se empaqueta como aplicación Android sin abandonar Next.js, Supab
 Google Play Store
        |
        v
-Reporty Android (TWA, package ar.com.reporty.app)
+Reporty Android (TWA, package com.reporty.app)
        |
        v
 https://reporty.com.ar
@@ -80,7 +80,7 @@ bubblewrap update
 
 Configuración vigente:
 
-- Package: `ar.com.reporty.app` — **a confirmar antes de la primera publicación** (no se puede cambiar después en Play).
+- Package: `com.reporty.app` — **confirmado** (no se puede cambiar después de la primera subida a Play).
 - Host: `reporty.com.ar`, start URL `/mapa`.
 - `targetSdkVersion` 36 / `minSdkVersion` 23 (AGP 8.9.1, Gradle 8.11.1).
 - Orientación por defecto (adaptable).
@@ -167,7 +167,7 @@ Verificar en el dispositivo: mapa Leaflet, GPS de alta precisión, selector de f
 
 ## Publicación futura en Google Play
 
-1. Confirmar el package ID `ar.com.reporty.app` (definitivo tras la primera subida).
+1. Package ID confirmado: `com.reporty.app` (definitivo tras la primera subida).
 2. Crear la app en Play Console y habilitar **Play App Signing**.
 3. Subir el AAB firmado con la upload key.
 4. Copiar la huella SHA-256 del App Signing Key y regenerar `assetlinks.json` con ambas huellas (upload + App Signing).

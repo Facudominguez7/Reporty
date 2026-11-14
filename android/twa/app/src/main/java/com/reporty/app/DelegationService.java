@@ -1,4 +1,4 @@
-package ar.com.reporty.app;
+package com.reporty.app;
 
 
 import com.google.androidbrowserhelper.locationdelegation.LocationDelegationExtraCommandHandler;

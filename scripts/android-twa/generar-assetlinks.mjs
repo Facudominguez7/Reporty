@@ -14,7 +14,7 @@
  *     --huella AA:BB:... --huella CC:DD:...
  *
  * El archivo se escribe solo si hay al menos una huella válida. Con el paquete
- * por defecto `ar.com.reporty.app` (confirmar antes de la primera publicación,
+ * por defecto `com.reporty.app` (definitivo tras la primera publicación,
  * ver docs/android-twa.md).
  */
 import { execFileSync } from "node:child_process";
@@ -24,8 +24,8 @@ import { fileURLToPath } from "node:url";
 
 const raizRepo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-/** Paquete Android de Reporty (identificador a confirmar antes de publicar). */
-const PAQUETE = "ar.com.reporty.app";
+/** Paquete Android de Reporty (definitivo: no se puede cambiar tras la primera subida a Play). */
+const PAQUETE = "com.reporty.app";
 
 /** Dominio verificado que sirve el archivo. */
 const DOMINIO = "reporty.com.ar";

@@ -91,7 +91,7 @@
 <header class="hero">
   <h1>Reporty Android — Guía completa</h1>
   <p>Qué se implementó, cómo probarlo y todo lo que tenés que configurar en Google para publicar en Play Store.</p>
-  <p style="margin-top:.6rem; font-size:.9rem;">Rama <code style="background:rgba(255,255,255,.15); color:#fff;">feat/android-twa-bubblewrap</code> · PR <strong>#253</strong> · Package <strong>ar.com.reporty.app</strong></p>
+  <p style="margin-top:.6rem; font-size:.9rem;">Rama <code style="background:rgba(255,255,255,.15); color:#fff;">feat/android-twa-bubblewrap</code> · PR <strong>#253</strong> · Package <strong>com.reporty.app</strong></p>
 </header>
 
 <nav class="indice">
@@ -120,7 +120,7 @@ La app es una <strong>Trusted Web Activity (TWA)</strong>: una cápsula Android 
   <tr><th>Componente</th><th>Qué es</th><th>Estado</th></tr>
   <tr><td><strong>PWA</strong></td><td>Manifiesto web completo: nombre, íconos normales y maskable, atajos (Mapa, Reportes, Crear reporte), color de marca</td><td><span class="check">✓ Hecho</span></td></tr>
   <tr><td><strong>Service Worker</strong></td><td>Caché <em>solo</em> de estáticos propios (JS/CSS con hash, íconos, mapas). Nunca cachea APIs, sesiones ni fotos privadas. Página offline propia</td><td><span class="check">✓ Hecho</span></td></tr>
-  <tr><td><strong>Proyecto Android</strong></td><td><code>android/twa/</code> generado con Bubblewrap. Package <code>ar.com.reporty.app</code>, targetSdk 36, minSdk 24, Gradle 8.11.1, AGP 8.9.1</td><td><span class="check">✓ Hecho</span></td></tr>
+  <tr><td><strong>Proyecto Android</strong></td><td><code>android/twa/</code> generado con Bubblewrap. Package <code>com.reporty.app</code>, targetSdk 36, minSdk 24, Gradle 8.11.1, AGP 8.9.1</td><td><span class="check">✓ Hecho</span></td></tr>
   <tr><td><strong>Permisos de ubicación</strong></td><td>Delegación TWA habilitada: el aviso web de geolocalización se convierte en permiso Android nativo. <code>buscarUbicacionPrecisa()</code> no cambió</td><td><span class="check">✓ Configurado</span></td></tr>
   <tr><td><strong>Digital Asset Links</strong></td><td>Mecanismo que prueba a Chrome que la app y el dominio son del mismo dueño (quita la barra de URL). Generador listo, falta la huella real</td><td><span class="pend">⏳ Falta certificado</span></td></tr>
   <tr><td><strong>CI (GitHub Actions)</strong></td><td>Workflow que valida manifiesto, SW y assetlinks, y compila APK/AAB en cada PR</td><td><span class="check">✓ Hecho</span></td></tr>
@@ -249,11 +249,11 @@ por dártelo; si un sitio pide pago por el número, es un intermediario innecesa
 <p class="pend">☐ Número D-U-N-S en mano (o solicitud enviada y en seguimiento)</p>
 
 <h3><span class="paso">1</span>Decidir el package definitivo</h3>
-<p>El proyecto usa <code>ar.com.reporty.app</code>. <strong>Es la última decisión barata:</strong> después de la primera
+<p>El proyecto usa <code>com.reporty.app</code>. <strong>Es la última decisión barata:</strong> después de la primera
 subida a Play, el package no se puede cambiar jamás (una nueva app sería un listado distinto con 0 instalaciones heredadas).
 Si preferís otro identificador, es el momento: se cambia <code>packageId</code> en <code>android/twa/twa-manifest.json</code>,
 <code>NAME</code> en el script de assetlinks, y se regenera con <code>bubblewrap update</code>.</p>
-<p class="pend">☐ Confirmar y anotar: <code>ar.com.reporty.app</code></p>
+<p>✔ Confirmado: <code>com.reporty.app</code></p>
 
 <h3><span class="paso">2</span>Crear la cuenta y la app en Play Console</h3>
 <ol>
@@ -312,8 +312,8 @@ curl -s https://reporty.com.ar/.well-known/assetlinks.json | node -e \
 <div class="caja caja-info">
   <b>Cómo comprobar que la verificación anduvo:</b> reinstalá el APK en el emulador/teléfono con el dominio ya desplegado.
   Si la barra con "reporty.com.ar" desaparece y la app queda a pantalla completa, la vinculación funciona.
-  También: <code>adb shell pm verify-app-links --re-verify ar.com.reporty.app</code> y luego
-  <code>adb shell pm get-app-links ar.com.reporty.app</code>.
+  También: <code>adb shell pm verify-app-links --re-verify com.reporty.app</code> y luego
+  <code>adb shell pm get-app-links com.reporty.app</code>.
 </div>
 <p class="pend">☐ assetlinks.json con huella real desplegado en producción</p>
 
@@ -377,7 +377,6 @@ curl -s https://reporty.com.ar/.well-known/assetlinks.json | node -e \
 
 <table>
   <tr><th>Riesgo / pendiente</th><th>Impacto</th><th>Acción</th></tr>
-  <tr><td>Package <code>ar.com.reporty.app</code> sin confirmar</td><td>Irreversible después del primer envío</td><td>Confirmar antes de generar el AAB real</td></tr>
   <tr><td>Sin <code>assetlinks.json</code> real</td><td>La app muestra barra de URL (funciona, pero no es la experiencia final)</td><td>Pasos 3, 4 y 6 de esta guía</td></tr>
   <tr><td>Gráfico destacado 1024×500 no existe</td><td>Bloquea el envío</td><td>Diseñar (se puede pedir al canvas de diseño)</td></tr>
   <tr><td>Página de política de privacidad: verificar URL viva</td><td>Bloquea el envío si falta</td><td>Revisar <code>reporty.com.ar</code>; crear página si no existe</td></tr>
@@ -391,7 +390,7 @@ curl -s https://reporty.com.ar/.well-known/assetlinks.json | node -e \
   <ol style="margin:.4rem 0 0; padding-left:1.2rem;">
     <li>Implementar eliminación de cuenta desde la web (crítico).</li>
     <li>Verificar/crear página de privacidad y términos accesibles.</li>
-    <li>Confirmar package → generar keystore → primer AAB → Play App Signing.</li>
+    <li>Generar keystore → primer AAB → Play App Signing.</li>
     <li>Obtener ambas huellas → assetlinks.json → deploy Cloudflare → probar TWA fullscreen en teléfono.</li>
     <li>Diseñar gráfico destacado + capturas → completar Data Safety → envío a prueba cerrada.</li>
   </ol>

@@ -3,12 +3,12 @@
   "entradas_pendientes": [
     {
       "rol": "upload-key (local, para APK/AAB firmados con la clave de subida)",
-      "package": "ar.com.reporty.app",
+      "package": "com.reporty.app",
       "sha256": "REEMPLAZAR_CON_HUELLA_REAL"
     },
     {
       "rol": "google-play-app-signing (huella que asigna Google Play Console → Configuración → Firma de apps)",
-      "package": "ar.com.reporty.app",
+      "package": "com.reporty.app",
       "sha256": "REEMPLAZAR_CON_HUELLA_REAL"
     }
   ]

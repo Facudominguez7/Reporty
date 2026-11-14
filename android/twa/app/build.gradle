@@ -21,7 +21,7 @@ plugins {
 }
 
 def twaManifest = [
-    applicationId: 'ar.com.reporty.app',
+    applicationId: 'com.reporty.app',
     hostName: 'reporty.com.ar', // The domain being opened in the TWA.
     launchUrl: '/mapa', // The start path for the TWA. Must be relative to the domain.
     name: 'Reporty', // The application name.
@@ -52,9 +52,9 @@ def twaManifest = [
 
 android {
     compileSdkVersion 36
-    namespace "ar.com.reporty.app"
+    namespace "com.reporty.app"
     defaultConfig {
-        applicationId "ar.com.reporty.app"
+        applicationId "com.reporty.app"
         minSdkVersion 24
         targetSdkVersion 36
         versionCode 1
