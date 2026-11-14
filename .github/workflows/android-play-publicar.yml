@@ -1,0 +1,108 @@
+# Publica la app Android (TWA) en Google Play.
+#
+# Solo hace falta una versión nueva cuando cambia la cáscara Android (android/twa/**):
+# ícono, splash, colores, permisos. Los cambios de la web llegan a la app sin publicar nada,
+# porque la TWA abre https://reporty.com.ar.
+#
+# Compila el proyecto Gradle tal como está commiteado (regenerarlo con `bubblewrap update`
+# es un paso local, que además sube el versionCode). Si el versionCode no subió, Google Play
+# rechaza la subida y el job falla.
+#
+# Secretos (environment `google-play`):
+#   ANDROID_UPLOAD_KEYSTORE_BASE64   keystore de la upload key, en base64
+#   ANDROID_UPLOAD_KEYSTORE_PASSWORD contraseña del keystore
+#   ANDROID_UPLOAD_KEY_PASSWORD      contraseña de la clave (alias `reporty`)
+#   PLAY_SERVICE_ACCOUNT_JSON        JSON de la cuenta de servicio con acceso a la app en Play Console
+# Variables opcionales del repositorio:
+#   PLAY_TRACK           pista de destino (por defecto `internal`)
+#   PLAY_RELEASE_STATUS  `draft` (por defecto: obligatorio mientras la app no está publicada) o `completed`
+
+name: Publicar app Android en Google Play
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/twa/**"
+  workflow_dispatch:
+
+concurrency:
+  group: android-play-publicar
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publicar:
+    name: Compilar, firmar y subir el AAB
+    runs-on: ubuntu-latest
+    environment: google-play
+    timeout-minutes: 30
+    env:
+      PLAY_TRACK: ${{ vars.PLAY_TRACK || 'internal' }}
+      PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'draft' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar que estén los secretos
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          CUENTA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          faltan=""
+          [ -n "$KEYSTORE" ] || faltan="$faltan ANDROID_UPLOAD_KEYSTORE_BASE64"
+          [ -n "$STORE_PASS" ] || faltan="$faltan ANDROID_UPLOAD_KEYSTORE_PASSWORD"
+          [ -n "$KEY_PASS" ] || faltan="$faltan ANDROID_UPLOAD_KEY_PASSWORD"
+          [ -n "$CUENTA" ] || faltan="$faltan PLAY_SERVICE_ACCOUNT_JSON"
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos en el environment google-play:$faltan (ver docs/android-twa.md)."
+            exit 1
+          fi
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Leer versión
+        id: version
+        working-directory: android/twa
+        run: |
+          codigo=$(grep -oP 'versionCode\s+\K[0-9]+' app/build.gradle)
+          nombre=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle)
+          echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
+          echo "nombre=$nombre" >> "$GITHUB_OUTPUT"
+          echo "Versión $nombre (versionCode $codigo) → pista $PLAY_TRACK, estado $PLAY_RELEASE_STATUS"
+
+      - name: Compilar y firmar el AAB con la upload key
+        working-directory: android/twa
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/upload-key.jks"
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$KEYSTORE" | base64 -d > "$keystore"
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease \
+            -Pandroid.injected.signing.store.file="$keystore" \
+            -Pandroid.injected.signing.store.password="$STORE_PASS" \
+            -Pandroid.injected.signing.key.alias=reporty \
+            -Pandroid.injected.signing.key.password="$KEY_PASS"
+          ls -l app/build/outputs/bundle/release/app-release.aab
+
+      - name: Subir a Google Play
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.reporty.app
+          releaseFiles: android/twa/app/build/outputs/bundle/release/app-release.aab
+          releaseName: ${{ steps.version.outputs.nombre }} (${{ steps.version.outputs.codigo }})
+          track: ${{ env.PLAY_TRACK }}
+          status: ${{ env.PLAY_RELEASE_STATUS }}
