@@ -17,7 +17,7 @@
   "navigationDividerColor": "#2e7d5b",
   "navigationDividerColorDark": "#2e7d5b",
   "backgroundColor": "#2e7d5b",
-  "enableNotifications": false,
+  "enableNotifications": true,
   "startUrl": "/mapa",
   "iconUrl": "https://reporty.com.ar/favicon_io/android-chrome-512x512.png",
   "maskableIconUrl": "https://reporty.com.ar/favicon_io/maskable-icon-512x512.png",
@@ -30,7 +30,7 @@
   "appVersionCode": 1,
   "appVersion": "1.0.0",
   "minSdkVersion": 24,
-  "orientation": "default",
+  "orientation": "portrait",
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": {
@@ -86,5 +86,6 @@
   "retainedBundles": [],
   "fingerprints": [],
   "generatorApp": "Bubblewrap",
-  "serviceAccountJsonFile": null
+  "serviceAccountJsonFile": null,
+  "monochromeIconUrl": "https://reporty.com.ar/favicon_io/monochrome-icon-512x512.png"
 }
