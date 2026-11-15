@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   const markerOptions: Array<{ title?: string; alt?: string }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
-  const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
+  const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
   const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), getLayers: vi.fn(() => []) }
   const marker = { bindPopup: vi.fn(), on: vi.fn() }
   return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, marker, refIndex: 0 }
@@ -71,6 +71,31 @@ describe("LeafletMap initial view", () => {
     expect(mocks.map.setView).toHaveBeenCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
     expect(mocks.calls).toEqual(["tileLayer", "setView", "addLayer"])
     expect(mocks.marker.bindPopup).toHaveBeenCalledOnce()
+  })
+
+  it("pans open popups clear of the floating map controls", () => {
+    render([report])
+    const opciones = mocks.marker.bindPopup.mock.calls.at(-1)?.[1] as { autoPanPaddingTopLeft?: [number, number]; autoPanPaddingBottomRight?: [number, number] }
+    expect(opciones.autoPanPaddingTopLeft?.[1]).toBeGreaterThanOrEqual(96)
+    expect(opciones.autoPanPaddingTopLeft?.[0]).toBeGreaterThanOrEqual(64)
+    expect(opciones.autoPanPaddingBottomRight?.[1]).toBeGreaterThanOrEqual(96)
+  })
+
+  it("lets an open popup pan past the city limits and restores them on close", () => {
+    render([report])
+    const manejador = (nombre: string) => mocks.map.on.mock.calls.find(([evento]) => evento === nombre)?.[1] as (evento: unknown) => void
+    const cargas: Array<() => void> = []
+    const imagen = { complete: false, addEventListener: vi.fn((_: string, fn: () => void) => cargas.push(fn)) }
+    const popup = { update: vi.fn(), getElement: () => ({ querySelectorAll: () => [imagen] }) }
+
+    manejador("popupopen")({ popup })
+    expect(mocks.map.setMaxBounds).toHaveBeenCalledOnce()
+    expect(popup.update).toHaveBeenCalledOnce()
+    cargas.forEach((fn) => fn())
+    expect(popup.update).toHaveBeenCalledTimes(2)
+
+    manejador("popupclose")({ popup })
+    expect(mocks.map.setMaxBounds).toHaveBeenCalledTimes(2)
   })
 
   it("renders escaped pet details inside a native detail link", () => {
