@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { APORTES_COMUNITARIOS, type AporteKey } from "@/lib/reportes/aportes"
 import type { AvisoDuplicado } from "@/lib/reportes/duplicados"
+import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 
 export type DecisionDuplicado = "distinto" | "reemplazar"
 
@@ -51,7 +52,7 @@ function TarjetaReporteExistente({ aviso }: { aviso: AvisoDuplicado }) {
           <p className="line-clamp-2 text-xs text-muted-foreground">«{aviso.reporte.descripcion}»</p>
         )}
         <p className="text-xs text-muted-foreground">
-          A {aviso.metros} m · {new Date(aviso.reporte.createdAt).toLocaleDateString("es-AR")}
+          A {aviso.metros} m · {formatearFechaArgentina(aviso.reporte.createdAt)}
         </p>
       </div>
       <ExternalLink className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Abre en otra pestaña" />

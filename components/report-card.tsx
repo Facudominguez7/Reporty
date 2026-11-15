@@ -13,6 +13,7 @@ import {
   User,
   X,
 } from "lucide-react"
+import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 
 export type ReportCardProps = {
   id: number
@@ -162,7 +163,7 @@ export function ReportCard({
             </div>
             <div className="flex items-center gap-2 whitespace-nowrap">
               <Calendar className="size-3.5 flex-none" />
-              <span>{new Date(createdAt).toLocaleDateString("es-AR")}</span>
+              <span>{formatearFechaArgentina(createdAt)}</span>
             </div>
           </div>
         </CardContent>

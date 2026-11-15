@@ -24,6 +24,7 @@ import {
   POSADAS_BOUNDS,
   POSADAS_MIN_ZOOM,
 } from "@/lib/map/initial-view"
+import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 
 interface Report {
   id: number
@@ -200,7 +201,7 @@ const createPopupContent = (
   const safeAuthor = escapeHtml(report.author)
   const imageUrl = toSafeImageUrl(report.image)
   const safeImage = imageUrl ? escapeHtml(imageUrl) : null
-  const safeDate = escapeHtml(new Date(report.createdAt).toLocaleDateString("es-AR"))
+  const safeDate = escapeHtml(formatearFechaArgentina(report.createdAt))
   // Truncate before escaping so the cut never splits an HTML entity.
   const description = report.description ?? ""
   const truncatedDescription = escapeHtml(
