@@ -10,6 +10,8 @@ const effects = vi.hoisted(() => ({
 }))
 
 vi.mock("server-only", () => ({}))
+const push = vi.hoisted(() => ({ pushCambioEstadoReporte: vi.fn(), pushComentarioReporte: vi.fn(), pushModeracionPendiente: vi.fn() }))
+vi.mock("@/lib/push/avisos.server", () => push)
 vi.mock("@/lib/notifications/report-notifications", () => ({ sendStatusNotificationEmail: effects.notificar, sendCommentNotificationEmail: vi.fn(), sendAdminReviewNotificationEmail: effects.notificarRevisionAdmin }))
 vi.mock("@/database/queries/puntos", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/database/queries/puntos")>()),
@@ -60,6 +62,7 @@ function reportClient({ voteCount, ownerId = "report-owner", email = false, esta
 }
 
 beforeEach(() => {
+  Object.values(push).forEach((espia) => espia.mockReset())
   vi.clearAllMocks()
   effects.sumarPuntos.mockResolvedValue({ success: true, error: null })
   effects.actualizarPuntos.mockResolvedValue({ success: true, error: null })
@@ -128,6 +131,8 @@ describe("community report status votes", () => {
     expect(result).toMatchObject({ success: true, data: { count: 5, stateChangedTo: null, needsAdminReview: true } })
     expect(effects.notificarRevisionAdmin).toHaveBeenCalledOnce()
     expect(effects.notificarRevisionAdmin).toHaveBeenCalledWith(expect.objectContaining({ tipo: "reporte", reporteId: 9 }))
+    expect(push.pushModeracionPendiente).toHaveBeenCalledOnce()
+    expect(push.pushModeracionPendiente).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: "reporte", reporteId: 9 }))
     expect(effects.updateReport).not.toHaveBeenCalled()
   })
 
@@ -135,6 +140,7 @@ describe("community report status votes", () => {
     await votarNoExisteWorkflow(reportClient({ voteCount: 6 }), 9, "voter")
 
     expect(effects.notificarRevisionAdmin).not.toHaveBeenCalled()
+    expect(push.pushModeracionPendiente).not.toHaveBeenCalled()
   })
 
   it("does not send four 'No existe' votes to admin review", async () => {
@@ -156,6 +162,7 @@ describe("community report status votes", () => {
 
     expect(result).toMatchObject({ success: true, data: { count: 5, stateChangedTo: 2 } })
     expect(effects.updateReport).not.toHaveBeenCalled()
+    expect(push.pushCambioEstadoReporte).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reporteId: 9, nuevoEstado: "Reparado" }))
   })
 
   it("allows the report author to vote repaired", async () => {

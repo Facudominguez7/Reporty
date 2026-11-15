@@ -1,12 +1,21 @@
 import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { enviarAvisoEstadoMascota, type EstadoAvisoMascota } from "@/lib/notifications/mascota-notifications"
+import { pushMascotaEncontrada } from "@/lib/push/avisos.server"
 
 // Keep in sync with the provider's 24-hour idempotency window, with a five-minute safety margin.
 export const VENTANA_REINTENTO_AVISO_MASCOTA_MS = (24 * 60 - 5) * 60_000
 export type EstadoAvisoMascotaProceso = "enviado" | "pendiente" | "conciliacion" | "sin_pendientes"
 
-/** Claims a durable event before network I/O; never reports accepted until DB confirms the lease token. */
+/**
+ * Reclama un aviso durable antes de cualquier I/O de red y nunca lo informa como enviado hasta
+ * que la base confirma el token del lease. Si el evento es «encontrada», tras confirmar avisa
+ * también por push a quien publicó la mascota (de mejor esfuerzo).
+ *
+ * @param servicio - Cliente de servicio.
+ * @param avisoId - Id del aviso en `avisos_estado_mascota`.
+ * @returns Estado del aviso tras el intento.
+ */
 export async function enviarAvisoMascotaPendiente(servicio: SupabaseClient, avisoId: number): Promise<EstadoAvisoMascotaProceso> {
   try {
     const claim = await servicio.rpc("reclamar_aviso_estado_mascota", { p_id: avisoId })
@@ -17,7 +26,7 @@ export async function enviarAvisoMascotaPendiente(servicio: SupabaseClient, avis
       return data.estado === "conciliacion" ? "conciliacion" : data.estado === "enviado" ? "enviado" : "pendiente"
     }
     const { data: row, error } = await servicio.from("avisos_estado_mascota")
-      .select("id,mascota_id,destinatario,evento,token,reclamado_hasta,primer_intento_at")
+      .select("id,mascota_id,propietario_id,destinatario,evento,token,reclamado_hasta,primer_intento_at")
       .eq("id", avisoId).single()
     if (error || !row || row.token !== claim.data || !(Date.parse(row.reclamado_hasta) > Date.now())) return "pendiente"
     const primerIntento = Date.parse(row.primer_intento_at)
@@ -30,7 +39,16 @@ export async function enviarAvisoMascotaPendiente(servicio: SupabaseClient, avis
     })
     if (result.error || !result.data?.id) return "pendiente"
     const confirmed = await servicio.rpc("confirmar_aviso_estado_mascota", { p_id: avisoId, p_token: claim.data })
-    return !confirmed.error && confirmed.data === true ? "enviado" : "pendiente"
+    if (confirmed.error || confirmed.data !== true) return "pendiente"
+    // Solo después de confirmar el lease: un reintento del outbox no duplica la push.
+    if (row.evento === "encontrada") {
+      try {
+        await pushMascotaEncontrada(servicio, { usuarioId: row.propietario_id, mascotaId: row.mascota_id })
+      } catch (error) {
+        console.error("No pudimos enviar la push de mascota encontrada:", error)
+      }
+    }
+    return "enviado"
   } catch {
     // Provider timeout/acceptance is uncertain; stable provider idempotency permits retry only inside the window.
     return "pendiente"

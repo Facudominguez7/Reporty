@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { prepararImagenReporte } from "@/lib/media/preparar-imagen-reporte.server"
 import { sendAdminReviewNotificationEmail } from "@/lib/notifications/report-notifications"
+import { pushModeracionPendiente } from "@/lib/push/avisos.server"
 import { moderarImagen } from "./sightengine.server"
 import type { ResultadoModeracion } from "./tipos"
 import { enviarAvisoRetiro } from "./avisos-retiro.server"
@@ -60,9 +61,20 @@ export type ResultadoImagenEvidenciaReparacion = ResultadoImagenReporte & {
 /** Calcula identidad exacta del contenido sin nombres suministrados por el cliente. */
 function hash(bytes: Uint8Array) { return createHash("sha256").update(bytes).digest("hex") }
 
-/** Email is best-effort: provider failures must not change the report/photo workflow. */
+/**
+ * Avisa a la administración (push y correo) que una foto quedó en revisión manual.
+ * Ambos avisos son de mejor esfuerzo: sus fallos no cambian el flujo del reporte ni de la foto.
+ *
+ * @param supabase - Cliente de servicio.
+ * @param fila - Fila de la imagen moderada.
+ */
 async function notificarRevisionAdmin(supabase: SupabaseClient, fila: FilaImagen) {
   if (fila.decision !== "REVIEW" || fila.estado_publicacion !== "pendiente") return
+  await pushModeracionPendiente(supabase, {
+    tipo: "foto",
+    reporteId: fila.reporte_id,
+    titulo: `Reporte N.º ${fila.reporte_id}`,
+  })
   try {
     await sendAdminReviewNotificationEmail({
       supabase,

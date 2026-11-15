@@ -16,6 +16,7 @@ import {
   sendStatusNotificationEmail,
 } from "@/lib/notifications/report-notifications"
 import { APORTES_COMUNITARIOS, type AporteKey } from "@/lib/reportes/aportes"
+import { pushCambioEstadoReporte, pushComentarioReporte, pushModeracionPendiente } from "@/lib/push/avisos.server"
 import { eliminarFotoReportePublicada, moderarYGuardarImagenReporte } from "@/lib/moderation/imagenes-reporte.server"
 import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYTES_LABEL } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
@@ -470,6 +471,16 @@ export async function applyReportStateChange(
     console.error("Error al registrar historial de estado:", historyError)
   }
 
+  // La push no depende del correo: los dueños sin email cargado también la reciben.
+  if (report.usuario_id && (nextStateId === REPORT_STATE_IDS.REPARADO || nextStateId === REPORT_STATE_IDS.RECHAZADO)) {
+    await pushCambioEstadoReporte(supabase, {
+      usuarioId: report.usuario_id,
+      reporteId: report.id,
+      titulo: report.titulo,
+      nuevoEstado: nextStateId === REPORT_STATE_IDS.REPARADO ? "Reparado" : "Rechazado",
+    })
+  }
+
   if (report.usuario_id && owner?.email && (nextStateId === REPORT_STATE_IDS.REPARADO || nextStateId === REPORT_STATE_IDS.RECHAZADO)) {
     try {
       await sendStatusNotificationEmail({
@@ -668,6 +679,7 @@ export async function votarNoExisteWorkflow(
   if (!voteResult.success) return voteResult
   const voto = voteResult.data
   if (voto.votos_no_existe === REPORT_STATUS_VOTE_THRESHOLD) {
+    await pushModeracionPendiente(supabase, { tipo: "reporte", reporteId, titulo: report.titulo })
     try {
       await sendAdminReviewNotificationEmail({
         supabase,
@@ -723,6 +735,9 @@ export async function votarReparadoWorkflow(
   if (!voteResult.success) return voteResult
   const voto = voteResult.data
   const owner = getOwnerProfile(report.ownerProfile)
+  if (voto.estado_cambiado && report.usuario_id) {
+    await pushCambioEstadoReporte(supabase, { usuarioId: report.usuario_id, reporteId, titulo: report.titulo, nuevoEstado: "Reparado" })
+  }
   if (voto.estado_cambiado && report.usuario_id && owner?.email) {
     try {
       await sendStatusNotificationEmail({
@@ -811,6 +826,14 @@ export async function crearComentarioWorkflow(
   }
 
   const owner = getOwnerProfile(report.ownerProfile)
+  if (report.usuario_id && report.usuario_id !== actorUserId) {
+    await pushComentarioReporte(supabase, {
+      usuarioId: report.usuario_id,
+      reporteId,
+      autor: getCommentUsername((data as CommentView).profiles),
+      contenido: cleanContent,
+    })
+  }
   if (report.usuario_id && report.usuario_id !== actorUserId && owner?.email) {
     try {
       await sendCommentNotificationEmail({

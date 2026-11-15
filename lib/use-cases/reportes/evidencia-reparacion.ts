@@ -26,6 +26,7 @@ import {
   isAcceptedReportImageType,
 } from "@/lib/media/report-images"
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
+import { pushCambioEstadoReporte } from "@/lib/push/avisos.server"
 import {
   type ResultadoImagenEvidenciaReparacion,
   moderarYGuardarImagenEvidenciaReparacion,
@@ -400,8 +401,18 @@ async function notificarReparacionValidada(
 
     const contexto = await getReportContext(supabase, reporteId)
     if (!contexto.success) return
+    if (!contexto.data.usuario_id) return
+
+    // La push no depende de que el autor tenga correo.
+    await pushCambioEstadoReporte(supabase, {
+      usuarioId: contexto.data.usuario_id,
+      reporteId,
+      titulo: contexto.data.titulo,
+      nuevoEstado: "Reparado",
+    })
+
     const autor = leerPerfilAutor(contexto.data.ownerProfile)
-    if (!contexto.data.usuario_id || !autor?.email) return
+    if (!autor?.email) return
 
     await sendStatusNotificationEmail({
       ownerEmail: autor.email,
