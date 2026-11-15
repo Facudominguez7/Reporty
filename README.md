@@ -204,6 +204,10 @@ sequenceDiagram
    NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
    RESEND_API_KEY=tu_resend_api_key
    NEXT_PUBLIC_APP_URL=http://localhost:3000
+   # Notificaciones push (ver docs/notificaciones-push.md). Opcional: sin estas
+   # variables las push quedan apagadas. La privada nunca con NEXT_PUBLIC_.
+   VAPID_PUBLIC_KEY=
+   VAPID_PRIVATE_KEY=
    # Archivo histórico de auditoría en Cloudflare R2 (ver docs/auditoria-archivo-r2.md).
    # Opcional en desarrollo: sin estas variables el panel funciona y solo queda
    # deshabilitado el archivado. Nunca uses NEXT_PUBLIC_ para estos valores.
@@ -295,6 +299,8 @@ Reporty envía notificaciones por email en los siguientes casos:
 - **Donación aprobada**: agradecimiento al donante con sesión y aviso a los administradores
 
 Los emails son enviados mediante [Resend](https://resend.com) con plantillas HTML personalizadas.
+
+Además, quien las activa recibe **notificaciones push** (web, PWA y app Android) cuando su reporte cambia de estado, le comentan, le asignan una cuadrilla o su mascota figura como encontrada; los administradores, cuando hay contenido para moderar. Cada tipo se apaga desde «Mi cuenta». Ver [`docs/notificaciones-push.md`](docs/notificaciones-push.md).
 
 ---
 
