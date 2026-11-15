@@ -32,6 +32,7 @@ import {
   Trash2,
   Clock,
   Shield,
+  ShieldCheck,
   Share2,
   Users,
   FileSearch2,
@@ -84,6 +85,8 @@ import {
 import { HojaReporte } from "@/components/report-detail/hojas-reporte";
 import { AvisoComentar, useAvisoComentar } from "@/components/report-detail/aviso-comentar";
 import { ChipReporte, TONO_CATEGORIA, tonoEstado, tonoPrioridad } from "@/components/report-detail/chip-reporte";
+import { AvisoSenalNoExiste } from "@/components/report-detail/aviso-senal-no-existe";
+import { calcularSenalNoExiste } from "@/lib/reportes/senal-no-existe";
 import { ContenidoUbicacion, FranjaUbicacion } from "@/components/report-detail/ubicacion-reporte";
 import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
@@ -180,6 +183,8 @@ function formatearFechaEvidencia(fecha: string) {
 export type ReporteDetalleInicial = {
   reporte: ReporteDetalle | null;
   fotografiaPendiente?: boolean;
+  /** Si un administrador está revisando el reporte por votos «No existe» (sin números). */
+  revisionRechazoPendiente?: boolean;
   puedeContactar: boolean;
   currentUser: UsuarioActual | null;
   isAdmin: boolean;
@@ -215,6 +220,7 @@ export type ReporteDetalleInicial = {
 export function ReporteDetalleClient({
   reporte,
   fotografiaPendiente = false,
+  revisionRechazoPendiente = false,
   puedeContactar,
   currentUser,
   isAdmin,
@@ -239,6 +245,7 @@ export function ReporteDetalleClient({
   const [adminSaveError, setAdminSaveError] = useState<string | null>(null);
   const [votosCount, setVotosCount] = useState(reporte?.votos.noExiste.count ?? 0);
   const [hasVoted, setHasVoted] = useState(reporte?.votos.noExiste.hasVoted ?? false);
+  const [enRevisionRechazo, setEnRevisionRechazo] = useState(revisionRechazoPendiente);
   const [isVoting, setIsVoting] = useState(false);
   // Los votos históricos «reparado» se siguen mostrando: el flujo nuevo no los borra (S15).
   const [votosReparadoCount, setVotosReparadoCount] = useState(reporte?.votos.reparado.count ?? 0);
@@ -297,6 +304,13 @@ export function ReporteDetalleClient({
     reporte && (reporte.estado_id === REPORT_STATE_IDS.REPARADO || reporte.estado_id === REPORT_STATE_IDS.RECHAZADO),
   );
 
+  const senalNoExiste = calcularSenalNoExiste({
+    votos: votosCount,
+    yaVoto: hasVoted,
+    enRevision: enRevisionRechazo,
+    cerrado: isReporteCerrado,
+  });
+
   const handleVoteNoExiste = async () => {
     if (!reporte) return;
     if (currentUser?.is_anonymous) {
@@ -325,6 +339,7 @@ export function ReporteDetalleClient({
       setVotosCount(result.data.votosNoExiste);
       setVotosReparadoCount(result.data.votosReparado);
       setHasVoted(true);
+      setEnRevisionRechazo(Boolean(result.data.enRevision));
       toast.success(result.data.primero ? `¡Voto registrado! +${PUNTOS.VOTAR_NO_EXISTE} punto` : result.data.cambio ? "Voto actualizado" : "Tu voto ya estaba registrado");
 
     } catch (error) {
@@ -822,6 +837,9 @@ export function ReporteDetalleClient({
                   ) : (
                     <ChipReporte etiqueta="Estado" tono={tonoEstado(getNameFromRelation(reporte.estados))} icono={getStatusIcon(getNameFromRelation(reporte.estados))} valor={getNameFromRelation(reporte.estados)} />
                   )}
+                  {senalNoExiste === "en_revision" && (
+                    <ChipReporte etiqueta="Revisión" tono="var(--semantic-info)" icono={<ShieldCheck aria-hidden="true" />} valor="En revisión" />
+                  )}
                   {isAdmin ? (
                     <AdminInlineField
                       key={`category-${isAdminEditing ? "editing" : "display"}`}
@@ -1047,6 +1065,10 @@ export function ReporteDetalleClient({
                           )}
                         </div>
                       )}
+                      <AvisoSenalNoExiste
+                        senal={senalNoExiste}
+                        puedeVotar={showVoteButtons}
+                      />
                       {isReporteCerrado && (
                         <span className="text-xs text-muted-foreground">
                           Reparado {votosReparadoCount} · No existe {votosCount}

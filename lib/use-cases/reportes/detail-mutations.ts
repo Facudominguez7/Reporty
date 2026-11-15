@@ -21,6 +21,7 @@ import { isAcceptedReportImageType, REPORT_IMAGE_MAX_BYTES, REPORT_IMAGE_MAX_BYT
 import { validateUploadedReportImage } from "@/lib/media/report-image-validation.server"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import { obtenerDireccion } from "@/lib/geocodificacion/direccion-inversa"
+import { hayRevisionRechazoPendiente } from "@/database/queries/reportes/[id]/revision-rechazo"
 
 type MutationResult<T> =
   | { success: true; data: T }
@@ -83,6 +84,8 @@ type VoteResult = {
   votosReparado: number
   primero: boolean
   cambio: boolean
+  /** Si queda una revisión de rechazo pendiente; solo existe desde el quinto voto «No existe». */
+  enRevision?: boolean
 }
 
 type StatusChangeResult = {
@@ -677,6 +680,10 @@ export async function votarNoExisteWorkflow(
       console.error("Error al notificar revisión administrativa del reporte:", error)
     }
   }
+  // La revisión solo se abre desde el umbral; debajo no hace falta consultarla.
+  const enRevision = voto.votos_no_existe >= REPORT_STATUS_VOTE_THRESHOLD
+    ? await hayRevisionRechazoPendiente(supabase, reporteId).catch(() => false)
+    : false
   return {
     success: true,
     data: {
@@ -687,6 +694,7 @@ export async function votarNoExisteWorkflow(
       cambio: voto.cambio,
       stateChangedTo: null,
       needsAdminReview: voto.votos_no_existe >= REPORT_STATUS_VOTE_THRESHOLD,
+      enRevision,
     },
   }
 }

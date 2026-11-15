@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getPrioridades: vi.fn(),
   tieneFotografiaPendiente: vi.fn(),
   tieneFotografiaAprobada: vi.fn(),
+  tieneRevisionRechazoPendiente: vi.fn(),
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
   obtenerGestionOperativaDetalle: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("./reporte-detalle-client", () => ({ ReporteDetalleClient: () => null })
 vi.mock("@/lib/moderation/estado-publico.server", () => ({
   tieneFotografiaPendiente: mocks.tieneFotografiaPendiente,
   tieneFotografiaAprobada: mocks.tieneFotografiaAprobada,
+  tieneRevisionRechazoPendiente: mocks.tieneRevisionRechazoPendiente,
 }))
 vi.mock("@/utils/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser: mocks.getUser } }),
@@ -71,6 +73,7 @@ describe("ReporteDetallePage", () => {
     mocks.getPrioridades.mockReset().mockResolvedValue([{ id: 2, nombre: "Alta" }])
     mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
     mocks.tieneFotografiaAprobada.mockReset().mockResolvedValue(false)
+    mocks.tieneRevisionRechazoPendiente.mockReset().mockResolvedValue(false)
     mocks.obtenerGestionOperativaDetalle.mockReset().mockResolvedValue({
       puedeOperar: false,
       estadoOperativo: null,
@@ -91,6 +94,14 @@ describe("ReporteDetallePage", () => {
     expect(page.props.fotografiaPendiente).toBe(true)
     expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
     expect(page.props.reporte).toEqual({ id: 5, estado_id: 1 })
+  })
+
+  it("passes only whether an open report is under admin review", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.tieneRevisionRechazoPendiente.mockResolvedValue(true)
+    const page = await renderPage()
+    expect(page.props.revisionRechazoPendiente).toBe(true)
+    expect(mocks.tieneRevisionRechazoPendiente).toHaveBeenCalledWith(5)
   })
 
   it("loads edit lookup options only for admins", async () => {

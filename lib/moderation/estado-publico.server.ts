@@ -1,4 +1,5 @@
 import "server-only"
+import { hayRevisionRechazoPendiente } from "@/database/queries/reportes/[id]/revision-rechazo"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 /** Public status only: never return moderation rows, reasons or private object paths. */
@@ -26,6 +27,20 @@ export async function tieneFotografiaAprobada(reporteId: number): Promise<boolea
       .eq("decision", "APPROVED")
       .limit(1)
     return !error && (count ?? 0) > 0
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Solo dice si un administrador está revisando el reporte por votos «No existe»;
+ * nunca expone la fila, quién votó ni cuántos votos hay.
+ *
+ * @param reporteId - Reporte a consultar.
+ */
+export async function tieneRevisionRechazoPendiente(reporteId: number): Promise<boolean> {
+  try {
+    return await hayRevisionRechazoPendiente(createAdminClient(), reporteId)
   } catch {
     return false
   }

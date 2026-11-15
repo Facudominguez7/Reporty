@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
-import { tieneFotografiaPendiente } from "./estado-publico.server"
+import { tieneFotografiaPendiente, tieneRevisionRechazoPendiente } from "./estado-publico.server"
 
-const { from, eq, limit, select } = vi.hoisted(() => ({
-  from: vi.fn(), eq: vi.fn(), limit: vi.fn(), select: vi.fn(),
+const { from, eq, limit, select, maybeSingle } = vi.hoisted(() => ({
+  from: vi.fn(), eq: vi.fn(), limit: vi.fn(), select: vi.fn(), maybeSingle: vi.fn(),
 }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => ({ from }) }))
 
@@ -19,5 +19,23 @@ describe("public pending photo status", () => {
   it("does not claim a pending photo on query failure", async () => {
     limit.mockResolvedValue({ count: null, error: { message: "private detail" } })
     expect(await tieneFotografiaPendiente(42)).toBe(false)
+  })
+})
+
+describe("public report rejection review status", () => {
+  it.each([[{ estado: "pendiente" }, true], [{ estado: "descartada" }, false], [null, false]])(
+    "exposes only whether review %o is pending", async (fila, esperado) => {
+      from.mockReturnValue({ select }); select.mockReturnValue({ eq }); eq.mockReturnValue({ maybeSingle })
+      maybeSingle.mockResolvedValue({ data: fila, error: null })
+      expect(await tieneRevisionRechazoPendiente(42)).toBe(esperado)
+      expect(from).toHaveBeenCalledWith("reportes_revision_rechazo")
+      expect(select).toHaveBeenCalledWith("estado")
+      expect(eq).toHaveBeenCalledWith("reporte_id", 42)
+    })
+
+  it("does not claim a pending review on query failure", async () => {
+    from.mockReturnValue({ select }); select.mockReturnValue({ eq }); eq.mockReturnValue({ maybeSingle })
+    maybeSingle.mockResolvedValue({ data: null, error: { message: "private detail" } })
+    expect(await tieneRevisionRechazoPendiente(42)).toBe(false)
   })
 })
