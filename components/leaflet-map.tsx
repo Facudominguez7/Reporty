@@ -49,6 +49,31 @@ export interface LeafletMapProps {
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
 
+/**
+ * Opciones de los popups del mapa. El margen del auto-desplazamiento deja libre la zona de los
+ * controles flotantes (encabezado, pestañas, filtros y zoom arriba; botones y navegación abajo),
+ * que se dibujan por encima del mapa y tapaban la parte superior del popup.
+ */
+const OPCIONES_POPUP = {
+  maxWidth: 300,
+  autoPanPaddingTopLeft: [64, 112] as [number, number],
+  autoPanPaddingBottomRight: [16, 104] as [number, number],
+}
+
+/**
+ * Vuelve a calcular el popup cuando terminan de cargar sus imágenes. Leaflet desplaza el mapa
+ * una sola vez al abrirlo; si la foto llega después, el popup crece hacia arriba y queda debajo
+ * de los controles flotantes. `update()` recalcula el tamaño y repite el desplazamiento.
+ *
+ * @param evento - Evento `popupopen` del mapa.
+ */
+const reajustarPopupAlCargarImagenes = (evento: { popup: { update: () => void; getElement: () => HTMLElement | undefined } }) => {
+  const imagenes = evento.popup.getElement()?.querySelectorAll("img") ?? []
+  for (const imagen of Array.from(imagenes)) {
+    if (!imagen.complete) imagen.addEventListener("load", () => evento.popup.update(), { once: true })
+  }
+}
+
 const createClusterIconHTML = (count: number): string => {
   const size = count > 10 ? 50 : count > 5 ? 40 : 30
   const color = count > 10 ? "var(--map-heat-high)" : count > 5 ? "var(--map-heat-medium)" : "var(--map-heat-low)"
@@ -338,10 +363,11 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
     container.addEventListener("error", handlePetImageError, true)
 
+    const limitesCiudad = L.latLngBounds([south, west], [north, east])
     const map = L.map(container, {
       scrollWheelZoom: true,
       zoomControl: true,
-      maxBounds: L.latLngBounds([south, west], [north, east]),
+      maxBounds: limitesCiudad,
       maxBoundsViscosity: 1,
       minZoom: POSADAS_MIN_ZOOM,
       maxZoom: MAP_MAX_ZOOM,
@@ -373,6 +399,16 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
 
     tileLayer.addTo(map)
     clusterGroup.addTo(map)
+
+    // La vista inicial ya toca el límite norte: con los límites activos Leaflet no puede
+    // desplazar el mapa para mostrar un popup alto. Se liberan mientras hay uno abierto y,
+    // al cerrarlo, el mapa vuelve dentro de la ciudad.
+    map.on("popupopen", (evento) => {
+      map.setMaxBounds(L.latLngBounds([]))
+      evento.popup.update()
+      reajustarPopupAlCargarImagenes(evento)
+    })
+    map.on("popupclose", () => map.setMaxBounds(limitesCiudad))
 
     map.on("zoomend", () => {
       if (map.getZoom() < MAP_MAX_ZOOM) return
@@ -436,7 +472,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
         getCategoryColor()
       )
 
-      marker.bindPopup(popupContent, { maxWidth: 300 })
+      marker.bindPopup(popupContent, OPCIONES_POPUP)
       if (onSeleccionarReporte) {
         marker.on("click", () => onSeleccionarReporte(report.id))
       }
@@ -468,7 +504,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
             <span style="display:inline-flex;">${popupIcons.date}</span><span>${escapeHtml(new Date(pet.createdAt).toLocaleDateString("es-AR"))}</span>
           </div>
         </a>`
-      marker.bindPopup(popup, { maxWidth: 300 })
+      marker.bindPopup(popup, OPCIONES_POPUP)
       clusterGroup.addLayer(marker)
     }
 
