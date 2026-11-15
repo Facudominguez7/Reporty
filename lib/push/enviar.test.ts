@@ -71,6 +71,25 @@ describe("enviarPush", () => {
     expect(pedido.body.byteLength).toBeGreaterThan(0)
   })
 
+  it("corta el pedido a un servicio push que no responde y lo cuenta como fallido", async () => {
+    vi.useFakeTimers()
+    try {
+      consultas.listarSuscripcionesParaTipo.mockResolvedValue({ data: [await suscripcion("u1", "https://fcm.googleapis.com/lento")], error: null })
+      fetchFalso.mockImplementation((_url: string, pedido: RequestInit) => new Promise((_resolver, rechazar) => {
+        pedido.signal?.addEventListener("abort", () => rechazar(new DOMException("abortado", "AbortError")))
+      }))
+      vi.spyOn(console, "error").mockImplementation(() => {})
+
+      const envio = enviarPush({ admin: ADMIN, usuarioIds: ["u1"], tipo: "comentarios", mensaje: MENSAJE })
+      await vi.waitFor(() => expect(fetchFalso).toHaveBeenCalledOnce())
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      await expect(envio).resolves.toEqual({ enviadas: 0, vencidas: 0, fallidas: 1 })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("borra las suscripciones que el servicio push da por vencidas (404 y 410)", async () => {
     const dispositivos = [
       await suscripcion("u1", "https://fcm.googleapis.com/ok"),

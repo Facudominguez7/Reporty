@@ -104,6 +104,13 @@ describe("mensaje push de moderación", () => {
     ])
   })
 
+  it("sin título propio no repite el número de reporte", async () => {
+    const { cliente } = clienteFalso({ data: [{ id: "a1" }], error: null })
+
+    await pushModeracionPendiente(cliente, { tipo: "foto", reporteId: 6 })
+    expect(envio.enviarPush.mock.calls[0][0].mensaje.cuerpo).toBe("Reporte N.º 6")
+  })
+
   it("sin claves VAPID no consulta los administradores", async () => {
     envio.leerClavesVapid.mockReturnValue(null)
     const { cliente, eq } = clienteFalso({ data: [{ id: "a1" }], error: null })

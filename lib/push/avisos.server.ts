@@ -125,11 +125,11 @@ export async function pushMascotaEncontrada(
  * reporte que llegó al umbral de votos «No existe».
  *
  * @param admin - Cliente de servicio.
- * @param datos - Tipo de revisión y reporte.
+ * @param datos - Tipo de revisión, reporte y su título (opcional: sin título solo se muestra el número).
  */
 export async function pushModeracionPendiente(
   admin: SupabaseClient,
-  { tipo, reporteId, titulo }: { tipo: "foto" | "reporte"; reporteId: number; titulo: string },
+  { tipo, reporteId, titulo }: { tipo: "foto" | "reporte"; reporteId: number; titulo?: string },
 ): Promise<void> {
   // Sin claves VAPID no hay push: ni siquiera se consulta la base.
   if (!leerClavesVapid()) return
@@ -146,7 +146,7 @@ export async function pushModeracionPendiente(
       tipo: "moderacion",
       mensaje: {
         titulo: tipo === "foto" ? "Fotografía pendiente de revisión" : "Reporte pendiente de revisión",
-        cuerpo: `Reporte N.º ${reporteId}: ${recortar(titulo, 100)}`,
+        cuerpo: titulo?.trim() ? `Reporte N.º ${reporteId}: ${recortar(titulo, 100)}` : `Reporte N.º ${reporteId}`,
         url: tipo === "reporte" ? "/admin/moderacion?tipo=reportes" : "/admin/moderacion",
         etiqueta: `moderacion-${tipo}-${reporteId}`,
       },

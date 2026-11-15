@@ -191,7 +191,7 @@ describe("orquestación de imágenes", () => {
     expect(notificarRevisionAdmin).toHaveBeenCalledOnce()
     expect(notificarRevisionAdmin).toHaveBeenCalledWith(expect.objectContaining({ supabase: e.supabase, tipo: "foto", reviewId: e.fila().id, reporteId: 7 }))
     expect(pushModeracion).toHaveBeenCalledOnce()
-    expect(pushModeracion).toHaveBeenCalledWith(e.supabase, { tipo: "foto", reporteId: 7, titulo: "Reporte N.º 7" })
+    expect(pushModeracion).toHaveBeenCalledWith(e.supabase, { tipo: "foto", reporteId: 7 })
   })
   it("keeps the photo review result if the admin email fails", async () => {
     const e = escenario()

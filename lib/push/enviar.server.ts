@@ -36,13 +36,16 @@ export function leerClavesVapid(): VapidKeys | null {
   return { publicKey, privateKey, subject: process.env.VAPID_SUBJECT?.trim() || SUJETO_VAPID_POR_DEFECTO }
 }
 
+/** Tiempo máximo de espera de un servicio push, para no demorar la mutación ni el correo. */
+const TIEMPO_MAXIMO_PEDIDO_MS = 8_000
+
 /**
  * Entrega el mensaje a un dispositivo.
  *
  * @param suscripcion - Dispositivo de destino.
  * @param mensaje - Contenido de la notificación.
  * @param vapid - Claves del servidor.
- * @returns Si se entregó, si la suscripción venció o si falló.
+ * @returns Si se entregó, si la suscripción venció o si falló (también si no respondió a tiempo).
  */
 async function enviarADispositivo(
   suscripcion: SuscripcionPush,
@@ -55,11 +58,17 @@ async function enviarADispositivo(
       { endpoint: suscripcion.endpoint, expirationTime: null, keys: { p256dh: suscripcion.p256dh, auth: suscripcion.auth } },
       vapid,
     )
-    const respuesta = await fetch(suscripcion.endpoint, pedido)
-    if (respuesta.ok) return "enviada"
-    if (ESTADOS_VENCIDA.has(respuesta.status)) return "vencida"
-    console.error(`El servicio push respondió ${respuesta.status} para ${new URL(suscripcion.endpoint).host}`)
-    return "fallida"
+    const corte = new AbortController()
+    const temporizador = setTimeout(() => corte.abort(), TIEMPO_MAXIMO_PEDIDO_MS)
+    try {
+      const respuesta = await fetch(suscripcion.endpoint, { ...pedido, signal: corte.signal })
+      if (respuesta.ok) return "enviada"
+      if (ESTADOS_VENCIDA.has(respuesta.status)) return "vencida"
+      console.error(`El servicio push respondió ${respuesta.status} para ${new URL(suscripcion.endpoint).host}`)
+      return "fallida"
+    } finally {
+      clearTimeout(temporizador)
+    }
   } catch (error) {
     console.error("No pudimos enviar una notificación push:", error)
     return "fallida"
