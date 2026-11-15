@@ -1,9 +1,10 @@
 /** Contratos de creación, autorización y puntos independientes de la fotografía. */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { SupabaseClient } from "@supabase/supabase-js"
-const dobles = vi.hoisted(() => ({ crearReporte: vi.fn(), sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), moderarYGuardarImagenReporte: vi.fn(), subirImagenReporte: vi.fn(), obtenerDireccion: vi.fn(), notificarOrganismos: vi.fn() }))
+const dobles = vi.hoisted(() => ({ crearReporte: vi.fn(), sumarPuntos: vi.fn(), getUserRoleContext: vi.fn(), moderarYGuardarImagenReporte: vi.fn(), subirImagenReporte: vi.fn(), obtenerDireccion: vi.fn(), notificarOrganismos: vi.fn(), buscarDuplicado: vi.fn(), eliminarReportePropioWorkflow: vi.fn() }))
 vi.mock("@/lib/geocodificacion/direccion-inversa", () => ({ obtenerDireccion: dobles.obtenerDireccion }))
-vi.mock("@/database/queries/reportes/nuevo", () => ({ crearReporte: dobles.crearReporte, subirImagenReporte: dobles.subirImagenReporte }))
+vi.mock("@/database/queries/reportes/nuevo", () => ({ crearReporte: dobles.crearReporte, subirImagenReporte: dobles.subirImagenReporte, buscarDuplicado: dobles.buscarDuplicado }))
+vi.mock("./detail-mutations", () => ({ eliminarReportePropioWorkflow: dobles.eliminarReportePropioWorkflow }))
 vi.mock("@/database/queries/puntos", () => ({ sumarPuntos: dobles.sumarPuntos, PUNTOS: { CREAR_REPORTE: 10 } }))
 vi.mock("@/lib/authz/roles", async (original) => ({ ...await original<typeof import("@/lib/authz/roles")>(), getUserRoleContext: dobles.getUserRoleContext }))
 vi.mock("@/lib/moderation/imagenes-reporte.server", () => ({ moderarYGuardarImagenReporte: dobles.moderarYGuardarImagenReporte }))
@@ -26,6 +27,8 @@ beforeEach(() => {
   dobles.sumarPuntos.mockResolvedValue({ success: true })
   dobles.moderarYGuardarImagenReporte.mockResolvedValue({ estado: "REVIEW", publicada: false, motivos: ["Pendiente"], advertencias: [] })
   dobles.notificarOrganismos.mockResolvedValue([])
+  dobles.buscarDuplicado.mockResolvedValue(null)
+  dobles.eliminarReportePropioWorkflow.mockResolvedValue({ success: true, data: true })
 })
 
 describe("crearReporteWorkflow", () => {
@@ -161,5 +164,107 @@ describe("crearReporteWorkflow", () => {
     else expect(rpc).not.toHaveBeenCalled()
     expect(dobles.moderarYGuardarImagenReporte).toHaveBeenCalledWith(supabase, { reporteId: 7, propietarioId: "persona", image })
     expect(dobles.subirImagenReporte).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Arma la coincidencia que devolvería la búsqueda de duplicados.
+ *
+ * @param tipo - Tipo de coincidencia.
+ * @param id - Reporte existente.
+ * @param metros - Distancia al punto elegido.
+ */
+function coincidencia(tipo: "propio_mismo_punto" | "propio_cerca" | "ajeno", id = 50, metros = 40) {
+  return {
+    tipo, metros,
+    reporte: { id, usuarioId: tipo === "ajeno" ? "otra" : "persona", titulo: "Alumbrado en Calle 111, Posadas", descripcion: "Sin luz", createdAt: "2026-11-14T16:29:31Z", lat: -27.37, lon: -55.9 },
+  }
+}
+
+describe("crearReporteWorkflow con reportes duplicados", () => {
+  it("busca duplicados con la categoría, el punto y el autor", async () => {
+    await crearReporteWorkflow(supabase, entrada)
+    expect(dobles.buscarDuplicado).toHaveBeenCalledWith(supabase, { categoriaId: 1, lat: -27.37, lon: -55.9, usuarioId: "persona" })
+  })
+
+  it("un reporte ajeno cercano sin confirmación no crea el reporte y devuelve el aviso", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("ajeno"))
+    expect(await crearReporteWorkflow(supabase, entrada)).toEqual({
+      success: false,
+      error: "Ya hay un reporte parecido a 40 m. Si es el mismo problema, sumale una novedad; si no, confirmá que es otro.",
+      duplicado: { tipo: "ajeno", metros: 40, reporte: { id: 50, titulo: "Alumbrado en Calle 111, Posadas", descripcion: "Sin luz", createdAt: "2026-11-14T16:29:31Z" } },
+    })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+
+  it("un reporte ajeno cercano confirmado como distinto se crea", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("ajeno"))
+    expect(await crearReporteWorkflow(supabase, { ...entrada, confirmaDistinto: true })).toMatchObject({ success: true, data: { reportId: 7, reporteReemplazadoId: null } })
+    expect(dobles.eliminarReportePropioWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("un reporte propio entre 25 y 100 m confirmado como otro punto se crea", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("propio_cerca", 50, 60))
+    expect(await crearReporteWorkflow(supabase, { ...entrada, confirmaDistinto: true })).toMatchObject({ success: true })
+  })
+
+  it("un reporte propio en el mismo punto bloquea aunque se confirme como distinto", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("propio_mismo_punto", 50, 8))
+    expect(await crearReporteWorkflow(supabase, { ...entrada, confirmaDistinto: true })).toMatchObject({
+      success: false,
+      error: "Ya reportaste este punto y tu reporte sigue abierto. Agregale una novedad o reemplazalo.",
+      duplicado: { tipo: "propio_mismo_punto", metros: 8 },
+    })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+  })
+
+  it("reemplazar el reporte propio crea el nuevo y después elimina el anterior", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("propio_mismo_punto", 50, 8))
+    const result = await crearReporteWorkflow(supabase, { ...entrada, reemplazaReporteId: 50 })
+    expect(result).toMatchObject({ success: true, data: { reportId: 7, reporteReemplazadoId: 50 } })
+    expect(dobles.eliminarReportePropioWorkflow).toHaveBeenCalledWith(supabase, 50, "persona")
+    expect(dobles.crearReporte.mock.invocationCallOrder[0]).toBeLessThan(dobles.eliminarReportePropioWorkflow.mock.invocationCallOrder[0])
+  })
+
+  it("también se puede reemplazar un reporte propio cercano", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("propio_cerca", 50, 60))
+    expect(await crearReporteWorkflow(supabase, { ...entrada, reemplazaReporteId: 50 })).toMatchObject({ success: true, data: { reporteReemplazadoId: 50 } })
+  })
+
+  it.each([
+    ["un reporte ajeno", coincidencia("ajeno")],
+    ["otro reporte propio", coincidencia("propio_mismo_punto", 51, 8)],
+    ["ningún reporte cercano", null],
+  ])("no reemplaza cuando la coincidencia es %s", async (_caso, encontrada) => {
+    dobles.buscarDuplicado.mockResolvedValue(encontrada)
+    expect(await crearReporteWorkflow(supabase, { ...entrada, reemplazaReporteId: 50 })).toEqual({
+      success: false,
+      error: "Solo podés reemplazar tu reporte abierto de ese mismo lugar.",
+    })
+    expect(dobles.crearReporte).not.toHaveBeenCalled()
+    expect(dobles.eliminarReportePropioWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("si falla la eliminación del anterior, el reporte nuevo queda creado", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("propio_mismo_punto", 50, 8))
+    dobles.eliminarReportePropioWorkflow.mockResolvedValue({ success: false, error: "No pudimos eliminar el reporte." })
+    expect(await crearReporteWorkflow(supabase, { ...entrada, reemplazaReporteId: 50 })).toMatchObject({ success: true, data: { reportId: 7, reporteReemplazadoId: null } })
+  })
+
+  it("sin coordenadas no busca duplicados", async () => {
+    await crearReporteWorkflow(supabase, { ...entrada, lat: null, lon: null })
+    expect(dobles.buscarDuplicado).not.toHaveBeenCalled()
+  })
+})
+
+describe("reemplazo con fotografía rechazada", () => {
+  it("si la foto retira el reporte nuevo, conserva el anterior", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia("propio_mismo_punto", 50, 8))
+    dobles.moderarYGuardarImagenReporte.mockResolvedValue({ estado: "REJECTED", publicada: false, motivos: ["Retirado"], advertencias: [] })
+    const bytes = new Uint8Array(24); bytes.set([137, 80, 78, 71, 13, 10, 26, 10]); bytes[19] = 1; bytes[23] = 1
+    const image = new File([bytes], "x.png", { type: "image/png" })
+    const result = await crearReporteWorkflow(supabase, { ...entrada, reemplazaReporteId: 50, image })
+    expect(result).toMatchObject({ success: true, data: { reporteReemplazadoId: null } })
+    expect(dobles.eliminarReportePropioWorkflow).not.toHaveBeenCalled()
   })
 })

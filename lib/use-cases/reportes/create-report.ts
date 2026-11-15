@@ -5,9 +5,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { PUNTOS } from "@/database/queries/puntos"
 import {
+  buscarDuplicado,
   crearReporte,
   type CrearReporteParams,
 } from "@/database/queries/reportes/nuevo"
+import { aAvisoDuplicado, type AvisoDuplicado, type CoincidenciaDuplicado } from "@/lib/reportes/duplicados"
+import { eliminarReportePropioWorkflow } from "./detail-mutations"
 import { obtenerDireccion } from "@/lib/geocodificacion/direccion-inversa"
 import { TITULO_REPORTE_MAX, armarTituloReporte, requiereTituloManual } from "@/lib/reportes/titulo-automatico"
 import { canCreateReports, getUserRoleContext, isGuestRole } from "@/lib/authz/roles"
@@ -18,11 +21,57 @@ import { moderateReportText } from "@/lib/moderation/texto-determinista.server"
 
 type MutationResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string; requiereTitulo?: true }
+  | { success: false; error: string; requiereTitulo?: true; duplicado?: AvisoDuplicado }
 
 /** Respuesta cuando falta la dirección: el formulario muestra el campo título y se reenvía. */
 const MENSAJE_TITULO_SIN_DIRECCION =
   "No pudimos obtener la dirección de ese punto. Escribí un título para el reporte y volvé a enviarlo."
+
+const MENSAJE_MISMO_PUNTO_PROPIO =
+  "Ya reportaste este punto y tu reporte sigue abierto. Agregale una novedad o reemplazalo."
+
+const MENSAJE_REEMPLAZO_INVALIDO = "Solo podés reemplazar tu reporte abierto de ese mismo lugar."
+
+type DecisionDuplicado =
+  | { permitido: true; reemplazaReporteId: number | null }
+  | { permitido: false; error: string; duplicado?: AvisoDuplicado }
+
+/**
+ * Aplica la decisión de quien carga frente al posible duplicado encontrado en el servidor.
+ * Un reporte propio a menos de 25 m solo admite reemplazo; el resto admite reemplazo (si es
+ * propio) o la confirmación explícita de que es otro problema.
+ *
+ * @param coincidencia - Posible duplicado, o `null` si no hay ninguno.
+ * @param confirmaDistinto - Quien carga confirmó que es otro problema.
+ * @param reemplazaReporteId - Reporte propio que se pidió reemplazar.
+ * @returns Si se puede crear y qué reporte eliminar después, o el error con el aviso a mostrar.
+ */
+function decidirDuplicado(
+  coincidencia: CoincidenciaDuplicado | null,
+  confirmaDistinto: boolean,
+  reemplazaReporteId: number | null,
+): DecisionDuplicado {
+  if (reemplazaReporteId !== null) {
+    const esPropia = coincidencia !== null && coincidencia.tipo !== "ajeno"
+    return esPropia && coincidencia.reporte.id === reemplazaReporteId
+      ? { permitido: true, reemplazaReporteId }
+      : { permitido: false, error: MENSAJE_REEMPLAZO_INVALIDO }
+  }
+
+  if (!coincidencia) return { permitido: true, reemplazaReporteId: null }
+
+  if (coincidencia.tipo === "propio_mismo_punto") {
+    return { permitido: false, error: MENSAJE_MISMO_PUNTO_PROPIO, duplicado: aAvisoDuplicado(coincidencia) }
+  }
+
+  if (confirmaDistinto) return { permitido: true, reemplazaReporteId: null }
+
+  return {
+    permitido: false,
+    error: `Ya hay un reporte parecido a ${coincidencia.metros} m. Si es el mismo problema, sumale una novedad; si no, confirmá que es otro.`,
+    duplicado: aAvisoDuplicado(coincidencia),
+  }
+}
 
 /**
  * Indica si un título escrito por la persona tiene un largo aceptable.
@@ -41,6 +90,10 @@ export type CreateReportWorkflowInput = Omit<CrearReporteParams, "titulo" | "dir
   imageThumbnail?: File | null
   /** Identidad anónima verificada en sesión; se combina con el rol de base de datos. */
   actorIsAnonymous?: boolean
+  /** Quien carga confirmó que no es el mismo problema que el reporte cercano. */
+  confirmaDistinto?: boolean
+  /** Reporte propio cercano que se elimina después de crear este. */
+  reemplazaReporteId?: number | null
 }
 
 export type CreateReportWorkflowResult = {
@@ -53,6 +106,8 @@ export type CreateReportWorkflowResult = {
   isGuest: boolean
   /** Conservado por compatibilidad; los avisos se solicitan mediante acción posterior. */
   correosEnviados: string[]
+  /** Reporte propio eliminado al reemplazarlo; `null` si no se pidió o no se pudo eliminar. */
+  reporteReemplazadoId: number | null
 }
 
 /**
@@ -89,6 +144,17 @@ export async function crearReporteWorkflow(
   const textModerationError = moderateReportText(tituloEscrito, input.descripcion)
   if (textModerationError) return { success: false, error: textModerationError }
 
+  // El formulario ya avisó del duplicado; acá se vuelve a validar para que no se pueda saltear.
+  const coincidencia = input.lat !== null && input.lon !== null
+    ? await buscarDuplicado(supabase, { categoriaId: input.categoriaId, lat: input.lat, lon: input.lon, usuarioId: input.usuarioId })
+    : null
+  const decision = decidirDuplicado(coincidencia, input.confirmaDistinto === true, input.reemplazaReporteId ?? null)
+  if (!decision.permitido) {
+    return decision.duplicado
+      ? { success: false, error: decision.error, duplicado: decision.duplicado }
+      : { success: false, error: decision.error }
+  }
+
   // Arranca ya para no sumar su espera a la validación de la foto; nunca lanza.
   const direccionPendiente = input.lat !== null && input.lon !== null
     ? obtenerDireccion(input.lat, input.lon)
@@ -107,6 +173,7 @@ export async function crearReporteWorkflow(
   else if (tituloEscritoValido(tituloEscrito)) titulo = tituloEscrito
   else return { success: false, requiereTitulo: true, error: MENSAJE_TITULO_SIN_DIRECCION }
   const reporte = await crearReporte(supabase, { ...input, titulo, direccion })
+
 
   let imageModeration = input.image
     ? await moderarYGuardarImagenReporte(supabase, { reporteId: reporte.id, propietarioId: input.usuarioId, image: input.image })
@@ -141,6 +208,14 @@ export async function crearReporteWorkflow(
     }
   }
 
+  // El anterior se elimina solo si el nuevo quedó en pie: si la foto lo retiró, se conserva el viejo.
+  let reporteReemplazadoId: number | null = null
+  if (decision.reemplazaReporteId !== null && imageModeration?.estado !== "REJECTED") {
+    const eliminado = await eliminarReportePropioWorkflow(supabase, decision.reemplazaReporteId, input.usuarioId)
+    if (eliminado.success) reporteReemplazadoId = decision.reemplazaReporteId
+    else console.error("No pudimos eliminar el reporte reemplazado:", eliminado.error)
+  }
+
   if (imageModeration?.estado !== "REJECTED") {
     return {
       success: true,
@@ -152,6 +227,7 @@ export async function crearReporteWorkflow(
         pointsAwarded,
         isGuest,
         correosEnviados: [],
+        reporteReemplazadoId,
       },
     }
   }
@@ -166,6 +242,7 @@ export async function crearReporteWorkflow(
       pointsAwarded,
       isGuest,
       correosEnviados: [],
+      reporteReemplazadoId,
     },
   }
 }
