@@ -33,6 +33,11 @@ vi.mock("@/components/cuenta/nombre-usuario-section", async () => {
   }
 })
 
+vi.mock("@/components/cuenta/notificaciones-section", async () => {
+  const { createElement } = await import("react")
+  return { NotificacionesSection: () => createElement("section", null, "Sección de notificaciones") }
+})
+
 import DashboardPage from "./page"
 
 /**
@@ -82,5 +87,18 @@ describe("nombre de usuario en Mi cuenta", () => {
 
   it("el interesado también lo ve en la vista de analíticas", async () => {
     expect(await renderizar(3, true)).toContain("Nombre de usuario: vecino")
+  })
+})
+
+describe("notificaciones en Mi cuenta", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it.each([
+    ["ciudadano", 2, false],
+    ["interesado en analíticas", 3, true],
+    ["administrador", 1, true],
+  ])("la ve el %s", async (_rol, roleId, analiticas) => {
+    const html = await renderizar(roleId, analiticas)
+    expect(html.split("Sección de notificaciones")).toHaveLength(2)
   })
 })
