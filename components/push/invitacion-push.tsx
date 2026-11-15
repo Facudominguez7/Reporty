@@ -16,8 +16,11 @@ export const CLAVE_INVITACION_PUSH_DESCARTADA = "reporty:invitacion-push-descart
 /** Días que la invitación queda escondida después de «Ahora no»; después se vuelve a ofrecer. */
 export const DIAS_PARA_REOFRECER_PUSH = 14
 
-/** Rutas donde no va el aviso automático porque ya hay una invitación propia. */
-const RUTAS_SIN_AVISO_AUTOMATICO = ["/reportes/nuevo"]
+/**
+ * Rutas sin aviso automático: crear un reporte ya tiene su invitación propia y el mapa ocupa la
+ * pantalla completa (un cartel ahí tapa controles y leyenda).
+ */
+const RUTAS_SIN_AVISO_AUTOMATICO = ["/reportes/nuevo", "/mapa"]
 
 /**
  * Decide si un «Ahora no» guardado todavía esconde la invitación.
@@ -36,7 +39,7 @@ export function descarteVigente(valor: string | null, ahora: number): boolean {
  * Decide si en esta ruta se muestra el aviso automático de notificaciones.
  *
  * @param ruta - `pathname` actual.
- * @returns `false` donde ya existe una invitación propia (crear un reporte).
+ * @returns `false` al crear un reporte y en el mapa.
  */
 export function rutaAdmiteAvisoPush(ruta: string): boolean {
   return !RUTAS_SIN_AVISO_AUTOMATICO.some((excluida) => ruta === excluida || ruta.startsWith(`${excluida}/`))
@@ -82,12 +85,58 @@ function invitacionDescartada(): boolean {
 }
 
 /**
+ * Barra compacta del aviso automático (solo presentación): una línea fija arriba de la
+ * navegación inferior, con «Activar» y una cruz que equivale a «Ahora no».
+ *
+ * @param props.pregunta - Texto corto de la barra.
+ * @param props.pendiente - Si la activación está en curso.
+ * @param props.alActivar - Se llama al tocar «Activar».
+ * @param props.alDescartar - Se llama al tocar la cruz.
+ * @returns La barra.
+ */
+export function BarraAvisoPush({
+  pregunta,
+  pendiente,
+  alActivar,
+  alDescartar,
+}: {
+  pregunta: string
+  pendiente: boolean
+  alActivar: () => void
+  alDescartar: () => void
+}) {
+  return (
+    <div
+      role="region"
+      aria-label="Activar notificaciones"
+      className="fixed inset-x-3 bottom-[calc(var(--bottom-nav-space,0px)+0.75rem)] z-50 flex items-center gap-2 rounded-full border border-border bg-card/95 py-1.5 pl-3 pr-1.5 text-sm shadow-md backdrop-blur sm:left-auto sm:right-6 sm:max-w-sm"
+    >
+      <Bell className="size-4 shrink-0 text-secondary" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate">{pregunta}</span>
+      <Button type="button" size="sm" className="h-8 rounded-full px-3" onClick={alActivar} disabled={pendiente}>
+        {pendiente ? "Activando…" : "Activar"}
+      </Button>
+      <button
+        type="button"
+        onClick={alDescartar}
+        disabled={pendiente}
+        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        aria-label="Ahora no"
+      >
+        <X className="size-4" aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+/**
  * Invitación a activar las notificaciones, pensada para el momento en que tienen sentido:
  * justo después de crear un reporte. Nunca pide el permiso sola; lo pide el botón.
  *
  * @param props.pregunta - Texto de la pregunta, según el contexto.
- * @param props.flotante - Si es el aviso automático: se muestra fijo abajo, con botón de cerrar,
- *   y al activarse desaparece con un aviso breve en lugar de dejar el mensaje en pantalla.
+ * @param props.flotante - Si es el aviso automático: una barra compacta de una línea, fija arriba
+ *   de la navegación inferior, con «Activar» y una cruz («Ahora no»). Los resultados se informan
+ *   con un aviso breve en lugar de agrandar la barra.
  * @returns La invitación, o `null` si no corresponde ofrecerla.
  */
 export function InvitacionPush({ pregunta, flotante = false }: { pregunta: string; flotante?: boolean }) {
@@ -129,7 +178,13 @@ export function InvitacionPush({ pregunta, flotante = false }: { pregunta: strin
   const activar = () => {
     startTransition(async () => {
       const respuesta = await activarPushEnEsteDispositivo(clavePublica)
-      if (respuesta === "activada" && flotante) toast.success("Listo: te vamos a avisar en este dispositivo.")
+      if (flotante) {
+        if (respuesta === "activada") toast.success("Listo: te vamos a avisar en este dispositivo.")
+        else toast.error(MENSAJES_ACTIVACION_PUSH[respuesta])
+        // Si el permiso quedó bloqueado o no hay soporte, la barra no vuelve a servir.
+        setResultado(respuesta === "activada" || respuesta === "error" ? respuesta : "descartada")
+        return
+      }
       setResultado(respuesta === "activada" ? "activada" : MENSAJES_ACTIVACION_PUSH[respuesta])
     })
   }
@@ -144,23 +199,13 @@ export function InvitacionPush({ pregunta, flotante = false }: { pregunta: strin
     setResultado("descartada")
   }
 
-  const contenedor = flotante
-    ? "fixed inset-x-4 bottom-4 z-50 rounded-xl border border-border bg-card p-4 text-center shadow-lg sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-sm"
-    : "rounded-xl border border-border/70 bg-muted/40 p-4 text-center"
+  if (flotante) {
+    return <BarraAvisoPush pregunta={pregunta} pendiente={pendiente} alActivar={activar} alDescartar={descartar} />
+  }
 
   return (
-    <div className={contenedor} role={flotante ? "region" : undefined} aria-label={flotante ? "Activar notificaciones" : undefined}>
-      {flotante && (
-        <button
-          type="button"
-          onClick={descartar}
-          className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Cerrar"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
-      )}
-      <p className="flex items-center justify-center gap-2 px-4 text-sm font-medium">
+    <div className="rounded-xl border border-border/70 bg-muted/40 p-4 text-center">
+      <p className="flex items-center justify-center gap-2 text-sm font-medium">
         <Bell className="size-4 text-secondary" aria-hidden="true" />
         {pregunta}
       </p>
@@ -192,5 +237,5 @@ export function InvitacionPush({ pregunta, flotante = false }: { pregunta: strin
 export function AvisoPushAutomatico() {
   const ruta = usePathname()
   if (!rutaAdmiteAvisoPush(ruta ?? "/")) return null
-  return <InvitacionPush pregunta="¿Te avisamos cuando haya novedades de tus reportes?" flotante />
+  return <InvitacionPush pregunta="Avisos de tus reportes" flotante />
 }

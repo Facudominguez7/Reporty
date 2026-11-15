@@ -56,7 +56,7 @@ describe("«Ahora no» vence y la invitación se vuelve a ofrecer", () => {
 })
 
 describe("aviso automático en todas las páginas", () => {
-  it.each(["/", "/mapa", "/reportes", "/reportes/12", "/dashboard", "/mascotas"])("se muestra en %s", (ruta) => {
+  it.each(["/", "/reportes", "/reportes/12", "/dashboard", "/mascotas", "/comunidad"])("se muestra en %s", (ruta) => {
     expect(rutaAdmiteAvisoPush(ruta)).toBe(true)
   })
 
@@ -64,8 +64,20 @@ describe("aviso automático en todas las páginas", () => {
     expect(rutaAdmiteAvisoPush("/reportes/nuevo")).toBe(false)
   })
 
+  it("no se muestra sobre el mapa, que ocupa la pantalla completa", () => {
+    expect(rutaAdmiteAvisoPush("/mapa")).toBe(false)
+  })
+
   it("está montado una sola vez en el layout raíz", () => {
     const layout = readFileSync(fileURLToPath(new URL("../../app/layout.tsx", import.meta.url)), "utf8")
     expect(layout.match(/<AvisoPushAutomatico \/>/g)).toHaveLength(1)
+  })
+})
+
+describe("aviso automático no invasivo", () => {
+  const componente = readFileSync(fileURLToPath(new URL("./invitacion-push.tsx", import.meta.url)), "utf8")
+
+  it("se apoya arriba de la barra de navegación inferior, no debajo", () => {
+    expect(componente).toContain("bottom-[calc(var(--bottom-nav-space,0px)+0.75rem)]")
   })
 })

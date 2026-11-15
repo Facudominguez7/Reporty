@@ -16,8 +16,10 @@ siguen igual.
 Las push no se pueden prender sin permiso: el navegador o Android lo exigen. Por eso se ofrecen
 solas a toda cuenta registrada que todavía no las activó en ese dispositivo:
 
-- **Aviso automático** fijo abajo, en todas las páginas (`AvisoPushAutomatico` en el layout
-  raíz). No aparece en `/reportes/nuevo`, que tiene su propia invitación después de publicar.
+- **Aviso automático**: una barra compacta de una línea («Avisos de tus reportes» ·
+  [Activar] · ✕), apoyada arriba de la navegación inferior (`AvisoPushAutomatico` en el layout
+  raíz). No aparece en `/mapa` (pantalla completa, taparía controles y leyenda) ni en
+  `/reportes/nuevo`, que tiene su propia invitación después de publicar.
 - **«Ahora no»** (o la cruz) lo esconde 14 días en ese navegador; después se vuelve a ofrecer.
 - El diálogo del sistema se abre recién al tocar «Sí, avisame»: pedirlo sin un toque no funciona
   en Firefox ni Safari, y en Chrome un «Bloquear» queda para siempre.
