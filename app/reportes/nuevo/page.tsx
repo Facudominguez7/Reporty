@@ -42,7 +42,11 @@ import {
   verificarPuedeCrearReporte
 } from "@/database/queries/reportes/nuevo"
 import dynamic from "next/dynamic"
-import { avisarOrganismosAction, crearReporteAction } from "./actions"
+import { avisarOrganismosAction, buscarDuplicadoAction, crearReporteAction } from "./actions"
+import { crearComentarioAction } from "@/app/reportes/[id]/actions"
+import { AvisoReporteDuplicado, type DecisionDuplicado } from "@/components/reportes/aviso-reporte-duplicado"
+import type { AvisoDuplicado } from "@/lib/reportes/duplicados"
+import type { AporteKey } from "@/lib/reportes/aportes"
 import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
 import { PageTitleBar } from "@/components/page-title-bar"
 import {
@@ -164,12 +168,63 @@ export default function NuevoReportePage() {
   const [showResultDialog, setShowResultDialog] = useState(false)
   const [isSendingInstitutionEmail, setIsSendingInstitutionEmail] = useState(false)
   const [institutionEmailChoice, setInstitutionEmailChoice] = useState<boolean | null>(null)
+  // Resultado de la última búsqueda de duplicados, atado a la categoría y el punto consultados.
+  const [busquedaDuplicado, setBusquedaDuplicado] = useState<{
+    clave: string
+    aviso: AvisoDuplicado | null
+    puedeAportar: boolean
+  } | null>(null)
+  // Decisión tomada sobre un reporte existente concreto; deja de valer si el aviso cambia.
+  const [eleccionDuplicado, setEleccionDuplicado] = useState<{
+    reporteId: number
+    tipo: AvisoDuplicado["tipo"]
+    decision: DecisionDuplicado
+  } | null>(null)
+  const [publicandoAporte, setPublicandoAporte] = useState(false)
   // Synchronous guards against double clicks before React re-renders disabled buttons.
   const submitLockRef = useRef(false)
   const institutionEmailLockRef = useRef(false)
 
   const supabase = createClient()
   const router = useRouter()
+
+  const claveDuplicado =
+    formData.category !== "" && formData.lat !== null && formData.lon !== null && isWithinReportCoverage(formData.lat, formData.lon)
+      ? `${formData.category}|${formData.lat}|${formData.lon}`
+      : null
+  const avisoDuplicado = busquedaDuplicado && busquedaDuplicado.clave === claveDuplicado ? busquedaDuplicado.aviso : null
+  const puedeAportarDuplicado = busquedaDuplicado?.puedeAportar ?? false
+  const decisionDuplicado =
+    avisoDuplicado && eleccionDuplicado?.reporteId === avisoDuplicado.reporte.id && eleccionDuplicado.tipo === avisoDuplicado.tipo
+      ? eleccionDuplicado.decision
+      : null
+
+  /**
+   * Guarda la decisión frente al aviso visible, o la borra con `null`.
+   *
+   * @param decision - «distinto», «reemplazar» o `null` para deshacer.
+   */
+  const decidirDuplicado = (decision: DecisionDuplicado | null) => {
+    setEleccionDuplicado(decision && avisoDuplicado
+      ? { reporteId: avisoDuplicado.reporte.id, tipo: avisoDuplicado.tipo, decision }
+      : null)
+  }
+
+  // Busca un reporte parecido apenas hay categoría y punto, antes de que se cargue la foto.
+  useEffect(() => {
+    if (claveDuplicado === null) return
+    let vigente = true
+    const [categoria, lat, lon] = claveDuplicado.split("|").map(Number)
+    const espera = window.setTimeout(async () => {
+      const resultado = await buscarDuplicadoAction({ categoriaId: categoria, lat, lon })
+      if (vigente) setBusquedaDuplicado({ clave: claveDuplicado, ...resultado })
+    }, 400)
+
+    return () => {
+      vigente = false
+      window.clearTimeout(espera)
+    }
+  }, [claveDuplicado, user?.id])
   useEffect(() => {
     const checkUserAndLoadData = async () => {
       try {
@@ -336,6 +391,11 @@ export default function NuevoReportePage() {
   const pideTitulo = esOtros || tituloPorFaltaDeDireccion
   const tituloAutomatico = formData.category !== "" ? armarTituloReporte(Number(formData.category), null) : null
 
+  // Un reporte propio en el mismo punto solo se publica reemplazándolo.
+  const duplicadoResuelto =
+    avisoDuplicado === null ||
+    (avisoDuplicado.tipo === "propio_mismo_punto" ? decisionDuplicado === "reemplazar" : decisionDuplicado !== null)
+
   const canSubmitReport =
     // Solo quien no tiene sesión necesita el token para abrir la sesión de invitado.
     (!needsCaptcha || captchaToken !== null) &&
@@ -349,7 +409,8 @@ export default function NuevoReportePage() {
     !loading &&
     !isSubmitting &&
     // Submitting mid-optimization would silently send the report without its photo.
-    !isOptimizingImage
+    !isOptimizingImage &&
+    duplicadoResuelto
 
   const missingFields = [
     !pideTitulo || formData.title.trim().length >= 3 ? null : "título",
@@ -359,6 +420,7 @@ export default function NuevoReportePage() {
     formData.images.length > 0 ? null : "fotografía",
     formData.lat !== null && formData.lon !== null ? null : "ubicación",
     !needsCaptcha || captchaToken !== null ? null : "verificación de seguridad",
+    duplicadoResuelto ? null : "decisión sobre el reporte parecido",
   ].filter(Boolean) as string[]
 
   const estadoDeEnvio = isPublishing
@@ -448,6 +510,33 @@ export default function NuevoReportePage() {
     })
   }
 
+  /**
+   * Publica la novedad elegida en el reporte existente y lleva a verlo; el reporte nuevo no se crea.
+   *
+   * @param aporte - Novedad elegida en el aviso de duplicado.
+   */
+  const publicarAporteEnDuplicado = async (aporte: AporteKey) => {
+    if (!avisoDuplicado || publicandoAporte) return
+    setPublicandoAporte(true)
+    try {
+      const resultado = await crearComentarioAction(avisoDuplicado.reporte.id, aporte)
+      if (!resultado.success) {
+        toast.error("No pudimos publicar tu novedad", { description: resultado.error })
+        return
+      }
+      toast.success(
+        resultado.data.pointsAwarded > 0
+          ? `Sumaste tu novedad al reporte existente. +${resultado.data.pointsAwarded} puntos`
+          : "Sumaste tu novedad al reporte existente.",
+      )
+      router.push(`/reportes/${avisoDuplicado.reporte.id}`)
+    } catch {
+      toast.error("No pudimos publicar tu novedad", { description: "Intentá nuevamente." })
+    } finally {
+      setPublicandoAporte(false)
+    }
+  }
+
   const startNewReport = () => {
     setTituloPorFaltaDeDireccion(false)
     setFormData((prev) => ({
@@ -485,6 +574,8 @@ export default function NuevoReportePage() {
       payload.set("lat", String(formData.lat))
       payload.set("lon", String(formData.lon))
       payload.set("submissionId", submissionId)
+      if (avisoDuplicado && decisionDuplicado === "distinto") payload.set("confirmaDistinto", "true")
+      if (avisoDuplicado && decisionDuplicado === "reemplazar") payload.set("reemplazaReporteId", String(avisoDuplicado.reporte.id))
 
       if (formData.images[0]) {
         payload.set("image", formData.images[0])
@@ -496,6 +587,10 @@ export default function NuevoReportePage() {
 
       if (!result.success) {
         // The report and everything already written in the form stay exactly as they were.
+        if ("duplicado" in result && result.duplicado && claveDuplicado) {
+          const duplicado = result.duplicado
+          setBusquedaDuplicado((anterior) => ({ clave: claveDuplicado, aviso: duplicado, puedeAportar: anterior?.puedeAportar ?? false }))
+        }
         avisarFalloDeEnvio(result)
         return
       }
@@ -520,6 +615,12 @@ export default function NuevoReportePage() {
           ? `¡Reporte creado exitosamente! +${result.data.pointsAwarded} puntos`
           : "¡Reporte creado exitosamente!",
       )
+
+      if (result.data.reporteReemplazadoId !== null) {
+        toast.info("Tu reporte anterior fue reemplazado por este.")
+      }
+      setBusquedaDuplicado(null)
+      setEleccionDuplicado(null)
 
       setInstitutionEmailChoice(null)
       setShowResultDialog(true)
@@ -847,6 +948,17 @@ export default function NuevoReportePage() {
                   )}
                 </div>
               </div>
+
+              {avisoDuplicado && (
+                <AvisoReporteDuplicado
+                  aviso={avisoDuplicado}
+                  puedeAportar={puedeAportarDuplicado}
+                  decision={decisionDuplicado}
+                  publicandoAporte={publicandoAporte}
+                  onPublicarAporte={publicarAporteEnDuplicado}
+                  onDecidir={decidirDuplicado}
+                />
+              )}
 
               {/* Image Upload */}
               <div className="space-y-4">

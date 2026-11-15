@@ -8,7 +8,9 @@ import { ZodError, z } from "zod"
 
 import { crearReporteWorkflow, mutationErrorMessage } from "@/lib/use-cases/reportes"
 import { notificarOrganismosDeReporte } from "@/lib/use-cases/reportes/notificar-organismos"
-import { isAnonymousUser } from "@/lib/authz/roles"
+import { canParticipateInCommunity, getUserRoleContext, isAnonymousUser } from "@/lib/authz/roles"
+import { buscarDuplicado } from "@/database/queries/reportes/nuevo"
+import { aAvisoDuplicado, type AvisoDuplicado } from "@/lib/reportes/duplicados"
 import { isWithinReportCoverage } from "@/lib/map/report-coverage"
 import {
   claimReportSubmission,
@@ -30,6 +32,12 @@ const createReportSchema = z.object({
   lon: z.coerce.number().min(-180, "Seleccioná una ubicación en el mapa.").max(180, "Seleccioná una ubicación en el mapa."),
   // Zod 3 accepted generic UUID-shaped identifiers, not only RFC-versioned UUIDs.
   submissionId: z.guid("No pudimos identificar el envío. Recargá la página e intentá nuevamente."),
+  // Decisión frente a un reporte parecido cercano; el servidor la vuelve a validar.
+  confirmaDistinto: z.preprocess((valor) => valor === "true", z.boolean()),
+  reemplazaReporteId: z.preprocess(
+    (valor) => (valor === null || valor === "" ? null : valor),
+    z.coerce.number().int().positive("No pudimos identificar el reporte a reemplazar.").nullable(),
+  ),
 }).refine(({ lat, lon }) => isWithinReportCoverage(lat, lon), {
   path: ["lat"],
   message: "La ubicación debe estar dentro de Posadas, Garupá o Candelaria.",
@@ -102,6 +110,8 @@ export async function crearReporteAction(formData: FormData) {
       lat: formData.get("lat"),
       lon: formData.get("lon"),
       submissionId: formData.get("submissionId"),
+      confirmaDistinto: formData.get("confirmaDistinto"),
+      reemplazaReporteId: formData.get("reemplazaReporteId"),
     })
 
     const textModerationError = moderateReportText(parsedInput.titulo ?? "", parsedInput.descripcion)
@@ -141,6 +151,8 @@ export async function crearReporteAction(formData: FormData) {
         lat: parsedInput.lat,
         lon: parsedInput.lon,
         image,
+        confirmaDistinto: parsedInput.confirmaDistinto,
+        reemplazaReporteId: parsedInput.reemplazaReporteId,
       })
 
       if (!result.success) {
@@ -176,5 +188,45 @@ export async function crearReporteAction(formData: FormData) {
       success: false as const,
       error: mutationErrorMessage(error, "No pudimos crear el reporte."),
     }
+  }
+}
+
+const busquedaDuplicadoSchema = z.object({
+  categoriaId: z.number().int().positive(),
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+}).refine(({ lat, lon }) => isWithinReportCoverage(lat, lon))
+
+export type ResultadoBusquedaDuplicado = {
+  aviso: AvisoDuplicado | null
+  /** Si la sesión actual puede publicar una novedad en el reporte existente. */
+  puedeAportar: boolean
+}
+
+/**
+ * Busca un reporte abierto parecido mientras se completa el formulario. Funciona sin sesión
+ * (nada cuenta como propio) y nunca lanza: ante cualquier fallo no muestra aviso.
+ *
+ * @param entrada - Categoría y punto elegidos en el formulario.
+ * @returns El aviso a mostrar y si la sesión puede sumar una novedad al reporte existente.
+ */
+export async function buscarDuplicadoAction(entrada: { categoriaId: number; lat: number; lon: number }): Promise<ResultadoBusquedaDuplicado> {
+  const parsed = busquedaDuplicadoSchema.safeParse(entrada)
+  if (!parsed.success) return { aviso: null, puedeAportar: false }
+
+  try {
+    const sessionClient = await createClient()
+    const { data: { user } } = await sessionClient.auth.getUser()
+    let puedeAportar = false
+    if (user) {
+      const { data: contextoRol } = await getUserRoleContext(sessionClient, user.id)
+      puedeAportar = canParticipateInCommunity(user, contextoRol?.roleId)
+    }
+
+    const coincidencia = await buscarDuplicado(createAdminClient(), { ...parsed.data, usuarioId: user?.id ?? null })
+    return { aviso: coincidencia ? aAvisoDuplicado(coincidencia) : null, puedeAportar }
+  } catch (error) {
+    console.error("Error al buscar un reporte duplicado:", error)
+    return { aviso: null, puedeAportar: false }
   }
 }

@@ -9,12 +9,14 @@ const { createClient, createAdminClient } = vi.hoisted(() => ({
 vi.mock("@/utils/supabase/server", () => ({ createClient }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient }))
 
-const dobles = vi.hoisted(() => ({ workflow: vi.fn(), claim: vi.fn(), release: vi.fn(), notify: vi.fn() }))
+const dobles = vi.hoisted(() => ({ workflow: vi.fn(), claim: vi.fn(), release: vi.fn(), notify: vi.fn(), buscarDuplicado: vi.fn(), rol: vi.fn() }))
+vi.mock("@/database/queries/reportes/nuevo", () => ({ buscarDuplicado: dobles.buscarDuplicado }))
+vi.mock("@/lib/authz/roles", async (original) => ({ ...await original<typeof import("@/lib/authz/roles")>(), getUserRoleContext: dobles.rol }))
 vi.mock("@/lib/use-cases/reportes/notificar-organismos", () => ({ notificarOrganismosDeReporte: dobles.notify }))
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }))
 vi.mock("@/lib/use-cases/reportes", () => ({ crearReporteWorkflow: dobles.workflow, mutationErrorMessage: (e: Error) => e.message }))
 vi.mock("@/lib/security/report-submission-guard.server", () => ({ claimReportSubmission: dobles.claim, releaseReportSubmission: dobles.release, hashClientIp: () => "ip-sintetica", reportSubmissionClaimMessage: () => "Envío duplicado" }))
-import { crearReporteAction, avisarOrganismosAction } from "./actions"
+import { crearReporteAction, avisarOrganismosAction, buscarDuplicadoAction } from "./actions"
 
 
 /** Construye un envío válido que no requiere datos reales. */
@@ -31,6 +33,8 @@ beforeEach(() => {
   createAdminClient.mockReturnValue({})
   dobles.claim.mockResolvedValue("ok")
   dobles.workflow.mockResolvedValue({ success: true, data: { reportId: 7, imageUploaded: false } })
+  dobles.buscarDuplicado.mockResolvedValue(null)
+  dobles.rol.mockResolvedValue({ data: { roleId: 2 }, error: null })
 })
 
 afterEach(() => {
@@ -179,5 +183,79 @@ describe("crearReporteAction — sin verificación Turnstile", () => {
     expect(await crearReporteAction(formulario())).toEqual({ success: true, data: { reportId: 7, imageUploaded: false } })
     expect(dobles.claim).toHaveBeenCalledOnce()
     expect(dobles.workflow).toHaveBeenCalledOnce()
+  })
+})
+
+describe("decisión sobre reportes duplicados al crear", () => {
+  it("sin decisión envía al workflow que no confirmó ni pidió reemplazo", async () => {
+    await crearReporteAction(formulario())
+    expect(dobles.workflow.mock.calls[0][1]).toMatchObject({ confirmaDistinto: false, reemplazaReporteId: null })
+  })
+
+  it("pasa la confirmación de que es otro problema", async () => {
+    const datos = formulario()
+    datos.set("confirmaDistinto", "true")
+    await crearReporteAction(datos)
+    expect(dobles.workflow.mock.calls[0][1]).toMatchObject({ confirmaDistinto: true, reemplazaReporteId: null })
+  })
+
+  it("pasa el reporte propio a reemplazar", async () => {
+    const datos = formulario()
+    datos.set("reemplazaReporteId", "50")
+    await crearReporteAction(datos)
+    expect(dobles.workflow.mock.calls[0][1]).toMatchObject({ reemplazaReporteId: 50 })
+  })
+
+  it("rechaza un reporte a reemplazar inválido sin llamar al workflow", async () => {
+    const datos = formulario()
+    datos.set("reemplazaReporteId", "-3")
+    expect(await crearReporteAction(datos)).toMatchObject({ success: false })
+    expect(dobles.workflow).not.toHaveBeenCalled()
+  })
+
+  it("devuelve el aviso de duplicado del workflow y libera el envío", async () => {
+    const duplicado = { tipo: "ajeno", metros: 40, reporte: { id: 50, titulo: "Alumbrado", descripcion: null, createdAt: "2026-11-14T16:29:31Z" } }
+    dobles.workflow.mockResolvedValue({ success: false, error: "Ya hay un reporte parecido a 40 m.", duplicado })
+    expect(await crearReporteAction(formulario())).toEqual({ success: false, error: "Ya hay un reporte parecido a 40 m.", duplicado })
+    expect(dobles.release).toHaveBeenCalled()
+  })
+})
+
+describe("buscarDuplicadoAction", () => {
+  const coincidencia = {
+    tipo: "ajeno" as const, metros: 40,
+    reporte: { id: 50, usuarioId: "otra", titulo: "Alumbrado", descripcion: "Sin luz", createdAt: "2026-11-14T16:29:31Z", lat: -27.37, lon: -55.9 },
+  }
+
+  it("busca con la sesión y devuelve el aviso sin autor ni coordenadas", async () => {
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia)
+    expect(await buscarDuplicadoAction({ categoriaId: 4, lat: -27.37, lon: -55.9 })).toEqual({
+      aviso: { tipo: "ajeno", metros: 40, reporte: { id: 50, titulo: "Alumbrado", descripcion: "Sin luz", createdAt: "2026-11-14T16:29:31Z" } },
+      puedeAportar: true,
+    })
+    expect(dobles.buscarDuplicado.mock.calls[0][1]).toEqual({ categoriaId: 4, lat: -27.37, lon: -55.9, usuarioId: "persona" })
+  })
+
+  it("sin sesión busca igual, sin reportes propios ni aportes", async () => {
+    createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } })
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia)
+    expect(await buscarDuplicadoAction({ categoriaId: 4, lat: -27.37, lon: -55.9 })).toMatchObject({ puedeAportar: false })
+    expect(dobles.buscarDuplicado.mock.calls[0][1]).toMatchObject({ usuarioId: null })
+  })
+
+  it("una sesión invitada no puede aportar", async () => {
+    createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "invitada", is_anonymous: true } } }) } })
+    dobles.buscarDuplicado.mockResolvedValue(coincidencia)
+    expect(await buscarDuplicadoAction({ categoriaId: 4, lat: -27.37, lon: -55.9 })).toMatchObject({ puedeAportar: false })
+  })
+
+  it("sin coincidencia no hay aviso", async () => {
+    expect(await buscarDuplicadoAction({ categoriaId: 4, lat: -27.37, lon: -55.9 })).toEqual({ aviso: null, puedeAportar: true })
+  })
+
+  it("con datos inválidos o fuera de cobertura no consulta", async () => {
+    expect(await buscarDuplicadoAction({ categoriaId: 0, lat: -27.37, lon: -55.9 })).toEqual({ aviso: null, puedeAportar: false })
+    expect(await buscarDuplicadoAction({ categoriaId: 4, lat: -34.6, lon: -58.4 })).toEqual({ aviso: null, puedeAportar: false })
+    expect(dobles.buscarDuplicado).not.toHaveBeenCalled()
   })
 })
