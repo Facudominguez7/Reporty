@@ -7,6 +7,9 @@
  * - /_next/static: caché primero (los archivos llevan hash de contenido y son inmutables).
  * - Todo lo demás (API, POST, Supabase, otros orígenes) pasa directo a la red sin intervenir.
  *
+ * Notificaciones push: muestra el mensaje que manda el servidor (lib/push/enviar.server.ts) y,
+ * al tocarlo, abre la ruta indicada dentro de Reporty (nunca otro origen).
+ *
  * Para invalidar las cachés de todos los clientes, subir VERSION.
  */
 const VERSION = "v1"
@@ -14,6 +17,8 @@ const CACHE_PAGINAS = `reporty-paginas-${VERSION}`
 const CACHE_ESTATICOS = `reporty-estaticos-${VERSION}`
 const PAGINA_OFFLINE = "/offline.html"
 const MAXIMO_ESTATICOS = 150
+const ICONO_NOTIFICACION = "/favicon_io/maskable-icon-192x192.png"
+const INSIGNIA_NOTIFICACION = "/favicon_io/monochrome-icon-512x512.png"
 
 self.addEventListener("install", (evento) => {
   evento.waitUntil(
@@ -102,4 +107,76 @@ async function recortarCache(cache) {
   const claves = await cache.keys()
   const sobrantes = claves.slice(0, Math.max(0, claves.length - MAXIMO_ESTATICOS))
   await Promise.all(sobrantes.map((clave) => cache.delete(clave)))
+}
+
+self.addEventListener("push", (evento) => {
+  const mensaje = leerMensajePush(evento.data)
+  evento.waitUntil(
+    self.registration.showNotification(mensaje.titulo, {
+      body: mensaje.cuerpo,
+      icon: ICONO_NOTIFICACION,
+      badge: INSIGNIA_NOTIFICACION,
+      tag: mensaje.etiqueta,
+      lang: "es-AR",
+      data: { url: mensaje.url },
+    }),
+  )
+})
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close()
+  evento.waitUntil(abrirRuta(evento.notification.data && evento.notification.data.url))
+})
+
+/**
+ * Lee el JSON de una push; si falta o está mal formado, devuelve un aviso genérico, porque
+ * Chrome exige mostrar una notificación por cada push recibida.
+ *
+ * @param {PushMessageData | null} datos - Datos de la push.
+ * @returns {{ titulo: string, cuerpo: string, url: string, etiqueta: string | undefined }}
+ */
+function leerMensajePush(datos) {
+  const generico = { titulo: "Reporty", cuerpo: "Tenés novedades en Reporty.", url: "/", etiqueta: undefined }
+  if (!datos) return generico
+  try {
+    const json = datos.json()
+    return {
+      titulo: typeof json.titulo === "string" && json.titulo ? json.titulo : generico.titulo,
+      cuerpo: typeof json.cuerpo === "string" ? json.cuerpo : generico.cuerpo,
+      url: typeof json.url === "string" ? json.url : generico.url,
+      etiqueta: typeof json.etiqueta === "string" ? json.etiqueta : undefined,
+    }
+  } catch {
+    return generico
+  }
+}
+
+/**
+ * Lleva a una pestaña de Reporty a la ruta de la notificación, o abre una nueva.
+ * Solo acepta rutas del mismo origen: cualquier otra URL abre el inicio.
+ *
+ * @param {unknown} ruta - Ruta guardada en la notificación.
+ * @returns {Promise<unknown>}
+ */
+async function abrirRuta(ruta) {
+  let destino = new URL("/", self.location.origin)
+  try {
+    const candidata = new URL(typeof ruta === "string" ? ruta : "/", self.location.origin)
+    if (candidata.origin === self.location.origin) destino = candidata
+  } catch {
+    // Ruta inválida: queda el inicio.
+  }
+
+  const pestanas = await self.clients.matchAll({ type: "window", includeUncontrolled: true })
+  const propia = pestanas.find((pestana) => new URL(pestana.url).origin === self.location.origin)
+  if (propia) {
+    try {
+      // navigate() solo funciona en pestañas que controla este worker; si no, se abre otra.
+      await propia.navigate(destino.href)
+      return propia.focus()
+    } catch {
+      return self.clients.openWindow(destino.href)
+    }
+  }
+  return self.clients.openWindow(destino.href)
 }

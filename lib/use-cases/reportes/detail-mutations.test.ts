@@ -8,6 +8,14 @@ const mocks = vi.hoisted(() => ({
   reemplazarFoto: vi.fn(), quitarFoto: vi.fn(), validarImagen: vi.fn(), obtenerDireccion: vi.fn(),
 }))
 vi.mock("server-only", () => ({}))
+const push = vi.hoisted(() => ({
+  pushCambioEstadoReporte: vi.fn(),
+  pushComentarioReporte: vi.fn(),
+  pushModeracionPendiente: vi.fn(),
+  pushCuadrillaAsignada: vi.fn(),
+  pushMascotaEncontrada: vi.fn(),
+}))
+vi.mock("@/lib/push/avisos.server", () => push)
 vi.mock("@/lib/geocodificacion/direccion-inversa", () => ({ obtenerDireccion: mocks.obtenerDireccion }))
 vi.mock("@/lib/moderation/imagenes-reporte.server", () => ({
   moderarYGuardarImagenReporte: mocks.reemplazarFoto,
@@ -25,6 +33,7 @@ vi.mock("@/database/queries/puntos", async (importOriginal) => ({
 }))
 
 beforeEach(() => {
+  Object.values(push).forEach((espia) => espia.mockReset())
   mocks.sumarPuntos.mockReset().mockResolvedValue({ success: true, error: null })
   mocks.getUserRoleContext.mockReset().mockResolvedValue({ data: { roleId: 2 }, error: null })
   mocks.isAdminRole.mockReset().mockReturnValue(true)
@@ -211,6 +220,13 @@ describe("report status transition concurrency", () => {
     expect(updateIsFilters).toContainEqual(["estado_id", null])
     expect(currentState).toBe(2)
     expect(historyInsert).toHaveBeenCalledTimes(1)
+    // La push no depende de que el dueño tenga correo cargado.
+    expect(push.pushCambioEstadoReporte).toHaveBeenCalledWith(supabase, {
+      usuarioId: "owner",
+      reporteId: 4,
+      titulo: "Reporte",
+      nuevoEstado: "Reparado",
+    })
   })
 
   it("does not overwrite an admin status change made after the workflow read the report", async () => {
@@ -302,6 +318,12 @@ describe("report activity contributions", () => {
     })
     expect(mocks.sumarPuntos).toHaveBeenCalledTimes(1)
     expect(mocks.sumarPuntos).toHaveBeenCalledWith(supabase, "user-1", 2, "Comentar en reporte ajeno")
+    expect(push.pushComentarioReporte).toHaveBeenCalledWith(supabase, {
+      usuarioId: "owner",
+      reporteId: 4,
+      autor: "Vecina",
+      contenido: "El problema sigue igual",
+    })
   })
 
   it("allows repeated active contributions and awards points for each", async () => {

@@ -20,6 +20,7 @@ import {
 import { ESTADOS_OPERATIVOS, ETIQUETAS_MOTIVO_CIERRE, REPORT_STATE_IDS } from "@/lib/authz/catalog"
 import { applyReportStateChange, getReportContext } from "@/lib/use-cases/reportes/detail-mutations"
 import { sendCrewAssignedEmail } from "@/lib/notifications/report-notifications"
+import { pushCuadrillaAsignada } from "@/lib/push/avisos.server"
 
 import { calcularAccionesDisponibles } from "./acciones-disponibles"
 import { asegurarOperadorDeCuadrillas, type ResultadoAccion } from "./guardias"
@@ -115,9 +116,31 @@ async function leerCuadrillaActiva(supabase: SupabaseClient, cuadrillaId: number
   return { success: true, data }
 }
 
-/** Envía, sin romper el flujo si falla, el email de asignación de cuadrilla al propietario del reporte (si tiene email). */
-async function notificarCuadrillaAsignada(contexto: ContextoReporte, cuadrillaNombre: string | null) {
-  if (!contexto.usuarioId || !contexto.propietario?.email) {
+/**
+ * Avisa al dueño del reporte que se le asignó una cuadrilla: push (si la tiene activada) y
+ * correo (si tiene email). Ningún fallo rompe el flujo de asignación.
+ *
+ * @param supabase - Cliente de servicio, necesario para leer las suscripciones push.
+ * @param contexto - Reporte asignado y su propietario.
+ * @param cuadrillaNombre - Nombre de la cuadrilla, si se conoce.
+ */
+export async function notificarCuadrillaAsignada(
+  supabase: SupabaseClient,
+  contexto: ContextoReporte,
+  cuadrillaNombre: string | null,
+) {
+  if (!contexto.usuarioId) {
+    return
+  }
+
+  await pushCuadrillaAsignada(supabase, {
+    usuarioId: contexto.usuarioId,
+    reporteId: contexto.id,
+    titulo: contexto.titulo,
+    cuadrillaNombre,
+  })
+
+  if (!contexto.propietario?.email) {
     return
   }
 
@@ -220,7 +243,7 @@ export async function asignarCuadrillaWorkflow(
   }
 
   if (esPrimeraAsignacion) {
-    await notificarCuadrillaAsignada(contextoResultado.data, cuadrillaResultado.data.nombre)
+    await notificarCuadrillaAsignada(supabase, contextoResultado.data, cuadrillaResultado.data.nombre)
   }
 
   return { success: true, data: asignacion }

@@ -28,6 +28,7 @@ import {
 import { MapPin, Send, CheckCircle2, CircleX, Info, FilePlus2, LoaderCircle } from "lucide-react"
 import Link from "next/link"
 import { InvitacionDonar } from "@/components/donaciones/invitacion-donar"
+import { InvitacionPush } from "@/components/push/invitacion-push"
 import { PUNTOS } from "@/database/queries/puntos"
 import { MapLoadingSkeleton, NuevoReporteLoadingSkeleton } from "@/components/loading-skeletons"
 import { REPORT_IMAGE_ACCEPT_ATTR } from "@/lib/media/report-images"
@@ -755,6 +756,9 @@ export default function NuevoReportePage() {
             {!createdReport.withdrawn && <Button asChild variant="outline" size="sm" className="w-full min-w-0 whitespace-normal [overflow-wrap:anywhere] text-center">
               <Link href={`/reportes/${createdReport.reportId}`}>Ver el reporte</Link>
             </Button>}
+            {!createdReport.isGuest && !createdReport.withdrawn && (
+              <InvitacionPush pregunta="¿Querés que te avisemos cuando cambie de estado?" />
+            )}
             {!createdReport.withdrawn && <InvitacionDonar />}
             {(!createdReport.imageApproved || createdReport.withdrawn) && (
               <Button type="button" variant="ghost-bordered" className="w-full" onClick={startNewReport}>

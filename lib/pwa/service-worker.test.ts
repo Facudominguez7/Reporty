@@ -68,7 +68,12 @@ function cargarServiceWorker(red: (peticion: Request) => Promise<Response>) {
     location: { origin: ORIGEN },
     addEventListener: (tipo: string, escucha: Escucha) => escuchas.set(tipo, escucha),
     skipWaiting: vi.fn(async () => {}),
-    clients: { claim: vi.fn(async () => {}) },
+    clients: {
+      claim: vi.fn(async () => {}),
+      matchAll: vi.fn(async (): Promise<Array<{ url: string; focus: () => Promise<unknown>; navigate: (url: string) => Promise<unknown> }>> => []),
+      openWindow: vi.fn(async () => null),
+    },
+    registration: { showNotification: vi.fn(async () => {}) },
   }
   new Function("self", "caches", "fetch", codigoServiceWorker)(selfFalso, almacenCaches, red)
 
@@ -88,7 +93,24 @@ function cargarServiceWorker(red: (peticion: Request) => Promise<Response>) {
     return respuesta ? await respuesta : undefined
   }
 
-  return { selfFalso, cachesAbiertas, almacenCaches, despacharCicloDeVida, despacharFetch }
+  /** Despacha un evento `push` con el JSON dado (o sin datos) y espera su `waitUntil`. */
+  async function despacharPush(datos?: unknown) {
+    let pendiente: Promise<unknown> = Promise.resolve()
+    const data = datos === undefined ? null : { json: () => datos }
+    escuchas.get("push")!({ data, waitUntil: (promesa: Promise<unknown>) => (pendiente = promesa) })
+    await pendiente
+  }
+
+  /** Despacha un `notificationclick` sobre una notificación con los datos dados. */
+  async function despacharClicNotificacion(datos: unknown) {
+    let pendiente: Promise<unknown> = Promise.resolve()
+    const notificacion = { data: datos, close: vi.fn() }
+    escuchas.get("notificationclick")!({ notification: notificacion, waitUntil: (promesa: Promise<unknown>) => (pendiente = promesa) })
+    await pendiente
+    return notificacion
+  }
+
+  return { selfFalso, cachesAbiertas, almacenCaches, despacharCicloDeVida, despacharFetch, despacharPush, despacharClicNotificacion }
 }
 
 /** Crea una petición de navegación de documento, como la que dispara abrir una URL. */
@@ -169,5 +191,52 @@ describe("service worker de Reporty", () => {
     expect(await sw.despacharFetch(new Request("https://proyecto.supabase.co/rest/v1/reportes"))).toBeUndefined()
     expect(await sw.despacharFetch(new Request(`${ORIGEN}/api/reportes`))).toBeUndefined()
     expect(red).not.toHaveBeenCalled()
+  })
+
+  it("muestra la notificación push con título, cuerpo, ícono, etiqueta y la ruta a abrir", async () => {
+    const sw = cargarServiceWorker(red)
+    await sw.despacharPush({ titulo: "Nuevo comentario", cuerpo: "ana comentó tu reporte", url: "/reportes/7", etiqueta: "comentario-7" })
+
+    expect(sw.selfFalso.registration.showNotification).toHaveBeenCalledWith("Nuevo comentario", expect.objectContaining({
+      body: "ana comentó tu reporte",
+      tag: "comentario-7",
+      icon: "/favicon_io/maskable-icon-192x192.png",
+      badge: "/favicon_io/monochrome-icon-512x512.png",
+      data: { url: "/reportes/7" },
+    }))
+  })
+
+  it("con una push sin datos muestra igual un aviso genérico (Chrome exige mostrar algo)", async () => {
+    const sw = cargarServiceWorker(red)
+    await sw.despacharPush()
+
+    expect(sw.selfFalso.registration.showNotification).toHaveBeenCalledWith("Reporty", expect.objectContaining({ data: { url: "/" } }))
+  })
+
+  it("al tocar la notificación enfoca una pestaña abierta de Reporty y la lleva a la ruta", async () => {
+    const sw = cargarServiceWorker(red)
+    const pestana = { url: `${ORIGEN}/mapa`, focus: vi.fn(async () => pestana), navigate: vi.fn(async () => pestana) }
+    sw.selfFalso.clients.matchAll.mockResolvedValue([pestana])
+
+    const notificacion = await sw.despacharClicNotificacion({ url: "/reportes/7" })
+
+    expect(notificacion.close).toHaveBeenCalled()
+    expect(pestana.navigate).toHaveBeenCalledWith(`${ORIGEN}/reportes/7`)
+    expect(pestana.focus).toHaveBeenCalled()
+    expect(sw.selfFalso.clients.openWindow).not.toHaveBeenCalled()
+  })
+
+  it("si no hay pestañas abiertas, abre una nueva en la ruta", async () => {
+    const sw = cargarServiceWorker(red)
+    await sw.despacharClicNotificacion({ url: "/mascotas/3" })
+
+    expect(sw.selfFalso.clients.openWindow).toHaveBeenCalledWith(`${ORIGEN}/mascotas/3`)
+  })
+
+  it("nunca abre otro origen desde una notificación", async () => {
+    const sw = cargarServiceWorker(red)
+    await sw.despacharClicNotificacion({ url: "https://sitio-malicioso.example/robo" })
+
+    expect(sw.selfFalso.clients.openWindow).toHaveBeenCalledWith(`${ORIGEN}/`)
   })
 })

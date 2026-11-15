@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   moderarEvidencia: vi.fn(),
   validarImagen: vi.fn(),
   notificarEstado: vi.fn(),
+  pushEstado: vi.fn(),
 }))
 
 vi.mock("server-only", () => ({}))
@@ -24,6 +25,7 @@ vi.mock("@/lib/moderation/imagenes-reporte.server", () => ({
 vi.mock("@/lib/media/report-image-validation.server", () => ({
   validateUploadedReportImage: mocks.validarImagen,
 }))
+vi.mock("@/lib/push/avisos.server", () => ({ pushCambioEstadoReporte: mocks.pushEstado }))
 vi.mock("@/lib/notifications/report-notifications", () => ({
   sendStatusNotificationEmail: mocks.notificarEstado,
   sendCommentNotificationEmail: vi.fn(),
@@ -519,6 +521,13 @@ describe("confirmar o impugnar una reparación", () => {
       reporteTitulo: "Bache en Av. Uruguay y Bolívar",
       nuevoEstado: "Reparado",
     }))
+    expect(mocks.pushEstado).toHaveBeenCalledOnce()
+    expect(mocks.pushEstado).toHaveBeenCalledWith(cliente.supabase, {
+      usuarioId: REPORTE_CON_DUEÑO.usuario_id,
+      reporteId: 9,
+      titulo: "Bache en Av. Uruguay y Bolívar",
+      nuevoEstado: "Reparado",
+    })
   })
 
   it("no deshace la verificación si falla el aviso por correo", async () => {
@@ -531,6 +540,7 @@ describe("confirmar o impugnar una reparación", () => {
 
     await expect(verificarReparacionWorkflow(cliente.supabase, "evidencia-1", "vecino", "confirmacion"))
       .resolves.toMatchObject({ success: true, data: { cerrado: true } })
+    expect(mocks.pushEstado).toHaveBeenCalledOnce()
   })
 })
 

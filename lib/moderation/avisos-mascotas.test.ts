@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-const { send } = vi.hoisted(() => ({ send: vi.fn() }))
+const { send, pushEncontrada } = vi.hoisted(() => ({ send: vi.fn(), pushEncontrada: vi.fn() }))
+vi.mock("@/lib/push/avisos.server", () => ({ pushMascotaEncontrada: pushEncontrada }))
 vi.mock("server-only", () => ({}))
 vi.mock("@/lib/notifications/mascota-notifications", () => ({ enviarAvisoEstadoMascota: send }))
 import { enviarAvisoMascotaPendiente, procesarAvisosMascota } from "./avisos-mascotas.server"
 
-function servicio({ claim = "token-1", row = { id: 7, mascota_id: 12, destinatario: "a@example.test", evento: "encontrada", token: "token-1", primer_intento_at: new Date().toISOString(), reclamado_hasta: new Date(Date.now() + 60_000).toISOString() }, confirm = true }: { claim?: string | null; row?: { id: number; mascota_id?: number; destinatario?: string; evento?: string; token?: string; estado?: string; primer_intento_at?: string; reclamado_hasta?: string }; confirm?: boolean } = {}) {
+function servicio({ claim = "token-1", row = { id: 7, mascota_id: 12, propietario_id: "dueña", destinatario: "a@example.test", evento: "encontrada", token: "token-1", primer_intento_at: new Date().toISOString(), reclamado_hasta: new Date(Date.now() + 60_000).toISOString() }, confirm = true }: { claim?: string | null; row?: { id: number; mascota_id?: number; propietario_id?: string; destinatario?: string; evento?: string; token?: string; estado?: string; primer_intento_at?: string; reclamado_hasta?: string }; confirm?: boolean } = {}) {
   const rpc = vi.fn(async (name: string) => name === "reclamar_aviso_estado_mascota"
     ? { data: claim, error: null } : { data: confirm, error: null })
   const query: Record<string, any> = {}
@@ -16,6 +17,29 @@ function servicio({ claim = "token-1", row = { id: 7, mascota_id: 12, destinatar
 }
 
 beforeEach(() => { vi.resetAllMocks(); send.mockResolvedValue({ data: { id: "resend-1" }, error: null }) })
+describe("push de mascota encontrada", () => {
+  it("avisa por push a quien publicó cuando el correo «encontrada» quedó confirmado", async () => {
+    const { db } = servicio()
+    await expect(enviarAvisoMascotaPendiente(db as never, 7)).resolves.toBe("enviado")
+    expect(pushEncontrada).toHaveBeenCalledOnce()
+    expect(pushEncontrada).toHaveBeenCalledWith(db, { usuarioId: "dueña", mascotaId: 12 })
+  })
+  it("no envía push por una publicación retirada", async () => {
+    const { db } = servicio({ row: { id: 7, mascota_id: 12, propietario_id: "dueña", destinatario: "a@example.test", evento: "retirada", token: "token-1", primer_intento_at: new Date().toISOString(), reclamado_hasta: new Date(Date.now() + 60_000).toISOString() } })
+    await expect(enviarAvisoMascotaPendiente(db as never, 7)).resolves.toBe("enviado")
+    expect(pushEncontrada).not.toHaveBeenCalled()
+  })
+  it("no envía push si el lease no se confirmó (el reintento la enviará)", async () => {
+    const { db } = servicio({ confirm: false })
+    await expect(enviarAvisoMascotaPendiente(db as never, 7)).resolves.toBe("pendiente")
+    expect(pushEncontrada).not.toHaveBeenCalled()
+  })
+  it("un fallo de la push no cambia el resultado del outbox", async () => {
+    pushEncontrada.mockRejectedValueOnce(new Error("push caída"))
+    const { db } = servicio()
+    await expect(enviarAvisoMascotaPendiente(db as never, 7)).resolves.toBe("enviado")
+  })
+})
 describe("outbox de avisos de mascotas", () => {
   it("no afirma envío cuando el proveedor pudo aceptar el correo", async () => {
     send.mockRejectedValueOnce(new Error("response lost after acceptance"))
