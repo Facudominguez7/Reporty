@@ -12,6 +12,7 @@ import { ChipReporte, TONO_CATEGORIA, tonoEstado } from "@/components/report-det
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { withReportesReturnTo } from "@/lib/reportes/navigation"
+import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 
 /** Chips más chicos que los de la ficha: la tarjeta compacta tiene poco ancho a la derecha. */
 const CLASE_CHIP_TARJETA = "h-5 max-w-24 overflow-hidden gap-1 px-2 text-[10px] sm:h-6 sm:max-w-[7.5rem] sm:text-[11px] md:text-[11px] [&_svg]:size-3"
@@ -85,7 +86,7 @@ export function ReportCompactCard({
                 </span>
                 <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <Calendar className="size-3.5 flex-none" />
-                  {new Date(createdAt).toLocaleDateString("es-AR")}
+                  {formatearFechaArgentina(createdAt)}
                 </span>
               </div>
             </div>

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getCategoryIcon, getPriorityIcon, getPriorityVariant } from "@/components/report-card"
 import type { AdminReport } from "@/database/queries/admin/admin-reportes"
 import { cambiarEstadoReporteAction, eliminarReporteAction } from "@/app/admin/reportes/actions"
+import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 
 type Option = { id: number; nombre: string }
 
@@ -103,7 +104,7 @@ export function RecentAdminReports({ reports, estados }: Props) {
               </div>
               <p className="truncate text-sm font-semibold">{report.titulo}</p>
               <p className="truncate text-[0.7rem] text-muted-foreground">Creado por: <span className="font-medium text-foreground">{report.autor?.username || "Usuario sin nombre"}</span></p>
-              <time className="block text-right text-[0.7rem] text-muted-foreground" dateTime={report.created_at}>{new Date(report.created_at).toLocaleDateString("es-AR")}</time>
+              <time className="block text-right text-[0.7rem] text-muted-foreground" dateTime={report.created_at}>{formatearFechaArgentina(report.created_at)}</time>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:justify-end" onClick={(event) => event.stopPropagation()}>
               <Select disabled={isPending && busyId === report.id} value={String(report.estado_id)} onValueChange={(value) => requestStatusChange(report.id, value, report.titulo)}>

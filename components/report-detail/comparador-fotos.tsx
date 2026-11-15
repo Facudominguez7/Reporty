@@ -16,6 +16,7 @@ import dayjs from "dayjs"
 import utc from "dayjs/plugin/utc"
 import timezone from "dayjs/plugin/timezone"
 import { MoveHorizontal } from "lucide-react"
+import { leerFechaBase } from "@/lib/fechas/fecha-base"
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -45,12 +46,14 @@ export type ComparadorFotosProps = {
 
 /**
  * Fecha corta del rótulo («27 oct») en hora argentina, para que el HTML del servidor
- * y el del navegador coincidan. Las fechas sin zona se leen como -03:00, igual que el
- * resto de la ficha del reporte.
+ * y el del navegador coincidan. Las fechas sin zona se leen como UTC (`leerFechaBase`),
+ * igual que el resto de la ficha del reporte.
+ *
+ * @param fecha - Fecha devuelta por la base, o `null`.
  */
 function formatearFechaCorta(fecha: string | null) {
   if (!fecha) return null
-  const interpretada = /(Z|[+-]\d{2}(:?\d{2})?)$/.test(fecha) ? new Date(fecha) : new Date(`${fecha}-03:00`)
+  const interpretada = leerFechaBase(fecha)
   if (Number.isNaN(interpretada.getTime())) return null
 
   const enZona = dayjs(interpretada).tz(ZONA_HORARIA)

@@ -61,6 +61,7 @@ import type {
   SeccionReparacionVista,
 } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server"
 import { ComparadorFotos, type FotoComparada } from "./comparador-fotos"
+import { leerFechaBase } from "@/lib/fechas/fecha-base"
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -93,13 +94,13 @@ function formatearFechaHora(fecha: string) {
 }
 
 /**
- * `reportes.created_at` es un timestamp sin zona: se lee como hora argentina para que
- * el HTML del servidor y el navegador coincidan, igual que en la ficha.
+ * `reportes.created_at` es un timestamp sin zona guardado en UTC: se lee con `leerFechaBase`
+ * para que el HTML del servidor y el navegador coincidan, igual que en la ficha.
+ *
+ * @param fecha - Fecha devuelta por la base.
  */
 function formatearFechaDeReporte(fecha: string) {
-  const interpretada = /(Z|[+-]\d{2}(:?\d{2})?)$/.test(fecha)
-    ? new Date(fecha)
-    : new Date(`${fecha}-03:00`)
+  const interpretada = leerFechaBase(fecha)
   if (Number.isNaN(interpretada.getTime())) return null
   return dayjs(interpretada).tz(ZONA_HORARIA).format("DD/MM/YYYY")
 }

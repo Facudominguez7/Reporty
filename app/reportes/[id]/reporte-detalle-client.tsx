@@ -107,6 +107,7 @@ import {
   eliminarReportePropioAction,
   votarNoExisteAction,
 } from "./actions";
+import { leerFechaBase } from "@/lib/fechas/fecha-base"
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -148,13 +149,13 @@ function createAdminReportDraft(reporte: ReporteDetalle): AdminReportDraft {
 }
 
 /**
- * `reportes.created_at` is a timestamp without time zone. Browsers parse such strings as local
- * time, so the page has always shown them as Argentine wall-clock time. Reading them as UTC-3
- * (Argentina has no daylight saving) gives that same result on the server and in any browser,
- * so the server HTML matches the hydrated page. Strings that carry an offset keep it.
+ * Lee `reportes.created_at`, un timestamp sin zona guardado en UTC, igual en el servidor y en
+ * el navegador (ver `leerFechaBase`).
+ *
+ * @param fecha - Fecha devuelta por la base.
  */
 function parseFechaReporte(fecha: string) {
-  return /(Z|[+-]\d{2}(:?\d{2})?)$/.test(fecha) ? new Date(fecha) : new Date(`${fecha}-03:00`);
+  return leerFechaBase(fecha);
 }
 
 function formatRepairDuration(createdAt: string, repairedAt: string) {
