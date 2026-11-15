@@ -6,6 +6,7 @@ const effects = vi.hoisted(() => ({
   updateReport: vi.fn(),
   notificar: vi.fn(),
   notificarRevisionAdmin: vi.fn(),
+  consultaRevision: vi.fn(),
 }))
 
 vi.mock("server-only", () => ({}))
@@ -18,7 +19,7 @@ vi.mock("@/database/queries/puntos", async (importOriginal) => ({
 
 import { votarNoExisteWorkflow, votarReparadoWorkflow } from "@/lib/use-cases/reportes/detail-mutations"
 
-function reportClient({ voteCount, ownerId = "report-owner", email = false, estado = 1 }: { voteCount: number; ownerId?: string; email?: boolean; estado?: number }) {
+function reportClient({ voteCount, ownerId = "report-owner", email = false, estado = 1, revision = null }: { voteCount: number; ownerId?: string; email?: boolean; estado?: number; revision?: string | null }) {
   const report = { id: 9, usuario_id: ownerId, titulo: "Bache", estado_id: estado, deleted_at: null, ownerProfile: email ? { email: "autor@example.invalid", username: "Autor" } : null }
   return {
     rpc: vi.fn(async (_nombre: string, args: { p_tipo: string }) => ({
@@ -48,6 +49,11 @@ function reportClient({ voteCount, ownerId = "report-owner", email = false, esta
         }
       }
       if (table === "historial_estados") return { insert: async () => ({ error: null }) }
+      if (table === "reportes_revision_rechazo") {
+        effects.consultaRevision()
+        const query = { eq: () => query, maybeSingle: async () => ({ data: revision ? { estado: revision } : null, error: null }) }
+        return { select: () => query }
+      }
       throw new Error(`Unexpected table ${table}`)
     },
   } as never
@@ -100,6 +106,22 @@ describe("contrato de voto exclusivo", () => {
 })
 
 describe("community report status votes", () => {
+  it("reports the open admin review once five votes opened it", async () => {
+    const result = await votarNoExisteWorkflow(reportClient({ voteCount: 5, revision: "pendiente" }), 9, "voter")
+    expect(result).toMatchObject({ success: true, data: { enRevision: true } })
+  })
+
+  it("does not report a review an admin already dismissed", async () => {
+    const result = await votarNoExisteWorkflow(reportClient({ voteCount: 6, revision: "descartada" }), 9, "voter")
+    expect(result).toMatchObject({ success: true, data: { enRevision: false } })
+  })
+
+  it("skips the review lookup below five votes", async () => {
+    const result = await votarNoExisteWorkflow(reportClient({ voteCount: 4 }), 9, "voter")
+    expect(result).toMatchObject({ success: true, data: { enRevision: false } })
+    expect(effects.consultaRevision).not.toHaveBeenCalled()
+  })
+
   it("notifies admins when the fifth 'No existe' vote opens review without rejecting the report", async () => {
     const result = await votarNoExisteWorkflow(reportClient({ voteCount: 5 }), 9, "voter")
 

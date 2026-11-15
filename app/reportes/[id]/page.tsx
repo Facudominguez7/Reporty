@@ -14,7 +14,7 @@ import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
 import { getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
-import { tieneFotografiaAprobada, tieneFotografiaPendiente } from "@/lib/moderation/estado-publico.server";
+import { tieneFotografiaAprobada, tieneFotografiaPendiente, tieneRevisionRechazoPendiente } from "@/lib/moderation/estado-publico.server";
 import { obtenerSeccionReparacion } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { obtenerGestionOperativaDetalle } from "@/lib/use-cases/cuadrillas/detalle-operativo";
 import { ReporteDetalleClient, type ReporteDetalleInicial } from "./reporte-detalle-client";
@@ -124,10 +124,12 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
         )
       : undefined;
 
-    const [fotografiaPendiente, fotografiaAprobada, evidenciaReparacion] = encontrado
+    const [fotografiaPendiente, fotografiaAprobada, revisionRechazoPendiente, evidenciaReparacion] = encontrado
       ? await Promise.all([
           tieneFotografiaPendiente(encontrado.id),
           tieneFotografiaAprobada(encontrado.id),
+          // Solo un reporte abierto puede estar en revisión de rechazo.
+          cerrado ? false : tieneRevisionRechazoPendiente(encontrado.id),
           // La evidencia de reparación nunca rompe la ficha: si su lectura falla, la
           // sección desaparece y el reporte sigue renderizado.
           obtenerSeccionReparacion(encontrado.id, encontrado.estado_id).catch((evidenciaError) => {
@@ -135,11 +137,12 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
             return null
           }),
         ])
-      : [false, false, null];
+      : [false, false, false, null];
 
     return {
       reporte: encontrado,
       fotografiaPendiente,
+      revisionRechazoPendiente,
       puedeContactar: Boolean(encontrado && fotografiaAprobada),
       currentUser: user ? { id: user.id, is_anonymous: user.is_anonymous } : null,
       isAdmin: adminResult?.isAdmin ?? false,
