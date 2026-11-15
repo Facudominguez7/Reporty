@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Arquitectura Android y Push · Reporty</title>
+<style>
+  :root{
+    --fondo:#f6f8f7;--panel:#ffffff;--borde:#d5ddd9;--texto:#17211d;--suave:#55645d;
+    --verde:#2e7d5b;--verde-suave:#e3f1ea;--azul:#2563a8;--azul-suave:#e3edf8;
+    --ambar:#a8650b;--ambar-suave:#fbf0dc;--rojo:#b3402f;--rojo-suave:#f8e4e0;--gris-suave:#eef1f0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --fondo:#0d1412;--panel:#152019;--borde:#2c3b34;--texto:#e7efeb;--suave:#9fb1a8;
+      --verde:#6fd3a5;--verde-suave:#173226;--azul:#8cbcf2;--azul-suave:#16273a;
+      --ambar:#f0be6c;--ambar-suave:#33270f;--rojo:#f09a8b;--rojo-suave:#3a1d18;--gris-suave:#1b2722;
+    }
+  }
+  :root[data-theme="dark"]{
+    --fondo:#0d1412;--panel:#152019;--borde:#2c3b34;--texto:#e7efeb;--suave:#9fb1a8;
+    --verde:#6fd3a5;--verde-suave:#173226;--azul:#8cbcf2;--azul-suave:#16273a;
+    --ambar:#f0be6c;--ambar-suave:#33270f;--rojo:#f09a8b;--rojo-suave:#3a1d18;--gris-suave:#1b2722;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--fondo);color:var(--texto);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:1040px;margin:0 auto;padding:40px 16px 80px}
+  header{border-bottom:1px solid var(--borde);padding-bottom:24px;margin-bottom:8px}
+  .eyebrow{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--verde);font-weight:600}
+  h1{font-size:clamp(28px,5vw,40px);line-height:1.15;margin:8px 0 12px}
+  h2{font-size:24px;margin:48px 0 6px;scroll-margin-top:16px}
+  h2 .num{color:var(--verde);font-variant-numeric:tabular-nums;margin-right:8px}
+  h3{font-size:17px;margin:20px 0 6px}
+  p{margin:8px 0}
+  .lead{font-size:18px;color:var(--suave);max-width:70ch}
+  .sub{color:var(--suave);margin-top:0;max-width:72ch}
+  nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  nav a{font-size:14px;color:var(--texto);text-decoration:none;border:1px solid var(--borde);border-radius:999px;padding:4px 12px;background:var(--panel)}
+  nav a:hover{border-color:var(--verde)}
+  code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--gris-suave);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+  figure{margin:16px 0;background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:16px;overflow-x:auto}
+  figure svg{display:block;width:100%;height:auto;min-width:640px}
+  figcaption{font-size:14px;color:var(--suave);margin-top:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:12px 0}
+  .card{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:14px 16px}
+  .card h3{margin-top:0}
+  .card p{font-size:15px}
+  .tag{display:inline-block;font-size:12px;font-weight:600;border-radius:6px;padding:1px 8px;margin-bottom:6px}
+  .t-verde{background:var(--verde-suave);color:var(--verde)}
+  .t-azul{background:var(--azul-suave);color:var(--azul)}
+  .t-ambar{background:var(--ambar-suave);color:var(--ambar)}
+  .t-rojo{background:var(--rojo-suave);color:var(--rojo)}
+  .table-wrap{overflow-x:auto;border:1px solid var(--borde);border-radius:12px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:15px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--borde);vertical-align:top}
+  th{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave);background:var(--gris-suave)}
+  tr:last-child td{border-bottom:0}
+  .nota{border-left:3px solid var(--ambar);background:var(--ambar-suave);padding:10px 14px;border-radius:0 8px 8px 0;font-size:15px}
+  footer{margin-top:56px;color:var(--suave);font-size:14px;border-top:1px solid var(--borde);padding-top:16px}
+  /* Diagramas: los colores salen de las variables para que funcionen en claro y oscuro. */
+  svg text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--texto)}
+  svg .t-sm{font-size:12px;fill:var(--suave)}
+  svg .t-md{font-size:14px}
+  svg .t-b{font-weight:600}
+  svg .caja{fill:var(--panel);stroke:var(--borde);stroke-width:1.5}
+  svg .c-verde{fill:var(--verde-suave);stroke:var(--verde)}
+  svg .c-azul{fill:var(--azul-suave);stroke:var(--azul)}
+  svg .c-ambar{fill:var(--ambar-suave);stroke:var(--ambar)}
+  svg .c-rojo{fill:var(--rojo-suave);stroke:var(--rojo)}
+  svg .c-gris{fill:var(--gris-suave);stroke:var(--borde)}
+  svg .linea{stroke:var(--suave);stroke-width:1.5;fill:none}
+  svg .linea-v{stroke:var(--verde);stroke-width:1.8;fill:none}
+  svg .punteada{stroke:var(--suave);stroke-width:1.2;stroke-dasharray:5 4;fill:none}
+  svg .vida{stroke:var(--borde);stroke-width:1.5;stroke-dasharray:4 4}
+  svg .act{fill:var(--verde-suave);stroke:var(--verde);stroke-width:1}
+  svg .flecha{fill:var(--suave)}
+  svg .flecha-v{fill:var(--verde)}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="eyebrow">Reporty · documento de arquitectura</div>
+  <h1>App Android y notificaciones push</h1>
+  <p class="lead">Cómo la misma aplicación web llega a Android sin código nativo propio, y cómo un evento del servidor termina como notificación en el teléfono.</p>
+  <nav aria-label="Secciones">
+    <a href="#contexto">1. Contexto</a><a href="#despliegue">2. Despliegue</a><a href="#capas">3. Capas</a>
+    <a href="#suscripcion">4. Suscripción</a><a href="#envio">5. Envío</a><a href="#datos">6. Datos</a>
+    <a href="#estados">7. Estados</a><a href="#decisiones">8. Decisiones</a><a href="#archivos">9. Archivos</a>
+  </nav>
+</header>
+
+<!-- 1. CONTEXTO -->
+<section id="contexto">
+  <h2><span class="num">1</span>Diagrama de contexto</h2>
+  <p class="sub">El sistema visto como una caja negra: quién lo usa y con qué sistemas externos conversa. La app Android no es un sistema aparte: es una ventana de Chrome sin barra de direcciones que muestra <code>reporty.com.ar</code>.</p>
+  <figure>
+    <svg viewBox="0 0 900 420" role="img" aria-labelledby="ctx-t">
+      <title id="ctx-t">Contexto: vecinos y administradores usan Reporty desde el navegador o la app Android; Reporty usa Supabase, Resend y los servicios push.</title>
+      <defs>
+        <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="flecha"/></marker>
+        <marker id="mv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="flecha-v"/></marker>
+      </defs>
+      <!-- actores -->
+      <rect x="20" y="60" width="150" height="70" rx="10" class="caja c-gris"/>
+      <text x="95" y="90" text-anchor="middle" class="t-md t-b">Vecino</text>
+      <text x="95" y="110" text-anchor="middle" class="t-sm">reporta, vota, comenta</text>
+      <rect x="20" y="290" width="150" height="70" rx="10" class="caja c-gris"/>
+      <text x="95" y="320" text-anchor="middle" class="t-md t-b">Administrador</text>
+      <text x="95" y="340" text-anchor="middle" class="t-sm">modera, cambia estados</text>
+      <!-- clientes -->
+      <rect x="230" y="40" width="190" height="110" rx="10" class="caja c-azul"/>
+      <text x="325" y="70" text-anchor="middle" class="t-md t-b">App Android (TWA)</text>
+      <text x="325" y="92" text-anchor="middle" class="t-sm">com.reporty.app</text>
+      <text x="325" y="110" text-anchor="middle" class="t-sm">Chrome sin barra de URL</text>
+      <text x="325" y="128" text-anchor="middle" class="t-sm">abre /mapa</text>
+      <rect x="230" y="270" width="190" height="110" rx="10" class="caja c-azul"/>
+      <text x="325" y="300" text-anchor="middle" class="t-md t-b">Navegador / PWA</text>
+      <text x="325" y="322" text-anchor="middle" class="t-sm">Chrome, Firefox, Safari</text>
+      <text x="325" y="340" text-anchor="middle" class="t-sm">mismo sitio web</text>
+      <!-- sistema -->
+      <rect x="480" y="140" width="190" height="140" rx="12" class="caja c-verde" stroke-width="2.5"/>
+      <text x="575" y="180" text-anchor="middle" class="t-md t-b">Reporty</text>
+      <text x="575" y="202" text-anchor="middle" class="t-sm">reporty.com.ar</text>
+      <text x="575" y="222" text-anchor="middle" class="t-sm">Next.js 15 en</text>
+      <text x="575" y="240" text-anchor="middle" class="t-sm">Cloudflare Workers</text>
+      <text x="575" y="258" text-anchor="middle" class="t-sm">(OpenNext)</text>
+      <!-- externos -->
+      <rect x="730" y="30" width="150" height="70" rx="10" class="caja c-gris"/>
+      <text x="805" y="60" text-anchor="middle" class="t-md t-b">Supabase</text>
+      <text x="805" y="80" text-anchor="middle" class="t-sm">Auth, Postgres, Storage</text>
+      <rect x="730" y="175" width="150" height="70" rx="10" class="caja c-gris"/>
+      <text x="805" y="205" text-anchor="middle" class="t-md t-b">Resend</text>
+      <text x="805" y="225" text-anchor="middle" class="t-sm">correos</text>
+      <rect x="730" y="320" width="150" height="70" rx="10" class="caja c-ambar"/>
+      <text x="805" y="345" text-anchor="middle" class="t-md t-b">Servicios push</text>
+      <text x="805" y="365" text-anchor="middle" class="t-sm">FCM · Mozilla · Apple</text>
+      <!-- relaciones -->
+      <path d="M170 95 H230" class="linea" marker-end="url(#m)"/>
+      <path d="M170 325 H230" class="linea" marker-end="url(#m)"/>
+      <path d="M95 130 V290" class="punteada"/>
+      <text x="103" y="215" class="t-sm">usa ambos</text>
+      <path d="M420 110 L480 175" class="linea" marker-end="url(#m)"/>
+      <path d="M420 310 L480 250" class="linea" marker-end="url(#m)"/>
+      <text x="400" y="220" class="t-sm">HTTPS</text>
+      <path d="M670 170 L730 75" class="linea" marker-end="url(#m)"/>
+      <path d="M670 210 H730" class="linea" marker-end="url(#m)"/>
+      <path d="M670 250 L730 345" class="linea-v" marker-end="url(#mv)"/>
+      <text x="676" y="320" class="t-sm" style="fill:var(--verde)">VAPID</text>
+      <!-- retorno push al teléfono -->
+      <path d="M805 390 V408 H325 V380" class="linea-v" marker-end="url(#mv)"/>
+      <text x="560" y="402" class="t-sm" style="fill:var(--verde)">entrega la notificación al dispositivo (también a la TWA)</text>
+    </svg>
+    <figcaption>Figura 1. Contexto del sistema. La flecha verde es el camino nuevo de las notificaciones push.</figcaption>
+  </figure>
+</section>
+
+<!-- 2. DESPLIEGUE -->
+<section id="despliegue">
+  <h2><span class="num">2</span>Diagrama de despliegue</h2>
+  <p class="sub">Un solo repositorio produce dos entregables. La web se despliega en cada merge a <code>main</code>. El paquete Android solo se recompila cuando cambia <code>android/twa/**</code>, porque la app muestra la web publicada: un cambio de la web llega al teléfono sin subir una versión nueva a Play.</p>
+  <figure>
+    <svg viewBox="0 0 900 360" role="img" aria-labelledby="dep-t">
+      <title id="dep-t">Despliegue: main dispara Workers Builds hacia Cloudflare; cambios en android/twa disparan GitHub Actions hacia Play Console.</title>
+      <defs>
+        <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="flecha"/></marker>
+      </defs>
+      <rect x="20" y="140" width="160" height="80" rx="10" class="caja c-gris"/>
+      <text x="100" y="172" text-anchor="middle" class="t-md t-b">GitHub · main</text>
+      <text x="100" y="194" text-anchor="middle" class="t-sm">Facudominguez7/Reporty</text>
+      <!-- rama web -->
+      <rect x="250" y="40" width="180" height="80" rx="10" class="caja c-azul"/>
+      <text x="340" y="72" text-anchor="middle" class="t-md t-b">Workers Builds</text>
+      <text x="340" y="94" text-anchor="middle" class="t-sm">cada push a main</text>
+      <rect x="500" y="30" width="200" height="100" rx="10" class="caja c-verde"/>
+      <text x="600" y="60" text-anchor="middle" class="t-md t-b">Worker «reporty»</text>
+      <text x="600" y="82" text-anchor="middle" class="t-sm">reporty.com.ar</text>
+      <text x="600" y="100" text-anchor="middle" class="t-sm">secretos: VAPID_*, Supabase,</text>
+      <text x="600" y="116" text-anchor="middle" class="t-sm">Resend, R2…</text>
+      <rect x="760" y="40" width="120" height="80" rx="10" class="caja c-gris"/>
+      <text x="820" y="72" text-anchor="middle" class="t-md t-b">Supabase</text>
+      <text x="820" y="94" text-anchor="middle" class="t-sm">migraciones</text>
+      <!-- rama android -->
+      <rect x="250" y="240" width="180" height="90" rx="10" class="caja c-azul"/>
+      <text x="340" y="268" text-anchor="middle" class="t-md t-b">GitHub Actions</text>
+      <text x="340" y="290" text-anchor="middle" class="t-sm">android-play-publicar.yml</text>
+      <text x="340" y="308" text-anchor="middle" class="t-sm">solo si cambia android/twa/**</text>
+      <rect x="500" y="240" width="200" height="90" rx="10" class="caja c-ambar"/>
+      <text x="600" y="268" text-anchor="middle" class="t-md t-b">Play Console</text>
+      <text x="600" y="290" text-anchor="middle" class="t-sm">track «internal»</text>
+      <text x="600" y="308" text-anchor="middle" class="t-sm">AAB firmado con upload key</text>
+      <rect x="760" y="240" width="120" height="90" rx="10" class="caja c-gris"/>
+      <text x="820" y="272" text-anchor="middle" class="t-md t-b">Teléfono</text>
+      <text x="820" y="294" text-anchor="middle" class="t-sm">instala la TWA</text>
+      <!-- flechas -->
+      <path d="M180 165 L250 85" class="linea" marker-end="url(#m2)"/>
+      <path d="M180 200 L250 280" class="linea" marker-end="url(#m2)"/>
+      <path d="M430 80 H500" class="linea" marker-end="url(#m2)"/>
+      <path d="M700 80 H760" class="punteada" marker-end="url(#m2)"/>
+      <path d="M430 285 H500" class="linea" marker-end="url(#m2)"/>
+      <path d="M700 285 H760" class="linea" marker-end="url(#m2)"/>
+      <!-- verificación de dominio -->
+      <path d="M820 240 V170 H600 V130" class="punteada" marker-end="url(#m2)"/>
+      <text x="625" y="162" class="t-sm">verifica /.well-known/assetlinks.json (sin barra de URL)</text>
+    </svg>
+    <figcaption>Figura 2. Despliegue. La línea punteada a Supabase significa que las migraciones se aplican a mano, no en el build.</figcaption>
+  </figure>
+  <div class="grid">
+    <article class="card"><span class="tag t-azul">Paquete Android</span><h3>Trusted Web Activity</h3><p>Generado con Bubblewrap. <code>com.reporty.app</code>, versión 1.0.1 (versionCode 2), minSdk 24, targetSdk 36. Si el teléfono no tiene un navegador compatible, abre una Custom Tab.</p></article>
+    <article class="card"><span class="tag t-azul">Confianza</span><h3>Digital Asset Links</h3><p><code>assetlinks.json</code> declara dos huellas: la de la upload key y la de Play App Signing. Sin las dos, la app muestra la barra de URL.</p></article>
+    <article class="card"><span class="tag t-ambar">Firma</span><h3>Secretos de CI</h3><p>El entorno <code>google-play</code> de GitHub guarda el keystore, sus claves y la cuenta de servicio con permiso en Play Console.</p></article>
+  </div>
+</section>
+
+<!-- 3. CAPAS -->
+<section id="capas">
+  <h2><span class="num">3</span>Arquitectura en capas</h2>
+  <p class="sub">Cada capa solo usa la de abajo. El cliente nunca toca las tablas de push: todo pasa por server actions, que validan la sesión y escriben con el cliente de servicio.</p>
+  <figure>
+    <svg viewBox="0 0 900 380" role="img" aria-labelledby="cap-t">
+      <title id="cap-t">Capas: presentación, server actions, casos de uso, envío push, acceso a datos y base de datos.</title>
+      <g>
+        <rect x="20" y="10" width="860" height="70" rx="10" class="caja c-azul"/>
+        <text x="40" y="38" class="t-md t-b">Presentación (cliente)</text>
+        <text x="40" y="60" class="t-sm">AvisoPushAutomatico · InvitacionPush · NotificacionesSection (Mi cuenta) · lib/push/cliente.ts · public/sw.js</text>
+        <rect x="20" y="95" width="860" height="56" rx="10" class="caja c-gris"/>
+        <text x="40" y="120" class="t-md t-b">Server actions</text>
+        <text x="40" y="140" class="t-sm">app/cuenta/push-actions.ts (estado, guardar, eliminar, preferencias) · acciones de reportes, cuadrillas y mascotas</text>
+        <rect x="20" y="166" width="860" height="56" rx="10" class="caja c-gris"/>
+        <text x="40" y="191" class="t-md t-b">Casos de uso (dominio)</text>
+        <text x="40" y="211" class="t-sm">detail-mutations · evidencia-reparacion · cuadrillas/asignaciones · moderation/* → llaman al correo Y a la push</text>
+        <rect x="20" y="237" width="420" height="56" rx="10" class="caja c-verde"/>
+        <text x="40" y="262" class="t-md t-b">Avisos push</text>
+        <text x="40" y="282" class="t-sm">lib/push/avisos.server.ts (un aviso por función)</text>
+        <rect x="460" y="237" width="420" height="56" rx="10" class="caja c-verde"/>
+        <text x="480" y="262" class="t-md t-b">Envío</text>
+        <text x="480" y="282" class="t-sm">lib/push/enviar.server.ts (VAPID, cifrado, 8 s, 404/410)</text>
+        <rect x="20" y="308" width="860" height="56" rx="10" class="caja c-ambar"/>
+        <text x="40" y="333" class="t-md t-b">Datos</text>
+        <text x="40" y="353" class="t-sm">database/queries/push/suscripciones.ts → suscripciones_push, preferencias_push (solo service role)</text>
+      </g>
+    </svg>
+    <figcaption>Figura 3. Capas. Lo verde es nuevo y es lo único que conoce el protocolo Web Push.</figcaption>
+  </figure>
+</section>
+
+<!-- 4. SECUENCIA SUSCRIPCIÓN -->
+<section id="suscripcion">
+  <h2><span class="num">4</span>Secuencia: activar las notificaciones</h2>
+  <p class="sub">El permiso del sistema solo se pide después de un toque. En la app Android, Chrome se lo delega a la TWA (<code>DelegationService</code>), y Android 13 o más nuevo muestra su propio diálogo de <code>POST_NOTIFICATIONS</code>.</p>
+  <figure>
+    <svg viewBox="0 0 900 520" role="img" aria-labelledby="sus-t">
+      <title id="sus-t">Secuencia de suscripción entre la persona, el aviso, el navegador, el servicio push, la server action y la base.</title>
+      <defs>
+        <marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="flecha"/></marker>
+      </defs>
+      <!-- cabeceras -->
+      <g class="t-sm">
+        <rect x="20" y="10" width="110" height="40" rx="8" class="caja c-gris"/><text x="75" y="35" text-anchor="middle" class="t-md t-b">Persona</text>
+        <rect x="165" y="10" width="130" height="40" rx="8" class="caja c-azul"/><text x="230" y="35" text-anchor="middle" class="t-md t-b">Aviso (React)</text>
+        <rect x="330" y="10" width="140" height="40" rx="8" class="caja c-azul"/><text x="400" y="35" text-anchor="middle" class="t-md t-b">Navegador / TWA</text>
+        <rect x="505" y="10" width="120" height="40" rx="8" class="caja c-ambar"/><text x="565" y="35" text-anchor="middle" class="t-md t-b">Servicio push</text>
+        <rect x="660" y="10" width="120" height="40" rx="8" class="caja c-gris"/><text x="720" y="35" text-anchor="middle" class="t-md t-b">Server action</text>
+        <rect x="805" y="10" width="80" height="40" rx="8" class="caja c-gris"/><text x="845" y="35" text-anchor="middle" class="t-md t-b">Base</text>
+      </g>
+      <line x1="75" y1="50" x2="75" y2="510" class="vida"/><line x1="230" y1="50" x2="230" y2="510" class="vida"/>
+      <line x1="400" y1="50" x2="400" y2="510" class="vida"/><line x1="565" y1="50" x2="565" y2="510" class="vida"/>
+      <line x1="720" y1="50" x2="720" y2="510" class="vida"/><line x1="845" y1="50" x2="845" y2="510" class="vida"/>
+      <!-- mensajes -->
+      <path d="M230 80 H715" class="linea" marker-end="url(#m3)"/><text x="245" y="74" class="t-sm">1. obtenerEstadoPushAction() — sesión registrada, clave pública VAPID</text>
+      <path d="M720 105 H235" class="punteada" marker-end="url(#m3)"/><text x="420" y="99" class="t-sm">{ disponible, clavePublica, preferencias }</text>
+      <path d="M230 135 H395" class="linea" marker-end="url(#m3)"/><text x="240" y="129" class="t-sm">2. ¿ya suscripto?</text>
+      <rect x="160" y="150" width="140" height="22" rx="4" class="act"/><text x="230" y="166" text-anchor="middle" class="t-sm">muestra la barra</text>
+      <path d="M75 200 H225" class="linea" marker-end="url(#m3)"/><text x="85" y="194" class="t-sm">3. «Activar»</text>
+      <path d="M230 230 H395" class="linea" marker-end="url(#m3)"/><text x="240" y="224" class="t-sm">4. requestPermission()</text>
+      <path d="M400 255 H80" class="punteada" marker-end="url(#m3)"/><text x="160" y="249" class="t-sm">diálogo del sistema (Android 13+: POST_NOTIFICATIONS)</text>
+      <path d="M75 280 H395" class="linea" marker-end="url(#m3)"/><text x="160" y="274" class="t-sm">5. «Permitir»</text>
+      <path d="M400 310 H560" class="linea" marker-end="url(#m3)"/><text x="410" y="304" class="t-sm">6. pushManager.subscribe(clave)</text>
+      <path d="M565 335 H405" class="punteada" marker-end="url(#m3)"/><text x="415" y="329" class="t-sm">endpoint + p256dh + auth</text>
+      <path d="M400 365 H715" class="linea" marker-end="url(#m3)"/><text x="420" y="359" class="t-sm">7. guardarSuscripcionPushAction(suscripción)</text>
+      <rect x="660" y="378" width="120" height="40" rx="4" class="act"/><text x="720" y="395" text-anchor="middle" class="t-sm">valida https,</text><text x="720" y="410" text-anchor="middle" class="t-sm">base64url, sesión</text>
+      <path d="M720 440 H840" class="linea" marker-end="url(#m3)"/><text x="730" y="434" class="t-sm">8. upsert</text>
+      <path d="M720 470 H235" class="punteada" marker-end="url(#m3)"/><text x="420" y="464" class="t-sm">ok → la barra se cierra con «Listo»</text>
+      <text x="245" y="500" class="t-sm">Si el guardado falla, el navegador se desuscribe para no dejar una suscripción huérfana.</text>
+    </svg>
+    <figcaption>Figura 4. Suscripción. Los invitados no llegan al paso 2: el servidor responde «no disponible».</figcaption>
+  </figure>
+</section>
+
+<!-- 5. SECUENCIA ENVÍO -->
+<section id="envio">
+  <h2><span class="num">5</span>Secuencia: de un evento a la notificación</h2>
+  <p class="sub">Ejemplo: alguien comenta el reporte de otra persona. El mismo patrón vale para los cuatro tipos de aviso.</p>
+  <figure>
+    <svg viewBox="0 0 900 470" role="img" aria-labelledby="env-t">
+      <title id="env-t">Secuencia de envío: caso de uso, aviso push, consultas, servicio push, service worker y la persona.</title>
+      <defs>
+        <marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="flecha"/></marker>
+      </defs>
+      <rect x="15" y="10" width="125" height="40" rx="8" class="caja c-gris"/><text x="77" y="35" text-anchor="middle" class="t-md t-b">Caso de uso</text>
+      <rect x="165" y="10" width="125" height="40" rx="8" class="caja c-verde"/><text x="227" y="35" text-anchor="middle" class="t-md t-b">enviarPush</text>
+      <rect x="315" y="10" width="110" height="40" rx="8" class="caja c-gris"/><text x="370" y="35" text-anchor="middle" class="t-md t-b">Base</text>
+      <rect x="450" y="10" width="125" height="40" rx="8" class="caja c-ambar"/><text x="512" y="35" text-anchor="middle" class="t-md t-b">Servicio push</text>
+      <rect x="600" y="10" width="140" height="40" rx="8" class="caja c-azul"/><text x="670" y="35" text-anchor="middle" class="t-md t-b">Service worker</text>
+      <rect x="765" y="10" width="120" height="40" rx="8" class="caja c-gris"/><text x="825" y="35" text-anchor="middle" class="t-md t-b">Dueño</text>
+      <line x1="77" y1="50" x2="77" y2="460" class="vida"/><line x1="227" y1="50" x2="227" y2="460" class="vida"/>
+      <line x1="370" y1="50" x2="370" y2="460" class="vida"/><line x1="512" y1="50" x2="512" y2="460" class="vida"/>
+      <line x1="670" y1="50" x2="670" y2="460" class="vida"/><line x1="825" y1="50" x2="825" y2="460" class="vida"/>
+      <rect x="20" y="62" width="115" height="22" rx="4" class="act"/><text x="77" y="78" text-anchor="middle" class="t-sm">comentario creado</text>
+      <path d="M77 110 H222" class="linea" marker-end="url(#m4)"/><text x="85" y="104" class="t-sm">1. pushComentarioReporte</text>
+      <path d="M227 140 H365" class="linea" marker-end="url(#m4)"/><text x="235" y="134" class="t-sm">2. suscripciones del dueño</text>
+      <path d="M370 165 H232" class="punteada" marker-end="url(#m4)"/><text x="240" y="159" class="t-sm">menos si apagó «comentarios»</text>
+      <rect x="170" y="180" width="115" height="36" rx="4" class="act"/><text x="227" y="195" text-anchor="middle" class="t-sm">firma VAPID y</text><text x="227" y="209" text-anchor="middle" class="t-sm">cifra aes128gcm</text>
+      <path d="M227 240 H507" class="linea" marker-end="url(#m4)"/><text x="240" y="234" class="t-sm">3. POST endpoint (TTL 24 h, corte a los 8 s)</text>
+      <path d="M512 265 H232" class="punteada" marker-end="url(#m4)"/><text x="245" y="259" class="t-sm">201 ok · 404/410 → se borra la suscripción</text>
+      <path d="M77 295 H222" class="punteada" marker-end="url(#m4)"/><text x="85" y="289" class="t-sm">4. sigue con el correo</text>
+      <path d="M512 325 H665" class="linea" marker-end="url(#m4)"/><text x="520" y="319" class="t-sm">5. evento «push»</text>
+      <rect x="610" y="338" width="120" height="22" rx="4" class="act"/><text x="670" y="354" text-anchor="middle" class="t-sm">showNotification</text>
+      <path d="M670 385 H820" class="linea" marker-end="url(#m4)"/><text x="680" y="379" class="t-sm">6. notificación</text>
+      <path d="M825 415 H675" class="linea" marker-end="url(#m4)"/><text x="690" y="409" class="t-sm">7. toca</text>
+      <text x="520" y="445" class="t-sm">8. notificationclick: abre /reportes/:id (solo mismo origen)</text>
+    </svg>
+    <figcaption>Figura 5. Envío. La push sale antes del correo y fuera de su <code>try</code>: si falla, el correo y la acción siguen igual.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tipo (interruptor)</th><th>Disparador</th><th>Destinatario</th><th>Dónde se llama</th></tr></thead>
+    <tbody>
+      <tr><td><code>estado_reporte</code></td><td>Reparado o Rechazado (admin, votos o reparación validada); primera cuadrilla asignada</td><td>Dueño del reporte</td><td><code>detail-mutations</code>, <code>evidencia-reparacion</code>, <code>cuadrillas/asignaciones</code></td></tr>
+      <tr><td><code>comentarios</code></td><td>Comentario de alguien que no es el dueño</td><td>Dueño del reporte</td><td><code>detail-mutations</code></td></tr>
+      <tr><td><code>mascotas</code></td><td>Mascota marcada como encontrada, después de confirmar el correo del outbox</td><td>Quien la publicó</td><td><code>moderation/avisos-mascotas.server.ts</code></td></tr>
+      <tr><td><code>moderacion</code></td><td>Foto en revisión manual; reporte que llega al umbral de «No existe»</td><td>Administradores</td><td><code>imagenes-reporte.server.ts</code>, <code>detail-mutations</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 6. DATOS -->
+<section id="datos">
+  <h2><span class="num">6</span>Modelo de datos</h2>
+  <p class="sub">Dos tablas privadas. RLS activo sin políticas y sin permisos para <code>anon</code> ni <code>authenticated</code>: solo el servidor con service role las lee y escribe. Al borrar la cuenta, la cascada las limpia.</p>
+  <figure>
+    <svg viewBox="0 0 900 300" role="img" aria-labelledby="er-t">
+      <title id="er-t">auth.users tiene muchas suscripciones_push y como máximo una preferencias_push.</title>
+      <rect x="340" y="20" width="220" height="90" rx="8" class="caja c-gris"/>
+      <text x="450" y="46" text-anchor="middle" class="t-md t-b">auth.users</text>
+      <line x1="340" y1="56" x2="560" y2="56" class="linea"/>
+      <text x="355" y="80" class="t-sm">id  uuid  PK</text>
+      <rect x="40" y="160" width="330" height="130" rx="8" class="caja c-verde"/>
+      <text x="205" y="186" text-anchor="middle" class="t-md t-b">suscripciones_push</text>
+      <line x1="40" y1="196" x2="370" y2="196" class="linea"/>
+      <text x="55" y="216" class="t-sm">id  bigint  PK</text>
+      <text x="55" y="234" class="t-sm">usuario_id  uuid  FK → on delete cascade</text>
+      <text x="55" y="252" class="t-sm">endpoint  text  único, empieza con https://</text>
+      <text x="55" y="270" class="t-sm">p256dh, auth  text  ·  creada_at, actualizada_at</text>
+      <rect x="530" y="160" width="330" height="130" rx="8" class="caja c-verde"/>
+      <text x="695" y="186" text-anchor="middle" class="t-md t-b">preferencias_push</text>
+      <line x1="530" y1="196" x2="860" y2="196" class="linea"/>
+      <text x="545" y="216" class="t-sm">usuario_id  uuid  PK, FK → on delete cascade</text>
+      <text x="545" y="234" class="t-sm">estado_reporte, comentarios  boolean = true</text>
+      <text x="545" y="252" class="t-sm">mascotas, moderacion  boolean = true</text>
+      <text x="545" y="270" class="t-sm">sin fila → todo activo</text>
+      <path d="M400 110 L250 160" class="linea"/>
+      <text x="262" y="150" class="t-sm">1 … N (un dispositivo por fila)</text>
+      <path d="M500 110 L650 160" class="linea"/>
+      <text x="590" y="130" class="t-sm">1 … 0..1</text>
+    </svg>
+    <figcaption>Figura 6. Entidades y relaciones. Migración <code>supabase/migrations/20261114203000_notificaciones_push.sql</code>.</figcaption>
+  </figure>
+</section>
+
+<!-- 7. ESTADOS -->
+<section id="estados">
+  <h2><span class="num">7</span>Estados de un dispositivo</h2>
+  <p class="sub">Las push no se pueden prender sin permiso, así que se ofrecen solas. Así decide el aviso automático qué mostrar, por dispositivo y por navegador.</p>
+  <figure>
+    <svg viewBox="0 0 900 300" role="img" aria-labelledby="est-t">
+      <title id="est-t">Estados: sin activar, aviso visible, descartado 14 días, activado, bloqueado.</title>
+      <defs>
+        <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="flecha"/></marker>
+      </defs>
+      <circle cx="40" cy="140" r="10" fill="var(--texto)"/>
+      <rect x="80" y="110" width="150" height="60" rx="30" class="caja c-gris"/>
+      <text x="155" y="137" text-anchor="middle" class="t-md t-b">Sin activar</text>
+      <text x="155" y="155" text-anchor="middle" class="t-sm">cuenta registrada</text>
+      <rect x="300" y="110" width="150" height="60" rx="30" class="caja c-azul"/>
+      <text x="375" y="137" text-anchor="middle" class="t-md t-b">Aviso visible</text>
+      <text x="375" y="155" text-anchor="middle" class="t-sm">barra de una línea</text>
+      <rect x="560" y="20" width="170" height="60" rx="30" class="caja c-verde"/>
+      <text x="645" y="47" text-anchor="middle" class="t-md t-b">Activado</text>
+      <text x="645" y="65" text-anchor="middle" class="t-sm">recibe todos los tipos</text>
+      <rect x="560" y="120" width="170" height="60" rx="30" class="caja c-ambar"/>
+      <text x="645" y="147" text-anchor="middle" class="t-md t-b">Descartado</text>
+      <text x="645" y="165" text-anchor="middle" class="t-sm">14 días</text>
+      <rect x="560" y="220" width="170" height="60" rx="30" class="caja c-rojo"/>
+      <text x="645" y="247" text-anchor="middle" class="t-md t-b">Bloqueado</text>
+      <text x="645" y="265" text-anchor="middle" class="t-sm">no se vuelve a ofrecer</text>
+      <path d="M50 140 H80" class="linea" marker-end="url(#m5)"/>
+      <path d="M230 140 H300" class="linea" marker-end="url(#m5)"/><text x="236" y="132" class="t-sm">entra al sitio</text>
+      <path d="M450 125 L560 55" class="linea" marker-end="url(#m5)"/><text x="470" y="78" class="t-sm">permite</text>
+      <path d="M450 145 H560" class="linea" marker-end="url(#m5)"/><text x="470" y="140" class="t-sm">«Ahora no» / ✕</text>
+      <path d="M450 160 L560 245" class="linea" marker-end="url(#m5)"/><text x="470" y="222" class="t-sm">bloquea</text>
+      <path d="M645 180 V200 H375 V170" class="punteada" marker-end="url(#m5)"/><text x="400" y="195" class="t-sm">pasan 14 días</text>
+      <path d="M730 50 H790 V140 H230" class="punteada"/>
+      <path d="M790 140 V140" class="punteada"/>
+      <text x="745" y="100" class="t-sm">desactiva en</text>
+      <text x="745" y="116" class="t-sm">Mi cuenta</text>
+      <path d="M250 140 H232" class="punteada" marker-end="url(#m5)"/>
+    </svg>
+    <figcaption>Figura 7. El aviso es una barra de una línea arriba de la navegación inferior. No aparece en <code>/mapa</code> (pantalla completa) ni en <code>/reportes/nuevo</code>, que tiene su propia invitación después de publicar. Los interruptores de Mi cuenta apagan tipos sin cambiar el estado del dispositivo.</figcaption>
+  </figure>
+</section>
+
+<!-- 8. DECISIONES -->
+<section id="decisiones">
+  <h2><span class="num">8</span>Decisiones de diseño</h2>
+  <div class="grid">
+    <article class="card"><span class="tag t-verde">Android</span><h3>TWA y no app nativa</h3><p>Un solo frontend. Los cambios web llegan a la app sin pasar por Play. El costo: lo que el navegador no permite, la app tampoco.</p></article>
+    <article class="card"><span class="tag t-verde">Push</span><h3>Web Push estándar</h3><p>El mismo código sirve para la web, la PWA y la TWA, que recibe las notificaciones de Chrome por delegación. No hay SDK de Firebase en el proyecto.</p></article>
+    <article class="card"><span class="tag t-verde">Librería</span><h3>WebCrypto</h3><p><code>@block65/webcrypto-web-push</code> corre en Cloudflare Workers. <code>web-push</code> se descartó porque depende de <code>crypto</code> y <code>https</code> de Node.</p></article>
+    <article class="card"><span class="tag t-ambar">Resiliencia</span><h3>Mejor esfuerzo</h3><p>Ninguna función de push lanza errores. La push sale antes del correo, se corta a los 8 s y no requiere que la persona tenga correo.</p></article>
+    <article class="card"><span class="tag t-ambar">Mascotas</span><h3>Sin duplicados</h3><p>La push de mascota encontrada sale recién cuando el outbox confirma el correo, así un reintento no la repite.</p></article>
+    <article class="card"><span class="tag t-rojo">Seguridad</span><h3>Claves y datos</h3><p>La clave privada VAPID es un secreto del Worker y nunca va al cliente. La pública se entrega en tiempo de ejecución. Las tablas solo se acceden con service role.</p></article>
+  </div>
+  <p class="nota"><strong>No rotar las claves VAPID sin necesidad:</strong> con claves nuevas, todas las suscripciones dejan de funcionar y cada persona tiene que volver a activar las notificaciones.</p>
+</section>
+
+<!-- 9. ARCHIVOS -->
+<section id="archivos">
+  <h2><span class="num">9</span>Por dónde empezar a leer</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tema</th><th>Archivos</th></tr></thead>
+    <tbody>
+      <tr><td>Paquete Android</td><td><code>android/twa/twa-manifest.json</code>, <code>android/twa/app/src/main/AndroidManifest.xml</code>, <code>docs/android-twa.md</code></td></tr>
+      <tr><td>Dominio verificado</td><td><code>public/.well-known/assetlinks.json</code>, <code>scripts/android-twa/generar-assetlinks.mjs</code></td></tr>
+      <tr><td>Publicación en Play</td><td><code>.github/workflows/android-play-publicar.yml</code></td></tr>
+      <tr><td>Cliente push</td><td><code>components/push/invitacion-push.tsx</code>, <code>components/cuenta/notificaciones-section.tsx</code>, <code>lib/push/cliente.ts</code>, <code>public/sw.js</code></td></tr>
+      <tr><td>Servidor push</td><td><code>app/cuenta/push-actions.ts</code>, <code>lib/push/avisos.server.ts</code>, <code>lib/push/enviar.server.ts</code>, <code>lib/push/tipos.ts</code></td></tr>
+      <tr><td>Datos</td><td><code>supabase/migrations/20261114203000_notificaciones_push.sql</code>, <code>database/queries/push/suscripciones.ts</code>, <code>supabase/access-matrix.md</code></td></tr>
+      <tr><td>Claves y operación</td><td><code>scripts/push/generar-claves-vapid.mjs</code>, <code>docs/notificaciones-push.md</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>Reporty · documento de arquitectura · actualizado el 15 de noviembre de 2026 (PR #270 y #271).</footer>
+</main>
+</body>
+</html>
