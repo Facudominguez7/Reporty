@@ -13,8 +13,18 @@ siguen igual.
 | `mascotas` | La mascota publicada figura como encontrada (después de confirmar el correo) | Quien la publicó |
 | `moderacion` | Foto en revisión manual o reporte que llega al umbral de votos «No existe» | Administradores |
 
-El permiso se pide solo desde un botón: en la invitación que aparece después de crear un
-reporte o en «Mi cuenta → Notificaciones». Los invitados no reciben push.
+Las push no se pueden prender sin permiso: el navegador o Android lo exigen. Por eso se ofrecen
+solas a toda cuenta registrada que todavía no las activó en ese dispositivo:
+
+- **Aviso automático** fijo abajo, en todas las páginas (`AvisoPushAutomatico` en el layout
+  raíz). No aparece en `/reportes/nuevo`, que tiene su propia invitación después de publicar.
+- **«Ahora no»** (o la cruz) lo esconde 14 días en ese navegador; después se vuelve a ofrecer.
+- El diálogo del sistema se abre recién al tocar «Sí, avisame»: pedirlo sin un toque no funciona
+  en Firefox ni Safari, y en Chrome un «Bloquear» queda para siempre.
+- También se activan o desactivan desde «Mi cuenta → Notificaciones».
+
+Al activarlas, todos los tipos quedan prendidos; los interruptores sirven para apagar alguno.
+Los invitados no reciben push.
 
 ## Piezas
 
