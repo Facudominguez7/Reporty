@@ -15,7 +15,7 @@ Branch: `feat/notificaciones-push`; delivery: single-pr with work-unit commits; 
 - T2 — S1-S4, S7 — inline — done (`a73f5dd`; 6 tests, real VAPID+aes128gcm) — `lib/push/` sender with `@block65/webcrypto-web-push`: VAPID env, per-type preference filter, 404/410 cleanup, tests.
 - T3 — S5, S6 — inline — done (`6f3b149`, `0d61f94`) — service worker `push`/`notificationclick`, client subscribe helper, server actions, Mi cuenta section with per-type toggles, prompt in the report-created dialog.
 - T4 — S1-S4 — inline — done (`79f4e99`; RED observed 5+4 before wiring, then GREEN; full suite only the 3 baseline failures) — wire the 4 notification points next to the existing emails.
-- T5 — S1-S7 — independent verification — pending — high risk: migration (item 1), credentials/VAPID (item 2), new dependency (item 5).
+- T5 — S1-S7 — independent verification — done (S1-S7 met, 0 blockers; advisories in L8) — high risk: migration (item 1), credentials/VAPID (item 2), new dependency (item 5).
 - T6 — rollout — pending, needs user confirmation — VAPID keys in Cloudflare, migration in production, docs.
 
 ## Log
@@ -26,3 +26,4 @@ L4 — Forecast: ~900 authored lines. Delivery: single PR with work-unit commits
 L5 — 2026-11-14: T1 and T2 committed. T3 partial: `public/sw.js` push/notificationclick (same-origin only, falls back to openWindow), `app/cuenta/push-actions.ts` (obtenerEstado/guardar/eliminar/actualizarPreferencia). The VAPID public key is served at runtime by `obtenerEstadoPushAction`, so no NEXT_PUBLIC build variable is needed. Env: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (optional).
 L6 — User: “continuamos luego”. Paused after the T3 partial commit.
 L7 — User: “continuemos”. Branch rebased on origin/main `e3a6037` (commit hashes updated). T3 closed: `lib/push/cliente.ts` was written in the same batch as its test, so RED was not observed for that piece. T4: pushes go out before the email, outside its try, and do not require an email; the pet push is sent only after `confirmar_aviso_estado_mascota` returns true and only for evento «encontrada», so outbox retries do not duplicate it. `notificarCuadrillaAsignada` is now exported and takes the service client. Baseline still failing (not caused here): 3 tests in `app/mascotas/nueva/resultado-navegacion.test.ts`, 2 tsc errors in `components/report-detail/*.test.ts`. Lint: 0 errors, warnings only in untouched files. Next: T5 independent verifier.
+L8 — T5 verifier: S1-S7 met, no blockers. Advisories: no timeout on push fetch; endpoint reassignment between accounts (intended, low risk); photo moderation push body repeats «Reporte N.º X: Reporte N.º X»; pet push depends on the email being confirmed. Next: T6 needs user confirmation.
