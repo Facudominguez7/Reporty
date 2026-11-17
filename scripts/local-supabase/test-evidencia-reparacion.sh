@@ -12,6 +12,7 @@ base="$raiz/supabase/migrations/20261106120000_evidencia_reparacion.sql"
 incremental="$raiz/supabase/migrations/20261107120000_admin_participa_reparacion.sql"
 cancelacion="$raiz/supabase/migrations/20261108120000_cancelacion_revision_reparado.sql"
 impugnacion="$raiz/supabase/migrations/20261109120000_historial_aceptar_impugnacion.sql"
+cierre_autor="$raiz/supabase/migrations/20261117120000_autor_cierra_reparacion.sql"
 prueba="$raiz/supabase/tests/evidencia_reparacion.sql"
 emitir() { while IFS= read -r linea || [[ -n "$linea" ]]; do printf '%s\n' "$linea"; done < "$1"; }
 {
@@ -24,6 +25,7 @@ emitir() { while IFS= read -r linea || [[ -n "$linea" ]]; do printf '%s\n' "$lin
   emitir "$incremental"
   emitir "$cancelacion"
   emitir "$impugnacion"
+  emitir "$cierre_autor"
   emitir "$prueba"
   printf 'rollback;\n'
 } | docker exec -i "$contenedor" psql -U postgres -d postgres -v ON_ERROR_STOP=1

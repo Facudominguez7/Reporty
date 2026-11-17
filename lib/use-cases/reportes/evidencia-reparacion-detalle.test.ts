@@ -42,6 +42,7 @@ type FilaEvidencia = {
   thumbnail_path: string | null
   created_at: string
   publicada_at: string | null
+  resuelta_por: string | null
 }
 
 type FilaVerificacion = { usuario_id: string; tipo: string; estado: string }
@@ -115,6 +116,7 @@ function evidencia(extra: Partial<FilaEvidencia> = {}): FilaEvidencia {
     thumbnail_path: null,
     created_at: "2026-11-28T12:42:00Z",
     publicada_at: null,
+    resuelta_por: null,
     ...extra,
   }
 }
@@ -154,6 +156,7 @@ describe("obtenerSeccionReparacion", () => {
       umbral: UMBRAL_CONFIRMACIONES_REPARACION,
       evidencia: null,
       puedeInformar: true,
+      esAutorDelReporte: false,
     })
   })
 
@@ -165,6 +168,7 @@ describe("obtenerSeccionReparacion", () => {
       umbral: UMBRAL_CONFIRMACIONES_REPARACION,
       evidencia: null,
       puedeInformar: true,
+      esAutorDelReporte: false,
     })
   })
 
@@ -177,6 +181,7 @@ describe("obtenerSeccionReparacion", () => {
       umbral: UMBRAL_CONFIRMACIONES_REPARACION,
       evidencia: null,
       puedeInformar: false,
+      esAutorDelReporte: false,
     })
 
     mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador()))
@@ -184,6 +189,7 @@ describe("obtenerSeccionReparacion", () => {
       umbral: UMBRAL_CONFIRMACIONES_REPARACION,
       evidencia: null,
       puedeInformar: false,
+      esAutorDelReporte: false,
     })
   })
 
@@ -326,6 +332,54 @@ describe("obtenerSeccionReparacion", () => {
     }).servicio)
 
     expect((await obtenerSeccionReparacion(9, 1))?.evidencia?.evidenciaId).toBe("nueva")
+  })
+
+  it("avisa al autor del reporte que su foto lo cierra, y a nadie más", async () => {
+    mocks.sesion.mockResolvedValue(crearSesion(usuarioEspectador()))
+    mocks.servicio.mockReturnValue(crearServicio({}).servicio)
+
+    expect(await obtenerSeccionReparacion(9, 1, ESPECTADOR_ID)).toEqual({
+      umbral: UMBRAL_CONFIRMACIONES_REPARACION,
+      evidencia: null,
+      puedeInformar: true,
+      esAutorDelReporte: true,
+    })
+    expect((await obtenerSeccionReparacion(9, 1, "otra-persona"))?.esAutorDelReporte).toBe(false)
+
+    mocks.sesion.mockResolvedValue(crearSesion(null))
+    // Sin sesión nunca se presume autoría, aunque el reporte no tenga autor.
+    expect((await obtenerSeccionReparacion(9, 1, null))?.esAutorDelReporte).toBe(false)
+  })
+
+  it("marca la evidencia que informó el autor del reporte mientras espera moderación", async () => {
+    mocks.sesion.mockResolvedValue(crearSesion(null))
+    mocks.servicio.mockReturnValue(crearServicio({
+      evidencias: [evidencia({ estado: "informada" })],
+    }).servicio)
+
+    expect((await obtenerSeccionReparacion(9, 1, AUTOR_ID))?.evidencia?.porAutorDelReporte).toBe(true)
+    expect((await obtenerSeccionReparacion(9, 1, "otra-persona"))?.evidencia?.porAutorDelReporte).toBe(false)
+  })
+
+  it("distingue el cierre del autor de una reparación validada por la comunidad", async () => {
+    mocks.sesion.mockResolvedValue(crearSesion(null))
+    mocks.servicio.mockReturnValue(crearServicio({
+      evidencias: [evidenciaPublicada({ estado: "validada", resuelta_por: AUTOR_ID })],
+    }).servicio)
+    expect((await obtenerSeccionReparacion(9, 2, AUTOR_ID))?.evidencia).toMatchObject({
+      estado: "reparado",
+      porAutorDelReporte: true,
+    })
+
+    // El autor del reporte informó, pero la cerró la comunidad (evidencia anterior).
+    mocks.servicio.mockReturnValue(crearServicio({
+      evidencias: [evidenciaPublicada({ estado: "validada", resuelta_por: "otra-3" })],
+    }).servicio)
+    expect((await obtenerSeccionReparacion(9, 2, AUTOR_ID))?.evidencia?.porAutorDelReporte).toBe(false)
+
+    // Una evidencia del autor que quedó en verificación sigue el flujo comunitario.
+    mocks.servicio.mockReturnValue(crearServicio({ evidencias: [evidenciaPublicada()] }).servicio)
+    expect((await obtenerSeccionReparacion(9, 1, AUTOR_ID))?.evidencia?.porAutorDelReporte).toBe(false)
   })
 
   it("oculta la sección cuando la lectura falla, sin romper la ficha", async () => {

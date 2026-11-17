@@ -32,7 +32,7 @@ vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
   crearComentarioWorkflow: mocks.crearComentarioWorkflow,
 }))
 vi.mock("@/database/queries/reportes/[id]/index", () => ({
-  getReporteDetalle: async () => ({ data: { id: 5, estado_id: 1 }, error: null }),
+  getReporteDetalle: async () => ({ data: { id: 5, estado_id: 1, usuario_id: "autor-5" }, error: null }),
   getComentariosReporte: async () => ({ data: [] }),
   getHistorialEstados: async () => ({ data: [] }),
 }))
@@ -93,7 +93,7 @@ describe("ReporteDetallePage", () => {
     const page = await renderPage()
     expect(page.props.fotografiaPendiente).toBe(true)
     expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
-    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1 })
+    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
   })
 
   it("passes only whether an open report is under admin review", async () => {
@@ -206,12 +206,12 @@ describe("ReporteDetallePage", () => {
   })
   it("pasa la sección de evidencia de reparación al detalle con el estado del reporte", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
-    const seccion = { umbral: 3, evidencia: null, puedeInformar: false }
+    const seccion = { umbral: 3, evidencia: null, puedeInformar: false, esAutorDelReporte: false }
     mocks.obtenerSeccionReparacion.mockResolvedValue(seccion)
 
     const page = await renderPage()
 
-    expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1)
+    expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1, "autor-5")
     expect(page.props.evidenciaReparacion).toEqual(seccion)
     // La ficha existente se conserva: comentarios, historial y fotografías siguen llegando.
     expect(page.props.comentarios).toEqual([])
@@ -225,7 +225,7 @@ describe("ReporteDetallePage", () => {
 
     const page = await renderPage()
 
-    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1 })
+    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
     expect(page.props.evidenciaReparacion).toBeNull()
   })
 })

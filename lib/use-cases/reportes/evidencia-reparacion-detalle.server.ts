@@ -51,6 +51,11 @@ export type EvidenciaReparacionVista = {
   foto: FotoEvidenciaReparacion | null
   confirmaciones: number
   impugnacionesPendientes: number
+  /**
+   * La informó el autor del reporte: mientras espera moderación, su publicación cierra
+   * el reporte; ya reparada, la cerró él sin verificación de la comunidad.
+   */
+  porAutorDelReporte: boolean
   participacion: {
     puede: boolean
     motivo: MotivoSinParticipacion | null
@@ -64,6 +69,8 @@ export type SeccionReparacionVista = {
   evidencia: EvidenciaReparacionVista | null
   /** Muestra el formulario: cuenta habilitada, reporte Pendiente y sin evidencia activa. */
   puedeInformar: boolean
+  /** Quien mira es el autor del reporte: su foto aprobada lo cierra, sin sumar puntos. */
+  esAutorDelReporte: boolean
 }
 
 const ESTADOS_VISIBLES = ["informada", "en_verificacion", "validada"] as const
@@ -73,7 +80,7 @@ const LIMITE_VERIFICACIONES = 1000
 /** Tope de evidencias leídas por reporte cuando una validada convive con una activa. */
 const LIMITE_EVIDENCIAS = 5
 
-const COLUMNAS_EVIDENCIA = "id,autor_id,comentario,estado,url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path,created_at,publicada_at"
+const COLUMNAS_EVIDENCIA = "id,autor_id,comentario,estado,url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path,created_at,publicada_at,resuelta_por"
 
 type Relacion<T> = T | T[] | null
 
@@ -90,6 +97,7 @@ type FilaEvidencia = {
   thumbnail_path: string | null
   created_at: string
   publicada_at: string | null
+  resuelta_por: string | null
 }
 
 type FilaVerificacion = { usuario_id: string; tipo: string; estado: string }
@@ -154,6 +162,21 @@ function leerVerificaciones(filas: FilaVerificacion[], usuarioId: string | null)
   return { confirmaciones, impugnacionesPendientes, yaVerifico }
 }
 
+/**
+ * Indica si la evidencia sigue el cierre del autor del reporte: informada por él y
+ * todavía en moderación, o ya validada por él mismo (nunca por la comunidad, porque
+ * el autor de la foto no puede confirmarla).
+ *
+ * @param fila - Evidencia visible del reporte.
+ * @param reporteAutorId - Autor del reporte, o `null` si la cuenta ya no existe.
+ * @returns `true` cuando la evidencia la informó y la cierra el autor del reporte.
+ */
+function esCierreDelAutor(fila: FilaEvidencia, reporteAutorId: string | null): boolean {
+  if (!reporteAutorId || fila.autor_id !== reporteAutorId) return false
+  if (fila.estado === "informada") return true
+  return fila.estado === "validada" && fila.resuelta_por === reporteAutorId
+}
+
 /** Arma la foto pública de la evidencia; una evidencia en moderación no tiene foto. */
 function fotoPublica(fila: FilaEvidencia): FotoEvidenciaReparacion | null {
   if (!fila.publicada_at) return null
@@ -172,6 +195,7 @@ async function leerSeccion(
   entrada: {
     reporteId: number
     reporteEstadoId: number
+    reporteAutorId: string | null
     usuario: Pick<User, "id" | "is_anonymous" | "email_confirmed_at"> | null
     rolId: number | null
   },
@@ -194,17 +218,20 @@ async function leerSeccion(
     && !hayEvidenciaActiva
     && puedeInformarReparacion(entrada.usuario, entrada.rolId),
   )
+  const esAutorDelReporte = Boolean(
+    entrada.usuario && entrada.reporteAutorId && entrada.usuario.id === entrada.reporteAutorId,
+  )
 
   // Sin evidencia visible la franja igual se devuelve: quien no puede informar
   // (invitado, sesión anónima, operador o reporte cerrado) ve la invitación a
   // ingresar en vez de que la sección desaparezca.
   if (!fila) {
-    return { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar }
+    return { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar, esAutorDelReporte }
   }
 
   const estado = estadoVisibleEvidencia(fila.estado)
   if (!estado) {
-    return { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar }
+    return { umbral: UMBRAL_CONFIRMACIONES_REPARACION, evidencia: null, puedeInformar, esAutorDelReporte }
   }
 
   const [{ data: filasVerificacion, error: errorVerificaciones }, perfilResult] = await Promise.all([
@@ -232,6 +259,7 @@ async function leerSeccion(
   return {
     umbral: UMBRAL_CONFIRMACIONES_REPARACION,
     puedeInformar,
+    esAutorDelReporte,
     evidencia: {
       evidenciaId: fila.id,
       estado,
@@ -242,6 +270,7 @@ async function leerSeccion(
       foto: fotoPublica(fila),
       confirmaciones,
       impugnacionesPendientes,
+      porAutorDelReporte: esCierreDelAutor(fila, entrada.reporteAutorId),
       participacion: {
         puede: estado === "en_verificacion" && motivo === null,
         motivo,
@@ -256,11 +285,13 @@ async function leerSeccion(
  *
  * @param reporteId - Reporte cuya evidencia se muestra.
  * @param reporteEstadoId - `estado_id` ya cargado por la ficha, para no volver a leerlo.
+ * @param reporteAutorId - `usuario_id` del reporte, ya cargado por la ficha; `null` si no tiene autor.
  * @returns La sección visible, o `null` cuando no hay nada que mostrar o la lectura falla.
  */
 export async function obtenerSeccionReparacion(
   reporteId: number,
   reporteEstadoId: number,
+  reporteAutorId: string | null = null,
 ): Promise<SeccionReparacionVista | null> {
   try {
     const sesion = await createClient()
@@ -271,7 +302,7 @@ export async function obtenerSeccionReparacion(
       ? (await getUserRoleContext(sesion, usuario.id)).data?.roleId ?? null
       : null
 
-    return await leerSeccion(createAdminClient(), { reporteId, reporteEstadoId, usuario, rolId })
+    return await leerSeccion(createAdminClient(), { reporteId, reporteEstadoId, reporteAutorId, usuario, rolId })
   } catch (error) {
     console.error("Error al cargar la evidencia de reparación:", error)
     return null

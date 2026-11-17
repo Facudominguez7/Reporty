@@ -132,7 +132,7 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
           cerrado ? false : tieneRevisionRechazoPendiente(encontrado.id),
           // La evidencia de reparación nunca rompe la ficha: si su lectura falla, la
           // sección desaparece y el reporte sigue renderizado.
-          obtenerSeccionReparacion(encontrado.id, encontrado.estado_id).catch((evidenciaError) => {
+          obtenerSeccionReparacion(encontrado.id, encontrado.estado_id, encontrado.usuario_id ?? null).catch((evidenciaError) => {
             console.error("Error al cargar la evidencia de reparación:", evidenciaError)
             return null
           }),
