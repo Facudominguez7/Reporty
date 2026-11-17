@@ -2,6 +2,7 @@
   "name": "reporty",
   "version": "4.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "build": "next build --webpack",
     "db:setup": "node scripts/local-supabase/setup.mjs",

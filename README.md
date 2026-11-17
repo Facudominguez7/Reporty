@@ -304,17 +304,11 @@ Además, quien las activa recibe **notificaciones push** (web, PWA y app Android
 
 ---
 
-## 🤝 Contribuir
-
-1. Fork del repositorio
-2. Crear rama feature: `git checkout -b feature/nueva-funcionalidad`
-3. Commit cambios: `git commit -m 'feat: agregar nueva funcionalidad'`
-4. Push a la rama: `git push origin feature/nueva-funcionalidad`
-5. Crear Pull Request
-
----
-
 ## 📄 Licencia
+
+Copyright (c) 2026 Ing. Octavio Duarte e Ing. Facundo Diaz Dominguez. **Todos los derechos reservados.**
+
+El código es visible públicamente, pero no es de código abierto: no se permite usarlo, copiarlo, modificarlo ni distribuirlo sin autorización previa y por escrito de los titulares. Ver [LICENSE](LICENSE).
 
 Este proyecto es una iniciativa ciudadana independiente sin afiliación gubernamental.
 
