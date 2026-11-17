@@ -84,6 +84,7 @@ const reporte = {
 const seccionReparacion: SeccionReparacionVista = {
   umbral: 3,
   puedeInformar: false,
+  esAutorDelReporte: false,
   evidencia: {
     evidenciaId: "22222222-2222-4222-8222-222222222222",
     estado: "en_verificacion",
@@ -94,6 +95,7 @@ const seccionReparacion: SeccionReparacionVista = {
     foto: { src: "https://ejemplo.test/despues.webp", miniatura: null },
     confirmaciones: 2,
     impugnacionesPendientes: 0,
+    porAutorDelReporte: false,
     participacion: { puede: true, motivo: null, yaVerifico: null },
   },
 }

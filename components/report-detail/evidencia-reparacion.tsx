@@ -306,7 +306,9 @@ function TarjetaEstadoEvidencia({
         </CardHeader>
         <CardContent className="space-y-2 pt-0">
           <p className="text-xs text-muted-foreground">
-            El reporte sigue Pendiente hasta que la comunidad confirme la reparación.
+            {evidencia.porAutorDelReporte
+              ? "El reporte pasa a Reparado en cuanto se apruebe la foto."
+              : "El reporte sigue Pendiente hasta que la comunidad confirme la reparación."}
           </p>
           {evidencia.comentario && (
             <p className="text-sm leading-relaxed text-foreground">
@@ -333,7 +335,12 @@ function TarjetaEstadoEvidencia({
             {reparado ? "Reparado" : "En verificación"}
           </span>
         </CardTitle>
-        {reparado && (
+        {reparado && evidencia.porAutorDelReporte && (
+          <CardDescription className="text-xs md:text-sm">
+            El autor del reporte informó la reparación y el reporte está Reparado.
+          </CardDescription>
+        )}
+        {reparado && !evidencia.porAutorDelReporte && (
           <CardDescription className="text-xs md:text-sm">
             {evidencia.foto
               ? "La reparación quedó validada y el reporte está Reparado. El antes y el después se mantienen en la ficha."
@@ -342,7 +349,10 @@ function TarjetaEstadoEvidencia({
         )}
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
-        <ProgresoConfirmaciones hechas={evidencia.confirmaciones} umbral={umbral} />
+        {/* El cierre del autor no pasa por la comunidad: no hay progreso que mostrar. */}
+        {!(reparado && evidencia.porAutorDelReporte) && (
+          <ProgresoConfirmaciones hechas={evidencia.confirmaciones} umbral={umbral} />
+        )}
 
         {!reparado && puedeConfirmar && (
           <Button type="button" className="w-full" onClick={confirmar} disabled={confirmando}>
@@ -370,12 +380,17 @@ function TarjetaEstadoEvidencia({
  * Formulario mínimo mobile-first: una foto con cámara, la frase que describe el
  * arreglo y la verificación anti bots del resto del sitio (S13, S16). Reusa el
  * pipeline existente: la foto se optimiza en el navegador y entra en la moderación
- * de siempre.
+ * de siempre. Al autor del reporte le avisa que su foto aprobada lo cierra sin puntos.
+ *
+ * @param onInformar - Acción que envía la frase y la foto optimizada.
+ * @param esAutorDelReporte - Quien informa es el autor del reporte.
  */
 function FormularioEvidenciaReparacion({
   onInformar,
+  esAutorDelReporte,
 }: {
   onInformar: AccionesEvidenciaReparacion["onInformar"]
+  esAutorDelReporte: boolean
 }) {
   const router = useRouter()
   const [imagen, setImagen] = useState<File | null>(null)
@@ -430,8 +445,9 @@ function FormularioEvidenciaReparacion({
       <CardHeader className="pb-3">
         <CardTitle className="text-base md:text-xl">¿Ya lo arreglaron? Informá la reparación</CardTitle>
         <CardDescription className="text-xs md:text-sm">
-          Subí una foto del lugar. El reporte no cambia de estado hasta que la comunidad
-          la confirme.
+          {esAutorDelReporte
+            ? "Subí una foto del lugar. Cuando la moderación apruebe la foto, tu reporte pasa a Reparado. Cerrar tu propio reporte no suma puntos."
+            : "Subí una foto del lugar. El reporte no cambia de estado hasta que la comunidad la confirme."}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
@@ -647,7 +663,10 @@ export function EvidenciaReparacion({ seccion, fotoAntes, acciones }: EvidenciaR
         <ComparadorAntesDespues evidencia={evidencia} fotoAntes={fotoAntes} />
       )}
       {seccion.puedeInformar && (
-        <FormularioEvidenciaReparacion onInformar={acciones.onInformar} />
+        <FormularioEvidenciaReparacion
+          onInformar={acciones.onInformar}
+          esAutorDelReporte={seccion.esAutorDelReporte}
+        />
       )}
     </div>
   )

@@ -62,13 +62,14 @@ function vista(extra: Partial<EvidenciaReparacionVista> = {}): EvidenciaReparaci
     foto: { src: "https://ejemplo.test/despues.webp", miniatura: null },
     confirmaciones: 2,
     impugnacionesPendientes: 0,
+    porAutorDelReporte: false,
     participacion: { puede: true, motivo: null, yaVerifico: null },
     ...extra,
   }
 }
 
 function seccion(extra: Partial<SeccionReparacionVista> = {}): SeccionReparacionVista {
-  return { umbral: 3, evidencia: vista(), puedeInformar: false, ...extra }
+  return { umbral: 3, evidencia: vista(), puedeInformar: false, esAutorDelReporte: false, ...extra }
 }
 
 /** Renderiza la sección de reparación tal como la pinta la ficha del reporte. */
@@ -98,7 +99,7 @@ beforeEach(() => vi.clearAllMocks())
 describe("franja de reparación para quien no puede informar", () => {
   it("invita a ingresar en vez de esconder la franja", () => {
     const html = renderToStaticMarkup(
-      createElement(ResumenReparacion, { seccion: { umbral: 3, evidencia: null, puedeInformar: false }, onVer: () => {} }),
+      createElement(ResumenReparacion, { seccion: { umbral: 3, evidencia: null, puedeInformar: false, esAutorDelReporte: false }, onVer: () => {} }),
     )
 
     expect(html).toContain("¿Ya lo arreglaron?")
@@ -409,5 +410,54 @@ describe("diálogo de confirmación de envío", () => {
     expect(fuente).toContain("{enviando && (")
     expect(fuente).toContain("La IA está analizando tu foto")
     expect(fuente).toContain('aria-busy="true"')
+  })
+})
+
+describe("cierre por el autor del reporte", () => {
+  it("le avisa al autor que su foto aprobada cierra el reporte y que no suma puntos", () => {
+    const html = renderizar({ evidencia: null, puedeInformar: true, esAutorDelReporte: true })
+
+    expect(html).toContain("Cuando la moderación apruebe la foto, tu reporte pasa a Reparado.")
+    expect(html).toContain("Cerrar tu propio reporte no suma puntos.")
+    expect(html).not.toContain("hasta que la comunidad")
+  })
+
+  it("mantiene la verificación de la comunidad en el formulario de otras cuentas", () => {
+    const html = renderizarFormulario()
+
+    expect(html).toContain("El reporte no cambia de estado hasta que la comunidad")
+    expect(html).not.toContain("no suma puntos")
+  })
+
+  it("anuncia que la reparación informada por el autor cierra el reporte al aprobarse", () => {
+    const html = renderizar({
+      evidencia: vista({
+        estado: "informada",
+        publicadaAt: null,
+        foto: null,
+        porAutorDelReporte: true,
+        participacion: { puede: false, motivo: null, yaVerifico: null },
+      }),
+    })
+
+    expect(html).toContain("El reporte pasa a Reparado en cuanto se apruebe la foto.")
+    expect(html).not.toContain("hasta que la comunidad confirme")
+  })
+
+  it("presenta el cierre del autor sin un progreso de confirmaciones que nunca existió", () => {
+    const html = renderizar({
+      evidencia: vista({
+        estado: "reparado",
+        confirmaciones: 0,
+        porAutorDelReporte: true,
+        participacion: { puede: false, motivo: null, yaVerifico: null },
+      }),
+    })
+
+    expect(html).toContain("Reparado")
+    expect(html).toContain("El autor del reporte informó la reparación y el reporte está Reparado.")
+    expect(html).not.toContain("confirmaciones")
+    expect(html).not.toContain('role="progressbar"')
+    expect(html).toContain("Antes y después")
   })
 })

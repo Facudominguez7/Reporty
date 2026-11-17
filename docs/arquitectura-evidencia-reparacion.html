@@ -50,6 +50,7 @@
       <div class="estado fin">validada<small>reporte → Reparado</small></div><span class="sep">Admin revierte →</span>
       <div class="estado malo">revertida<small>reporte → Pendiente, −5 puntos</small></div>
     </div>
+    <p>Atajo del autor del reporte: si la evidencia la informó el mismo autor del reporte, al publicarse la foto aprobada pasa directo de <code>informada</code> a <code>validada</code> y el reporte a Reparado, sin verificación de la comunidad y <strong>sin los +5 puntos</strong>. Lo hace el trigger <code>cerrar_reparacion_del_autor</code> (<code>20261117120000_autor_cierra_reparacion.sql</code>).</p>
     <div class="estados">
       <div class="estado malo">rechazada<small>sin cambio en el reporte</small></div><span class="sep">← foto rechazada por moderación · Admin rechaza · impugnación aceptada</span>
     </div>
@@ -101,6 +102,7 @@
     <ul>
       <li>Hace falta el email confirmado (<code>auth.users.email_confirmed_at</code>), también para Admin.</li>
       <li>Nadie confirma ni impugna su propia evidencia, Admin incluido (<code>PRE02</code>). El autor del reporte sí puede confirmar la evidencia de otra persona.</li>
+      <li>El autor del reporte cierra su propio reporte con su foto: no necesita confirmaciones, pero la foto igual pasa por moderación y el cierre no suma puntos.</li>
       <li>La regla se aplica en tres lugares: SQL (<code>private.usuario_habilitado_para_reparacion</code>), caso de uso (<code>esRolHabilitadoParaReparacion</code>) e interfaz. La que decide es la de la base de datos.</li>
       <li>Las lecturas públicas devuelven conteos, nunca identidades de quienes votaron.</li>
     </ul>
@@ -125,7 +127,7 @@
   </section>
 
   <section id="archivos"><h2>Por dónde empezar a leer</h2><div class="grid paths">
-    <article class="card"><h3>Base de datos</h3><p><code>supabase/migrations/20261106120000_evidencia_reparacion.sql</code><br><code>supabase/migrations/20261107120000_admin_participa_reparacion.sql</code><br><code>supabase/tests/evidencia_reparacion.sql</code><br><code>supabase/tests/admin_reparacion.sql</code></p></article>
+    <article class="card"><h3>Base de datos</h3><p><code>supabase/migrations/20261106120000_evidencia_reparacion.sql</code><br><code>supabase/migrations/20261107120000_admin_participa_reparacion.sql</code><br><code>supabase/tests/evidencia_reparacion.sql</code><br><code>supabase/tests/admin_reparacion.sql</code><br><code>supabase/migrations/20261117120000_autor_cierra_reparacion.sql</code><br><code>supabase/tests/reparacion_autor_reporte.sql</code></p></article>
     <article class="card"><h3>Servidor</h3><p><code>lib/use-cases/reportes/evidencia-reparacion.ts</code><br><code>lib/use-cases/reportes/evidencia-reparacion-detalle.server.ts</code><br><code>lib/moderation/imagenes-reporte.server.ts</code><br><code>lib/moderation/evidencia-reparacion-admin.server.ts</code></p></article>
     <article class="card"><h3>Interfaz y acciones</h3><p><code>components/report-detail/evidencia-reparacion.tsx</code><br><code>app/reportes/[id]/actions.ts</code><br><code>app/admin/moderacion/cola-reparaciones.tsx</code><br><code>app/admin/moderacion/reparaciones-actions.ts</code></p></article>
   </div></section>
