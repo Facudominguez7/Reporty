@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { sendOrganismoNotificationEmail } from "@/lib/notifications/report-notifications"
 import { resolveReportMunicipality } from "@/lib/map/report-coverage"
+import type { ContactoAviso } from "@/lib/reportes/contacto-aviso"
 
 /**
  * Nombres de categoría tal como los guarda `report_contact_directory` (sin tildes); difieren de
@@ -31,14 +32,16 @@ export type AvisoOrganismoInput = {
   descripcion: string | null
   lat: number | null
   lon: number | null
+  /** Contacto del autor que viaja en el aviso para que el organismo pueda responderle (S3). */
+  contactoAutor?: ContactoAviso
 }
 
 /**
  * Notifica por correo a cada canal de correo vigente del directorio para el municipio y la
  * categoría del reporte y devuelve las direcciones efectivamente notificadas, para que la
- * interfaz pueda mostrárselas a quien creó el reporte. Nunca es destinatario el canal de
- * escalamiento (prioridad 3, p. ej. Defensoría con otros canales): ese sigue siendo una opción
- * manual de seguimiento.
+ * interfaz pueda mostrárselas a quien creó el reporte. La Defensoría del Pueblo hoy es
+ * prioridad 2: recibe el aviso automático como cualquier organismo vigente del directorio;
+ * los canales de prioridad 3 quedan para seguimiento manual.
  *
  * @param supabase - Cliente de servidor; el directorio es de lectura pública.
  * @param input - Datos ya confirmados del reporte creado.
@@ -77,6 +80,7 @@ export async function notificarOrganismosDeReporte(
         categoria,
         descripcion: input.descripcion,
         contactoId: contacto.id,
+        contactoAutor: input.contactoAutor,
       }),
     ),
   )

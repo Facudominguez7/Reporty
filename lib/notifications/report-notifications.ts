@@ -63,6 +63,8 @@ type OrganismoEmailParams = {
   descripcion: string | null | undefined;
   /** Id del canal de contacto; particiona la clave de idempotencia por destinatario. */
   contactoId: number;
+  /** Contacto del autor para que el organismo pueda responderle (S3); ninguno se muestra al público. */
+  contactoAutor?: { email: string | null; telefono: string | null };
 };
 
 type AdminReviewEmailParams = {
@@ -318,6 +320,7 @@ export async function sendOrganismoNotificationEmail({
   categoria,
   descripcion,
   contactoId,
+  contactoAutor,
 }: OrganismoEmailParams) {
   const resend = getResendClient();
   const reportUrl = `${getAppUrl()}/reportes/${reporteId}`;
@@ -342,6 +345,8 @@ export async function sendOrganismoNotificationEmail({
             emailField("Organismo", escapeHtml(organizacion)),
             emailField("Categoría", escapeHtml(categoria)),
             descripcion ? emailField("Descripción", escapeHtml(descripcion)) : "",
+            contactoAutor?.email ? emailField("Email del vecino", escapeHtml(contactoAutor.email)) : "",
+            contactoAutor?.telefono ? emailField("Teléfono del vecino", escapeHtml(contactoAutor.telefono)) : "",
           ].join("\n"),
         }),
         emailButton("Ver reporte completo", reportUrl),
@@ -352,6 +357,8 @@ export async function sendOrganismoNotificationEmail({
       `Nuevo reporte de ${categoria}: ${reporteTitulo}`,
       `Organismo: ${organizacion}`,
       descripcion && `Descripción: ${descripcion}`,
+      contactoAutor?.email && `Email del vecino: ${contactoAutor.email}`,
+      contactoAutor?.telefono && `Teléfono del vecino: ${contactoAutor.telefono}`,
       `Ver reporte completo: ${reportUrl}`,
       "Este aviso fue enviado a pedido de quien creó el reporte ciudadano en Reporty.",
     ]),
