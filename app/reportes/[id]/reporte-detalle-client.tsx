@@ -88,6 +88,7 @@ import { ChipReporte, TONO_CATEGORIA, tonoEstado, tonoPrioridad } from "@/compon
 import { AvisoSenalNoExiste } from "@/components/report-detail/aviso-senal-no-existe";
 import { calcularSenalNoExiste } from "@/lib/reportes/senal-no-existe";
 import { ContenidoUbicacion, FranjaUbicacion } from "@/components/report-detail/ubicacion-reporte";
+import { urlMapaConFoco } from "@/lib/map/foco-reporte";
 import type { SeccionReparacionVista } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { AdminInlineField, AdminReportEditActions, AdminReportPhotoControls, type AdminReportPhotoDraft } from "./admin-report-editor";
 import { ReportContactActions, CONTACT_DISCLAIMER } from "@/components/report-contact-actions";
@@ -1168,7 +1169,7 @@ export function ReporteDetalleClient({
                   disabled={isAdminSaving}
                   className="w-full"
                   display={() => (
-                    <Link href="/mapa" className="group block w-full">
+                    <Link href={reporte.lat !== null && reporte.lon !== null ? urlMapaConFoco({ reporteId: reporte.id, lat: reporte.lat, lon: reporte.lon }) : "/mapa"} className="group block w-full">
                       <div className="group relative aspect-square overflow-hidden rounded-md border shadow-sm transition-all group-hover:shadow-md md:rounded-lg">
                         {reporte.lat !== null && reporte.lon !== null ? (
                           <MiniMap lat={reporte.lat} lon={reporte.lon} />
@@ -1374,7 +1375,7 @@ export function ReporteDetalleClient({
         descripcion="El mapa del reporte y el acceso al mapa completo de la ciudad."
         etiquetaCerrar="Cerrar la ubicación"
       >
-        <ContenidoUbicacion lat={reporte.lat} lon={reporte.lon} direccion={reporte.direccion} />
+        <ContenidoUbicacion reporteId={reporte.id} lat={reporte.lat} lon={reporte.lon} direccion={reporte.direccion} />
       </HojaReporte>
 
       <HojaReporte

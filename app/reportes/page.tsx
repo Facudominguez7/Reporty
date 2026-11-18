@@ -22,6 +22,9 @@ import { EstadoMascotas } from "@/components/estado-mascotas"
 import { ListaMascotasClient } from "@/components/lista-mascotas-client"
 import { getMascotasListado, getMascotasStatusCounts } from "@/database/queries/mascotas/listado"
 import { BuscadorMascotas } from "@/components/buscador-mascotas"
+import { RecordarCapa } from "@/components/recordar-capa"
+import { COOKIE_CAPA_PREFERIDA, listadoMuestraMascotas } from "@/lib/preferencias/capa"
+import { cookies } from "next/headers"
 
 export const dynamic = "force-dynamic"
 
@@ -45,10 +48,14 @@ type ReportesPageProps = {
   }>
 }
 
+/**
+ * Lista de incidentes o mascotas. Sin `vista` explícita en la URL abre la última capa
+ * elegida (en la lista o en el mapa), guardada en una cookie.
+ */
 export default async function ReportesPage({ searchParams }: ReportesPageProps) {
-  const params = await searchParams
+  const [params, almacenCookies] = await Promise.all([searchParams, cookies()])
   const { search, categoria, estado, prioridad, vista, tipo, estadoMascota, searchMascota } = params
-  const mascotas = vista === "mascotas"
+  const mascotas = listadoMuestraMascotas(vista, almacenCookies.get(COOKIE_CAPA_PREFERIDA)?.value)
 
   // Reports and filter options don't depend on each other, so they load at the same time.
   const [
@@ -87,9 +94,10 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
           </Alert>
         )}
 
+        <RecordarCapa capa={mascotas ? "mascotas" : "reportes"} />
         <section className="incident-shell space-y-4 sm:space-y-5">
           <nav aria-label="Tipo de publicaciones" className="card-shadow mx-auto flex w-fit max-w-full rounded-[var(--radius-pill)] bg-input p-1 !text-foreground">
-            <Link href={{ pathname: "/reportes", query: { search, categoria, estado, prioridad } }} aria-current={!mascotas ? "page" : undefined} className={`inline-flex min-h-9 items-center justify-center rounded-[var(--radius-pill)] px-4 py-1.5 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${!mascotas ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-background"}`}>Incidentes</Link>
+            <Link href={{ pathname: "/reportes", query: { search, categoria, estado, prioridad, vista: "incidentes" } }} aria-current={!mascotas ? "page" : undefined} className={`inline-flex min-h-9 items-center justify-center rounded-[var(--radius-pill)] px-4 py-1.5 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${!mascotas ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-background"}`}>Incidentes</Link>
             <Link href={{ pathname: "/reportes", query: { ...params, vista: "mascotas" } }} aria-current={mascotas ? "page" : undefined} className={`inline-flex min-h-9 items-center justify-center rounded-[var(--radius-pill)] px-4 py-1.5 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${mascotas ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-background"}`}>Mascotas</Link>
           </nav>
           {mascotas ? <>

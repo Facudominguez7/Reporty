@@ -21,6 +21,8 @@ import { IntroEntrada } from "@/components/intro-entrada"
 import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
+import type { FocoReporte } from "@/lib/map/foco-reporte"
+import { guardarCapaPreferida, type CapaPreferida } from "@/lib/preferencias/capa"
 
 const loadMapContainer = () => import("@/components/map-container").then((m) => m.MapContainer)
 
@@ -46,6 +48,10 @@ type MapaClientProps = {
   error: string | null
   petError: string | null
   mascotas: MascotaMapa[]
+  /** Capa con la que abre el mapa: la última elegida en la lista o en el mapa. */
+  capaInicial?: CapaPreferida
+  /** Reporte al que el mapa se acerca al abrir, cuando se llega desde su detalle. */
+  focoReporte?: FocoReporte | null
 }
 
 const MASCOTAS_ONBOARDING_STORAGE_KEY = "reporty_mascotas_onboarding_completed"
@@ -124,7 +130,7 @@ export function PetLayerError({ error }: { error: string | null }) {
   return <div role="alert" className="absolute left-1/2 top-20 z-30 w-[min(92vw,32rem)] -translate-x-1/2 rounded-lg border border-destructive/30 bg-card/95 p-3 text-sm text-destructive shadow-lg">No se pudieron cargar las mascotas: {error}</div>
 }
 
-export function MapaClient({ reportes, mascotas, categorias, estados, prioridades, error, petError }: MapaClientProps) {
+export function MapaClient({ reportes, mascotas, categorias, estados, prioridades, error, petError, capaInicial = "reportes", focoReporte = null }: MapaClientProps) {
   // The map tiles are the largest paint of this page. Rendering this hint during SSR
   // puts it in the document head, so the tile connection opens while the map code downloads.
   preconnect(MAP_TILE_ORIGIN)
@@ -142,7 +148,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
   const searchParams = useSearchParams()
   const [showFilters, setShowFilters] = useState(false)
   const [showActions, setShowActions] = useState(false)
-  const [layer, setLayer] = useState<"reportes" | "mascotas">("reportes")
+  const [layer, setLayer] = useState<"reportes" | "mascotas">(capaInicial)
   const [showPetOnboarding, setShowPetOnboarding] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -159,6 +165,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
   const handleLayerChange = (nextLayer: "reportes" | "mascotas") => {
     setLayer(nextLayer)
+    guardarCapaPreferida(nextLayer)
     if (shouldShowMascotasOnboarding(nextLayer, Boolean(window.localStorage.getItem(MASCOTAS_ONBOARDING_STORAGE_KEY)))) {
       setShowPetOnboarding(true)
     }
@@ -205,7 +212,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
             </Alert>
           </div>
         ) : (
-          <MapContainer reports={reportes} mascotas={mascotasFiltradas} layer={layer} showLegend />
+          <MapContainer reports={reportes} mascotas={mascotasFiltradas} layer={layer} showLegend focoReporte={focoReporte} />
         )}
       </div>
 

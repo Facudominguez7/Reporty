@@ -6,9 +6,11 @@ const mocks = vi.hoisted(() => ({
   getReportMapData: vi.fn(),
   getEstados: vi.fn(),
   getMascotasMapa: vi.fn(),
+  capaCookie: { valor: undefined as string | undefined },
 }))
 
 vi.mock("./mapa-client", () => ({ MapaClient: () => null }))
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: (nombre: string) => nombre === "reporty_capa" && mocks.capaCookie.valor ? { value: mocks.capaCookie.valor } : undefined }) }))
 vi.mock("@/database/queries/mascotas/mapa", () => ({ getMascotasMapa: mocks.getMascotasMapa }))
 vi.mock("@/database/queries/reportes/get-reportes", () => ({
   getReportMapData: mocks.getReportMapData,
@@ -19,6 +21,7 @@ vi.mock("@/database/queries/reportes/get-reportes", () => ({
 
 describe("MapaPage", () => {
   beforeEach(() => {
+    mocks.capaCookie.valor = undefined
     mocks.getReportMapData.mockReset().mockResolvedValue({ data: [], error: null })
     mocks.getMascotasMapa.mockReset().mockResolvedValue({ data: [], error: null })
   })
@@ -48,5 +51,19 @@ describe("MapaPage", () => {
 
     expect(page.props.estados).toEqual([])
     expect(mocks.getEstados).not.toHaveBeenCalled()
+  })
+
+  it("opens with the last chosen layer", async () => {
+    mocks.capaCookie.valor = "mascotas"
+    const page = await MapaPage({ searchParams: Promise.resolve({}) })
+    expect(page.props.capaInicial).toBe("mascotas")
+    expect(page.props.focoReporte).toBeNull()
+  })
+
+  it("focuses the report from its detail and shows incidents even if pets were chosen", async () => {
+    mocks.capaCookie.valor = "mascotas"
+    const page = await MapaPage({ searchParams: Promise.resolve({ reporte: "42", lat: "-27.4", lon: "-55.9" }) })
+    expect(page.props.capaInicial).toBe("reportes")
+    expect(page.props.focoReporte).toEqual({ reporteId: 42, lat: -27.4, lon: -55.9 })
   })
 })
