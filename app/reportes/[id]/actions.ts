@@ -30,6 +30,7 @@ import {
   type TipoVerificacionReparacion,
 } from "@/lib/use-cases/reportes/evidencia-reparacion"
 import { canParticipateInCommunity, getUserRoleContext, puedeOperarCuadrillas } from "@/lib/authz/roles"
+import { tomarReporteDefensoriaWorkflow } from "@/lib/use-cases/reportes/tomar-reporte-defensoria"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
@@ -303,6 +304,30 @@ export async function quitarFotoReporteAdminAction(reporteId: number, fotoId: nu
     return result
   } catch (error) {
     return { success: false as const, error: mutationErrorMessage(error, "No pudimos quitar la foto.") }
+  }
+}
+
+/**
+ * Toma de un reporte por la Defensoría del Pueblo: sesión válida + rol en el workflow,
+ * ejecución confiable con el cliente admin (patrón de cambiarEstadoAdminAction).
+ */
+export async function tomarReporteDefensoriaAction(reporteId: number, numeroReclamo: string) {
+  try {
+    const parsedReportId = reportIdSchema.parse(reporteId)
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false as const, error: "Tenés que iniciar sesión para tomar el reporte." }
+    }
+
+    const resultado = await tomarReporteDefensoriaWorkflow(createAdminClient(), parsedReportId, user.id, numeroReclamo)
+    if (resultado.success) revalidatePath(`/reportes/${parsedReportId}`)
+    return resultado
+  } catch {
+    return { success: false as const, error: "No pudimos tomar el reporte. Revisá el número de reclamo e intentá nuevamente." }
   }
 }
 

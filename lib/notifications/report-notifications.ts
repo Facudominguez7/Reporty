@@ -26,6 +26,16 @@ type CommentNotificationParams = {
   comentarioContenido: string;
 };
 
+type TomaDefensoriaEmailParams = {
+  /** Email del autor cargado en su perfil. */
+  ownerEmail: string;
+  ownerUsername: string | null;
+  reporteId: number;
+  reporteTitulo: string;
+  /** Número de reclamo emitido por el sistema externo de la Defensoría. */
+  numeroReclamo: string;
+};
+
 type StatusNotificationParams = {
   ownerEmail: string;
   ownerUsername: string | null;
@@ -265,6 +275,56 @@ export async function sendRepairReviewCancelledEmail({
       motivo && `Motivo: ${motivo}`,
       sugerencia,
       `Ver reporte completo: ${urlReporte}`,
+      UNSUBSCRIBE_NOTE,
+    ]),
+  });
+}
+
+/**
+ * Avisa al autor que la Defensoría del Pueblo tomó su reporte, con el número de reclamo
+ * visible (S9). El estado «Tomado por Defensoría» da esperanza: se muestra en tono info.
+ */
+export async function sendTomaDefensoriaEmail({
+  ownerEmail,
+  ownerUsername,
+  reporteId,
+  reporteTitulo,
+  numeroReclamo,
+}: TomaDefensoriaEmailParams) {
+  const resend = getResendClient();
+  const reportUrl = `${getAppUrl()}/reportes/${reporteId}`;
+  const owner = ownerUsername || "Usuario";
+  const titular = "La Defensoría del Pueblo tomó tu reporte";
+
+  return resend.emails.send({
+    from: SENDER,
+    to: [ownerEmail],
+    subject: `${titular} — Reclamo Nº ${numeroReclamo}`,
+    html: renderEmailLayout({
+      assetBaseUrl: getAppUrl(),
+      title: "Tu reporte fue tomado por la Defensoría",
+      kicker: "Reclamo asignado",
+      preheader: `${titular}: "${reporteTitulo}".`,
+      heading: `¡Hola ${owner}!`,
+      body: [
+        emailParagraph(escapeHtml(titular)),
+        emailPanel({
+          eyebrow: `Reporte N.º ${reporteId} · Reclamo Nº ${numeroReclamo}`,
+          title: reporteTitulo,
+          badge: { label: "Tomado por Defensoría", tone: "info" },
+          content: emailField("Reclamo", escapeHtml(numeroReclamo)),
+        }),
+        emailParagraph("Tu reporte quedó registrado con un reclamo de la Defensoría del Pueblo y ya lo podés seguir desde la ficha. Te avisaremos cuando haya novedades."),
+        emailButton("Ver el reporte", reportUrl),
+      ].join("\n"),
+      footnote: UNSUBSCRIBE_NOTE,
+    }),
+    text: plainText([
+      `¡Hola ${owner}!`,
+      `${titular}.`,
+      `Reporte: ${reporteTitulo} (N.º ${reporteId})`,
+      `Reclamo Nº: ${numeroReclamo}`,
+      `Ver el reporte: ${reportUrl}`,
       UNSUBSCRIBE_NOTE,
     ]),
   });
