@@ -221,7 +221,7 @@ describe("LeafletMap initial view", () => {
   })
 
   it("marca con aro violeta y escudo los reportes tomados por la Defensoría, sin revelar el número", () => {
-    render([{ ...report, id: 2, status: "Tomado por Defensoría" }])
+    render([{ ...report, id: 2, estadoId: 4, status: "Tomado por Defensoría " }])
 
     const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
     // Aro violeta alrededor del punto, conservando el color de prioridad del círculo (S8).
@@ -235,12 +235,13 @@ describe("LeafletMap initial view", () => {
     // «Reclamo Nº» ni píldora con el número.
     const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
     expect(popup).toContain("Tomado por la Defensoría del Pueblo")
+    expect(popup).toMatch(/Creado el \d/)
     expect(popup).not.toContain("Reclamo")
   })
 
   it("mantiene el aro violeta y conserva la información de cuadrilla en el popup cuando ambos conviven", () => {
     render([
-      { ...report, id: 3, status: "Tomado por Defensoría", estadoOperativo: "en_progreso", cuadrillaNombre: "Cuadrilla Norte" },
+      { ...report, id: 3, estadoId: 4, status: "Tomado por Defensoría", estadoOperativo: "en_progreso", cuadrillaNombre: "Cuadrilla Norte" },
     ])
 
     const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""

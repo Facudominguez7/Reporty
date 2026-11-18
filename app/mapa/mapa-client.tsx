@@ -102,7 +102,7 @@ function MapHeaderActions({ layer }: { layer: "reportes" | "mascotas" }) {
   return (
     <div className="relative flex min-w-9 items-center justify-end sm:hidden">
       <div
-        className={`absolute right-0 top-[calc(100%+0.5rem)] flex origin-top-right flex-col items-end gap-2 transition-all duration-300 ease-out ${expanded ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-2 scale-90 opacity-0"}`}
+        className={`mapa-vidrio-acciones absolute right-0 top-[calc(100%+0.5rem)] flex origin-top-right flex-col items-end gap-2 transition-all duration-300 ease-out ${expanded ? "translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-2 scale-90 opacity-0"}`}
         aria-hidden={!expanded}
         inert={!expanded}
       >
@@ -188,12 +188,12 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
   return (
     <Drawer open={showFilters} onOpenChange={handleDrawerOpenChange}>
-      <div className="relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
+      <div className="mapa-vidrio relative h-[100dvh] min-h-[32rem] overflow-hidden bg-background">
       <IntroEntrada />
       <OnboardingModal />
       <MascotasOnboardingModal open={showPetOnboarding} onComplete={handlePetOnboardingComplete} />
       <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-h-[4.75rem] items-center justify-end px-2 pt-[env(safe-area-inset-top)] sm:px-6">
-        <div className="pointer-events-auto hidden items-center gap-1 sm:flex sm:gap-2">
+        <div className="mapa-vidrio-acciones pointer-events-auto hidden items-center gap-1 sm:flex sm:gap-2">
           <BotonDonarMapa />
           <ContactsDialog />
           <HowToUseDialog layer={layer} />
@@ -220,7 +220,7 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
 
       {/* En mobile queda centrado entre filtros y ayuda; en desktop vuelve al centro del mapa. */}
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)] sm:left-[calc(50%-6.5rem)] lg:left-1/2">
-        <div className="pointer-events-auto flex rounded-full border border-white/70 bg-white/45 p-1 shadow-[0_8px_24px_rgb(15_23_42_/_0.16)] backdrop-blur-xl backdrop-saturate-150" role="group" aria-label="Capa del mapa">
+        <div className="mapa-vidrio-superficie pointer-events-auto flex rounded-full border p-1" role="group" aria-label="Capa del mapa">
           {MAP_LAYER_OPTIONS.map(([value, label]) => <Button key={value} type="button" size="sm" className="px-2.5 sm:px-3.5" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => handleLayerChange(value)}>{label}</Button>)}
         </div>
       </div>

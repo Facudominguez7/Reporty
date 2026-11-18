@@ -12,7 +12,7 @@ import L from "leaflet"
 import "leaflet.markercluster"
 
 import { getCategoryColor, getPriorityColor, getStatusColor } from "@/components/report-card"
-import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/catalog"
+import { ETIQUETAS_ESTADO_OPERATIVO, REPORT_STATE_IDS, type EstadoOperativo } from "@/lib/authz/catalog"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
@@ -34,6 +34,7 @@ interface Report {
   category: string
   priority: string
   status: string
+  estadoId?: number | null
   location: string
   coordinates: [number, number]
   author: string
@@ -241,7 +242,7 @@ const createPopupContent = (
     : ""
   // Toma de la Defensoría: píldora violeta que distingue la toma sin revelar el número (S8, S9);
   // el número de reclamo solo lo ve el autor en su ficha.
-  const tomadoDefensoria = report.status === "Tomado por Defensoría"
+  const tomadoDefensoria = report.estadoId === REPORT_STATE_IDS.TOMADO_DEFENSORIA
     ? `<span style="display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 9px;border-radius:999px;border:1px solid var(--semantic-admin-border);background:var(--semantic-admin-soft);color:var(--semantic-admin);font-size:11px;font-weight:600;line-height:1;white-space:nowrap;">
         Tomado por la Defensoría del Pueblo
       </span>`
@@ -288,7 +289,7 @@ const createPopupContent = (
         </span>
         <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
           <span style="display:inline-flex;">${popupIcons.date}</span>
-          <span>${safeDate}</span>
+          <span>Creado el ${safeDate}</span>
         </span>
       </div>
     </a>

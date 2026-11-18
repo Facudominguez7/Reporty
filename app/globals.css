@@ -644,6 +644,29 @@ body:not(:has(.admin-workspace)),
   border-bottom: none !important;
 }
 
+/* Vidrio del mapa y de los botones claros de Contactos y Cómo usar. */
+@layer components {
+  .mapa-vidrio :is(.map-legend-card, .mapa-vidrio-superficie, .leaflet-control-zoom, .mapa-vidrio-acciones button.backdrop-blur-xl) {
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    box-shadow: var(--elevation-soft) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    @media not (prefers-reduced-transparency: reduce) {
+      .mapa-vidrio :is(.map-legend-card, .mapa-vidrio-superficie, .leaflet-control-zoom, .mapa-vidrio-acciones button.backdrop-blur-xl) {
+        background: linear-gradient(155deg, color-mix(in oklab, var(--card) 78%, transparent), color-mix(in oklab, var(--card) 60%, transparent)) !important;
+        border-color: color-mix(in oklab, var(--card) 83%, var(--border)) !important;
+        box-shadow: inset 0 1px 1px color-mix(in oklab, var(--card) 90%, transparent), var(--elevation-soft) !important;
+        -webkit-backdrop-filter: blur(8px) saturate(160%) !important;
+        backdrop-filter: blur(8px) saturate(160%) !important;
+      }
+    }
+  }
+}
+
 .leaflet-top .leaflet-control {
   margin-top: 7.5rem !important;
   margin-left: 1rem !important;

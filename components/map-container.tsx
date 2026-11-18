@@ -14,7 +14,7 @@
 "use client"
 
 import LeafletMap from "@/components/leaflet-map"
-import { MousePointer2 } from "lucide-react"
+import { MousePointer2, Shield } from "lucide-react"
 
 import { getPriorityColor } from "@/components/report-card"
 import type { EstadoOperativo } from "@/lib/authz/catalog"
@@ -31,6 +31,7 @@ interface Report {
   category: string
   priority: string
   status: string
+  estadoId?: number | null
   location: string
   coordinates: [number, number]
   author: string
@@ -67,42 +68,26 @@ export function MapContainer({ reports, mascotas = [], layer = "reportes", showL
       {/* Componente principal del mapa de Leaflet */}
       <LeafletMap reports={layer === "reportes" ? reports : []} mascotas={layer === "mascotas" ? mascotas : []} onSeleccionarReporte={onSeleccionarReporte} focoReporte={focoReporte} />
 
-      {/* Leyenda de colores flotante - Ajustada para mobile */}
       {showLegend && layer === "reportes" && (
-        <div className="map-legend-card absolute bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 z-10 max-w-[140px] sm:left-5 md:max-w-[160px]">
-          <h4 className="font-semibold text-xs md:text-sm mb-2 md:mb-3">Prioridad</h4>
-          <div className="space-y-1.5 md:space-y-2">
-            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
-              <div 
-                className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0 ring-1 ring-black/10" 
-                style={{ backgroundColor: getPriorityColor("Alta") }}
-              ></div>
-              <span>Alta</span>
-            </div>
-            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
-              <div 
-                className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0 ring-1 ring-black/10" 
-                style={{ backgroundColor: getPriorityColor("Media") }}
-              ></div>
-              <span>Media</span>
-            </div>
-            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
-              <div 
-                className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0 ring-1 ring-black/10" 
-                style={{ backgroundColor: getPriorityColor("Baja") }}
-              ></div>
-              <span>Baja</span>
-            </div>
-            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
-              {/* Punto con aro violeta: igual señal que los marcadores tomados por la Defensoría (S8). */}
-              <div
-                className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
-                style={{ backgroundColor: "var(--map-heat-neutral)", boxShadow: "0 0 0 2px var(--semantic-admin)" }}
-              ></div>
-              <span>Tomado por la Defensoría del Pueblo</span>
-            </div>
+        <aside aria-label="Leyenda del mapa" className="map-legend-card absolute bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 z-10 w-41 px-2 py-1 sm:left-5 md:w-52 md:p-3">
+          <p className="text-xs font-bold leading-tight text-foreground md:text-sm">Prioridad</p>
+          <ul className="mt-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] leading-tight md:mt-1 md:gap-x-2 md:text-xs">
+            {(["Alta", "Media", "Baja"] as const).map((prioridad) => (
+              <li key={prioridad} className="flex items-center gap-1">
+                <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ backgroundColor: getPriorityColor(prioridad) }} />
+                {prioridad}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1 flex items-center gap-1.5 border-t border-border pt-1 md:mt-2 md:gap-2 md:pt-2">
+            <span aria-hidden="true" className="relative mx-0.5 size-3.5 shrink-0 rounded-full border-2 border-card bg-muted ring-2 ring-[var(--semantic-admin)] md:size-4.5">
+              <span className="absolute -right-1.5 -bottom-1 flex size-3 items-center justify-center rounded-full bg-[var(--semantic-admin)] text-card">
+                <Shield className="size-2" strokeWidth={2.5} />
+              </span>
+            </span>
+            <p className="min-w-0 pl-0.5 text-[11px] font-semibold leading-tight text-[color:color-mix(in_oklab,var(--semantic-admin)_50%,var(--foreground))] md:text-xs">Tomado por Defensoría</p>
           </div>
-        </div>
+        </aside>
       )}
 
       {/* Instrucciones de uso del mapa - Oculta en mobile para no saturar */}
