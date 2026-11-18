@@ -309,7 +309,9 @@ export async function quitarFotoReporteAdminAction(reporteId: number, fotoId: nu
 
 /**
  * Toma de un reporte por la Defensoría del Pueblo: sesión válida + rol en el workflow,
- * ejecución confiable con el cliente admin (patrón de cambiarEstadoAdminAction).
+ * ejecución confiable con el cliente admin (patrón de cambiarEstadoAdminAction). Al
+ * confirmar revalida la ficha y también la bandeja /defensoria, donde el panel del rol
+ * muestra los pendientes (S11).
  */
 export async function tomarReporteDefensoriaAction(reporteId: number, numeroReclamo: string) {
   try {
@@ -324,7 +326,10 @@ export async function tomarReporteDefensoriaAction(reporteId: number, numeroRecl
     }
 
     const resultado = await tomarReporteDefensoriaWorkflow(createAdminClient(), parsedReportId, user.id, numeroReclamo)
-    if (resultado.success) revalidatePath(`/reportes/${parsedReportId}`)
+    if (resultado.success) {
+      revalidatePath(`/reportes/${parsedReportId}`)
+      revalidatePath("/defensoria")
+    }
     return resultado
   } catch {
     return { success: false as const, error: "No pudimos tomar el reporte. Revisá el número de reclamo e intentá nuevamente." }

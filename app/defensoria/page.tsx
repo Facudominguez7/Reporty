@@ -1,14 +1,12 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ShieldCheck } from "lucide-react"
 
+import { AdminDashboardShell } from "@/components/admin/dashboard-shell"
 import { Card, CardContent } from "@/components/ui/card"
-import { ChipReporte, tonoEstado, tonoPrioridad } from "@/components/report-detail/chip-reporte"
-import { getCategoryIcon, getPriorityIcon } from "@/components/report-card"
+import { BandejaClient, type ReporteBandeja } from "@/app/defensoria/bandeja-client"
 import { getReportesDefensoria } from "@/database/queries/reportes/get-reportes"
-import { getUserRoleContext } from "@/lib/authz/roles"
-import { esDefensoria } from "@/lib/authz/roles"
+import { normalizarBusquedaDefensoria } from "@/database/queries/reportes/filtro-defensoria"
+import { getUserRoleContext, esDefensoria } from "@/lib/authz/roles"
 import { createClient } from "@/utils/supabase/server"
 
 export const metadata: Metadata = {
@@ -18,10 +16,12 @@ export const metadata: Metadata = {
 }
 
 /**
- * Bandeja de la Defensoría del Pueblo (S2, S10): lista de reportes Pendientes y Tomados,
- * con el número de reclamo visible. Solo accesible para el rol Defensoría.
+ * Bandeja de la Defensoría del Pueblo (S2, S10, S11): lista de reportes Pendientes y
+ * Tomados, con detalle y toma dentro del panel por medio de `BandejaClient`. La guarda
+ * de rol queda acá en el servidor (S10); la ficha directa /reportes/[id] sigue siendo
+ * la entrada desde el email (S2).
  */
-export default async function DefensoriaPage() {
+export default async function DefensoriaPage({ searchParams }: { searchParams?: Promise<{ pagina?: string; vista?: string; busqueda?: string }> } = {}) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -29,82 +29,49 @@ export default async function DefensoriaPage() {
   if (!user) redirect("/auth?next=/defensoria")
 
   const { data: contextoRol } = await getUserRoleContext(supabase, user.id)
-  if (!esDefensoria(contextoRol?.roleId)) redirect("/dashboard")
+  const rol = contextoRol?.roleId ?? null
+  if (!esDefensoria(rol)) redirect("/dashboard")
 
-  const { data: reportesSinReclamo, error } = await getReportesDefensoria()
-  const reportes = reportesSinReclamo.map((reporte) => ({
+  const parametros = await searchParams
+  const numeroPagina = Number(parametros?.pagina)
+  const pagina = Number.isSafeInteger(numeroPagina) && numeroPagina > 0 && numeroPagina <= 5000 ? numeroPagina : 1
+  const vista = parametros?.vista === "tomados" ? "tomados" : "pendientes"
+  const busqueda = normalizarBusquedaDefensoria(typeof parametros?.busqueda === "string" ? parametros.busqueda : "")
+  const limite = 20
+  const { data: reportesSinReclamo, error, hasMore } = await getReportesDefensoria(limite, (pagina - 1) * limite, { vista, busqueda })
+  const reportes: ReporteBandeja[] = (reportesSinReclamo ?? []).map((reporte) => ({
     id: reporte.id,
     titulo: reporte.title,
     descripcion: reporte.description,
     categoria: reporte.category,
     prioridad: reporte.priority,
     estado: reporte.status,
+    ubicacion: reporte.direccion?.trim() ? reporte.direccion : "Dirección no disponible",
     autor: reporte.author,
     createdAt: reporte.createdAt,
     imageUrl: reporte.image,
     numeroReclamo: reporte.numeroReclamo,
   }))
-  const pendientes = reportes.filter((reporte) => reporte.estado === "Pendiente").length
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-[var(--bottom-nav-space)] pt-6">
-      <header className="mb-4 flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-[var(--radius)] bg-[var(--semantic-admin)] text-white">
-          <ShieldCheck className="size-6" aria-hidden="true" />
-        </div>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Defensoría del Pueblo</h1>
-          <p className="text-xs text-muted-foreground">Reportes pendientes de tomar</p>
-        </div>
-        <span className="ml-auto rounded-[var(--radius-pill)] border border-[var(--semantic-admin)]/30 bg-[var(--semantic-admin)]/10 px-3 py-1 text-xs font-semibold text-[var(--semantic-admin)]">
-          {pendientes} pendientes
-        </span>
-      </header>
+    <AdminDashboardShell email={user.email ?? "Cuenta de Defensoría"} roleId={rol} pendingReviews={null} variante="defensoria">
+      <div className="flex min-w-0 flex-col gap-6 md:gap-8">
+        <header className="grid gap-2">
+          <p className="page-meta-label">Defensoría del Pueblo · Área de trabajo</p>
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Reportes</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">Revisá el contexto y asigná el reclamo sin salir de la bandeja.</p>
+        </header>
 
-      <p className="mb-5 rounded-[var(--radius)] border border-[var(--semantic-admin)]/20 bg-[var(--semantic-admin)]/5 p-3 text-xs leading-relaxed text-muted-foreground">
-        Tomá un reporte y asignale el <strong className="text-foreground">número de reclamo</strong> de nuestro sistema.
-        El autor recibe una notificación al instante y el reporte queda visible como «Tomado por la Defensoría».
-      </p>
-
-      {error ? (
-        <Card className="border-destructive/40">
-          <CardContent className="p-4 text-sm text-muted-foreground">
-            No pudimos cargar la bandeja. Intentá nuevamente en unos minutos.
-          </CardContent>
-        </Card>
-      ) : reportes.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="space-y-1 p-6 text-center">
-            <p className="font-semibold">No hay reportes pendientes ni tomados por ahora.</p>
-            <p className="text-sm text-muted-foreground">Cuando la comunidad publique reportes con foto aprobada, van a aparecer acá.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <ul className="grid gap-3" aria-label="Reportes de la Defensoría">
-          {reportes.map((reporte) => (
-            <li key={reporte.id}>
-              <Link
-                href={`/reportes/${reporte.id}`}
-                className="block rounded-[var(--radius)] border border-border/60 bg-card p-4 transition-colors hover:border-foreground/20"
-              >
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <ChipReporte etiqueta="Prioridad" tono={tonoPrioridad(reporte.prioridad)} icono={getPriorityIcon(reporte.prioridad)} valor={reporte.prioridad} />
-                  <ChipReporte etiqueta="Estado" tono={tonoEstado(reporte.estado)} icono={null} valor={reporte.estado} />
-                  {reporte.numeroReclamo && (
-                    <ChipReporte etiqueta="Reclamo" tono="var(--semantic-admin)" icono={null} valor={`Nº ${reporte.numeroReclamo}`} />
-                  )}
-                </div>
-                <h2 className="line-clamp-2 text-sm font-semibold tracking-tight">{reporte.titulo}</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {reporte.categoria}
-                  {reporte.autor ? ` · ${reporte.autor}` : ""}
-                  {` · ${new Date(reporte.createdAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+        {error ? (
+          <Card className="border-destructive/40">
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              No pudimos cargar la bandeja. Intentá nuevamente en unos minutos.
+            </CardContent>
+          </Card>
+        ) : (
+          <BandejaClient key={`${vista}:${busqueda}:${pagina}`} reportes={reportes} vistaInicial={vista} busquedaInicial={busqueda} pagina={pagina} hayMas={hasMore && pagina < 5000} />
+        )}
+      </div>
+    </AdminDashboardShell>
   )
 }

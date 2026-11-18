@@ -110,8 +110,8 @@ import {
   eliminarReporteAdminAction,
   eliminarReportePropioAction,
   votarNoExisteAction,
-  tomarReporteDefensoriaAction,
 } from "./actions";
+import { DialogoTomarReporte } from "@/components/defensoria/dialogo-tomar-reporte"
 import { leerFechaBase } from "@/lib/fechas/fecha-base"
 
 dayjs.extend(utc);
@@ -1438,34 +1438,14 @@ export function ReporteDetalleClient({
 }
 
 /**
- * Sección de toma de la Defensoría del Pueblo en la ficha (S1, S2, S5, S10): botón que abre
- * un diálogo con el campo de número de reclamo del sistema externo. Al confirmar llama a la
- * server action, que revalida el rol; el botón se deshabilita mientras se procesa.
+ * Sección de toma de la Defensoría del Pueblo en la ficha (S1, S2, S5, S10): botón que
+ * abre el diálogo compartido `DialogoTomarReporte` — el mismo que usa la bandeja (S11) —
+ * con el campo de número de reclamo. Al confirmar cierra y refresca la ficha; el rol se
+ * revalida en la server action.
  */
 function DefensoriaTomarSeccion({ reporteId }: { reporteId: number }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
-  const [numeroReclamo, setNumeroReclamo] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
-
-  const confirmar = async () => {
-    setEnviando(true);
-    setError(null);
-    try {
-      const resultado = await tomarReporteDefensoriaAction(reporteId, numeroReclamo);
-      if (!resultado.success) {
-        setError(resultado.error);
-        return;
-      }
-      setAbierto(false);
-      router.refresh();
-    } catch {
-      setError("No pudimos tomar el reporte. Intentá nuevamente.");
-    } finally {
-      setEnviando(false);
-    }
-  };
 
   return (
     <>
@@ -1477,50 +1457,15 @@ function DefensoriaTomarSeccion({ reporteId }: { reporteId: number }) {
         <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
         Tomar y asignar reclamo
       </Button>
-      <Dialog open={abierto} onOpenChange={(open) => { if (!enviando) setAbierto(open) }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="size-5 text-[var(--semantic-admin)]" aria-hidden="true" />
-              Tomar este reporte
-            </DialogTitle>
-            <DialogDescription>
-              El reporte queda «Tomado por la Defensoría del Pueblo» y no puede ser tomado por nadie más.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <label className="grid gap-1.5 text-sm font-medium">
-              Número de reclamo
-              <Input
-                value={numeroReclamo}
-                onChange={(event) => setNumeroReclamo(event.target.value)}
-                placeholder="RE-2026-01482"
-                autoComplete="off"
-                maxLength={40}
-                disabled={enviando}
-              />
-              <span className="text-xs font-normal text-muted-foreground">
-                El número que te dio el sistema interno de la Defensoría. Entre 4 y 40 caracteres.
-              </span>
-            </label>
-            {error && (
-              <p role="alert" className="text-sm text-destructive">{error}</p>
-            )}
-            <div className="grid grid-cols-[1fr_1.6fr] gap-2">
-              <Button type="button" variant="outline" disabled={enviando} onClick={() => setAbierto(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                disabled={enviando || numeroReclamo.trim().length < 4}
-                onClick={confirmar}
-              >
-                {enviando ? "Confirmando…" : "Confirmar y notificar"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DialogoTomarReporte
+        reporteId={reporteId}
+        abierto={abierto}
+        onCerrar={() => setAbierto(false)}
+        onTomado={() => {
+          setAbierto(false);
+          router.refresh();
+        }}
+      />
     </>
   );
 }

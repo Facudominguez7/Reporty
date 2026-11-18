@@ -134,10 +134,11 @@ describe("getReportMapData", () => {
   it("nunca consulta reclamos de Defensoría ni adjunta el número en los datos del mapa", async () => {
     // Reporte ya tomado por la Defensoría (estado 4): el popup y el pin del mapa no
     // deben revelar el número, que solo ve el autor en su ficha (S9).
-    mocks.rows.push({ ...pendingRow, id: 8, estado: { nombre: "Tomado por Defensoría" } })
+    mocks.rows.push({ ...pendingRow, id: 8, estado_id: 4, estado: { nombre: "Tomado por Defensoría" } })
 
     const { data } = await getReportMapData()
 
+    expect(data).toContainEqual(expect.objectContaining({ id: 8, estadoId: 4 }))
     expect(mocks.tablasConsultadas).not.toContain("reclamos_defensoria")
     expect(mocks.tablasConsultadas).not.toContain("reclamos_defensoria_publico")
     for (const item of data) {
