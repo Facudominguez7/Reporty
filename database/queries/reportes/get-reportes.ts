@@ -58,6 +58,8 @@ export type FiltrosReportes = {
   soloConCoordenadas?: boolean
   /** Deja solo los reportes en estado Pendiente: el mapa muestra únicamente problemas abiertos. */
   soloPendientes?: boolean
+  /** Bandeja de la Defensoría del Pueblo: Pendientes + Tomados por Defensoría. */
+  soloDefensoria?: boolean
   limite?: number
   offset?: number
 }
@@ -254,6 +256,7 @@ async function fetchReportes(
     prioridad,
     soloConCoordenadas,
     soloPendientes,
+    soloDefensoria,
     limite,
     offset,
   } = filtros
@@ -294,6 +297,11 @@ async function fetchReportes(
     query = query.eq("estado_id", REPORT_STATE_IDS.PENDIENTE)
   }
 
+  if (soloDefensoria) {
+    // Bandeja de la Defensoría: pendientes + ya tomados por Defensoría, para ver la cola completa.
+    query = query.in("estado_id", [REPORT_STATE_IDS.PENDIENTE, REPORT_STATE_IDS.TOMADO_DEFENSORIA])
+  }
+
   // Fetch one extra row to know whether another page exists without an expensive exact count.
   return query
     .order("created_at", { ascending: false })
@@ -323,6 +331,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     prioridad,
     soloConCoordenadas = false,
     soloPendientes = false,
+    soloDefensoria = false,
     limite = 12,
     offset = 0
   } = filtros
@@ -334,6 +343,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     prioridad,
     soloConCoordenadas,
     soloPendientes,
+    soloDefensoria,
     limite,
     offset,
   }
@@ -454,6 +464,40 @@ export async function getReportCardData(filtros: FiltrosReportes = {}, options: 
     data: adjuntarEstadoOperativo(data.map(mapReportToCardData), estadosOperativos),
     error,
     hasMore,
+  }
+}
+
+/**
+ * Reportes para la bandeja de la Defensoría del Pueblo: Pendientes y Tomados, con el
+ * número de reclamo adjunto cuando existe (S5, S9).
+ */
+export async function getReportesDefensoria(limite = 20, offset = 0) {
+  const { data, error, hasMore } = await getReportCardData(
+    { soloDefensoria: true, limite, offset },
+    { includeAuthors: true },
+  )
+  if (error) return { data: [], error, hasMore, totalPendientes: 0 }
+
+  const ids = data.map((report) => report.id)
+  // reclamos_defensoria es de lectura pública (RLS SELECT): el cliente de sesión alcanza.
+  const supabaseAdmin = await createClient()
+  const { data: reclamos } = ids.length
+    ? await supabaseAdmin
+      .from("reclamos_defensoria")
+      .select("reporte_id, numero_reclamo, tomado_at")
+      .in("reporte_id", ids)
+    : { data: [] as { reporte_id: number; numero_reclamo: string; tomado_at: string }[] }
+
+  const reclamosPorReporte = new Map((reclamos ?? []).map((reclamo) => [reclamo.reporte_id, reclamo]))
+
+  return {
+    data: data.map((report) => ({
+      ...report,
+      numeroReclamo: reclamosPorReporte.get(report.id)?.numero_reclamo ?? null,
+    })),
+    error: null,
+    hasMore,
+    totalPendientes: data.filter((report) => report.status === "Pendiente").length,
   }
 }
 
