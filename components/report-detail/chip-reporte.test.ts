@@ -30,6 +30,8 @@ describe("chip de dato del reporte", () => {
     expect(tonoEstado("Reparado")).toBe("var(--primary)")
     expect(tonoEstado("Pendiente")).toBe("var(--semantic-warning)")
     expect(tonoEstado("Rechazado")).toBe("var(--destructive)")
+    // Estado nuevo: «Tomado por Defensoría» se tiñe con el violeta institucional (S8).
+    expect(tonoEstado("Tomado por Defensoría")).toBe("var(--semantic-admin)")
     expect(tonoPrioridad("Otra")).toBe("var(--muted-foreground)")
     expect(tonoEstado("Otro")).toBe("var(--muted-foreground)")
   })

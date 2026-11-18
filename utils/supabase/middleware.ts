@@ -6,7 +6,7 @@ import {
   obtenerInicioAutenticacion,
   sesionVencida,
 } from '@/lib/auth/session-expiry'
-import { canAccessAdminPanel, canCreateReports, puedeOperarCuadrillas } from '@/lib/authz/roles'
+import { canAccessAdminPanel, canCreateReports, esDefensoria, puedeOperarCuadrillas } from '@/lib/authz/roles'
 import { GUEST_MODE_PARAM, GUEST_MODE_VALUE, NEW_REPORT_PATH } from '@/lib/routes/guest-report'
 
 export async function updateSession(request: NextRequest) {
@@ -90,7 +90,7 @@ export async function updateSession(request: NextRequest) {
   // /reportes/nuevo sends visitors without a session to /auth so they choose between signing
   // in and continuing as a guest; the guest choice returns with ?modo=invitado and the browser
   // opens the anonymous session only on submit.
-  const protectedPaths = ['/dashboard', '/admin']
+  const protectedPaths = ['/dashboard', '/admin', '/defensoria']
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/')
   const isNewReportWithoutGuestChoice =
     pathname === NEW_REPORT_PATH && request.nextUrl.searchParams.get(GUEST_MODE_PARAM) !== GUEST_MODE_VALUE
@@ -108,6 +108,7 @@ export async function updateSession(request: NextRequest) {
   // Se comparte una única lectura de `profiles` entre ambas guardas.
   const rutaCrearReporte = request.nextUrl.pathname.startsWith('/reportes/nuevo')
   const rutaCuadrillas = request.nextUrl.pathname.startsWith('/dashboard/cuadrillas')
+  const rutaDefensoria = request.nextUrl.pathname === '/defensoria' || request.nextUrl.pathname.startsWith('/defensoria/')
 
   if (user && isAdminRoute) {
     const { data: profileData } = await supabase
@@ -123,7 +124,7 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  if (user && (rutaCrearReporte || rutaCuadrillas)) {
+  if (user && (rutaCrearReporte || rutaCuadrillas || rutaDefensoria)) {
     const { data: profileData } = await supabase
       .from('profiles')
       .select('rol_id')
@@ -142,6 +143,13 @@ export async function updateSession(request: NextRequest) {
 
     if (rutaCuadrillas && !puedeOperarCuadrillas(rolId)) {
       // Usuario autenticado pero sin permisos para operar cuadrillas -> redirigir al dashboard
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return redirectWithSupabaseCookies(url)
+    }
+
+    if (rutaDefensoria && !esDefensoria(rolId)) {
+      // La bandeja de la Defensoría es solo para su rol staff (S10).
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return redirectWithSupabaseCookies(url)

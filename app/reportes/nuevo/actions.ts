@@ -8,6 +8,7 @@ import { ZodError, z } from "zod"
 
 import { crearReporteWorkflow, mutationErrorMessage } from "@/lib/use-cases/reportes"
 import { notificarOrganismosDeReporte } from "@/lib/use-cases/reportes/notificar-organismos"
+import { validarContactoAviso } from "@/lib/reportes/contacto-aviso"
 import { canParticipateInCommunity, getUserRoleContext, isAnonymousUser } from "@/lib/authz/roles"
 import { buscarDuplicado } from "@/database/queries/reportes/nuevo"
 import { aAvisoDuplicado, type AvisoDuplicado } from "@/lib/reportes/duplicados"
@@ -70,8 +71,15 @@ function obtenerImagen(formData: FormData) {
 }
 
 /** Crea el reporte con sesión y claim válidos, sin confiar en miniaturas enviadas por el cliente. */
-export async function avisarOrganismosAction(reporteId: number) {
+export async function avisarOrganismosAction(
+  reporteId: number,
+  contacto?: { email?: string | null; telefono?: string | null },
+) {
   if (!Number.isSafeInteger(reporteId) || reporteId <= 0) return { success: false as const, error: "El reporte no es válido." }
+
+  // Regla de producto: al avisar, el autor deja como mínimo email o teléfono (S3).
+  const contactoValidado = validarContactoAviso({ email: contacto?.email ?? null, telefono: contacto?.telefono ?? null })
+  if (!contactoValidado.success) return { success: false as const, error: contactoValidado.error }
 
   try {
     const sessionClient = await createClient()
@@ -90,9 +98,17 @@ export async function avisarOrganismosAction(reporteId: number) {
       .select("id").eq("reporte_id", reporteId).maybeSingle()
     if (fotoError || !foto) return { success: false as const, error: "La fotografía todavía no está publicada." }
 
+    // El contacto vive en el reporte (opción A): viaja en el aviso al organismo, nunca al público.
+    const { error: contactoError } = await adminClient.from("reportes").update({
+      email_contacto: contactoValidado.contacto.email,
+      telefono_contacto: contactoValidado.contacto.telefono,
+    }).eq("id", reporteId)
+    if (contactoError) return { success: false as const, error: "No pudimos registrar tu contacto. Intentá nuevamente." }
+
     const correosEnviados = await notificarOrganismosDeReporte(adminClient, {
       reporteId, titulo: reporte.titulo, categoriaId: reporte.categoria_id,
       descripcion: reporte.descripcion, lat: reporte.lat, lon: reporte.lon,
+      contactoAutor: contactoValidado.contacto,
     })
     return { success: true as const, correosEnviados }
   } catch {

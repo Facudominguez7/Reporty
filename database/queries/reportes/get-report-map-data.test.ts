@@ -5,6 +5,7 @@ import { getReportCardData, getReportMapData } from "./get-reportes"
 const mocks = vi.hoisted(() => {
   const calls: unknown[][] = []
   const rows: unknown[] = []
+  const tablasConsultadas: string[] = []
   // Records every query builder call and resolves like a Supabase query when awaited.
   const builder: object = new Proxy(
     {},
@@ -20,11 +21,13 @@ const mocks = vi.hoisted(() => {
       },
     },
   )
-  return { calls, rows, builder, obtenerEstadoOperativo: vi.fn(), getPublicProfiles: vi.fn() }
+  return { calls, rows, tablasConsultadas, builder, obtenerEstadoOperativo: vi.fn(), getPublicProfiles: vi.fn() }
 })
 
 vi.mock("next/cache", () => ({ unstable_cache: (load: unknown) => load }))
-vi.mock("@/utils/supabase/server", () => ({ createClient: async () => ({ from: () => mocks.builder }) }))
+vi.mock("@/utils/supabase/server", () => ({
+  createClient: async () => ({ from: (tabla: string) => { mocks.tablasConsultadas.push(tabla); return mocks.builder } }),
+}))
 vi.mock("@/utils/supabase/public", () => ({ createPublicClient: vi.fn() }))
 vi.mock("@/database/queries/profiles", () => ({
   getPublicProfilesByIds: mocks.getPublicProfiles,
@@ -54,6 +57,7 @@ describe("getReportMapData", () => {
   beforeEach(() => {
     mocks.calls.length = 0
     mocks.rows.length = 0
+    mocks.tablasConsultadas.length = 0
     mocks.obtenerEstadoOperativo.mockReset().mockResolvedValue(new Map())
     mocks.getPublicProfiles.mockReset().mockResolvedValue({ data: [{ id: "user-1", username: "Author" }] })
   })
@@ -125,5 +129,20 @@ describe("getReportMapData", () => {
 
     expect(mocks.obtenerEstadoOperativo).toHaveBeenCalledWith(expect.anything(), [7])
     expect(data).toMatchObject([{ id: 7, estadoOperativo: "en_progreso", cuadrillaNombre: "Cuadrilla Norte" }])
+  })
+
+  it("nunca consulta reclamos de Defensoría ni adjunta el número en los datos del mapa", async () => {
+    // Reporte ya tomado por la Defensoría (estado 4): el popup y el pin del mapa no
+    // deben revelar el número, que solo ve el autor en su ficha (S9).
+    mocks.rows.push({ ...pendingRow, id: 8, estado_id: 4, estado: { nombre: "Tomado por Defensoría" } })
+
+    const { data } = await getReportMapData()
+
+    expect(data).toContainEqual(expect.objectContaining({ id: 8, estadoId: 4 }))
+    expect(mocks.tablasConsultadas).not.toContain("reclamos_defensoria")
+    expect(mocks.tablasConsultadas).not.toContain("reclamos_defensoria_publico")
+    for (const item of data) {
+      expect(item).not.toHaveProperty("numeroReclamo")
+    }
   })
 })

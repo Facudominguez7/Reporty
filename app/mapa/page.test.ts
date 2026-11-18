@@ -26,7 +26,7 @@ describe("MapaPage", () => {
     mocks.getMascotasMapa.mockReset().mockResolvedValue({ data: [], error: null })
   })
 
-  it("loads only pending reports on the map, keeping the URL filters", async () => {
+  it("loads pending and Defensoría-taken reports on the map, keeping the URL filters", async () => {
     await MapaPage({ searchParams: Promise.resolve({ search: "bache", categoria: "Baches" }) })
 
     expect(mocks.getReportMapData).toHaveBeenCalledWith({
@@ -35,7 +35,8 @@ describe("MapaPage", () => {
       estado: undefined,
       prioridad: undefined,
       limite: 100,
-      soloPendientes: true,
+      // S8: pendientes + tomados por la Defensoría; un reporte tomado no desaparece del mapa.
+      soloDefensoria: true,
     })
   })
 

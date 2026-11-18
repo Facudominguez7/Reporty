@@ -3,6 +3,7 @@ import type { PostgrestError, SupabaseClient, User } from "@supabase/supabase-js
 import {
   CREW_MANAGEMENT_ROLE_IDS,
   CREW_OPERATION_ROLE_IDS,
+  DEFENSORIA_ROLE_IDS,
   DASHBOARD_ROLE_IDS,
   REPORT_CREATOR_ROLE_IDS,
   ROLE_IDS,
@@ -98,6 +99,11 @@ export function puedeGestionarCuadrillas(roleId: number | null | undefined) {
 /** Indica si el rol puede operar cuadrillas: asignar reportes, observar y cerrar intervenciones. */
 export function puedeOperarCuadrillas(roleId: number | null | undefined) {
   return CREW_OPERATION_ROLE_IDS.includes(roleId as (typeof CREW_OPERATION_ROLE_IDS)[number]);
+}
+
+/** Indica si el rol es Defensoría del Pueblo: solo tomar reportes y asignarles número de reclamo. */
+export function esDefensoria(roleId: number | null | undefined) {
+  return DEFENSORIA_ROLE_IDS.includes(roleId as (typeof DEFENSORIA_ROLE_IDS)[number]);
 }
 
 /** Whether the role is the anonymous guest role assigned to Supabase anonymous users. */

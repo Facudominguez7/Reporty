@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ROLE_IDS } from "@/lib/authz/catalog"
 
 const mocks = vi.hoisted(() => ({ datos: vi.fn() }))
 
@@ -61,6 +62,21 @@ async function renderizar(roleId: number, isAnalyticsDashboard: boolean) {
   })
   return renderToStaticMarkup(await DashboardPage({ searchParams: Promise.resolve({}) }))
 }
+
+describe("accesos a paneles desde Mi cuenta", () => {
+  it("conserva Mi cuenta y enlaza únicamente al panel de Defensoría para ese rol", async () => {
+    const html = await renderizar(ROLE_IDS.DEFENSORIA, false)
+    expect(html).toContain("Mi cuenta")
+    expect(html).toContain('href="/defensoria"')
+    expect(html).not.toContain('href="/admin"')
+  })
+
+  it("conserva el acceso al panel admin para administradores", async () => {
+    const html = await renderizar(ROLE_IDS.ADMIN, false)
+    expect(html).toContain('href="/admin"')
+    expect(html).not.toContain('href="/defensoria"')
+  })
+})
 
 describe("eliminar cuenta en Mi cuenta", () => {
   beforeEach(() => vi.clearAllMocks())

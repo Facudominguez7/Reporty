@@ -134,36 +134,47 @@ describe("crearReporteAction", () => {
 
 describe("avisarOrganismosAction", () => {
   const report = { usuario_id: "persona", deleted_at: null, estado_id: 1, titulo: "Bache", categoria_id: 1, descripcion: "Calle rota", lat: -27.37, lon: -55.9 }
+  // Regla S3: al avisar, el autor deja mínimo email o teléfono; la action lo persiste en el reporte.
+  const contacto = { email: "flor@example.com", telefono: null }
   function db(row: (Omit<typeof report, "deleted_at"> & { deleted_at: string | null }) | null = report, photos = [{ id: 1 }]) {
     const reportQuery = { eq: vi.fn(() => reportQuery), single: vi.fn(async () => ({ data: row, error: null })) }
     const photoQuery = { eq: vi.fn(() => photoQuery), maybeSingle: vi.fn(async () => ({ data: photos[0] ?? null, error: null })) }
-    createAdminClient.mockReturnValue({ from: vi.fn((table: string) => ({ select: vi.fn(() => table === "reportes" ? reportQuery : photoQuery) })) })
+    const updateQuery = { eq: vi.fn(async () => ({ error: null })) }
+    createAdminClient.mockReturnValue({ from: vi.fn((table: string) => ({
+      select: vi.fn(() => table === "reportes" ? reportQuery : photoQuery),
+      update: vi.fn(() => updateQuery),
+    })) })
     return { reportQuery, photoQuery }
   }
   it("only sends on an explicit request for an owned published report", async () => {
     db(); dobles.notify.mockResolvedValue(["institucion@example.com"])
-    expect(await avisarOrganismosAction(7)).toEqual({ success: true, correosEnviados: ["institucion@example.com"] })
+    expect(await avisarOrganismosAction(7, contacto)).toEqual({ success: true, correosEnviados: ["institucion@example.com"] })
     expect(dobles.notify).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reporteId: 7, titulo: "Bache" }))
   })
   it.each([
     ["missing", null], ["another owner", { ...report, usuario_id: "otro" }],
     ["withdrawn", { ...report, deleted_at: "now" }], ["rejected", { ...report, estado_id: 3 }],
   ])("rejects %s without dispatch", async (_label, row) => {
-    db(row); expect((await avisarOrganismosAction(7)).success).toBe(false)
+    db(row); expect((await avisarOrganismosAction(7, contacto)).success).toBe(false)
     expect(dobles.notify).not.toHaveBeenCalled()
   })
   it("rejects unpublished images and invalid IDs", async () => {
-    db(report, []); expect((await avisarOrganismosAction(7)).success).toBe(false)
-    expect((await avisarOrganismosAction(-1)).success).toBe(false)
+    db(report, []); expect((await avisarOrganismosAction(7, contacto)).success).toBe(false)
+    expect((await avisarOrganismosAction(-1, contacto)).success).toBe(false)
+    expect(dobles.notify).not.toHaveBeenCalled()
+  })
+  it("rejects a notice without the mandatory contact (minimum email or phone, S3)", async () => {
+    db()
+    expect((await avisarOrganismosAction(7)).success).toBe(false)
     expect(dobles.notify).not.toHaveBeenCalled()
   })
   it("reports delivery failure rather than claiming no institution exists", async () => {
     db(); dobles.notify.mockRejectedValue(new Error("provider unavailable"))
-    expect(await avisarOrganismosAction(7)).toEqual({ success: false, error: "No pudimos avisar al organismo. Intentá nuevamente." })
+    expect(await avisarOrganismosAction(7, contacto)).toEqual({ success: false, error: "No pudimos avisar al organismo. Intentá nuevamente." })
   })
   it("rejects missing sessions, including a lost guest session", async () => {
     db(); createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: null } }) } })
-    expect((await avisarOrganismosAction(7)).success).toBe(false)
+    expect((await avisarOrganismosAction(7, contacto)).success).toBe(false)
     expect(dobles.notify).not.toHaveBeenCalled()
   })
 })

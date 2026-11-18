@@ -1,8 +1,9 @@
-/**
- * Indica si la ruta muestra el encabezado superior (logo, Donar, contactos y ayuda).
- * El mapa, el inicio, el ingreso y el panel admin tienen su propia interfaz a pantalla completa.
- */
+/** Indica si la ruta usa la navegación propia de los paneles de trabajo. */
+export function esRutaDePanel(ruta: string): boolean {
+  return ["/admin", "/defensoria"].some((base) => ruta === base || ruta.startsWith(`${base}/`))
+}
+
+/** Indica si la ruta muestra el encabezado público con logo, Donar, contactos y ayuda. */
 export function muestraEncabezadoSuperior(ruta: string): boolean {
-  const esAdmin = ruta === "/admin" || ruta.startsWith("/admin/")
-  return !esAdmin && ruta !== "/" && ruta !== "/mapa" && !ruta.startsWith("/auth")
+  return !esRutaDePanel(ruta) && ruta !== "/" && ruta !== "/mapa" && !ruta.startsWith("/auth")
 }

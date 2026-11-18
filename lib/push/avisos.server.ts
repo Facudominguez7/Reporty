@@ -52,6 +52,30 @@ export async function pushCambioEstadoReporte(
 }
 
 /**
+ * Avisa al dueño que la Defensoría del Pueblo tomó su reporte y le asignó un reclamo.
+ * Usa el tipo "estado_reporte": respeta la preferencia de cambios de estado del usuario.
+ *
+ * @param admin - Cliente de servicio.
+ * @param datos - Dueño, reporte y número de reclamo asignado.
+ */
+export async function pushTomaDefensoria(
+  admin: SupabaseClient,
+  { usuarioId, reporteId, titulo, numeroReclamo }: { usuarioId: string; reporteId: number; titulo: string; numeroReclamo: string },
+): Promise<void> {
+  await enviarPush({
+    admin,
+    usuarioIds: [usuarioId],
+    tipo: "estado_reporte",
+    mensaje: {
+      titulo: "La Defensoría del Pueblo tomó tu reporte",
+      cuerpo: `Reclamo Nº ${numeroReclamo}: «${titulo}».`,
+      url: `/reportes/${reporteId}`,
+      etiqueta: `reporte-${reporteId}-defensoria`,
+    },
+  })
+}
+
+/**
  * Avisa al dueño que se asignó una cuadrilla a su reporte.
  *
  * @param admin - Cliente de servicio.
