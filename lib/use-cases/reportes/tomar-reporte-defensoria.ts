@@ -31,7 +31,7 @@ type ResultadoToma = MutationResult<{ numeroReclamo: string }>
  * @param supabase - Cliente admin (service role); las tablas tocadas son privadas o de escritura confiable.
  * @param reporteId - Reporte Pendiente a tomar.
  * @param actorUserId - Usuario autenticado con rol Defensoría.
- * @param numeroReclamo - Texto libre del sistema externo, 4 a 40 caracteres (S5).
+ * @param numeroReclamo - Texto libre no vacío del sistema externo (S5).
  * @returns El número normalizado, o el error para mostrar en la UI.
  */
 export async function tomarReporteDefensoriaWorkflow(
@@ -41,8 +41,8 @@ export async function tomarReporteDefensoriaWorkflow(
   numeroReclamo: string,
 ): Promise<ResultadoToma> {
   const numero = numeroReclamo.trim()
-  if (numero.length < 4 || numero.length > 40) {
-    return { success: false, error: "El número de reclamo debe tener entre 4 y 40 caracteres." }
+  if (!numero) {
+    return { success: false, error: "El número de reclamo es obligatorio." }
   }
 
   const rolResult = await getUserRoleContext(supabase, actorUserId)

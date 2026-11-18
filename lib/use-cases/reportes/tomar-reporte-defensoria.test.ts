@@ -114,11 +114,24 @@ describe("tomarReporteDefensoriaWorkflow", () => {
     expect(mocks.sendTomaDefensoriaEmail).toHaveBeenCalled()
   })
 
-  it("rechaza el número de reclamo corto (4 a 40 caracteres)", async () => {
-    const { supabase } = crearSupabaseMock()
-    const resultado = await tomarReporteDefensoriaWorkflow(supabase, 77, "defensoria-1", "RE")
-    expect(resultado.success).toBe(false)
-    if (!resultado.success) expect(resultado.error).toContain("4 y 40")
+  it.each(["RE", "R".repeat(41)])("acepta y normaliza el reclamo sin rango: %s", async (numero) => {
+    const { supabase, from } = crearSupabaseMock()
+    const resultado = await tomarReporteDefensoriaWorkflow(supabase, 77, "defensoria-1", `  ${numero}  `)
+    expect(resultado).toEqual({ success: true, data: { numeroReclamo: numero } })
+    expect(from).toHaveBeenCalledWith("reclamos_defensoria")
+    expect(mocks.pushTomaDefensoria).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ numeroReclamo: numero }))
+    expect(mocks.sendTomaDefensoriaEmail).toHaveBeenCalledWith(expect.objectContaining({ numeroReclamo: numero }))
+  })
+
+  it.each(["", " \t\n "])("rechaza el reclamo vacío sin efectos: %j", async (numero) => {
+    const { supabase, from } = crearSupabaseMock()
+    const resultado = await tomarReporteDefensoriaWorkflow(supabase, 77, "defensoria-1", numero)
+    expect(resultado).toEqual({ success: false, error: "El número de reclamo es obligatorio." })
+    expect(from).not.toHaveBeenCalled()
+    expect(mocks.getUserRoleContext).not.toHaveBeenCalled()
+    expect(mocks.registrarCambioEstado).not.toHaveBeenCalled()
+    expect(mocks.pushTomaDefensoria).not.toHaveBeenCalled()
+    expect(mocks.sendTomaDefensoriaEmail).not.toHaveBeenCalled()
   })
 
   it("rechaza un actor que no es Defensoría", async () => {
