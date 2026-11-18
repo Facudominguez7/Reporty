@@ -8,11 +8,12 @@ import {
   getReporteDetalle,
   getComentariosReporte,
   getHistorialEstados,
+  getNumeroReclamoDefensoria,
 } from "@/database/queries/reportes/[id]/index";
 import { verificarEsAdmin, getEstados } from "@/database/queries/admin/index"
 import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo";
 import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
-import { getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
+import { esDefensoria, getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
 import { tieneFotografiaAprobada, tieneFotografiaPendiente, tieneRevisionRechazoPendiente } from "@/lib/moderation/estado-publico.server";
 import { obtenerSeccionReparacion } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
@@ -32,6 +33,8 @@ const SIN_REPORTE: ReporteDetalleInicial = {
   fechaCambioEstado: null,
   gestionOperativa: null,
   puedeVotar: false,
+  esDefensoria: false,
+  numeroReclamoDefensoria: null,
   evidenciaReparacion: null,
 };
 
@@ -59,13 +62,16 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
     // lookup hides the vote buttons but still renders the report.
     const puedeVotarPromise = userPromise
       .then(async (user) => {
-        if (!user) return false;
+        if (!user) return { puedeVotar: false, esDefensoria: false };
         const { data: contextoRol } = await getUserRoleContext(supabase, user.id);
-        return puedeVotarReportes(user, contextoRol?.roleId);
+        return {
+          puedeVotar: puedeVotarReportes(user, contextoRol?.roleId),
+          esDefensoria: esDefensoria(contextoRol?.roleId),
+        };
       })
       .catch((rolError) => {
         console.error("Error al cargar el rol para votar:", rolError);
-        return false;
+        return { puedeVotar: false, esDefensoria: false };
       });
     // A failed management load must only hide the operational panel, never the report itself,
     // so its rejection resolves to null here. The role it reads comes from the server session.
@@ -104,7 +110,7 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
       { data: comentarios },
       { data: historial },
       gestionOperativa,
-      puedeVotar,
+      rolesVisitante,
     ] = await Promise.all([
       getReporteDetalle(supabase, id, user?.id),
       adminPromise,
@@ -115,6 +121,12 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
     ]);
 
     const encontrado = !error && reporte ? reporte : null;
+    // El reclamo de la Defensoría es de lectura pública: si existe, se muestra en la ficha (S9).
+    // Solo se consulta cuando el estado salió de Pendiente: Pendiente nunca tiene reclamo.
+    const numeroReclamoDefensoria = encontrado && encontrado.estado_id !== REPORT_STATE_IDS.PENDIENTE
+      ? await getNumeroReclamoDefensoria(supabase, encontrado.id)
+      : null;
+
     const cerrado =
       encontrado?.estado_id === REPORT_STATE_IDS.REPARADO || encontrado?.estado_id === REPORT_STATE_IDS.RECHAZADO;
     // When the report closed: the first history entry that moved it to Reparado or Rechazado.
@@ -153,7 +165,9 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
       historialEstados: historial ?? [],
       fechaCambioEstado: cambio?.created_at ?? null,
       gestionOperativa: encontrado ? gestionOperativa : null,
-      puedeVotar,
+      puedeVotar: rolesVisitante.puedeVotar,
+      esDefensoria: rolesVisitante.esDefensoria,
+      numeroReclamoDefensoria,
       evidenciaReparacion,
     };
   } catch (error) {

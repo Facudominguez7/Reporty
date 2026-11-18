@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -110,6 +110,7 @@ import {
   eliminarReporteAdminAction,
   eliminarReportePropioAction,
   votarNoExisteAction,
+  tomarReporteDefensoriaAction,
 } from "./actions";
 import { leerFechaBase } from "@/lib/fechas/fecha-base"
 
@@ -206,6 +207,12 @@ export type ReporteDetalleInicial = {
   gestionOperativa: GestionOperativaDetalle | null;
   /** Computed on the server from the visitor's role; the vote actions check it again. */
   puedeVotar: boolean;
+  /** La visitante tiene rol Defensoría (S10); la acción lo revalida. */
+  esDefensoria?: boolean;
+  /** Número de reclamo cuando la Defensoría tomó el reporte (S9); null si no hay. */
+  numeroReclamoDefensoria?: string | null;
+  /** La visitante tiene rol Defensoría y el reporte está en condiciones de ser tomado (S10). */
+  puedeTomarDefensoria?: boolean;
   /**
    * Evidencia de reparación con su estado visible y lo que puede hacer esta persona.
    * Se calcula en el servidor; `null` cuando no hay nada que mostrar (S10, S11).
@@ -233,6 +240,10 @@ export function ReporteDetalleClient({
   fechaCambioEstado,
   gestionOperativa,
   puedeVotar,
+  /** La visitante tiene rol Defensoría (S10); la acción lo revalida. */
+  esDefensoria = false,
+  /** Número de reclamo cuando la Defensoría tomó el reporte (S9); null si no hay. */
+  numeroReclamoDefensoria = null,
   evidenciaReparacion = null,
 }: ReporteDetalleInicial) {
   const router = useRouter();
@@ -861,6 +872,15 @@ export function ReporteDetalleClient({
                   ) : (
                     <ChipReporte etiqueta="Categoría" tono={TONO_CATEGORIA} icono={getCategoryIcon(getNameFromRelation(reporte.categorias))} valor={getNameFromRelation(reporte.categorias)} />
                   )}
+                  {/* Toma de la Defensoría: esperanza visible para el autor y la comunidad (S9). */}
+                  {reporte.estado_id === REPORT_STATE_IDS.TOMADO_DEFENSORIA && numeroReclamoDefensoria && (
+                    <ChipReporte
+                      etiqueta="Defensoría"
+                      tono="var(--semantic-admin)"
+                      icono={<ShieldCheck aria-hidden="true" />}
+                      valor={`Reclamo Nº ${numeroReclamoDefensoria}`}
+                    />
+                  )}
                 </div>
                 <div className="flex min-w-0 items-start gap-3">
                   {isAdmin ? (
@@ -1011,6 +1031,10 @@ export function ReporteDetalleClient({
                   >
                     Avisar a un organismo
                   </Button>
+                )}
+                {/* Toma de la Defensoría: botón + diálogo de número de reclamo (S1, S5, S10). */}
+                {esDefensoria && reporte.estado_id === REPORT_STATE_IDS.PENDIENTE && (
+                  <DefensoriaTomarSeccion reporteId={reporte.id} />
                 )}
                 {fechaCambioEstado && isReporteCerrado && (
                   <div className={`mt-3 inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium ${getNameFromRelation(reporte.estados).toLowerCase() === 'reparado'
@@ -1410,5 +1434,93 @@ export function ReporteDetalleClient({
         aviso={avisoComentar.visible ? <AvisoComentar onCerrar={avisoComentar.descartar} /> : undefined}
       />
     </div>
+  );
+}
+
+/**
+ * Sección de toma de la Defensoría del Pueblo en la ficha (S1, S2, S5, S10): botón que abre
+ * un diálogo con el campo de número de reclamo del sistema externo. Al confirmar llama a la
+ * server action, que revalida el rol; el botón se deshabilita mientras se procesa.
+ */
+function DefensoriaTomarSeccion({ reporteId }: { reporteId: number }) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+  const [numeroReclamo, setNumeroReclamo] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  const confirmar = async () => {
+    setEnviando(true);
+    setError(null);
+    try {
+      const resultado = await tomarReporteDefensoriaAction(reporteId, numeroReclamo);
+      if (!resultado.success) {
+        setError(resultado.error);
+        return;
+      }
+      setAbierto(false);
+      router.refresh();
+    } catch {
+      setError("No pudimos tomar el reporte. Intentá nuevamente.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        className="mt-3 flex w-full max-w-full whitespace-normal"
+        onClick={() => setAbierto(true)}
+      >
+        <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+        Tomar y asignar reclamo
+      </Button>
+      <Dialog open={abierto} onOpenChange={(open) => { if (!enviando) setAbierto(open) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="size-5 text-[var(--semantic-admin)]" aria-hidden="true" />
+              Tomar este reporte
+            </DialogTitle>
+            <DialogDescription>
+              El reporte queda «Tomado por la Defensoría del Pueblo» y no puede ser tomado por nadie más.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="grid gap-1.5 text-sm font-medium">
+              Número de reclamo
+              <Input
+                value={numeroReclamo}
+                onChange={(event) => setNumeroReclamo(event.target.value)}
+                placeholder="RE-2026-01482"
+                autoComplete="off"
+                maxLength={40}
+                disabled={enviando}
+              />
+              <span className="text-xs font-normal text-muted-foreground">
+                El número que te dio el sistema interno de la Defensoría. Entre 4 y 40 caracteres.
+              </span>
+            </label>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">{error}</p>
+            )}
+            <div className="grid grid-cols-[1fr_1.6fr] gap-2">
+              <Button type="button" variant="outline" disabled={enviando} onClick={() => setAbierto(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={enviando || numeroReclamo.trim().length < 4}
+                onClick={confirmar}
+              >
+                {enviando ? "Confirmando…" : "Confirmar y notificar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

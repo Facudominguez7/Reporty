@@ -77,3 +77,19 @@ export async function getHistorialEstados(
     error: null,
   };
 }
+
+/**
+ * Número de reclamo cuando la Defensoría del Pueblo tomó el reporte (S9). Es de lectura
+ * pública por RLS; sin reclamo devuelve null sin fallar.
+ */
+export async function getNumeroReclamoDefensoria(
+  supabase: SupabaseClient,
+  reporteId: number,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("reclamos_defensoria")
+    .select("numero_reclamo")
+    .eq("reporte_id", reporteId)
+    .maybeSingle();
+  return data?.numero_reclamo ?? null;
+}
