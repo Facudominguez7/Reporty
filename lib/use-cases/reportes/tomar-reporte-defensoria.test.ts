@@ -147,7 +147,7 @@ describe("tomarReporteDefensoriaWorkflow", () => {
       success: true as const,
       data: { ...reportePendiente.data, estado_id: REPORT_STATE_IDS.TOMADO_DEFENSORIA },
     })
-    const { supabase, from } = crearSupabaseMock()
+    const { supabase } = crearSupabaseMock()
     const resultado = await tomarReporteDefensoriaWorkflow(supabase, 77, "defensoria-1", "RE-2026-01482")
     expect(resultado.success).toBe(false)
     if (!resultado.success) expect(resultado.error).toContain("ya fue tomado")

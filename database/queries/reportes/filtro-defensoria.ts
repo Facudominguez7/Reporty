@@ -10,11 +10,20 @@ export function obtenerIdBusquedaDefensoria(valor: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null
 }
 
+/**
+ * Escapa un carácter en una sola pasada para las dos capas: primero como literal de regex
+ * y después dentro del valor citado de PostgREST, donde cada barra invertida se duplica.
+ */
+function escaparCaracterBusqueda(caracter: string) {
+  if (caracter === '"') return '\\"'
+  if (caracter === "\\") return "\\\\\\\\"
+  return `\\\\${caracter}`
+}
+
 /** Serializa una búsqueda literal de título o dirección como expresión OR de PostgREST. */
 export function filtroBusquedaDefensoria(valor: string) {
   const texto = normalizarBusquedaDefensoria(valor)
   if (!texto) return ""
-  const regex = texto.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")
-  const citado = `"${regex.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+  const citado = `"${texto.replace(/[\\^$.*+?()[\]{}|"]/g, escaparCaracterBusqueda)}"`
   return `titulo.imatch.${citado},direccion.imatch.${citado}`
 }
