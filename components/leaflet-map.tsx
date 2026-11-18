@@ -523,9 +523,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     const visibleItems = reports.length ? reports : mascotas
     let marcadorEnFoco: L.Marker | null = null
     for (const report of reports) {
-      // El estado exacto «Tomado por Defensoría» enciende el aro violeta y el escudo; el punto
-      // de cuadrilla se mantiene cuando además hay una cuadrilla asignada (S8).
-      const tieneDefensoria = report.status === "Tomado por Defensoría"
+      // El ID activa el aro y el escudo, independientemente del nombre visible.
+      const tieneDefensoria = report.estadoId === REPORT_STATE_IDS.TOMADO_DEFENSORIA
       const tieneCuadrilla = Boolean(report.estadoOperativo)
       const clave = `${tieneCuadrilla ? 1 : 0}${tieneDefensoria ? 1 : 0}` as "00" | "10" | "01" | "11"
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
