@@ -88,16 +88,16 @@ describe("franja de ubicación", () => {
 
 describe("contenido de la hoja de ubicación", () => {
   it("muestra el mapa del reporte y el acceso al mapa completo", () => {
-    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { lat: LAT, lon: LON }))
+    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { reporteId: 7, lat: LAT, lon: LON }))
 
     expect(html).toContain(`data-mini-mapa="${LAT},${LON}"`)
     expect(html).toContain("-27,36708 · -55,89610")
-    expect(html).toContain('href="/mapa"')
+    expect(html).toContain('href="/mapa?reporte=7&amp;lat=-27.36708&amp;lon=-55.8961"')
     expect(html).toContain("Ver en mapa completo")
   })
 
   it("encabeza la hoja con la calle y deja las coordenadas como dato secundario", () => {
-    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { lat: LAT, lon: LON, direccion: "Bolívar 1450, Posadas" }))
+    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { reporteId: 7, lat: LAT, lon: LON, direccion: "Bolívar 1450, Posadas" }))
 
     expect(html).toContain("Bolívar 1450, Posadas")
     expect(html).toContain("-27,36708 · -55,89610")
@@ -105,14 +105,14 @@ describe("contenido de la hoja de ubicación", () => {
   })
 
   it("no pinta un mapa vacío cuando faltan las coordenadas", () => {
-    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { lat: null, lon: null }))
+    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { reporteId: 7, lat: null, lon: null }))
 
     expect(html).not.toContain("data-mini-mapa")
     expect(html).toContain("no tiene coordenadas")
   })
 
   it("acota el alto del mapa para que la hoja no tenga scroll propio", () => {
-    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { lat: LAT, lon: LON }))
+    const html = renderToStaticMarkup(createElement(ContenidoUbicacion, { reporteId: 7, lat: LAT, lon: LON }))
 
     // En escritorio el mapa crecía con el ancho y empujaba la hoja: se limita a 22rem.
     expect(html).toContain("max-h-[22rem]")

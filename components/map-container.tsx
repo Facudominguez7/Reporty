@@ -19,6 +19,7 @@ import { MousePointer2 } from "lucide-react"
 import { getPriorityColor } from "@/components/report-card"
 import type { EstadoOperativo } from "@/lib/authz/catalog"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
+import type { FocoReporte } from "@/lib/map/foco-reporte"
 
 /**
  * Interfaz que representa un reporte con sus datos para visualizar en el mapa
@@ -49,6 +50,8 @@ interface MapContainerProps {
   onSeleccionarReporte?: (reporteId: number) => void
   mascotas?: MascotaMapa[]
   layer?: "reportes" | "mascotas"
+  /** Reporte al que el mapa se acerca al abrir (llegada desde su detalle). */
+  focoReporte?: FocoReporte | null
 }
 
 /**
@@ -58,11 +61,11 @@ interface MapContainerProps {
  * @param showLegend - Indica si se debe mostrar la leyenda de colores; por defecto `true`
  * @returns El elemento JSX que contiene el mapa y sus superposiciones (leyenda e instrucciones)
  */
-export function MapContainer({ reports, mascotas = [], layer = "reportes", showLegend = true, onSeleccionarReporte }: MapContainerProps) {
+export function MapContainer({ reports, mascotas = [], layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null }: MapContainerProps) {
   return (
     <div className="relative w-full h-full">
       {/* Componente principal del mapa de Leaflet */}
-      <LeafletMap reports={layer === "reportes" ? reports : []} mascotas={layer === "mascotas" ? mascotas : []} onSeleccionarReporte={onSeleccionarReporte} />
+      <LeafletMap reports={layer === "reportes" ? reports : []} mascotas={layer === "mascotas" ? mascotas : []} onSeleccionarReporte={onSeleccionarReporte} focoReporte={focoReporte} />
 
       {/* Leyenda de colores flotante - Ajustada para mobile */}
       {showLegend && layer === "reportes" && (

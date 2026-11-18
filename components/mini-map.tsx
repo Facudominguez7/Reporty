@@ -7,6 +7,8 @@ import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from "@/lib/map/initial-view"
 type MiniMapProps = {
   lat: number
   lon: number
+  /** Permite arrastrar y hacer zoom (rueda, pellizco, botones). Por defecto es una vista fija. */
+  interactivo?: boolean
 }
 
 /**
@@ -14,9 +16,10 @@ type MiniMapProps = {
  *
  * @param lat - Latitud en grados decimales del centro del mapa
  * @param lon - Longitud en grados decimales del centro del mapa
- * @returns Un elemento JSX que muestra un mapa no interactivo con un marcador circular en la posición indicada
+ * @param interactivo - Habilita arrastre y zoom; sin él la vista previa queda fija
+ * @returns Un elemento JSX que muestra el mapa con un marcador circular en la posición indicada
  */
-export function MiniMap({ lat, lon }: MiniMapProps) {
+export function MiniMap({ lat, lon, interactivo = false }: MiniMapProps) {
   const center: [number, number] = [lat, lon]
   return (
     <div className="w-full h-full">
@@ -25,12 +28,12 @@ export function MiniMap({ lat, lon }: MiniMapProps) {
         zoom={15}
         className="w-full h-full rounded-lg overflow-hidden"
         style={{ zIndex: 0 }}
-        scrollWheelZoom={false}
-        dragging={false}
-        doubleClickZoom={false}
-        zoomControl={false}
-        keyboard={false}
-        touchZoom={false}
+        scrollWheelZoom={interactivo}
+        dragging={interactivo}
+        doubleClickZoom={interactivo}
+        zoomControl={interactivo}
+        keyboard={interactivo}
+        touchZoom={interactivo}
       >
         <TileLayer
           attribution={MAP_TILE_ATTRIBUTION}

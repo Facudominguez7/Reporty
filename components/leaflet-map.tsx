@@ -25,6 +25,7 @@ import {
   POSADAS_MIN_ZOOM,
 } from "@/lib/map/initial-view"
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
+import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
 
 interface Report {
   id: number
@@ -46,6 +47,8 @@ export interface LeafletMapProps {
   reports: Report[]
   onSeleccionarReporte?: (reporteId: number) => void
   mascotas?: MascotaMapa[]
+  /** Reporte al que el mapa se acerca y abre su popup en la primera vista. */
+  focoReporte?: FocoReporte | null
 }
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
@@ -284,7 +287,43 @@ const createPopupContent = (
   `
 }
 
-export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte }: LeafletMapProps) {
+/**
+ * Lleva el mapa al reporte pedido desde su detalle. Si el reporte está entre los pendientes
+ * del mapa, lo saca del cluster y abre su popup; si no (reparado o rechazado), igual centra
+ * la vista en su ubicación y la marca con un círculo para que se vea dónde está.
+ *
+ * @param map - Mapa de Leaflet ya creado.
+ * @param clusterGroup - Grupo de clusters que contiene los marcadores.
+ * @param foco - Reporte y coordenadas a mostrar.
+ * @param marcador - Marcador del reporte, o `null` si no está en el mapa.
+ */
+function enfocarReporte(
+  map: L.Map,
+  clusterGroup: L.MarkerClusterGroup,
+  foco: FocoReporte,
+  marcador: L.Marker | null
+) {
+  if (marcador) {
+    map.setView(marcador.getLatLng(), ZOOM_FOCO_REPORTE)
+    clusterGroup.zoomToShowLayer(marcador, () => marcador.openPopup())
+    return
+  }
+
+  map.setView([foco.lat, foco.lon], ZOOM_FOCO_REPORTE)
+  L.circleMarker([foco.lat, foco.lon], {
+    radius: 12,
+    color: "var(--semantic-info)",
+    fillColor: "var(--semantic-info)",
+    fillOpacity: 0.6,
+  }).addTo(map)
+}
+
+/**
+ * Mapa principal de Leaflet con reportes y mascotas agrupados en clusters.
+ *
+ * @param focoReporte - Reporte al que la primera vista se acerca y abre su popup.
+ */
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
@@ -461,6 +500,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     clusterGroup.clearLayers()
 
     const visibleItems = reports.length ? reports : mascotas
+    let marcadorEnFoco: L.Marker | null = null
     for (const report of reports) {
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
         icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo)),
@@ -478,6 +518,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
         marker.on("click", () => onSeleccionarReporte(report.id))
       }
       clusterGroup.addLayer(marker)
+      if (focoReporte?.reporteId === report.id) {
+        marcadorEnFoco = marker
+      }
     }
 
     for (const pet of mascotas) {
@@ -510,6 +553,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
 
     if (isInitialView) {
+      if (focoReporte) {
+        enfocarReporte(map, clusterGroup, focoReporte, marcadorEnFoco)
+      }
       return
     }
 
@@ -532,7 +578,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
 
     map.fitBounds(bounds.pad(INITIAL_MAP_VIEW_CONFIG.padding))
-  }, [getIcon, onSeleccionarReporte, reports, mascotas])
+  }, [getIcon, onSeleccionarReporte, reports, mascotas, focoReporte])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }

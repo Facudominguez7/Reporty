@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import ReportesPage from "./page"
 
-const calls = vi.hoisted(() => ({ reportes: vi.fn(), mascotas: vi.fn(), petCounts: vi.fn() }))
+const calls = vi.hoisted(() => ({ reportes: vi.fn(), mascotas: vi.fn(), petCounts: vi.fn(), capaCookie: { valor: undefined as string | undefined } }))
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: (nombre: string) => nombre === "reporty_capa" && calls.capaCookie.valor ? { value: calls.capaCookie.valor } : undefined }) }))
+vi.mock("@/components/recordar-capa", () => ({ RecordarCapa: ({ capa }: { capa: string }) => React.createElement("i", { "data-recordar-capa": capa }) }))
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: unknown; children: React.ReactNode }) =>
   React.createElement("a", { href: typeof href === "string" ? href : JSON.stringify(href), ...props }, children) }))
 vi.mock("@/database/queries/reportes/get-reportes", () => ({
@@ -23,9 +25,29 @@ vi.mock("@/components/page-title-bar", () => ({ PageTitleBar: ({ title, actions 
 
 const incidentData = [{ id: 1, title: "Bache", description: "", category: "", priority: "", status: "Pendiente", location: "", author: "", createdAt: "", image: null, thumbnailImage: null }]
 beforeEach(() => {
+  calls.capaCookie.valor = undefined
   calls.reportes.mockReset().mockResolvedValue({ data: incidentData, error: null, hasMore: false })
   calls.mascotas.mockReset().mockResolvedValue({ data: [{ id: 8 }], error: null, hasMore: false })
   calls.petCounts.mockReset().mockResolvedValue({ all: 18, lost: 12, found: 6 })
+})
+
+describe("/reportes remembers the chosen layer", () => {
+  it("opens the pet listing when the last chosen layer was pets and the URL has no view", async () => {
+    calls.capaCookie.valor = "mascotas"
+    const html = renderToStaticMarkup(await ReportesPage({ searchParams: Promise.resolve({}) }))
+    expect(html).toContain("data-testid=\"pets\"")
+    expect(html).toContain("data-recordar-capa=\"mascotas\"")
+  })
+
+  it("lets the incidents tab win over the remembered pet layer", async () => {
+    calls.capaCookie.valor = "mascotas"
+    const html = renderToStaticMarkup(await ReportesPage({ searchParams: Promise.resolve({ vista: "incidentes" }) }))
+    expect(html).toContain("data-testid=\"incidents\"")
+    expect(html).not.toContain("data-testid=\"pets\"")
+    expect(html).toContain("data-recordar-capa=\"reportes\"")
+    const incidentTab = html.match(/<a href="([^"]+)"[^>]*>Incidentes<\/a>/)?.[1]
+    expect(incidentTab).toContain("&quot;vista&quot;:&quot;incidentes&quot;")
+  })
 })
 
 describe("/reportes publication tabs", () => {

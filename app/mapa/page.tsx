@@ -13,6 +13,9 @@ import { getReportMapData, getCategorias, getPrioridades } from "@/database/quer
 import { getMascotasMapa } from "@/database/queries/mascotas/mapa"
 import type { Metadata } from "next"
 import { pageMetadata } from "@/lib/seo/site"
+import { cookies } from "next/headers"
+import { COOKIE_CAPA_PREFERIDA, normalizarCapa } from "@/lib/preferencias/capa"
+import { leerFocoReporte } from "@/lib/map/foco-reporte"
 
 export const dynamic = "force-dynamic"
 
@@ -32,6 +35,9 @@ type MapaPageProps = {
     categoria?: string
     estado?: string
     prioridad?: string
+    reporte?: string
+    lat?: string
+    lon?: string
   }>
 }
 
@@ -43,8 +49,11 @@ type MapaPageProps = {
  */
 export default async function MapaPage({ searchParams }: MapaPageProps) {
   // Obtener los parámetros de búsqueda
-  const params = await searchParams
+  const [params, almacenCookies] = await Promise.all([searchParams, cookies()])
   const { search, categoria, estado, prioridad } = params
+  const focoReporte = leerFocoReporte(params)
+  // Al llegar desde un reporte se muestran incidentes; si no, la última capa elegida.
+  const capaInicial = focoReporte ? "reportes" : normalizarCapa(almacenCookies.get(COOKIE_CAPA_PREFERIDA)?.value)
 
   // Reports and filter options don't depend on each other, so they load at the same time.
   const [{ data: reportes, error }, { data: categorias }, { data: prioridades }, { data: mascotas, error: mascotasError }] = await Promise.all([
@@ -71,6 +80,8 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
       mascotas={mascotas ?? []}
       petError={mascotasError?.message ?? null}
       error={error?.message ?? null}
+      capaInicial={capaInicial}
+      focoReporte={focoReporte}
     />
   )
 }

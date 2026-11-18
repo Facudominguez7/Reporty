@@ -17,6 +17,7 @@ import { MapPin } from "lucide-react"
 
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { Button } from "@/components/ui/button"
+import { urlMapaConFoco } from "@/lib/map/foco-reporte"
 
 const MiniMap = dynamic(() => import("@/components/mini-map").then((m) => m.MiniMap), {
   ssr: false,
@@ -115,15 +116,19 @@ export function FranjaUbicacion({
 /**
  * Cuerpo de la hoja de ubicación: el mapa real del reporte, su calle con las
  * coordenadas como dato secundario y el acceso al mapa completo. Sin coordenadas no
- * se pinta un mapa vacío.
+ * se pinta un mapa vacío. El mapa admite zoom con la rueda, pellizco y botones, y el
+ * acceso al mapa completo lleva directo a este reporte.
  *
+ * @param reporteId - Reporte al que el mapa completo se acerca al abrir.
  * @param direccion - Calle guardada del reporte; sin ella el título son las coordenadas.
  */
 export function ContenidoUbicacion({
+  reporteId,
   lat,
   lon,
   direccion,
 }: {
+  reporteId: number
   lat: number | null
   lon: number | null
   direccion?: string | null
@@ -136,9 +141,10 @@ export function ContenidoUbicacion({
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
-      {/* Altura acotada: el mapa no empuja la hoja y no aparece un scroll interior. */}
-      <div className="aspect-video max-h-[22rem] overflow-hidden rounded-[var(--radius)] border border-border bg-[var(--surface-subtle)]">
-        <MiniMap lat={lat} lon={lon} />
+      {/* Altura acotada: el mapa no empuja la hoja y no aparece un scroll interior.
+          `data-vaul-no-drag` evita que arrastrar el mapa cierre la hoja. */}
+      <div data-vaul-no-drag="" className="aspect-video max-h-[22rem] overflow-hidden rounded-[var(--radius)] border border-border bg-[var(--surface-subtle)]">
+        <MiniMap lat={lat} lon={lon} interactivo />
       </div>
       <div className="flex items-start gap-2">
         <MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
@@ -148,7 +154,7 @@ export function ContenidoUbicacion({
         </div>
       </div>
       <Button asChild className="w-full">
-        <Link href="/mapa">Ver en mapa completo</Link>
+        <Link href={urlMapaConFoco({ reporteId, lat, lon })}>Ver en mapa completo</Link>
       </Button>
     </div>
   )
