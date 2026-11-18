@@ -63,7 +63,8 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
       estado,
       prioridad,
       limite: 100, // Más reportes para el mapa
-      soloPendientes: true,
+      // Pendientes + tomados por la Defensoría (S8): un reporte tomado no desaparece del mapa.
+      soloDefensoria: true,
     }),
     getCategorias(),
     getPrioridades(),

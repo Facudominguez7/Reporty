@@ -78,6 +78,8 @@ export type ReportMapItem = {
   image?: string
   estadoOperativo?: EstadoOperativo | null
   cuadrillaNombre?: string | null
+  /** Número de reclamo cuando la Defensoría tomó el reporte (S8, S9); null si no hay. */
+  numeroReclamo?: string | null
 }
 
 export type DashboardUserReport = {
@@ -511,8 +513,32 @@ export async function getReportMapData(filtros: FiltrosReportes = {}) {
     .map(mapReportToMapItem)
     .filter((report): report is ReportMapItem => report !== null)
 
+  const conEstadoOperativo = adjuntarEstadoOperativo(mapItems, estadosOperativos)
+
+  // Número de reclamo por reporte desde la vista pública (S8, S9): la ficha y el popup
+  // del mapa lo muestran. Un fallo de la vista no rompe el mapa: quedan en null.
+  const supabaseSesion = await createClient()
+  const idsTomados = conEstadoOperativo
+    .filter((report) => report.status !== "Pendiente")
+    .map((report) => report.id)
+  let reclamosPorReporte = new Map<number, string>()
+  if (idsTomados.length) {
+    try {
+      const { data: reclamos } = await supabaseSesion
+        .from("reclamos_defensoria_publico")
+        .select("reporte_id, numero_reclamo")
+        .in("reporte_id", idsTomados)
+      reclamosPorReporte = new Map((reclamos ?? []).map((reclamo) => [reclamo.reporte_id, reclamo.numero_reclamo]))
+    } catch (reclamosError) {
+      console.error("Error al obtener reclamos de Defensoría para el mapa:", reclamosError)
+    }
+  }
+
   return {
-    data: adjuntarEstadoOperativo(mapItems, estadosOperativos),
+    data: conEstadoOperativo.map((report) => ({
+      ...report,
+      numeroReclamo: reclamosPorReporte.get(report.id) ?? null,
+    })),
     error,
   }
 }

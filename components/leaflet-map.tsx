@@ -41,6 +41,8 @@ interface Report {
   image?: string
   estadoOperativo?: EstadoOperativo | null
   cuadrillaNombre?: string | null
+  /** Número de reclamo cuando la Defensoría tomó el reporte (S8, S9); null si no hay. */
+  numeroReclamo?: string | null
 }
 
 export interface LeafletMapProps {
@@ -239,6 +241,12 @@ const createPopupContent = (
         ${escapeHtml(ETIQUETAS_ESTADO_OPERATIVO[report.estadoOperativo])}${report.cuadrillaNombre ? ` · ${escapeHtml(report.cuadrillaNombre)}` : ""}
       </span>`
     : ""
+  // Toma de la Defensoría: píldora violeta con el número de reclamo (S8, S9).
+  const reclamoDefensoria = report.numeroReclamo
+    ? `<span style="display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 9px;border-radius:999px;border:1px solid var(--semantic-admin-border);background:var(--semantic-admin-soft);color:var(--semantic-admin);font-size:11px;font-weight:600;line-height:1;white-space:nowrap;">
+        Tomado por la Defensoría · <span style="color:var(--foreground)">${escapeHtml(report.numeroReclamo)}</span>
+      </span>`
+    : ""
 
   return `
     <a href="/reportes/${report.id}" style="display:block;min-width:250px;max-width:270px;color:var(--foreground);font-size:13px;line-height:1.45;text-decoration:none;">
@@ -271,6 +279,7 @@ const createPopupContent = (
         ${createPopupChip(safeCategory, categoryTone, popupIcons.category)}
         ${createPopupChip(safePriority, priorityTone, popupIcons.priority)}
         ${estadoOperativo}
+        ${reclamoDefensoria}
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground);">
@@ -331,7 +340,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const hasInitialViewRef = useRef(false)
 
   const iconsByPriority = useMemo(() => {
-    const mk = (color: string, category: string, hasCrew = false) =>
+    // Defensor badge: violet shield in the top-right corner, same slot as the crew dot (S8).
+    const ESCUDO_DEFENSORIA = '<div title="Tomado por la Defensoría del Pueblo" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:9px;height:9px;"><path d="M12 3 3 7.5V12c0 5 3.8 8.3 9 9.5 5.2-1.2 9-4.5 9-9.5V7.5L12 3Z"/></svg></div>'
+    const mk = (color: string, category: string, hasCrew = false, tieneDefensoria = false) =>
       L.divIcon({
         className: "custom-marker",
         html: `
@@ -351,7 +362,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
           ">
             ${createCategoryIconMarkup(category)}
           </div>
-          ${hasCrew ? '<div title="Con cuadrilla asignada" style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);"></div>' : ""}
+          ${tieneDefensoria ? ESCUDO_DEFENSORIA : hasCrew ? '<div title="Con cuadrilla asignada" style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);"></div>' : ""}
           </div>
         `,
         iconSize: [36, 36],
@@ -364,16 +375,17 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       for (const category of Object.keys(categoryIconNodes)) {
         icons.set(`${priority}|${category}|free`, mk(color, category))
         icons.set(`${priority}|${category}|assigned`, mk(color, category, true))
+        icons.set(`${priority}|${category}|defensoria`, mk(color, category, false, true))
       }
     }
     return icons
   }, [])
 
   const getIcon = useCallback(
-    (priority: string, category: string, hasCrew = false) => {
+    (priority: string, category: string, variante: "free" | "assigned" | "defensoria" = "free") => {
       const normalized = priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()
       const normalizedCategory = categoryIconNodes[category] ? category : "default"
-      return iconsByPriority.get(`${normalized}|${normalizedCategory}|${hasCrew ? "assigned" : "free"}`) ?? iconsByPriority.get(`default|default|${hasCrew ? "assigned" : "free"}`)!
+      return iconsByPriority.get(`${normalized}|${normalizedCategory}|${variante}`) ?? iconsByPriority.get(`default|default|${variante}`)!
     },
     [iconsByPriority]
   )
@@ -502,8 +514,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     const visibleItems = reports.length ? reports : mascotas
     let marcadorEnFoco: L.Marker | null = null
     for (const report of reports) {
+      const variante = report.numeroReclamo ? "defensoria" : Boolean(report.estadoOperativo) ? "assigned" : "free"
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
-        icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo)),
+        icon: getIcon(report.priority, report.category, variante),
       })
 
       const popupContent = createPopupContent(
