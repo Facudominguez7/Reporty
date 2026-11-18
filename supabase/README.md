@@ -15,6 +15,19 @@ This project is adopting tracked Supabase artifacts incrementally.
 - `supabase/access-matrix.md` documents the trusted access model used to phase in RLS and storage tightening.
 - Future schema and policy changes for this change MUST be added as incremental migrations after the baseline file.
 
+## Migraciones automáticas en producción
+
+El workflow `.github/workflows/supabase-migraciones.yml` escucha únicamente los pushes a `main` y permanece inactivo por defecto. No procesa pull requests. Antes de habilitarlo, un operador autorizado debe:
+
+1. Revisar y aprobar el historial real y cada SQL pendiente, sus dependencias, compatibilidad y un respaldo recuperable. La referencia histórica de este documento no demuestra el estado actual. No reparar ni modificar el historial como parte de esta activación.
+2. Coordinar el orden con el despliegue de Cloudflare y evitar ejecuciones paralelas de aplicación y migraciones incompatibles. No se configura Cloudflare desde este workflow. Las futuras migraciones incompatibles requieren mantenimiento coordinado explícito; desactivar la automatización antes de integrarlas hasta acordar el procedimiento.
+3. Configurar exclusivamente el entorno protegido de GitHub `production`, con revisores y reglas de protección apropiados. Allí definir el secreto `SUPABASE_DB_URL` con la conexión de producción y la variable `SUPABASE_CORTE_APROBADO` con la versión de 14 dígitos del último corte histórico revisado y ya aplicado. No publicar la URL ni colocarla en variables de repositorio.
+4. Solo después de esa revisión, definir la variable de repositorio `SUPABASE_MIGRACIONES_HABILITADAS` como `true`. Para detener futuras ejecuciones, quitarla o cambiar su valor; verificar también que no haya una ejecución en curso.
+
+Cada ejecución es exclusiva respecto de las demás de este workflow. Consulta el historial mediante `psql` en una transacción de solo lectura, rechaza versiones desconocidas, huecos y un corte ausente, muestra el plan de la CLI y recién entonces aplica pendientes. Un historial vacío se rechaza: no se inicializa ni repara automáticamente. Si no hay pendientes, la operación no aplica migraciones. La exclusividad no bloquea operadores externos ni despliegues de Cloudflare: coordinar esas operaciones por separado. La aprobación del entorno debe cubrir el SQL pendiente de esa ejecución; no habilitar el proceso para cambios aún no revisados.
+
+Las pruebas simuladas se ejecutan con `bash scripts/produccion/verificar-migraciones.test.sh` y no acceden a bases reales. La configuración y las operaciones de producción quedan pendientes de autorización; no se realizan al incorporar estos archivos.
+
 ## Votos exclusivos: despliegue coordinado
 
 **No es un despliegue sin interrupción.** Las versiones anteriores insertan votos directamente y no saben cambiar un voto; la versión nueva necesita la RPC y su respuesta extendida. No conviene ejecutar ambas durante la transición.
