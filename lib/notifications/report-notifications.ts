@@ -282,7 +282,7 @@ export async function sendRepairReviewCancelledEmail({
 
 /**
  * Avisa al autor que la Defensoría del Pueblo tomó su reporte, con el número de reclamo
- * visible (S9). El estado «Tomado por Defensoría» da esperanza: se muestra en tono info.
+ * visible (S9). El estado se comunica en la introducción y el reclamo tiene su propio campo.
  */
 export async function sendTomaDefensoriaEmail({
   ownerEmail,
@@ -309,12 +309,11 @@ export async function sendTomaDefensoriaEmail({
       body: [
         emailParagraph(escapeHtml(titular)),
         emailPanel({
-          eyebrow: `Reporte N.º ${reporteId} · Reclamo Nº ${numeroReclamo}`,
+          eyebrow: `Reporte N.º ${reporteId}`,
           title: reporteTitulo,
-          badge: { label: "Tomado por Defensoría", tone: "info" },
-          content: emailField("Reclamo", escapeHtml(numeroReclamo)),
+          content: emailField("Número de reclamo", escapeHtml(numeroReclamo)),
         }),
-        emailParagraph("Tu reporte quedó registrado con un reclamo de la Defensoría del Pueblo y ya lo podés seguir desde la ficha. Te avisaremos cuando haya novedades."),
+        emailParagraph("Tu reporte quedó registrado con un reclamo de la Defensoría del Pueblo y ya lo podés seguir desde la ficha. Con tu número de reclamo podés consultar el estado de tu trámite directamente en la Defensoría del Pueblo (Félix de Azara 2438, Posadas · recepcion.defensoria.posadas@gmail.com · (376) 443-3241). Te avisaremos cuando haya novedades."),
         emailButton("Ver el reporte", reportUrl),
       ].join("\n"),
       footnote: UNSUBSCRIBE_NOTE,
@@ -324,6 +323,7 @@ export async function sendTomaDefensoriaEmail({
       `${titular}.`,
       `Reporte: ${reporteTitulo} (N.º ${reporteId})`,
       `Reclamo Nº: ${numeroReclamo}`,
+      "Con tu número de reclamo podés consultar el estado de tu trámite directamente en la Defensoría del Pueblo (Félix de Azara 2438, Posadas · recepcion.defensoria.posadas@gmail.com · (376) 443-3241).",
       `Ver el reporte: ${reportUrl}`,
       UNSUBSCRIBE_NOTE,
     ]),

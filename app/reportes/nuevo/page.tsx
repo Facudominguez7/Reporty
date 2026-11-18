@@ -733,7 +733,7 @@ export default function NuevoReportePage() {
             )}
             {createdReport.imageApproved && !createdReport.withdrawn && institutionEmailChoice === null && (
               <div className="rounded-xl border border-border/70 bg-muted/40 p-4 text-center">
-                <p className="text-sm font-medium">¿Querés avisar a la institución responsable?</p>
+                <p className="text-sm font-medium">¿Querés avisar a la Defensoría del Pueblo?</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Dejanos al menos un email o un teléfono para que puedan contactarte. El reporte se enviará solo si elegís hacerlo.
                 </p>
