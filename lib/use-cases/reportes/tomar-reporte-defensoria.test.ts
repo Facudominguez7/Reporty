@@ -96,15 +96,18 @@ describe("tomarReporteDefensoriaWorkflow", () => {
     const llamadaReclamo = from.mock.calls.filter(([tabla]) => tabla === "reclamos_defensoria")
     expect(llamadaReclamo.length).toBeGreaterThan(0)
 
-    // El número de reclamo queda en el historial como evidencia (S9).
+    // El historial es la evidencia visible para la comunidad, pero el número de reclamo es
+    // privado del autor (S9): el comentario queda neutral, sin el número.
     expect(mocks.registrarCambioEstado).toHaveBeenCalledWith(
       expect.anything(),
       77,
       REPORT_STATE_IDS.PENDIENTE,
       REPORT_STATE_IDS.TOMADO_DEFENSORIA,
       "defensoria-1",
-      "Reclamo Nº RE-2026-01482",
+      "Tomado por la Defensoría del Pueblo",
     )
+    const comentario = mocks.registrarCambioEstado.mock.calls[0]?.[5] as string
+    expect(comentario).not.toContain("RE-2026-01482")
 
     // Notificación al autor: email + notificación en el celular (S1, S4).
     expect(mocks.pushTomaDefensoria).toHaveBeenCalled()

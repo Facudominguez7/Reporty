@@ -78,8 +78,6 @@ export type ReportMapItem = {
   image?: string
   estadoOperativo?: EstadoOperativo | null
   cuadrillaNombre?: string | null
-  /** Número de reclamo cuando la Defensoría tomó el reporte (S8, S9); null si no hay. */
-  numeroReclamo?: string | null
 }
 
 export type DashboardUserReport = {
@@ -481,7 +479,8 @@ export async function getReportesDefensoria(limite = 20, offset = 0) {
   if (error) return { data: [], error, hasMore, totalPendientes: 0 }
 
   const ids = data.map((report) => report.id)
-  // reclamos_defensoria es de lectura pública (RLS SELECT): el cliente de sesión alcanza.
+  // Panel autorizado de la Defensoría: los reclamos solo son legibles por staff de la
+  // Defensoría (RLS: autor o rol 6); el público ya no tiene acceso a la tabla (S9).
   const supabaseAdmin = await createClient()
   const { data: reclamos } = ids.length
     ? await supabaseAdmin
@@ -515,30 +514,10 @@ export async function getReportMapData(filtros: FiltrosReportes = {}) {
 
   const conEstadoOperativo = adjuntarEstadoOperativo(mapItems, estadosOperativos)
 
-  // Número de reclamo por reporte desde la vista pública (S8, S9): la ficha y el popup
-  // del mapa lo muestran. Un fallo de la vista no rompe el mapa: quedan en null.
-  const supabaseSesion = await createClient()
-  const idsTomados = conEstadoOperativo
-    .filter((report) => report.status !== "Pendiente")
-    .map((report) => report.id)
-  let reclamosPorReporte = new Map<number, string>()
-  if (idsTomados.length) {
-    try {
-      const { data: reclamos } = await supabaseSesion
-        .from("reclamos_defensoria_publico")
-        .select("reporte_id, numero_reclamo")
-        .in("reporte_id", idsTomados)
-      reclamosPorReporte = new Map((reclamos ?? []).map((reclamo) => [reclamo.reporte_id, reclamo.numero_reclamo]))
-    } catch (reclamosError) {
-      console.error("Error al obtener reclamos de Defensoría para el mapa:", reclamosError)
-    }
-  }
-
+  // El número de reclamo nunca llega al mapa ni al popup: es privado del autor (S9) y solo
+  // se consulta en la ficha (autor o Defensoría) y en el panel autorizado de la Defensoría.
   return {
-    data: conEstadoOperativo.map((report) => ({
-      ...report,
-      numeroReclamo: reclamosPorReporte.get(report.id) ?? null,
-    })),
+    data: conEstadoOperativo,
     error,
   }
 }

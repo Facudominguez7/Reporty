@@ -24,7 +24,9 @@ type ResultadoToma = MutationResult<{ numeroReclamo: string }>
 
 /**
  * Registra la toma: valida rol, estado vigente y número de reclamo; inserta el reclamo,
- * actualiza el estado y deja el número en el historial como evidencia pública (S9).
+ * actualiza el estado y deja el cambio en el historial con un comentario neutral. El número
+ * es privado del autor (S9): nunca viaja por el historial público, ni en tomas nuevas ni en
+ * las existentes (la migración de privacidad redacta los comentarios previos).
  *
  * @param supabase - Cliente admin (service role); las tablas tocadas son privadas o de escritura confiable.
  * @param reporteId - Reporte Pendiente a tomar.
@@ -83,14 +85,15 @@ export async function tomarReporteDefensoriaWorkflow(
     return { success: false, error: "No pudimos actualizar el estado. Intentá nuevamente." }
   }
 
-  // El número de reclamo queda en el historial: es la evidencia visible para la comunidad (S9).
+  // El historial es público: el comentario queda neutral porque el número de reclamo solo
+  // lo ve el autor en su ficha (S9). El reclamo en sí vive en reclamos_defensoria.
   await registrarCambioEstado(
     supabase,
     reporteId,
     REPORT_STATE_IDS.PENDIENTE,
     REPORT_STATE_IDS.TOMADO_DEFENSORIA,
     actorUserId,
-    `Reclamo Nº ${numero}`,
+    "Tomado por la Defensoría del Pueblo",
   )
 
   await notificarAutorToma(supabase, report, numero)

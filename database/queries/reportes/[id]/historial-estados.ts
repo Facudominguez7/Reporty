@@ -79,8 +79,10 @@ export async function getHistorialEstados(
 }
 
 /**
- * Número de reclamo cuando la Defensoría del Pueblo tomó el reporte (S9). Es de lectura
- * pública por RLS; sin reclamo devuelve null sin fallar.
+ * Número de reclamo cuando la Defensoría del Pueblo tomó el reporte (S9). La tabla solo es
+ * legible por el autor del reporte o por staff de la Defensoría (RLS de la migración de
+ * privacidad); el servidor de la ficha debe llamarla solo tras verificar ese gating, y un
+ * visitante sin reclamo recibe null sin fallar.
  */
 export async function getNumeroReclamoDefensoria(
   supabase: SupabaseClient,

@@ -121,9 +121,12 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
     ]);
 
     const encontrado = !error && reporte ? reporte : null;
-    // El reclamo de la Defensoría es de lectura pública: si existe, se muestra en la ficha (S9).
-    // Solo se consulta cuando el estado salió de Pendiente: Pendiente nunca tiene reclamo.
-    const numeroReclamoDefensoria = encontrado && encontrado.estado_id !== REPORT_STATE_IDS.PENDIENTE
+    // En la ficha pública, solo el autor recibe el número; Defensoría lo gestiona en su panel.
+    const esAutor = Boolean(encontrado && user && encontrado.usuario_id === user.id);
+    const numeroReclamoDefensoria =
+      encontrado &&
+      encontrado.estado_id !== REPORT_STATE_IDS.PENDIENTE &&
+      esAutor
       ? await getNumeroReclamoDefensoria(supabase, encontrado.id)
       : null;
 

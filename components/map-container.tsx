@@ -93,6 +93,14 @@ export function MapContainer({ reports, mascotas = [], layer = "reportes", showL
               ></div>
               <span>Baja</span>
             </div>
+            <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
+              {/* Punto con aro violeta: igual señal que los marcadores tomados por la Defensoría (S8). */}
+              <div
+                className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
+                style={{ backgroundColor: "var(--map-heat-neutral)", boxShadow: "0 0 0 2px var(--semantic-admin)" }}
+              ></div>
+              <span>Tomado por la Defensoría del Pueblo</span>
+            </div>
           </div>
         </div>
       )}
