@@ -331,11 +331,12 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const hasInitialViewRef = useRef(false)
 
   const iconsByPriority = useMemo(() => {
-    const mk = (color: string, category: string, hasCrew = false) =>
+    const mk = (color: string, category: string, hasCrew = false, reparado = false) =>
       L.divIcon({
         className: "custom-marker",
         html: `
           <div style="position:relative;width:36px;height:36px;">
+          ${reparado ? '<div class="repair-aura" style="position:absolute;inset:-5px;border-radius:50%;background:var(--primary);opacity:0.35;box-shadow:0 0 12px 4px var(--primary);pointer-events:none;"></div>' : ""}
           <div style="
             background-color: ${color};
             width: 36px;
@@ -364,16 +365,19 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       for (const category of Object.keys(categoryIconNodes)) {
         icons.set(`${priority}|${category}|free`, mk(color, category))
         icons.set(`${priority}|${category}|assigned`, mk(color, category, true))
+        icons.set(`${priority}|${category}|free-repaired`, mk(color, category, false, true))
+        icons.set(`${priority}|${category}|assigned-repaired`, mk(color, category, true, true))
       }
     }
     return icons
   }, [])
 
   const getIcon = useCallback(
-    (priority: string, category: string, hasCrew = false) => {
+    (priority: string, category: string, hasCrew = false, reparado = false) => {
       const normalized = priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()
       const normalizedCategory = categoryIconNodes[category] ? category : "default"
-      return iconsByPriority.get(`${normalized}|${normalizedCategory}|${hasCrew ? "assigned" : "free"}`) ?? iconsByPriority.get(`default|default|${hasCrew ? "assigned" : "free"}`)!
+      const clave = `${hasCrew ? "assigned" : "free"}${reparado ? "-repaired" : ""}`
+      return iconsByPriority.get(`${normalized}|${normalizedCategory}|${clave}`) ?? iconsByPriority.get(`default|default|${clave}`)!
     },
     [iconsByPriority]
   )
@@ -503,7 +507,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     let marcadorEnFoco: L.Marker | null = null
     for (const report of reports) {
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
-        icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo)),
+        icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo), report.status === "Reparado"),
       })
 
       const popupContent = createPopupContent(

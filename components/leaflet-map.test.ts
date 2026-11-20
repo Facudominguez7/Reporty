@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
   const icons: Array<{ className: string; html: string; iconSize?: [number, number] }> = []
   const refs: Array<{ current: unknown }> = []
   const listeners = new Map<string, (event: unknown) => void>()
-  const markerOptions: Array<{ title?: string; alt?: string }> = []
+  const markerOptions: Array<{ title?: string; alt?: string; icon?: { html: string } }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
   const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
@@ -33,8 +33,8 @@ vi.mock("leaflet", () => ({
     map: () => mocks.map,
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
-    marker: (_coordinates: unknown, options: { title?: string; alt?: string }) => { mocks.markerOptions.push(options); return mocks.marker },
-    divIcon: (icon: { className: string; html: string; iconSize?: [number, number] }) => { mocks.icons.push(icon); return {} },
+    marker: (_coordinates: unknown, options: { title?: string; alt?: string; icon?: { html: string } }) => { mocks.markerOptions.push(options); return mocks.marker },
+    divIcon: (icon: { className: string; html: string; iconSize?: [number, number] }) => { mocks.icons.push(icon); return icon },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
   },
 }))
@@ -71,6 +71,12 @@ describe("LeafletMap initial view", () => {
     expect(mocks.map.setView).toHaveBeenCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
     expect(mocks.calls).toEqual(["tileLayer", "setView", "addLayer"])
     expect(mocks.marker.bindPopup).toHaveBeenCalledOnce()
+  })
+
+  it("shows a green aura only on repaired report markers", () => {
+    render([{ ...report, status: "Reparado" }, report])
+    expect(mocks.markerOptions[0].icon?.html).toContain("repair-aura")
+    expect(mocks.markerOptions[1].icon?.html).not.toContain("repair-aura")
   })
 
   it("pans open popups clear of the floating map controls", () => {
