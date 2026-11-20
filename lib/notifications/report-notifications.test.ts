@@ -55,6 +55,19 @@ const expectNewStyle = (html: string) => {
 }
 
 describe("report notification emails", () => {
+  it("envía evidencia de reparación a cada administrador con una clave individual", async () => {
+    const db = supabaseWithAdmins([
+      { id: "a", email: "a@example.com", rol_id: ROLE_IDS.ADMIN },
+      { id: "b", email: "b@example.com", rol_id: ROLE_IDS.ADMIN },
+      { id: "c", email: "c@example.com", rol_id: 999 },
+    ])
+    await sendAdminReviewNotificationEmail({ supabase: db as never, tipo: "reparacion", reviewId: "ev-1", reporteId: 42, reporteTitulo: "Reporte N.º 42" })
+    expect(mocks.send).toHaveBeenCalledTimes(2)
+    expect(mocks.send.mock.calls[0][0]).toMatchObject({ to: ["a@example.com"], subject: "Nueva evidencia de reparación" })
+    expect(mocks.send.mock.calls[1][0]).toMatchObject({ to: ["b@example.com"] })
+    expect(mocks.send.mock.calls[0][1]).toEqual({ idempotencyKey: "admin-review/reparacion/ev-1/a" })
+    expect(mocks.send.mock.calls[1][1]).toEqual({ idempotencyKey: "admin-review/reparacion/ev-1/b" })
+  })
   it("envía el aviso de nuevo reporte al organismo del directorio con idempotencia por contacto", async () => {
     await sendOrganismoNotificationEmail({
       destinatario: "movilidadurbana@posadas.gov.ar",

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   moderarEvidencia: vi.fn(),
   validarImagen: vi.fn(),
   notificarEstado: vi.fn(),
+  notificarAdmin: vi.fn(),
   pushEstado: vi.fn(),
 }))
 
@@ -29,7 +30,7 @@ vi.mock("@/lib/push/avisos.server", () => ({ pushCambioEstadoReporte: mocks.push
 vi.mock("@/lib/notifications/report-notifications", () => ({
   sendStatusNotificationEmail: mocks.notificarEstado,
   sendCommentNotificationEmail: vi.fn(),
-  sendAdminReviewNotificationEmail: vi.fn(),
+  sendAdminReviewNotificationEmail: mocks.notificarAdmin,
 }))
 
 import {
@@ -136,6 +137,7 @@ describe("informar una reparación", () => {
       success: true,
       data: { evidenciaId: "evidencia-1", estado: "en_verificacion", publicada: true, motivos: [], advertencias: [] },
     })
+    expect(mocks.notificarAdmin).toHaveBeenCalledWith(expect.objectContaining({ tipo: "reparacion", reviewId: "evidencia-1", reporteId: 9 }))
     expect(mocks.moderarEvidencia).toHaveBeenCalledWith(cliente.supabase, {
       reporteId: 9,
       autorId: "autor",

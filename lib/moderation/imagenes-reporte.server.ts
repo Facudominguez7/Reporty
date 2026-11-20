@@ -71,6 +71,7 @@ function hash(bytes: Uint8Array) { return createHash("sha256").update(bytes).dig
 async function notificarRevisionAdmin(supabase: SupabaseClient, fila: FilaImagen) {
   if (fila.decision !== "REVIEW" || fila.estado_publicacion !== "pendiente") return
   await pushModeracionPendiente(supabase, { tipo: "foto", reporteId: fila.reporte_id })
+  if (fila.destino === "evidencia_reparacion") return
   try {
     await sendAdminReviewNotificationEmail({
       supabase,
