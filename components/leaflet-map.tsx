@@ -347,12 +347,11 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     const ESCUDO_DEFENSORIA = '<div title="Tomado por la Defensoría del Pueblo" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:9px;height:9px;"><path d="M12 3 3 7.5V12c0 5 3.8 8.3 9 9.5 5.2-1.2 9-4.5 9-9.5V7.5L12 3Z"/></svg></div>'
     /** Conserva el punto original y lo desplaza si comparte el marcador con el escudo. */
     const puntoCuadrilla = (tieneDefensoria: boolean) => `<div title="Con cuadrilla asignada" style="position:absolute;top:-3px;${tieneDefensoria ? "left" : "right"}:-3px;width:12px;height:12px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);"></div>`
-    const mk = (color: string, category: string, hasCrew = false, tieneDefensoria = false, reparado = false) =>
+    const mk = (color: string, category: string, hasCrew = false, tieneDefensoria = false) =>
       L.divIcon({
         className: "custom-marker",
         html: `
           <div style="position:relative;width:36px;height:36px;">
-          ${reparado ? '<div class="repair-aura" style="position:absolute;inset:-5px;border-radius:50%;background:var(--primary);opacity:0.35;box-shadow:0 0 12px 4px var(--primary);pointer-events:none;"></div>' : ""}
           ${tieneDefensoria ? ARO_DEFENSORIA : ""}
           <div style="
             background-color: ${color};
@@ -386,15 +385,13 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
         icons.set(`${priority}|${category}|10`, mk(color, category, true))
         icons.set(`${priority}|${category}|01`, mk(color, category, false, true))
         icons.set(`${priority}|${category}|11`, mk(color, category, true, true))
-        icons.set(`${priority}|${category}|reparado`, mk(color, category, false, false, true))
-        icons.set(`${priority}|${category}|reparado-cuadrilla`, mk(color, category, true, false, true))
       }
     }
     return icons
   }, [])
 
   const getIcon = useCallback(
-    (priority: string, category: string, clave: "00" | "10" | "01" | "11" | "reparado" | "reparado-cuadrilla" = "00") => {
+    (priority: string, category: string, clave: "00" | "10" | "01" | "11" = "00") => {
       const normalized = priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()
       const normalizedCategory = categoryIconNodes[category] ? category : "default"
       return iconsByPriority.get(`${normalized}|${normalizedCategory}|${clave}`) ?? iconsByPriority.get(`default|default|${clave}`)!
@@ -529,9 +526,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       // El ID activa el aro y el escudo, independientemente del nombre visible.
       const tieneDefensoria = report.estadoId === REPORT_STATE_IDS.TOMADO_DEFENSORIA
       const tieneCuadrilla = Boolean(report.estadoOperativo)
-      const clave = report.estadoId === REPORT_STATE_IDS.REPARADO
-        ? (tieneCuadrilla ? "reparado-cuadrilla" : "reparado")
-        : `${tieneCuadrilla ? 1 : 0}${tieneDefensoria ? 1 : 0}` as "00" | "10" | "01" | "11"
+      const clave = `${tieneCuadrilla ? 1 : 0}${tieneDefensoria ? 1 : 0}` as "00" | "10" | "01" | "11"
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
         icon: getIcon(report.priority, report.category, clave),
       })

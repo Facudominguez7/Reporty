@@ -73,12 +73,6 @@ describe("LeafletMap initial view", () => {
     expect(mocks.marker.bindPopup).toHaveBeenCalledOnce()
   })
 
-  it("shows a green aura only on repaired report markers", () => {
-    render([{ ...report, estadoId: 2, status: "Reparado" }, report])
-    expect(mocks.markerOptions[0].icon?.html).toContain("repair-aura")
-    expect(mocks.markerOptions[1].icon?.html).not.toContain("repair-aura")
-  })
-
   it("pans open popups clear of the floating map controls", () => {
     render([report])
     const opciones = mocks.marker.bindPopup.mock.calls.at(-1)?.[1] as { autoPanPaddingTopLeft?: [number, number]; autoPanPaddingBottomRight?: [number, number] }
