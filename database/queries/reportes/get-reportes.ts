@@ -56,8 +56,10 @@ export type FiltrosReportes = {
   estado?: string
   prioridad?: string
   soloConCoordenadas?: boolean
-  /** Deja solo los reportes en estado Pendiente: el mapa muestra únicamente problemas abiertos. */
+  /** Deja solo los reportes en estado Pendiente. */
   soloPendientes?: boolean
+  /** Restringe los resultados a estos IDs, además del filtro por nombre de estado. */
+  estadosPermitidos?: readonly number[]
   limite?: number
   offset?: number
 }
@@ -242,6 +244,7 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode) => `id,
           ? "url,bucket,path"
           : "url"})`
 
+/** Construye la consulta filtrada y paginada para el formato de imágenes solicitado. */
 async function fetchReportes(
   supabase: Awaited<ReturnType<typeof createClient>>,
   filtros: Required<Pick<FiltrosReportes, "soloConCoordenadas" | "limite" | "offset">> & FiltrosReportes,
@@ -254,6 +257,7 @@ async function fetchReportes(
     prioridad,
     soloConCoordenadas,
     soloPendientes,
+    estadosPermitidos,
     limite,
     offset,
   } = filtros
@@ -294,6 +298,10 @@ async function fetchReportes(
     query = query.eq("estado_id", REPORT_STATE_IDS.PENDIENTE)
   }
 
+  if (estadosPermitidos) {
+    query = query.in("estado_id", estadosPermitidos)
+  }
+
   // Fetch one extra row to know whether another page exists without an expensive exact count.
   return query
     .order("created_at", { ascending: false })
@@ -311,6 +319,7 @@ async function fetchReportes(
  *   - `prioridad`: nombre de la prioridad (o `"all"` para no filtrar)
  *   - `soloConCoordenadas`: si `true`, solo incluye reportes con `lat` y `lon`
  *   - `soloPendientes`: si `true`, incluye solo los reportes en estado Pendiente
+ *   - `estadosPermitidos`: IDs de estado que la consulta puede devolver
  *   - `limite`: número máximo de resultados (por defecto 12)
  * @returns Objeto con `data` — lista de reportes (`ReporteDB[]`) o `null`, y `error` — el error devuelto por Supabase o `null`.
  */
@@ -323,6 +332,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     prioridad,
     soloConCoordenadas = false,
     soloPendientes = false,
+    estadosPermitidos,
     limite = 12,
     offset = 0
   } = filtros
@@ -334,6 +344,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     prioridad,
     soloConCoordenadas,
     soloPendientes,
+    estadosPermitidos,
     limite,
     offset,
   }
