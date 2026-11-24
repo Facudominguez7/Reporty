@@ -25,7 +25,7 @@
 | T5 | Detalle: autor, comentarios e historial con su perfil en la misma consulta | S2, S7 | inline | hecho | a89f694 |
 | T6 | Detalle: un solo `getUser` y una sola lectura del rol por pedido; la consulta principal no espera al usuario | S2, S7 | inline | hecho | 66a4cee. Riesgo: ítem 2 (permisos) |
 | T7 | Detalle: moderación, revisión y evidencia en paralelo con la consulta principal | S2, S7 | inline | hecho | 66a4cee |
-| T8 | Medición después del deploy y cierre | S3 | inline | pendiente | |
+| T8 | Medición después del deploy y cierre | S3 | inline | hecho | L12, #315 |
 
 ## Log
 
@@ -62,4 +62,23 @@
   - P2, se aplica: si la lectura del rol lanza una excepción, `main` ocultaba los votos y la rama los mostraba. Ahora la ficha oculta los votos cada vez que el rol no se pudo leer. No cambia nada para quien tiene rol, porque `rol_id` vale 2 por defecto y no hay perfiles sin rol. Esto también corrige lo que se anotó en L7.
   - P3, se aplica: el conteo de votos arranca sin esperar la sesión. Solo la consulta de los votos propios espera al usuario.
   - P3, sin cambio: las 3 consultas de moderación con un id inexistente se aceptan como costo de la paralelización.
+- **L12 (medición después del deploy de la #314, 2026-11-24, merge 6fbdcbe):**
+  - `medir.sh`, tres corridas (20, 30 y 30 pedidos). La red local agrega ruido: el logo, servido desde la caché de Cloudflare, varió entre 54 y 86 ms.
+  - Medianas de tiempo total (antes → después, tomando la mediana de las tres corridas):
+    - `/api/mapa/reportes`: 430 → ~265 ms (−38 %).
+    - `/mapa` HTML: 589 → ~427 ms (−27 %).
+    - `/mapa` RSC: 619 → ~407 ms (−34 %).
+    - `/reportes/181` HTML: 610 → ~577 ms (−5 %).
+    - `/reportes/181` RSC: 837 → ~590 ms (−30 %).
+    - `/reportes` HTML: 537 → ~287 ms (−47 %).
+    - `/reportes` RSC: 244 → 574, 233 y 317 ms en las tres corridas; es ruido, sin tendencia.
+    - `/` y `/comunidad` siguen con `x-nextjs-cache: HIT`/STALE y sin cambios fuera del ruido.
+  - Consultas por pedido anónimo, contadas en los edge logs con un pedido aislado por ruta:
+    - API del mapa: 2 → 1.
+    - `/mapa`: 3 → 2 (la RPC y las mascotas).
+    - Detalle: 10 → 9.
+  - Caché: el estático da `cf-cache-status: HIT`. La API del mapa sigue sin `cf-cache-status` (#312).
+  - Tiempos en la base: `reportes_revision_rechazo` tarda 0,02 ms de media en `pg_stat_statements`, pero 448 ms de `origin_time`. El costo es de red, no de Postgres.
+  - **Hallazgo nuevo:** el detalle lanza 8 consultas a la vez y el Worker solo deja 6 esperando cabeceras ([límites de Workers](https://developers.cloudflare.com/workers/platform/limits/#simultaneous-open-connections)). `reportes_vote_summary` y la lectura de SEO salen ~165 ms después. Eso explica por qué el detalle en HTML mejoró solo ~5 %. Queda como issue #315 (P1).
+  - Cierre: S1–S7 cubiertos. Las mejoras que todavía no tienen medición quedan en #310–#313 y #315.
 
