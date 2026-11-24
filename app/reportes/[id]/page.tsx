@@ -10,9 +10,9 @@ import {
   getHistorialEstados,
   getNumeroReclamoDefensoria,
 } from "@/database/queries/reportes/[id]/index";
-import { verificarEsAdmin, getEstados } from "@/database/queries/admin/index"
+import { getEstados } from "@/database/queries/admin/index"
 import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo";
-import { REPORT_STATE_IDS } from "@/lib/authz/catalog";
+import { REPORT_STATE_IDS, ROLE_IDS } from "@/lib/authz/catalog";
 import { esDefensoria, getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
 import { tieneFotografiaAprobada, tieneFotografiaPendiente, tieneRevisionRechazoPendiente } from "@/lib/moderation/estado-publico.server";
@@ -56,55 +56,66 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
 
     // Loads that only need the report id start right away, at the same time as the user lookup.
     const userPromise = supabase.auth.getUser().then(({ data }) => data.user);
+    const usuarioIdPromise = userPromise.then((user) => user?.id ?? null);
     const comentariosPromise = getComentariosReporte(supabase, id);
     const historialPromise = getHistorialEstados(supabase, id);
-    // Voting depends only on who the visitor is, never on the crew panel loading. A failed role
-    // lookup hides the vote buttons but still renders the report.
-    const puedeVotarPromise = userPromise
-      .then(async (user) => {
-        if (!user) return { puedeVotar: false, esDefensoria: false };
-        const { data: contextoRol } = await getUserRoleContext(supabase, user.id);
-        return {
-          puedeVotar: puedeVotarReportes(user, contextoRol?.roleId),
-          esDefensoria: esDefensoria(contextoRol?.roleId),
-        };
-      })
-      .catch((rolError) => {
-        console.error("Error al cargar el rol para votar:", rolError);
-        return { puedeVotar: false, esDefensoria: false };
-      });
+    // The report row does not wait for the session: only its vote-presence lookup needs the user.
+    const reportePromise = getReporteDetalle(supabase, id, usuarioIdPromise);
+    // Moderation and the rejection review only need the id, so they start now too. Their result is
+    // used only if the report exists, and the review only while the report is open.
+    const moderacionPromise =
+      reporteIdNumerico !== null
+        ? Promise.all([
+            tieneFotografiaPendiente(reporteIdNumerico),
+            tieneFotografiaAprobada(reporteIdNumerico),
+            tieneRevisionRechazoPendiente(reporteIdNumerico),
+          ])
+        : Promise.resolve([false, false, false] as const);
+    // The role is read once per request, from the server session, and shared by voting, the admin
+    // tools, the crew panel and the repair section. A failed lookup means "no role": the vote
+    // buttons and admin tools hide, and the report still renders.
+    const rolIdPromise = userPromise.then(async (user) => {
+      if (!user) return null;
+      const { data: contextoRol, error: rolError } = await getUserRoleContext(supabase, user.id);
+      if (rolError) console.error("Error al cargar el rol del visitante:", rolError);
+      return contextoRol?.roleId ?? null;
+    }).catch((rolError) => {
+      console.error("Error al cargar el rol del visitante:", rolError);
+      return null;
+    });
+    const rolesVisitantePromise = Promise.all([userPromise, rolIdPromise]).then(([user, rolId]) => ({
+      puedeVotar: user ? puedeVotarReportes(user, rolId) : false,
+      esDefensoria: esDefensoria(rolId),
+    }));
     // A failed management load must only hide the operational panel, never the report itself,
-    // so its rejection resolves to null here. The role it reads comes from the server session.
-    // While crews are turned off there is no panel to load.
+    // so its rejection resolves to null here. While crews are turned off there is no panel to load.
     const gestionPromise =
       cuadrillasHabilitadas() && reporteIdNumerico !== null
-        ? userPromise
-            .then((user) => obtenerGestionOperativaDetalle(supabase, user?.id ?? null, reporteIdNumerico))
+        ? Promise.all([userPromise, rolIdPromise])
+            .then(([user, rolId]) => obtenerGestionOperativaDetalle(supabase, user?.id ?? null, reporteIdNumerico, rolId))
             .catch((gestionError) => {
               console.error("Error al cargar la gestión operativa:", gestionError);
               return null;
             })
         : null;
-    // These settle while the user lookup is still pending. A no-op handler avoids an
+    // The admin tools need the edit options; the lookups are only read for admins.
+    const adminPromise = rolIdPromise.then(async (rolId) => {
+      const isAdmin = rolId === ROLE_IDS.ADMIN;
+      if (!isAdmin) return { isAdmin, estados: [], categoriasDisponibles: [], prioridadesDisponibles: [] };
+      const [estados, categoriasDisponibles, prioridadesDisponibles] = await Promise.all([
+        getEstados(supabase), getCategorias(supabase), getPrioridades(supabase),
+      ]);
+      return { isAdmin, estados: estados.data, categoriasDisponibles, prioridadesDisponibles };
+    });
+    // These may settle while another load is still pending. A no-op handler avoids an
     // "unhandled rejection" in that window; Promise.all below still rethrows into the catch.
-    for (const pending of [comentariosPromise, historialPromise]) {
+    for (const pending of [comentariosPromise, historialPromise, reportePromise, moderacionPromise, adminPromise]) {
       pending.catch(() => {});
     }
 
-    const user = await userPromise;
-
-    // The admin check and the report detail both need the user, but not each other.
-    const adminPromise = user
-      ? verificarEsAdmin(supabase, user.id).then(async ({ isAdmin }) => {
-          if (!isAdmin) return { isAdmin, estados: [], categoriasDisponibles: [], prioridadesDisponibles: [] }
-          const [estados, categoriasDisponibles, prioridadesDisponibles] = await Promise.all([
-            getEstados(supabase), getCategorias(supabase), getPrioridades(supabase),
-          ])
-          return { isAdmin, estados: estados.data, categoriasDisponibles, prioridadesDisponibles }
-        })
-      : null;
-
     const [
+      user,
+      rolId,
       { data: reporte, error },
       adminResult,
       { data: comentarios },
@@ -112,23 +123,19 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
       gestionOperativa,
       rolesVisitante,
     ] = await Promise.all([
-      getReporteDetalle(supabase, id, user?.id),
+      userPromise,
+      rolIdPromise,
+      reportePromise,
       adminPromise,
       comentariosPromise,
       historialPromise,
       gestionPromise,
-      puedeVotarPromise,
+      rolesVisitantePromise,
     ]);
 
     const encontrado = !error && reporte ? reporte : null;
     // En la ficha pública, solo el autor recibe el número; Defensoría lo gestiona en su panel.
     const esAutor = Boolean(encontrado && user && encontrado.usuario_id === user.id);
-    const numeroReclamoDefensoria =
-      encontrado &&
-      encontrado.estado_id !== REPORT_STATE_IDS.PENDIENTE &&
-      esAutor
-      ? await getNumeroReclamoDefensoria(supabase, encontrado.id)
-      : null;
 
     const cerrado =
       encontrado?.estado_id === REPORT_STATE_IDS.REPARADO || encontrado?.estado_id === REPORT_STATE_IDS.RECHAZADO;
@@ -139,20 +146,25 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
         )
       : undefined;
 
-    const [fotografiaPendiente, fotografiaAprobada, revisionRechazoPendiente, evidenciaReparacion] = encontrado
+    const [[fotografiaPendiente, fotografiaAprobada, revisionEncontrada], evidenciaReparacion, numeroReclamoDefensoria] = encontrado
       ? await Promise.all([
-          tieneFotografiaPendiente(encontrado.id),
-          tieneFotografiaAprobada(encontrado.id),
-          // Solo un reporte abierto puede estar en revisión de rechazo.
-          cerrado ? false : tieneRevisionRechazoPendiente(encontrado.id),
+          moderacionPromise,
           // La evidencia de reparación nunca rompe la ficha: si su lectura falla, la
           // sección desaparece y el reporte sigue renderizado.
-          obtenerSeccionReparacion(encontrado.id, encontrado.estado_id, encontrado.usuario_id ?? null).catch((evidenciaError) => {
+          obtenerSeccionReparacion(encontrado.id, encontrado.estado_id, encontrado.usuario_id ?? null, {
+            usuario: user,
+            rolId,
+          }).catch((evidenciaError) => {
             console.error("Error al cargar la evidencia de reparación:", evidenciaError)
             return null
           }),
+          encontrado.estado_id !== REPORT_STATE_IDS.PENDIENTE && esAutor
+            ? getNumeroReclamoDefensoria(supabase, encontrado.id)
+            : null,
         ])
-      : [false, false, false, null];
+      : [[false, false, false] as const, null, null];
+    // Solo un reporte abierto puede estar en revisión de rechazo.
+    const revisionRechazoPendiente = cerrado ? false : revisionEncontrada;
 
     return {
       reporte: encontrado,

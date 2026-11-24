@@ -179,9 +179,89 @@ describe("ReporteDetallePage", () => {
 
     const page = await renderPage()
 
-    expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), "user-1", 5)
+    expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), "user-1", 5, ROLE.CIUDADANO)
     expect(page.props.gestionOperativa).toMatchObject({ puedeOperar: false })
     expect(page.props.puedeVotar).toBe(true)
+  })
+
+  it("lee la sesión y el rol una sola vez por pedido y los comparte con cada sección", async () => {
+    vi.stubEnv("CUADRILLAS_ENABLED", "true")
+    signInAs(ROLE.CIUDADANO)
+
+    const page = await renderPage()
+
+    expect(mocks.getUser).toHaveBeenCalledTimes(1)
+    expect(mocks.getUserRoleContext).toHaveBeenCalledTimes(1)
+    expect(mocks.verificarEsAdmin).not.toHaveBeenCalled()
+    expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), "user-1", 5, ROLE.CIUDADANO)
+    expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1, "autor-5", {
+      usuario: { id: "user-1", is_anonymous: false },
+      rolId: ROLE.CIUDADANO,
+    })
+    expect(page.props.puedeVotar).toBe(true)
+    expect(page.props.isAdmin).toBe(false)
+  })
+
+  it("reconoce al admin con el mismo rol leído una sola vez", async () => {
+    signInAs(ROLE.ADMIN)
+
+    const page = await renderPage()
+
+    expect(mocks.getUserRoleContext).toHaveBeenCalledTimes(1)
+    expect(mocks.verificarEsAdmin).not.toHaveBeenCalled()
+    expect(page.props.isAdmin).toBe(true)
+  })
+
+  it("trata como no admin a quien no tiene rol legible, sin romper la ficha", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: false } } })
+    mocks.getUserRoleContext.mockResolvedValue({ data: null, error: { message: "sin perfil" } })
+
+    const page = await renderPage()
+
+    expect(page.props.isAdmin).toBe(false)
+    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
+  })
+
+  it("pide el reporte, la moderación y la revisión sin esperar la sesión ni el reporte", async () => {
+    let resolverUsuario: (valor: unknown) => void = () => {}
+    mocks.getUser.mockReturnValue(new Promise((resolver) => { resolverUsuario = resolver }))
+    let resolverReporte: (valor: unknown) => void = () => {}
+    mocks.getReporteDetalle.mockReturnValue(new Promise((resolver) => { resolverReporte = resolver }))
+
+    const pagina = renderPage()
+    await new Promise((resolver) => setTimeout(resolver, 0))
+
+    expect(mocks.getReporteDetalle).toHaveBeenCalledTimes(1)
+    expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
+    expect(mocks.tieneFotografiaAprobada).toHaveBeenCalledWith(5)
+    expect(mocks.tieneRevisionRechazoPendiente).toHaveBeenCalledWith(5)
+
+    resolverUsuario({ data: { user: null } })
+    resolverReporte({ data: { id: 5, estado_id: 1, usuario_id: "autor-5" }, error: null })
+    expect((await pagina).props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
+  })
+
+  it("no muestra revisión de rechazo en un reporte cerrado aunque la consulta la encuentre", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.tieneRevisionRechazoPendiente.mockResolvedValue(true)
+    mocks.getReporteDetalle.mockResolvedValue({ data: { id: 5, estado_id: 3, usuario_id: "autor-5" }, error: null })
+
+    const page = await renderPage()
+
+    expect(page.props.revisionRechazoPendiente).toBe(false)
+  })
+
+  it("no muestra datos de moderación si el reporte no existe", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.tieneFotografiaPendiente.mockResolvedValue(true)
+    mocks.tieneFotografiaAprobada.mockResolvedValue(true)
+    mocks.getReporteDetalle.mockResolvedValue({ data: null, error: { message: "no existe" } })
+
+    const page = await renderPage()
+
+    expect(page.props.reporte).toBeNull()
+    expect(page.props.fotografiaPendiente).toBe(false)
+    expect(page.props.puedeContactar).toBe(false)
   })
 
   it("allows registered users to comment but rejects anonymous guests", async () => {
@@ -216,7 +296,7 @@ describe("ReporteDetallePage", () => {
 
     const page = await renderPage()
 
-    expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1, "autor-5")
+    expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1, "autor-5", { usuario: null, rolId: null })
     expect(page.props.evidenciaReparacion).toEqual(seccion)
     // La ficha existente se conserva: comentarios, historial y fotografías siguen llegando.
     expect(page.props.comentarios).toEqual([])

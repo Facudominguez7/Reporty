@@ -68,10 +68,11 @@ export type ReporteDetalle = ReporteDetalleView
 export async function getReporteDetalle(
   supabase: SupabaseClient,
   reporteId: string,
-  usuarioId?: string | null,
+  usuarioId?: string | null | PromiseLike<string | null | undefined>,
 ) {
-  // The vote summary only needs the report id, so it loads at the same time as the report row.
-  const voteSummaryPromise = getReporteVoteSummary(supabase, reporteId, usuarioId)
+  // The vote summary only needs the report id and, to mark the visitor's own votes, the user id.
+  // The user id may still be loading: the report row below never waits for it.
+  const voteSummaryPromise = Promise.resolve(usuarioId).then((id) => getReporteVoteSummary(supabase, reporteId, id))
   // Unused when the report lookup fails; the handler keeps that path free of unhandled rejections.
   voteSummaryPromise.catch(() => {})
 

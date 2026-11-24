@@ -44,9 +44,11 @@ export async function obtenerGestionOperativaDetalle(
   supabase: SupabaseClient,
   usuarioId: string | null,
   reporteId: number,
+  rolIdPrecargado?: number | null,
 ): Promise<GestionOperativaDetalle> {
-  let roleId: number | null = null
-  if (usuarioId) {
+  // La ficha ya leyó el rol de la sesión del servidor: si lo pasa, no se vuelve a leer.
+  let roleId: number | null = rolIdPrecargado ?? null
+  if (usuarioId && rolIdPrecargado === undefined) {
     const { data: roleContext } = await getUserRoleContext(supabase, usuarioId)
     roleId = roleContext?.roleId ?? null
   }

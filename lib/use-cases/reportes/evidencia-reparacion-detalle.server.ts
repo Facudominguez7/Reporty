@@ -286,21 +286,28 @@ async function leerSeccion(
  * @param reporteId - Reporte cuya evidencia se muestra.
  * @param reporteEstadoId - `estado_id` ya cargado por la ficha, para no volver a leerlo.
  * @param reporteAutorId - `usuario_id` del reporte, ya cargado por la ficha; `null` si no tiene autor.
+ * @param visitante - Usuario y rol que la ficha ya leyó de la sesión del servidor, para no volver
+ *   a consultarlos. Sin él, se leen acá. Nunca puede venir del navegador.
  * @returns La sección visible, o `null` cuando no hay nada que mostrar o la lectura falla.
  */
 export async function obtenerSeccionReparacion(
   reporteId: number,
   reporteEstadoId: number,
   reporteAutorId: string | null = null,
+  visitante?: { usuario: User | null; rolId: number | null },
 ): Promise<SeccionReparacionVista | null> {
   try {
-    const sesion = await createClient()
-    const { data } = await sesion.auth.getUser()
-    const usuario = data.user ?? null
-    // El rol se lee del perfil de la base con la sesión, nunca del navegador.
-    const rolId = usuario
-      ? (await getUserRoleContext(sesion, usuario.id)).data?.roleId ?? null
-      : null
+    let usuario = visitante?.usuario ?? null
+    let rolId = visitante?.rolId ?? null
+    if (!visitante) {
+      const sesion = await createClient()
+      const { data } = await sesion.auth.getUser()
+      usuario = data.user ?? null
+      // El rol se lee del perfil de la base con la sesión, nunca del navegador.
+      rolId = usuario
+        ? (await getUserRoleContext(sesion, usuario.id)).data?.roleId ?? null
+        : null
+    }
 
     return await leerSeccion(createAdminClient(), { reporteId, reporteEstadoId, reporteAutorId, usuario, rolId })
   } catch (error) {
