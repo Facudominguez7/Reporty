@@ -7,6 +7,7 @@ raiz="$(cd "$(dirname "$0")/../.." && pwd)"
 contenedor="${SUPABASE_DB_CONTAINER:-supabase_db_Reporty}"
 postgis="$raiz/supabase/migrations/20261124120000_postgis_ubicacion.sql"
 migracion="$raiz/supabase/migrations/20261124130000_mapa_por_zona.sql"
+limites="$raiz/supabase/migrations/20261124140000_mapa_por_zona_limites.sql"
 prueba="$raiz/supabase/tests/mapa_por_zona.sql"
 emitir() { while IFS= read -r linea || [[ -n "$linea" ]]; do printf '%s\n' "$linea"; done < "$1"; }
 consultar() { docker exec "$contenedor" psql -U postgres -d postgres -Atc "$1"; }
@@ -17,6 +18,9 @@ consultar() { docker exec "$contenedor" psql -U postgres -d postgres -Atc "$1"; 
   fi
   if [[ "$(consultar "select to_regprocedure('public.reportes_agrupados_en_zona(double precision,double precision,double precision,double precision,double precision,integer[],integer,integer,text)') is not null")" != "t" ]]; then
     emitir "$migracion"
+  fi
+  if [[ "$(consultar "select to_regprocedure('public.mapa_parametros_validos(double precision,double precision,double precision,double precision,double precision,text,integer[])') is not null")" != "t" ]]; then
+    emitir "$limites"
   fi
   emitir "$prueba"
   printf 'rollback;\n'

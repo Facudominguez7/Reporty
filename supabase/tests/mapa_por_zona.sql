@@ -20,6 +20,10 @@ insert into public.categorias(id,nombre) values (1,'Bache'),(4,'Alumbrado') on c
 insert into auth.users(id,email) values ('10000000-0000-0000-0000-000000028101','zona-autor@ejemplo.invalid');
 
 -- 150 pendientes recientes en el centro de Posadas.
+-- Aísla la prueba de lo que haya cargado en la base: los reportes reales quedan como
+-- eliminados dentro de esta transacción (que se revierte), así solo cuentan los de la prueba.
+update public.reportes set deleted_at = now() where id > 0 and deleted_at is null;
+
 insert into public.reportes(id,usuario_id,titulo,lat,lon,estado_id,categoria_id,created_at)
 select -928100 - g, '10000000-0000-0000-0000-000000028101', 'Reciente ' || g,
        -27.3700 + (g % 15) * 0.0004, -55.8960 + (g / 15) * 0.0004, 1, case when g % 2 = 0 then 1 else 4 end,
@@ -106,4 +110,29 @@ select pg_temp.exigir(
   'la consulta de reportes_en_zona usa reportes_ubicacion_gist');
 reset enable_seqscan;
 
-\echo 'OK mapa por zona: pendiente antiguo visible, sin eliminados, grupos = puntos e índice GiST'
+-- Las funciones son públicas vía PostgREST (sin pasar por el endpoint): validan sus propios
+-- parámetros para acotar el trabajo que alguien puede pedir directo.
+create or replace function pg_temp.rechaza(consulta text) returns boolean language plpgsql as $$
+begin
+  execute consulta;
+  return false;
+exception when invalid_parameter_value then
+  return true;
+end $$;
+
+select pg_temp.exigir(pg_temp.rechaza('select * from public.reportes_en_zona(-60, -30, -50, -20)'),
+  'rechaza una zona de más de 1 grado');
+select pg_temp.exigir(pg_temp.rechaza('select * from public.reportes_en_zona(-55.88, -27.36, -55.91, -27.38)'),
+  'rechaza una zona con los bordes invertidos');
+select pg_temp.exigir(pg_temp.rechaza('select * from public.reportes_en_zona(''NaN'', -27.38, -55.88, -27.36)'),
+  'rechaza bordes que no son números');
+select pg_temp.exigir(pg_temp.rechaza('select * from public.reportes_agrupados_en_zona(-55.91, -27.38, -55.88, -27.36, 0.0000001, array[1])'),
+  'rechaza una celda demasiado chica');
+select pg_temp.exigir(pg_temp.rechaza('select * from public.reportes_agrupados_en_zona(-55.91, -27.38, -55.88, -27.36, 0.002, array[1], null, null, repeat(''x'', 101))'),
+  'rechaza una búsqueda de más de 100 caracteres');
+select pg_temp.exigir(pg_temp.rechaza('select * from public.reportes_agrupados_en_zona(-55.91, -27.38, -55.88, -27.36, 0.002, array(select generate_series(1, 11)))'),
+  'rechaza más de 10 estados');
+select pg_temp.exigir(not pg_temp.rechaza('select * from public.reportes_agrupados_en_zona(-56.06, -27.59, -55.6, -27.32, 0.0003, array[1,4,2], null, null, ''bache'')'),
+  'acepta toda Posadas con la celda del zoom máximo y una búsqueda corta');
+
+\echo 'OK mapa por zona: pendiente antiguo visible, sin eliminados, grupos = puntos, índice GiST y parámetros acotados'
