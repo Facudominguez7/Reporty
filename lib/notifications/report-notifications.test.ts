@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { sendAdminReviewNotificationEmail, sendCommentNotificationEmail, sendCrewAssignedEmail, sendOrganismoNotificationEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail, sendRepairReviewCancelledEmail } from "./report-notifications"
+import { sendAdminReviewNotificationEmail, sendCommentNotificationEmail, sendCrewAssignedEmail, sendOrganismoNotificationEmail, sendStatusNotificationEmail, sendReportWithdrawalEmail, sendRepairReviewCancelledEmail, sendTomaDefensoriaEmail } from "./report-notifications"
 import { ROLE_IDS } from "@/lib/authz/catalog"
 
 const mocks = vi.hoisted(() => ({ send: vi.fn() }))
@@ -55,6 +55,26 @@ const expectNewStyle = (html: string) => {
 }
 
 describe("report notification emails", () => {
+  it("muestra el estado en el encabezado y deja el número de reclamo en su propio campo", async () => {
+    await sendTomaDefensoriaEmail({
+      ownerEmail: "vecino@example.test",
+      ownerUsername: "Vecino",
+      reporteId: 221,
+      reporteTitulo: "Bache en Bolívar",
+      numeroReclamo: "5789",
+    })
+
+    const { html, text, to } = sentEmail()
+    expect(to).toEqual(["vecino@example.test"])
+    expect(html).toContain("La Defensoría del Pueblo tomó tu reporte")
+    expect(html).toContain(">REPORTE N.º 221</span>")
+    expect(html).not.toContain(">TOMADO POR DEFENSORÍA</span>")
+    expect(html).toContain(">NÚMERO DE RECLAMO</p>")
+    expect(html).toContain(">5789</")
+    expect(html).toContain("/reportes/221")
+    expect(text).toContain("Reclamo Nº: 5789")
+  })
+
   it("envía evidencia de reparación a cada administrador con una clave individual", async () => {
     const db = supabaseWithAdmins([
       { id: "a", email: "a@example.com", rol_id: ROLE_IDS.ADMIN },
@@ -68,6 +88,7 @@ describe("report notification emails", () => {
     expect(mocks.send.mock.calls[0][1]).toEqual({ idempotencyKey: "admin-review/reparacion/ev-1/a" })
     expect(mocks.send.mock.calls[1][1]).toEqual({ idempotencyKey: "admin-review/reparacion/ev-1/b" })
   })
+
   it("envía el aviso de nuevo reporte al organismo del directorio con idempotencia por contacto", async () => {
     await sendOrganismoNotificationEmail({
       destinatario: "movilidadurbana@posadas.gov.ar",

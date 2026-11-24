@@ -111,6 +111,7 @@ import {
   eliminarReportePropioAction,
   votarNoExisteAction,
 } from "./actions";
+import { DialogoTomarReporte } from "@/components/defensoria/dialogo-tomar-reporte"
 import { leerFechaBase } from "@/lib/fechas/fecha-base"
 
 dayjs.extend(utc);
@@ -206,6 +207,12 @@ export type ReporteDetalleInicial = {
   gestionOperativa: GestionOperativaDetalle | null;
   /** Computed on the server from the visitor's role; the vote actions check it again. */
   puedeVotar: boolean;
+  /** La visitante tiene rol Defensoría (S10); la acción lo revalida. */
+  esDefensoria?: boolean;
+  /** Número de reclamo cuando la Defensoría tomó el reporte (S9); null si no hay. */
+  numeroReclamoDefensoria?: string | null;
+  /** La visitante tiene rol Defensoría y el reporte está en condiciones de ser tomado (S10). */
+  puedeTomarDefensoria?: boolean;
   /**
    * Evidencia de reparación con su estado visible y lo que puede hacer esta persona.
    * Se calcula en el servidor; `null` cuando no hay nada que mostrar (S10, S11).
@@ -233,6 +240,10 @@ export function ReporteDetalleClient({
   fechaCambioEstado,
   gestionOperativa,
   puedeVotar,
+  /** La visitante tiene rol Defensoría (S10); la acción lo revalida. */
+  esDefensoria = false,
+  /** Número de reclamo cuando la Defensoría tomó el reporte (S9); null si no hay. */
+  numeroReclamoDefensoria = null,
   evidenciaReparacion = null,
 }: ReporteDetalleInicial) {
   const router = useRouter();
@@ -861,6 +872,15 @@ export function ReporteDetalleClient({
                   ) : (
                     <ChipReporte etiqueta="Categoría" tono={TONO_CATEGORIA} icono={getCategoryIcon(getNameFromRelation(reporte.categorias))} valor={getNameFromRelation(reporte.categorias)} />
                   )}
+                  {/* Toma de la Defensoría: esperanza visible para el autor y la comunidad (S9). */}
+                  {reporte.estado_id === REPORT_STATE_IDS.TOMADO_DEFENSORIA && numeroReclamoDefensoria && (
+                    <ChipReporte
+                      etiqueta="Defensoría"
+                      tono="var(--semantic-admin)"
+                      icono={<ShieldCheck aria-hidden="true" />}
+                      valor={`Reclamo Nº ${numeroReclamoDefensoria}`}
+                    />
+                  )}
                 </div>
                 <div className="flex min-w-0 items-start gap-3">
                   {isAdmin ? (
@@ -1011,6 +1031,10 @@ export function ReporteDetalleClient({
                   >
                     Avisar a un organismo
                   </Button>
+                )}
+                {/* Toma de la Defensoría: botón + diálogo de número de reclamo (S1, S5, S10). */}
+                {esDefensoria && reporte.estado_id === REPORT_STATE_IDS.PENDIENTE && (
+                  <DefensoriaTomarSeccion reporteId={reporte.id} />
                 )}
                 {fechaCambioEstado && isReporteCerrado && (
                   <div className={`mt-3 inline-flex w-full items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium sm:w-auto ${getNameFromRelation(reporte.estados).toLowerCase() === 'reparado'
@@ -1411,5 +1435,38 @@ export function ReporteDetalleClient({
         aviso={avisoComentar.visible ? <AvisoComentar onCerrar={avisoComentar.descartar} reparado={evidenciaReparacion?.evidencia?.estado === "reparado"} /> : undefined}
       />
     </div>
+  );
+}
+
+/**
+ * Sección de toma de la Defensoría del Pueblo en la ficha (S1, S2, S5, S10): botón que
+ * abre el diálogo compartido `DialogoTomarReporte` — el mismo que usa la bandeja (S11) —
+ * con el campo de número de reclamo. Al confirmar cierra y refresca la ficha; el rol se
+ * revalida en la server action.
+ */
+function DefensoriaTomarSeccion({ reporteId }: { reporteId: number }) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+
+  return (
+    <>
+      <Button
+        type="button"
+        className="mt-3 flex w-full max-w-full whitespace-normal"
+        onClick={() => setAbierto(true)}
+      >
+        <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
+        Tomar y asignar reclamo
+      </Button>
+      <DialogoTomarReporte
+        reporteId={reporteId}
+        abierto={abierto}
+        onCerrar={() => setAbierto(false)}
+        onTomado={() => {
+          setAbierto(false);
+          router.refresh();
+        }}
+      />
+    </>
   );
 }

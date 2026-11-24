@@ -26,6 +26,16 @@ type CommentNotificationParams = {
   comentarioContenido: string;
 };
 
+type TomaDefensoriaEmailParams = {
+  /** Email del autor cargado en su perfil. */
+  ownerEmail: string;
+  ownerUsername: string | null;
+  reporteId: number;
+  reporteTitulo: string;
+  /** Número de reclamo emitido por el sistema externo de la Defensoría. */
+  numeroReclamo: string;
+};
+
 type StatusNotificationParams = {
   ownerEmail: string;
   ownerUsername: string | null;
@@ -63,6 +73,8 @@ type OrganismoEmailParams = {
   descripcion: string | null | undefined;
   /** Id del canal de contacto; particiona la clave de idempotencia por destinatario. */
   contactoId: number;
+  /** Contacto del autor para que el organismo pueda responderle (S3); ninguno se muestra al público. */
+  contactoAutor?: { email: string | null; telefono: string | null };
 };
 
 type AdminReviewEmailParams = {
@@ -269,6 +281,56 @@ export async function sendRepairReviewCancelledEmail({
 }
 
 /**
+ * Avisa al autor que la Defensoría del Pueblo tomó su reporte, con el número de reclamo
+ * visible (S9). El estado se comunica en la introducción y el reclamo tiene su propio campo.
+ */
+export async function sendTomaDefensoriaEmail({
+  ownerEmail,
+  ownerUsername,
+  reporteId,
+  reporteTitulo,
+  numeroReclamo,
+}: TomaDefensoriaEmailParams) {
+  const resend = getResendClient();
+  const reportUrl = `${getAppUrl()}/reportes/${reporteId}`;
+  const owner = ownerUsername || "Usuario";
+  const titular = "La Defensoría del Pueblo tomó tu reporte";
+
+  return resend.emails.send({
+    from: SENDER,
+    to: [ownerEmail],
+    subject: `${titular} — Reclamo Nº ${numeroReclamo}`,
+    html: renderEmailLayout({
+      assetBaseUrl: getAppUrl(),
+      title: "Tu reporte fue tomado por la Defensoría",
+      kicker: "Reclamo asignado",
+      preheader: `${titular}: "${reporteTitulo}".`,
+      heading: `¡Hola ${owner}!`,
+      body: [
+        emailParagraph(escapeHtml(titular)),
+        emailPanel({
+          eyebrow: `Reporte N.º ${reporteId}`,
+          title: reporteTitulo,
+          content: emailField("Número de reclamo", escapeHtml(numeroReclamo)),
+        }),
+        emailParagraph("Tu reporte quedó registrado con un reclamo de la Defensoría del Pueblo y ya lo podés seguir desde la ficha. Con tu número de reclamo podés consultar el estado de tu trámite directamente en la Defensoría del Pueblo (Félix de Azara 2438, Posadas · recepcion.defensoria.posadas@gmail.com · (376) 443-3241). Te avisaremos cuando haya novedades."),
+        emailButton("Ver el reporte", reportUrl),
+      ].join("\n"),
+      footnote: UNSUBSCRIBE_NOTE,
+    }),
+    text: plainText([
+      `¡Hola ${owner}!`,
+      `${titular}.`,
+      `Reporte: ${reporteTitulo} (N.º ${reporteId})`,
+      `Reclamo Nº: ${numeroReclamo}`,
+      "Con tu número de reclamo podés consultar el estado de tu trámite directamente en la Defensoría del Pueblo (Félix de Azara 2438, Posadas · recepcion.defensoria.posadas@gmail.com · (376) 443-3241).",
+      `Ver el reporte: ${reportUrl}`,
+      UNSUBSCRIBE_NOTE,
+    ]),
+  });
+}
+
+/**
  * Envía el email de asignación de cuadrilla al propietario del reporte, con la misma
  * plantilla que el resto de los emails de este módulo.
  */
@@ -320,6 +382,7 @@ export async function sendOrganismoNotificationEmail({
   categoria,
   descripcion,
   contactoId,
+  contactoAutor,
 }: OrganismoEmailParams) {
   const resend = getResendClient();
   const reportUrl = `${getAppUrl()}/reportes/${reporteId}`;
@@ -344,6 +407,8 @@ export async function sendOrganismoNotificationEmail({
             emailField("Organismo", escapeHtml(organizacion)),
             emailField("Categoría", escapeHtml(categoria)),
             descripcion ? emailField("Descripción", escapeHtml(descripcion)) : "",
+            contactoAutor?.email ? emailField("Email del vecino", escapeHtml(contactoAutor.email)) : "",
+            contactoAutor?.telefono ? emailField("Teléfono del vecino", escapeHtml(contactoAutor.telefono)) : "",
           ].join("\n"),
         }),
         emailButton("Ver reporte completo", reportUrl),
@@ -354,6 +419,8 @@ export async function sendOrganismoNotificationEmail({
       `Nuevo reporte de ${categoria}: ${reporteTitulo}`,
       `Organismo: ${organizacion}`,
       descripcion && `Descripción: ${descripcion}`,
+      contactoAutor?.email && `Email del vecino: ${contactoAutor.email}`,
+      contactoAutor?.telefono && `Teléfono del vecino: ${contactoAutor.telefono}`,
       `Ver reporte completo: ${reportUrl}`,
       "Este aviso fue enviado a pedido de quien creó el reporte ciudadano en Reporty.",
     ]),

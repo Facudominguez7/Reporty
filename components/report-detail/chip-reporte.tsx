@@ -46,6 +46,9 @@ export function tonoEstado(estado: string): string {
       return "var(--semantic-warning)"
     case "Rechazado":
       return "var(--destructive)"
+    case "Tomado por Defensoría":
+      // Violeta institucional de la Defensoría del Pueblo, igual que el aro del mapa (S8).
+      return "var(--semantic-admin)"
     default:
       return TONO_NEUTRO
   }

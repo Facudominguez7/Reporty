@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
   const icons: Array<{ className: string; html: string; iconSize?: [number, number] }> = []
   const refs: Array<{ current: unknown }> = []
   const listeners = new Map<string, (event: unknown) => void>()
-  const markerOptions: Array<{ title?: string; alt?: string; icon?: { html: string } }> = []
+  const markerOptions: Array<{ title?: string; alt?: string; icon?: { html?: string } }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
   const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
@@ -33,7 +33,7 @@ vi.mock("leaflet", () => ({
     map: () => mocks.map,
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
-    marker: (_coordinates: unknown, options: { title?: string; alt?: string; icon?: { html: string } }) => { mocks.markerOptions.push(options); return mocks.marker },
+    marker: (_coordinates: unknown, options: { title?: string; alt?: string; icon?: { html?: string } }) => { mocks.markerOptions.push(options); return mocks.marker },
     divIcon: (icon: { className: string; html: string; iconSize?: [number, number] }) => { mocks.icons.push(icon); return icon },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
   },
@@ -74,7 +74,7 @@ describe("LeafletMap initial view", () => {
   })
 
   it("shows a green aura only on repaired report markers", () => {
-    render([{ ...report, status: "Reparado" }, report])
+    render([{ ...report, estadoId: 2, status: "Reparado" }, report])
     expect(mocks.markerOptions[0].icon?.html).toContain("repair-aura")
     expect(mocks.markerOptions[1].icon?.html).not.toContain("repair-aura")
   })
@@ -224,5 +224,44 @@ describe("LeafletMap initial view", () => {
     expect(mocks.map.setView).toHaveBeenLastCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
     expect(mocks.map.setView).toHaveBeenCalledTimes(2)
     expect(mocks.cluster.clearLayers).toHaveBeenCalledTimes(2)
+  })
+
+  it("marca con aro violeta y escudo los reportes tomados por la Defensoría, sin revelar el número", () => {
+    render([{ ...report, id: 2, estadoId: 4, status: "Tomado por Defensoría " }])
+
+    const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
+    // Aro violeta alrededor del punto, conservando el color de prioridad del círculo (S8).
+    expect(html).toContain("border:3px solid var(--semantic-admin)")
+    expect(html).toContain("border-radius:50%")
+    expect(html).toContain("background-color: var(--priority-medium)")
+    // Escudo violeta conservado (S8).
+    expect(html).toContain("Tomado por la Defensoría del Pueblo")
+
+    // El popup distingue la toma pero nunca muestra el número de reclamo (S9): sin rótulo
+    // «Reclamo Nº» ni píldora con el número.
+    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    expect(popup).toContain("Tomado por la Defensoría del Pueblo")
+    expect(popup).toMatch(/Creado el \d/)
+    expect(popup).not.toContain("Reclamo")
+  })
+
+  it("mantiene el aro violeta y conserva la información de cuadrilla en el popup cuando ambos conviven", () => {
+    render([
+      { ...report, id: 3, estadoId: 4, status: "Tomado por Defensoría", estadoOperativo: "en_progreso", cuadrillaNombre: "Cuadrilla Norte" },
+    ])
+
+    const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
+    expect(html).toContain("Tomado por la Defensoría del Pueblo")
+    expect(html).toContain('title="Con cuadrilla asignada" style="position:absolute;top:-3px;left:-3px;')
+    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    expect(popup).toContain("En progreso · Cuadrilla Norte")
+  })
+
+  it("conserva el marcador de cuadrilla original para un Pendiente con cuadrilla", () => {
+    render([{ ...report, id: 4, estadoOperativo: "en_progreso", cuadrillaNombre: "Cuadrilla Norte" }])
+
+    const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
+    expect(html).toContain("Con cuadrilla asignada")
+    expect(html).not.toContain("Tomado por la Defensoría del Pueblo")
   })
 })

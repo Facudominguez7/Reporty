@@ -5,6 +5,8 @@ export const ROLE_IDS = {
   OPERADOR: 4,
   /** Anonymous guest identity (Supabase Anonymous Sign-Ins). Assigned and promoted by the DB trigger. */
   INVITADO: 5,
+  /** Defensoría del Pueblo: staff intermedio que solo toma reportes y les asigna número de reclamo. */
+  DEFENSORIA: 6,
 } as const;
 
 export type RoleId = (typeof ROLE_IDS)[keyof typeof ROLE_IDS];
@@ -13,6 +15,8 @@ export const REPORT_STATE_IDS = {
   PENDIENTE: 1,
   REPARADO: 2,
   RECHAZADO: 3,
+  /** Intermedio-terminal: la Defensoría tomó el reporte; el cierre sigue siendo de la comunidad/admin. */
+  TOMADO_DEFENSORIA: 4,
 } as const;
 
 export const REPORT_STATUS_VOTE_THRESHOLD = 5;
@@ -50,6 +54,9 @@ export const CREW_OPERATION_ROLE_IDS = [
   ROLE_IDS.ADMIN,
   ROLE_IDS.OPERADOR,
 ] as const;
+
+/** Único rol habilitado para tomar reportes como Defensoría del Pueblo y asignarles número de reclamo. */
+export const DEFENSORIA_ROLE_IDS = [ROLE_IDS.DEFENSORIA] as const;
 
 /** Estados operativos de una asignación de cuadrilla a un reporte (distintos del estado administrativo del reporte). */
 export const ESTADOS_OPERATIVOS = {

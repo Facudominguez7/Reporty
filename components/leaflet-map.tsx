@@ -12,7 +12,7 @@ import L from "leaflet"
 import "leaflet.markercluster"
 
 import { getCategoryColor, getPriorityColor, getStatusColor } from "@/components/report-card"
-import { ETIQUETAS_ESTADO_OPERATIVO, type EstadoOperativo } from "@/lib/authz/catalog"
+import { ETIQUETAS_ESTADO_OPERATIVO, REPORT_STATE_IDS, type EstadoOperativo } from "@/lib/authz/catalog"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getPetStatusAdjective } from "@/lib/mascotas/status-label"
 import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/lib/icons/category-icons"
@@ -34,6 +34,7 @@ interface Report {
   category: string
   priority: string
   status: string
+  estadoId?: number | null
   location: string
   coordinates: [number, number]
   author: string
@@ -239,6 +240,13 @@ const createPopupContent = (
         ${escapeHtml(ETIQUETAS_ESTADO_OPERATIVO[report.estadoOperativo])}${report.cuadrillaNombre ? ` · ${escapeHtml(report.cuadrillaNombre)}` : ""}
       </span>`
     : ""
+  // Toma de la Defensoría: píldora violeta que distingue la toma sin revelar el número (S8, S9);
+  // el número de reclamo solo lo ve el autor en su ficha.
+  const tomadoDefensoria = report.estadoId === REPORT_STATE_IDS.TOMADO_DEFENSORIA
+    ? `<span style="display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 9px;border-radius:999px;border:1px solid var(--semantic-admin-border);background:var(--semantic-admin-soft);color:var(--semantic-admin);font-size:11px;font-weight:600;line-height:1;white-space:nowrap;">
+        Tomado por la Defensoría del Pueblo
+      </span>`
+    : ""
 
   return `
     <a href="/reportes/${report.id}" style="display:block;min-width:250px;max-width:270px;color:var(--foreground);font-size:13px;line-height:1.45;text-decoration:none;">
@@ -271,6 +279,7 @@ const createPopupContent = (
         ${createPopupChip(safeCategory, categoryTone, popupIcons.category)}
         ${createPopupChip(safePriority, priorityTone, popupIcons.priority)}
         ${estadoOperativo}
+        ${tomadoDefensoria}
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground);">
@@ -280,11 +289,29 @@ const createPopupContent = (
         </span>
         <span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
           <span style="display:inline-flex;">${popupIcons.date}</span>
-          <span>${safeDate}</span>
+          <span>Creado el ${safeDate}</span>
         </span>
       </div>
     </a>
   `
+}
+
+/** Señal de estado que rodea al marcador: un reporte tiene un único estado, así que nunca se combinan. */
+type SenalEstadoMapa = "ninguna" | "defensoria" | "reparado"
+
+const SENALES_ESTADO_MAPA: readonly SenalEstadoMapa[] = ["ninguna", "defensoria", "reparado"]
+
+/**
+ * Elige la señal del marcador según el estado persistido, no según el nombre visible:
+ * aro violeta si la Defensoría tomó el reporte y aura verde si ya fue reparado.
+ *
+ * @param estadoId - ID del estado del reporte.
+ * @returns La señal de estado que corresponde al marcador.
+ */
+function senalEstadoMapa(estadoId: number | null | undefined): SenalEstadoMapa {
+  if (estadoId === REPORT_STATE_IDS.TOMADO_DEFENSORIA) return "defensoria"
+  if (estadoId === REPORT_STATE_IDS.REPARADO) return "reparado"
+  return "ninguna"
 }
 
 /**
@@ -331,12 +358,24 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const hasInitialViewRef = useRef(false)
 
   const iconsByPriority = useMemo(() => {
-    const mk = (color: string, category: string, hasCrew = false, reparado = false) =>
-      L.divIcon({
+    // Aro violeta alrededor de todo el punto (S8): la gente ve en el mapa que la Defensoría
+    // tomó el reclamo, sin tapar el color de prioridad ni el ícono de categoría.
+    const ARO_DEFENSORIA = '<div style="position:absolute;inset:-5px;border-radius:50%;border:3px solid var(--semantic-admin);pointer-events:none;"></div>'
+    // Aura verde: el reporte ya fue reparado. Reemplaza al aro violeta cuando el reclamo se cierra.
+    const AURA_REPARADO = '<div class="repair-aura" style="position:absolute;inset:-5px;border-radius:50%;background:var(--primary);opacity:0.35;box-shadow:0 0 12px 4px var(--primary);pointer-events:none;"></div>'
+    // Cuando coinciden, el escudo queda a la derecha y el punto de cuadrilla a la izquierda.
+    const ESCUDO_DEFENSORIA = '<div title="Tomado por la Defensoría del Pueblo" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:9px;height:9px;"><path d="M12 3 3 7.5V12c0 5 3.8 8.3 9 9.5 5.2-1.2 9-4.5 9-9.5V7.5L12 3Z"/></svg></div>'
+    /** Conserva el punto original y lo desplaza si comparte el marcador con el escudo. */
+    const puntoCuadrilla = (tieneDefensoria: boolean) => `<div title="Con cuadrilla asignada" style="position:absolute;top:-3px;${tieneDefensoria ? "left" : "right"}:-3px;width:12px;height:12px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);"></div>`
+    /** Arma el marcador con el color de prioridad, el punto de cuadrilla y la señal de estado. */
+    const mk = (color: string, category: string, hasCrew = false, senal: SenalEstadoMapa = "ninguna") => {
+      const tieneDefensoria = senal === "defensoria"
+      return L.divIcon({
         className: "custom-marker",
         html: `
           <div style="position:relative;width:36px;height:36px;">
-          ${reparado ? '<div class="repair-aura" style="position:absolute;inset:-5px;border-radius:50%;background:var(--primary);opacity:0.35;box-shadow:0 0 12px 4px var(--primary);pointer-events:none;"></div>' : ""}
+          ${tieneDefensoria ? ARO_DEFENSORIA : ""}
+          ${senal === "reparado" ? AURA_REPARADO : ""}
           <div style="
             background-color: ${color};
             width: 36px;
@@ -348,35 +387,38 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
             align-items: center;
             justify-content: center;
             color: var(--map-marker-foreground);
-            ${hasCrew ? "opacity:0.5;" : ""}
+            ${hasCrew && !tieneDefensoria ? "opacity:0.5;" : ""}
           ">
             ${createCategoryIconMarkup(category)}
           </div>
-          ${hasCrew ? '<div title="Con cuadrilla asignada" style="position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background-color:var(--semantic-admin);border:2px solid var(--map-marker-stroke);"></div>' : ""}
+          ${hasCrew ? puntoCuadrilla(tieneDefensoria) : ""}
+          ${tieneDefensoria ? ESCUDO_DEFENSORIA : ""}
           </div>
         `,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
       })
+    }
 
     const icons = new Map<string, L.DivIcon>()
     for (const priority of ["Alta", "Media", "Baja", "default"]) {
       const color = priority === "default" ? "var(--map-heat-neutral)" : getPriorityColor(priority)
       for (const category of Object.keys(categoryIconNodes)) {
-        icons.set(`${priority}|${category}|free`, mk(color, category))
-        icons.set(`${priority}|${category}|assigned`, mk(color, category, true))
-        icons.set(`${priority}|${category}|free-repaired`, mk(color, category, false, true))
-        icons.set(`${priority}|${category}|assigned-repaired`, mk(color, category, true, true))
+        // Clave `<cuadrilla>|<señal>`: el punto de cuadrilla convive con cualquier señal de estado.
+        for (const senal of SENALES_ESTADO_MAPA) {
+          icons.set(`${priority}|${category}|0|${senal}`, mk(color, category, false, senal))
+          icons.set(`${priority}|${category}|1|${senal}`, mk(color, category, true, senal))
+        }
       }
     }
     return icons
   }, [])
 
   const getIcon = useCallback(
-    (priority: string, category: string, hasCrew = false, reparado = false) => {
+    (priority: string, category: string, hasCrew = false, senal: SenalEstadoMapa = "ninguna") => {
       const normalized = priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase()
       const normalizedCategory = categoryIconNodes[category] ? category : "default"
-      const clave = `${hasCrew ? "assigned" : "free"}${reparado ? "-repaired" : ""}`
+      const clave = `${hasCrew ? 1 : 0}|${senal}`
       return iconsByPriority.get(`${normalized}|${normalizedCategory}|${clave}`) ?? iconsByPriority.get(`default|default|${clave}`)!
     },
     [iconsByPriority]
@@ -507,7 +549,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     let marcadorEnFoco: L.Marker | null = null
     for (const report of reports) {
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
-        icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo), report.status === "Reparado"),
+        icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo), senalEstadoMapa(report.estadoId)),
       })
 
       const popupContent = createPopupContent(

@@ -26,7 +26,7 @@ describe("MapaPage", () => {
     mocks.getMascotasMapa.mockReset().mockResolvedValue({ data: [], error: null })
   })
 
-  it("pide pendientes y reparados sin perder los filtros de la URL", async () => {
+  it("pide pendientes, tomados por la Defensoría y reparados sin perder los filtros de la URL", async () => {
     const reparado = { id: 42, status: "Reparado" }
     mocks.getReportMapData.mockResolvedValue({ data: [reparado], error: null })
     const pagina = await MapaPage({ searchParams: Promise.resolve({ search: "bache", categoria: "Baches" }) })
@@ -37,7 +37,7 @@ describe("MapaPage", () => {
       estado: undefined,
       prioridad: undefined,
       limite: 100,
-      estadosPermitidos: [1, 2],
+      estadosPermitidos: [1, 4, 2],
     })
     expect(pagina.props.reportes).toEqual([reparado])
   })

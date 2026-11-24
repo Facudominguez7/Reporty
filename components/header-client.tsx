@@ -19,7 +19,7 @@ import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { ContactsDialog } from "@/components/contacts-dialog";
 import { BotonDonarEncabezado } from "@/components/donaciones/invitacion-donar";
 import { needsPasswordSetup } from "@/lib/authz/guest-account";
-import { muestraEncabezadoSuperior } from "@/lib/routes/encabezado";
+import { esRutaDePanel, muestraEncabezadoSuperior } from "@/lib/routes/encabezado";
 
 interface HeaderClientProps {
   user: User | null | undefined;
@@ -45,6 +45,7 @@ function getAccountNavItem(user: User | null | undefined): NavItem {
   return { href: "/dashboard", label: "Cuenta", icon: LayoutDashboard };
 }
 
+/** Renderiza la navegación global y ajusta las acciones del encabezado según la ruta. */
 export function HeaderClient({ user }: HeaderClientProps) {
   const pathname = usePathname();
   const bottomItems: NavItem[] = [
@@ -55,7 +56,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
     getAccountNavItem(user),
   ];
 
-  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/");
+  const muestraBarraInferior = !esRutaDePanel(pathname) && pathname !== "/";
   const showTopHeader = muestraEncabezadoSuperior(pathname);
 
   const isActive = (href: string) => {
@@ -92,7 +93,7 @@ export function HeaderClient({ user }: HeaderClientProps) {
           </div>
         </header>
       )}
-      {!isAdminRoute && pathname !== "/" && <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-[60] grid min-h-16 grid-cols-5 rounded-t-[1.5rem] border border-b-0 border-secondary-foreground/15 bg-secondary px-2 pb-[max(env(safe-area-inset-bottom),0.2rem)] pt-0.5 text-secondary-foreground shadow-[0_-10px_30px_rgba(0,0,0,0.2)] sm:px-3">
+      {muestraBarraInferior && <nav aria-label="Navegación principal" className="fixed inset-x-0 bottom-0 z-[60] grid min-h-16 grid-cols-5 rounded-t-[1.5rem] border border-b-0 border-secondary-foreground/15 bg-secondary px-2 pb-[max(env(safe-area-inset-bottom),0.2rem)] pt-0.5 text-secondary-foreground shadow-[0_-10px_30px_rgba(0,0,0,0.2)] sm:px-3">
         {bottomItems.map(({ href, label, icon: Icon }) => {
           const active = isActive(href);
 

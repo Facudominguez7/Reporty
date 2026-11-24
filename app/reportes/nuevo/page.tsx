@@ -153,6 +153,8 @@ export default function NuevoReportePage() {
   const [prioridades, setPrioridades] = useState<{ id: number; nombre: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+  /** Contacto que el autor deja al avisar: email prellenado de la cuenta y teléfono opcional. */
+  const [contactoAviso, setContactoAviso] = useState({ email: "", telefono: "" })
   const [puedeCrear, setPuedeCrear] = useState(false)
   const [isLocatingLocation, setIsLocatingLocation] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -235,6 +237,9 @@ export default function NuevoReportePage() {
 
         if (user) {
           setUser(user)
+          // Email prellenado para el aviso al organismo: el invitado sin email igual puede
+          // avisar dejando un teléfono (regla mínimo email o teléfono).
+          setContactoAviso((contacto) => ({ ...contacto, email: contacto.email || user.email || "" }))
 
           // Verificar si el usuario puede crear reportes (Admin, Ciudadano o Invitado)
           const { puedeCrear: canCreate } = await verificarPuedeCrearReporte(supabase, user.id)
@@ -483,7 +488,10 @@ export default function NuevoReportePage() {
     institutionEmailLockRef.current = true
     setIsSendingInstitutionEmail(true)
     try {
-      const result = await avisarOrganismosAction(createdReport.reportId)
+      const result = await avisarOrganismosAction(createdReport.reportId, {
+        email: contactoAviso.email,
+        telefono: contactoAviso.telefono,
+      })
       if (!result.success) {
         toast.error("No se pudo enviar el correo", { description: result.error })
         return
@@ -725,8 +733,34 @@ export default function NuevoReportePage() {
             )}
             {createdReport.imageApproved && !createdReport.withdrawn && institutionEmailChoice === null && (
               <div className="rounded-xl border border-border/70 bg-muted/40 p-4 text-center">
-                <p className="text-sm font-medium">¿Querés avisar a la institución responsable?</p>
-                <p className="mt-1 text-xs text-muted-foreground">El reporte se enviará solo si elegís hacerlo.</p>
+                <p className="text-sm font-medium">¿Querés avisar a la Defensoría del Pueblo?</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Dejanos al menos un email o un teléfono para que puedan contactarte. El reporte se enviará solo si elegís hacerlo.
+                </p>
+                <div className="mt-3 grid gap-2 text-left">
+                  <label className="grid gap-1 text-xs font-medium">
+                    Email
+                    <input
+                      type="email"
+                      value={contactoAviso.email}
+                      onChange={(event) => setContactoAviso((contacto) => ({ ...contacto, email: event.target.value }))}
+                      placeholder="tu@email.com"
+                      autoComplete="email"
+                      className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium">
+                    Teléfono (opcional si dejaste email)
+                    <input
+                      type="tel"
+                      value={contactoAviso.telefono}
+                      onChange={(event) => setContactoAviso((contacto) => ({ ...contacto, telefono: event.target.value }))}
+                      placeholder="3764 123-456"
+                      autoComplete="tel"
+                      className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
                 <div className="mt-3 flex justify-center gap-2">
                   <Button type="button" size="sm" onClick={notifyInstitutions} disabled={isSendingInstitutionEmail}>
                     {isSendingInstitutionEmail ? "Enviando…" : "Sí, enviar"}

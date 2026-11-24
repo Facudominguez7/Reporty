@@ -64,7 +64,8 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
       estado,
       prioridad,
       limite: 100, // Más reportes para el mapa
-      estadosPermitidos: [REPORT_STATE_IDS.PENDIENTE, REPORT_STATE_IDS.REPARADO],
+      // Pendientes, tomados por la Defensoría (aro violeta) y reparados (aura verde).
+      estadosPermitidos: [REPORT_STATE_IDS.PENDIENTE, REPORT_STATE_IDS.TOMADO_DEFENSORIA, REPORT_STATE_IDS.REPARADO],
     }),
     getCategorias(),
     getPrioridades(),

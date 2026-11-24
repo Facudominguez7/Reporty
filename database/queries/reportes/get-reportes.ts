@@ -9,6 +9,7 @@
  */
 
 import { unstable_cache } from "next/cache"
+import { filtroBusquedaDefensoria, obtenerIdBusquedaDefensoria } from "@/database/queries/reportes/filtro-defensoria"
 
 import { createClient } from "@/utils/supabase/server"
 import { createPublicClient } from "@/utils/supabase/public"
@@ -30,6 +31,7 @@ export type ReporteDB = {
   usuario_id: string | null
   titulo: string
   descripcion: string | null
+  estado_id?: number | null
   created_at: string
   lat: number | null
   lon: number | null
@@ -58,6 +60,8 @@ export type FiltrosReportes = {
   soloConCoordenadas?: boolean
   /** Deja solo los reportes en estado Pendiente. */
   soloPendientes?: boolean
+  /** Bandeja de la Defensoría del Pueblo: vista Pendientes/Tomados y búsqueda global. */
+  filtroDefensoria?: { vista: "pendientes" | "tomados"; busqueda: string }
   /** Restringe los resultados a estos IDs, además del filtro por nombre de estado. */
   estadosPermitidos?: readonly number[]
   limite?: number
@@ -71,6 +75,7 @@ export type ReportMapItem = {
   category: string
   priority: string
   status: string
+  estadoId?: number | null
   location: string
   coordinates: [number, number]
   author: string
@@ -204,6 +209,7 @@ function mapReportToMapItem(report: ReporteDB): ReportMapItem | null {
     category: cardData.category,
     priority: cardData.priority,
     status: cardData.status,
+    estadoId: report.estado_id ?? null,
     location: cardData.location,
     coordinates: [report.lat, report.lon],
     author: cardData.author,
@@ -233,6 +239,7 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode) => `id,
       titulo,
       descripcion,
       created_at,
+      estado_id,
       lat,
       lon,
       categoria:categorias!reportes_categoria_id_fkey(nombre),
@@ -257,6 +264,7 @@ async function fetchReportes(
     prioridad,
     soloConCoordenadas,
     soloPendientes,
+    filtroDefensoria,
     estadosPermitidos,
     limite,
     offset,
@@ -302,9 +310,24 @@ async function fetchReportes(
     query = query.in("estado_id", estadosPermitidos)
   }
 
+  if (filtroDefensoria) {
+    const id = obtenerIdBusquedaDefensoria(filtroDefensoria.busqueda)
+    if (id !== null) {
+      query = query.in("estado_id", [REPORT_STATE_IDS.PENDIENTE, REPORT_STATE_IDS.TOMADO_DEFENSORIA]).eq("id", id)
+    } else {
+      query = query.eq("estado_id", filtroDefensoria.vista === "tomados" ? REPORT_STATE_IDS.TOMADO_DEFENSORIA : REPORT_STATE_IDS.PENDIENTE)
+      const expresion = filtroBusquedaDefensoria(filtroDefensoria.busqueda)
+      if (expresion) query = query.or(expresion)
+    }
+  }
+
+  // La bandeja de la Defensoría atiende primero los más antiguos; el resto conserva los más recientes.
+  const ordenarDesdeElMasAntiguo = filtroDefensoria !== undefined
+  query = query.order("created_at", { ascending: ordenarDesdeElMasAntiguo })
+  if (ordenarDesdeElMasAntiguo) query = query.order("id", { ascending: true })
+
   // Fetch one extra row to know whether another page exists without an expensive exact count.
   return query
-    .order("created_at", { ascending: false })
     .range(offset, offset + limite)
     .returns<ReporteDBRaw[]>()
 }
@@ -332,6 +355,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     prioridad,
     soloConCoordenadas = false,
     soloPendientes = false,
+    filtroDefensoria,
     estadosPermitidos,
     limite = 12,
     offset = 0
@@ -344,6 +368,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     prioridad,
     soloConCoordenadas,
     soloPendientes,
+    filtroDefensoria,
     estadosPermitidos,
     limite,
     offset,
@@ -468,6 +493,44 @@ export async function getReportCardData(filtros: FiltrosReportes = {}, options: 
   }
 }
 
+/**
+ * Reportes para la bandeja de la Defensoría del Pueblo: Pendientes y Tomados, con el
+ * número de reclamo y la dirección escrita adjuntos cuando existen (S5, S9).
+ */
+export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefensoria?: { vista: "pendientes" | "tomados"; busqueda: string }) {
+  const { data, error, hasMore } = await getReportCardData(
+    { estadosPermitidos: [REPORT_STATE_IDS.PENDIENTE, REPORT_STATE_IDS.TOMADO_DEFENSORIA], filtroDefensoria, limite, offset },
+    { includeAuthors: true },
+  )
+  if (error) return { data: [], error, hasMore, totalPendientes: 0 }
+
+  const ids = data.map((report) => report.id)
+  // Panel autorizado de la Defensoría: los reclamos solo son legibles por staff de la
+  // Defensoría (RLS: autor o rol 6); el público ya no tiene acceso a la tabla (S9).
+  const supabaseAdmin = await createClient()
+  const [{ data: reclamos }, { data: direcciones, error: errorDirecciones }] = ids.length
+    ? await Promise.all([
+      supabaseAdmin.from("reclamos_defensoria").select("reporte_id, numero_reclamo, tomado_at").in("reporte_id", ids),
+      supabaseAdmin.from("reportes").select("id, direccion").in("id", ids),
+    ])
+    : [{ data: [] as { reporte_id: number; numero_reclamo: string; tomado_at: string }[] }, { data: [], error: null }]
+
+  if (errorDirecciones) return { data: [], error: errorDirecciones, hasMore, totalPendientes: 0 }
+  const reclamosPorReporte = new Map((reclamos ?? []).map((reclamo) => [reclamo.reporte_id, reclamo]))
+  const direccionesPorReporte = new Map((direcciones ?? []).map((reporte) => [reporte.id, reporte.direccion]))
+
+  return {
+    data: data.map((report) => ({
+      ...report,
+      numeroReclamo: reclamosPorReporte.get(report.id)?.numero_reclamo ?? null,
+      direccion: direccionesPorReporte.get(report.id) ?? null,
+    })),
+    error: null,
+    hasMore,
+    totalPendientes: data.filter((report) => report.status === "Pendiente").length,
+  }
+}
+
 export async function getReportMapData(filtros: FiltrosReportes = {}) {
   const { data, error, estadosOperativos } = await getReportes({
     ...filtros,
@@ -478,8 +541,12 @@ export async function getReportMapData(filtros: FiltrosReportes = {}) {
     .map(mapReportToMapItem)
     .filter((report): report is ReportMapItem => report !== null)
 
+  const conEstadoOperativo = adjuntarEstadoOperativo(mapItems, estadosOperativos)
+
+  // El número de reclamo nunca llega al mapa ni al popup: es privado del autor (S9) y solo
+  // se consulta en la ficha (autor o Defensoría) y en el panel autorizado de la Defensoría.
   return {
-    data: adjuntarEstadoOperativo(mapItems, estadosOperativos),
+    data: conEstadoOperativo,
     error,
   }
 }

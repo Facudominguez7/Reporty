@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   obtenerGestionOperativaDetalle: vi.fn(),
   obtenerSeccionReparacion: vi.fn(),
   crearComentarioWorkflow: vi.fn(),
+  getReporteDetalle: vi.fn(),
+  getNumeroReclamoDefensoria: vi.fn(),
 }))
 
 vi.mock("./reporte-detalle-client", () => ({ ReporteDetalleClient: () => null }))
@@ -32,9 +34,10 @@ vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
   crearComentarioWorkflow: mocks.crearComentarioWorkflow,
 }))
 vi.mock("@/database/queries/reportes/[id]/index", () => ({
-  getReporteDetalle: async () => ({ data: { id: 5, estado_id: 1, usuario_id: "autor-5" }, error: null }),
+  getReporteDetalle: mocks.getReporteDetalle,
   getComentariosReporte: async () => ({ data: [] }),
   getHistorialEstados: async () => ({ data: [] }),
+  getNumeroReclamoDefensoria: mocks.getNumeroReclamoDefensoria,
 }))
 vi.mock("@/database/queries/reportes/nuevo", () => ({
   getCategorias: mocks.getCategorias,
@@ -55,7 +58,7 @@ vi.mock("@/lib/use-cases/reportes/evidencia-reparacion-detalle.server", () => ({
   obtenerSeccionReparacion: mocks.obtenerSeccionReparacion,
 }))
 
-const ROLE = { ADMIN: 1, CIUDADANO: 2, OPERADOR: 4, INVITADO: 5 }
+const ROLE = { ADMIN: 1, CIUDADANO: 2, OPERADOR: 4, INVITADO: 5, DEFENSORIA: 6 }
 
 function signInAs(roleId: number, isAnonymous = false) {
   mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: isAnonymous } } })
@@ -71,6 +74,8 @@ describe("ReporteDetallePage", () => {
     mocks.crearComentarioWorkflow.mockReset().mockResolvedValue({ success: true, data: {} })
     mocks.getCategorias.mockReset().mockResolvedValue([{ id: 1, nombre: "Otros" }])
     mocks.getPrioridades.mockReset().mockResolvedValue([{ id: 2, nombre: "Alta" }])
+    mocks.getReporteDetalle.mockReset().mockResolvedValue({ data: { id: 5, estado_id: 1, usuario_id: "autor-5" }, error: null })
+    mocks.getNumeroReclamoDefensoria.mockReset().mockResolvedValue("RE-2026-77")
     mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
     mocks.tieneFotografiaAprobada.mockReset().mockResolvedValue(false)
     mocks.tieneRevisionRechazoPendiente.mockReset().mockResolvedValue(false)
@@ -227,5 +232,55 @@ describe("ReporteDetallePage", () => {
 
     expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
     expect(page.props.evidenciaReparacion).toBeNull()
+  })
+
+  it("solo el autor ve el número de reclamo en un reporte tomado por Defensoría", async () => {
+    signInAs(ROLE.CIUDADANO)
+    mocks.getReporteDetalle.mockResolvedValue({ data: { id: 5, estado_id: 4, usuario_id: "user-1" }, error: null })
+
+    const page = await renderPage()
+
+    expect(mocks.getNumeroReclamoDefensoria).toHaveBeenCalledWith(expect.anything(), 5)
+    expect(page.props.numeroReclamoDefensoria).toBe("RE-2026-77")
+  })
+
+  it("un Admin que no es autor no ve el número: sin excepción en la ficha pública", async () => {
+    signInAs(ROLE.ADMIN)
+    mocks.getReporteDetalle.mockResolvedValue({ data: { id: 5, estado_id: 4, usuario_id: "autor-5" }, error: null })
+
+    const page = await renderPage()
+
+    expect(mocks.getNumeroReclamoDefensoria).not.toHaveBeenCalled()
+    expect(page.props.numeroReclamoDefensoria).toBeNull()
+  })
+
+  it("Defensoría no recibe el número en la ficha pública de otro autor", async () => {
+    signInAs(ROLE.DEFENSORIA)
+    mocks.getReporteDetalle.mockResolvedValue({ data: { id: 5, estado_id: 4, usuario_id: "autor-5" }, error: null })
+
+    const page = await renderPage()
+
+    expect(mocks.getNumeroReclamoDefensoria).not.toHaveBeenCalled()
+    expect(page.props.numeroReclamoDefensoria).toBeNull()
+  })
+
+  it("un visitante anónimo nunca consulta el número de un reporte tomado", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.getReporteDetalle.mockResolvedValue({ data: { id: 5, estado_id: 4, usuario_id: "autor-5" }, error: null })
+
+    const page = await renderPage()
+
+    expect(mocks.getNumeroReclamoDefensoria).not.toHaveBeenCalled()
+    expect(page.props.numeroReclamoDefensoria).toBeNull()
+  })
+
+  it("un reporte Pendiente nunca consulta el reclamo", async () => {
+    signInAs(ROLE.CIUDADANO)
+    mocks.getReporteDetalle.mockResolvedValue({ data: { id: 5, estado_id: 1, usuario_id: "user-1" }, error: null })
+
+    const page = await renderPage()
+
+    expect(mocks.getNumeroReclamoDefensoria).not.toHaveBeenCalled()
+    expect(page.props.numeroReclamoDefensoria).toBeNull()
   })
 })

@@ -33,6 +33,16 @@ describe("HeaderClient create navigation", () => {
     path.value = "/crear"
   })
 
+  it.each(["/admin", "/admin/reportes", "/defensoria", "/defensoria/reportes"])("deja solo la navegación del panel en %s", (ruta) => {
+    path.value = ruta
+    try {
+      const html = renderToStaticMarkup(createElement(HeaderClient, { user: null }))
+      expect(html).toBe("")
+    } finally {
+      path.value = "/crear"
+    }
+  })
+
   it("muestra el botón Donar en el encabezado y lo marca activo en /donar", () => {
     path.value = "/reportes"
     const enReportes = renderToStaticMarkup(createElement(HeaderClient, { user: null }))

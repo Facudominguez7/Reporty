@@ -9,6 +9,20 @@ vi.mock("@/components/sign-out-section", () => ({ SignOutSection: () => null }))
 import { AdminNav } from "./admin-nav"
 import { ROLE_IDS } from "@/lib/authz/catalog"
 
+describe("navegación del panel de Defensoría", () => {
+  it("muestra Reporty / Defensoría y solo enlaces de reportes", () => {
+    const html = renderToStaticMarkup(createElement(AdminNav, { email: "defensoria@example.com", roleId: ROLE_IDS.DEFENSORIA, pendingReviews: null, variante: "defensoria" }))
+    expect(html).toContain("/ DEFENSORÍA")
+    expect(html).toContain('href="/defensoria"')
+    expect(html).toContain(">Reportes<")
+    expect(html).not.toContain('href="/admin')
+  })
+
+  it("no convierte el rol Defensoría en un rol de administración", () => {
+    expect(renderToStaticMarkup(createElement(AdminNav, { email: "defensoria@example.com", roleId: ROLE_IDS.DEFENSORIA, pendingReviews: null }))).toBe("")
+  })
+})
+
 describe("AdminNav pending reviews", () => {
   it("shows the count on desktop and mobile only when reviews are pending", () => {
     const html = renderToStaticMarkup(createElement(AdminNav, { email: "admin@example.com", roleId: ROLE_IDS.ADMIN, pendingReviews: 2 }))
