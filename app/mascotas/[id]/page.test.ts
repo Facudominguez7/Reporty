@@ -15,6 +15,21 @@ import MascotaDetallePage from "./page"
 const pet = { id: 12, species: "Perro", status: "Perdida", description: "Collar rojo", createdAt: "2026-11-01T12:00:00Z", phone: "123456", image: "/api/mascotas/12/foto" }
 const render = (id = "12") => MascotaDetallePage({ params: Promise.resolve({ id }) })
 
+/** Converts a simulated getUser result into the equivalent getClaims answer. */
+function claimsDe(result: { data?: { user: { id: string; is_anonymous: boolean } | null }; error?: Error | null }) {
+  const usuario = result.data?.user
+  if (result.error || !usuario) return { data: null, error: result.error ?? null }
+  return { data: { claims: { sub: usuario.id, is_anonymous: usuario.is_anonymous } }, error: null }
+}
+
+/** Session client whose verified token belongs to the simulated user; getUser must not run. */
+const sesion = (result: Parameters<typeof claimsDe>[0]) => ({
+  auth: {
+    getClaims: vi.fn().mockResolvedValue(claimsDe(result)),
+    getUser: vi.fn().mockRejectedValue(new Error("the page must not call Supabase Auth")),
+  },
+})
+
 describe("pet detail page ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -29,14 +44,14 @@ describe("pet detail page ownership", () => {
   it("enables editing for a verified admin who does not own the pet", async () => {
     maybeSingle.mockResolvedValue({ data: null })
     getUserRoleContext.mockResolvedValue({ data: { roleId: 1 }, error: null })
-    createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "admin", is_anonymous: false } }, error: null }) } })
+    createClient.mockResolvedValue(sesion({ data: { user: { id: "admin", is_anonymous: false } }, error: null }))
     expect((await render()).props).toMatchObject({ isOwner: false, isAdmin: true })
     getUserRoleContext.mockResolvedValue({ data: { roleId: 1 }, error: new Error("role lookup") })
     expect((await render()).props.isAdmin).toBe(false)
   })
 
   it("checks the authenticated account against the publication owner", async () => {
-    createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "owner", is_anonymous: false } }, error: null }) } })
+    createClient.mockResolvedValue(sesion({ data: { user: { id: "owner", is_anonymous: false } }, error: null }))
     expect((await render()).props.isOwner).toBe(true)
     const query = createAdminClient.mock.results[0].value.from.mock.results[0].value
     expect(query.eq).toHaveBeenCalledWith("id", 12)
@@ -51,7 +66,7 @@ describe("pet detail page ownership", () => {
       { data: { user: { id: "guest", is_anonymous: true } }, error: null },
       { data: { user: { id: "owner", is_anonymous: false } }, error: new Error("auth failed") },
     ]) {
-      createClient.mockResolvedValue({ auth: { getUser: vi.fn().mockResolvedValue(result) } })
+      createClient.mockResolvedValue(sesion(result))
       expect((await render()).props.isOwner).toBe(false)
     }
     expect(createAdminClient).not.toHaveBeenCalled()

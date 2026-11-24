@@ -37,6 +37,7 @@ import {
   UMBRAL_CONFIRMACIONES_REPARACION,
   esRolHabilitadoParaReparacion,
   informarReparacionWorkflow,
+  mostrarParticipacionReparacion,
   puedeInformarReparacion,
   resolverEvidenciaReparacionWorkflow,
   resolverImpugnacionReparacionWorkflow,
@@ -121,6 +122,15 @@ describe("participación en reparaciones (S15, L21)", () => {
     [null, 2, false],
   ])("exige cuenta permanente con correo confirmado", (usuario, rol, habilitado) => {
     expect(puedeInformarReparacion(usuario as never, rol)).toBe(habilitado)
+  })
+
+  it("no acepta en las mutaciones el correo confirmado que viene de metadatos editables (#310)", () => {
+    const usuarioDeClaims = { is_anonymous: false, email_confirmed_at: null, correo_confirmado: true }
+
+    expect(puedeInformarReparacion(usuarioDeClaims as never, 2)).toBe(false)
+    expect(mostrarParticipacionReparacion(usuarioDeClaims, 2)).toBe(true)
+    expect(mostrarParticipacionReparacion({ ...usuarioDeClaims, correo_confirmado: false }, 2)).toBe(false)
+    expect(mostrarParticipacionReparacion({ ...usuarioDeClaims, is_anonymous: true }, 2)).toBe(false)
   })
 })
 

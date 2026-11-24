@@ -36,14 +36,26 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
-
-  let {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // IMPORTANT: DO NOT REMOVE auth.getClaims(). It refreshes an expired session (writing the new
+  // cookies through setAll) and verifies the access token signature locally against the
+  // project's ES256 key, so it does not call Supabase Auth on every request (issue #310).
+  // It does not see a session revoked elsewhere until the access token expires; mutations keep
+  // calling auth.getUser() for that reason.
+  // getClaims rethrows errors that are not AuthErrors (an expired or malformed token, an invalid
+  // alg claim). getUser returned those as errors, so a broken cookie counts as no session here
+  // too instead of failing every request, /auth included.
+  let claims: Record<string, unknown> | null = null
+  try {
+    const { data: datosClaims, error: errorClaims } = await supabase.auth.getClaims()
+    claims = errorClaims ? null : datosClaims?.claims ?? null
+  } catch (error) {
+    console.error("No se pudo verificar la sesión en el proxy:", error)
+  }
+  let user: { id: string; is_anonymous: boolean } | null =
+    typeof claims?.sub === 'string' && claims.sub ? { id: claims.sub, is_anonymous: claims.is_anonymous === true } : null
 
   // Absolute session expiry (issue #180): 30 days for regular users, 24 hours for admins.
   // Anonymous guest sessions are exempt. The profile is read only when the session is old
@@ -53,7 +65,14 @@ export async function updateSession(request: NextRequest) {
     const {
       data: { session },
     } = await supabase.auth.getSession()
-    const inicioMs = obtenerInicioAutenticacion(session?.access_token, user.last_sign_in_at)
+    let inicioMs = obtenerInicioAutenticacion(session?.access_token, undefined)
+    if (inicioMs === null) {
+      // Without an amr claim the start comes from last_sign_in_at, which only Supabase Auth has.
+      const {
+        data: { user: usuarioAuth },
+      } = await supabase.auth.getUser()
+      inicioMs = obtenerInicioAutenticacion(undefined, usuarioAuth?.last_sign_in_at)
+    }
     const ahoraMs = Date.now()
     let rolId: number | null = null
 

@@ -13,13 +13,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { isAnonymousUser } from "@/lib/authz/roles"
 import { createClient } from "@/utils/supabase/server"
+import { obtenerUsuarioDeLectura } from "@/lib/auth/usuario-de-lectura"
 import { RUTA_RECUPERAR_CONTRASENA } from "../rutas-seguras"
 
 export default async function NuevaContrasenaPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await obtenerUsuarioDeLectura(supabase)
   const canSetPassword = Boolean(user?.email) && !isAnonymousUser(user)
 
   return (

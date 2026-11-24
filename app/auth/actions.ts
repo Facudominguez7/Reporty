@@ -511,6 +511,14 @@ export async function crearContrasenaCuenta(
     return { error: "No pudimos guardar tu contraseña. Intentá nuevamente." }
   }
 
+  // updateUser keeps the old access token, and the pages read the user from its claims (#310):
+  // without a refresh the token would keep marking the password as pending until it expires.
+  // The password is already saved, so a failed refresh only delays that until the next one.
+  const { error: errorRefresco } = await supabase.auth.refreshSession()
+  if (errorRefresco) {
+    console.error("No se pudo refrescar la sesión después de crear la contraseña:", errorRefresco)
+  }
+
   revalidatePath("/", "layout")
   // Redirect instead of returning a message: once the flag is cleared the password card
   // unmounts on revalidation, so the confirmation lives on the page itself.

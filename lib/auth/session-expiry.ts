@@ -21,7 +21,7 @@ export const LIMITE_SESION_ADMIN_MS = 24 * HORA_MS
 /**
  * Lee el payload de un JWT sin verificar la firma.
  *
- * Solo debe usarse con un token que Supabase ya validó (`auth.getUser()`); no autentica nada.
+ * Solo debe usarse con un token ya validado (`auth.getClaims()` o `auth.getUser()`); no autentica nada.
  * Devuelve `null` si el token no tiene el formato esperado.
  */
 function leerPayloadJwt(token: string): Record<string, unknown> | null {

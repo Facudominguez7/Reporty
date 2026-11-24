@@ -19,6 +19,25 @@ import { getDashboardUserReports } from "@/database/queries/reportes/get-reporte
 import { needsPasswordSetup } from "@/lib/authz/guest-account"
 import { isAnonymousUser } from "@/lib/authz/roles"
 import { createClient } from "@/utils/supabase/server"
+import { obtenerUsuarioDeLectura } from "@/lib/auth/usuario-de-lectura"
+
+/**
+ * Lee el correo que un invitado pidió vincular y todavía no confirmó.
+ *
+ * Ese dato no viaja en el token, así que hace falta Supabase Auth. Solo se llama para invitados,
+ * que son los únicos que ven la tarjeta para guardar la cuenta.
+ *
+ * @param supabase - Cliente con la sesión del pedido.
+ * @returns El correo pendiente, o `null` si no hay ninguno o no se pudo leer.
+ */
+async function leerCorreoPendiente(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getUser()
+    return data.user?.new_email ?? null
+  } catch {
+    return null
+  }
+}
 
 type MisReportesPageProps = {
   searchParams: Promise<{ cuenta?: string }>
@@ -27,9 +46,7 @@ type MisReportesPageProps = {
 export default async function MisReportesPage({ searchParams }: MisReportesPageProps) {
   const { cuenta } = await searchParams
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await obtenerUsuarioDeLectura(supabase)
 
   if (!user) {
     return (
@@ -76,7 +93,10 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
 
   const isGuest = isAnonymousUser(user)
   const passwordPending = needsPasswordSetup(user)
-  const { data: reports } = await getDashboardUserReports(user.id)
+  const [{ data: reports }, correoPendiente] = await Promise.all([
+    getDashboardUserReports(user.id),
+    isGuest ? leerCorreoPendiente(supabase) : Promise.resolve(null),
+  ])
 
   return (
     <div className="page-shell">
@@ -179,7 +199,7 @@ export default async function MisReportesPage({ searchParams }: MisReportesPageP
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <LinkEmailForm pendingEmail={user.new_email ?? null} />
+              <LinkEmailForm pendingEmail={correoPendiente} />
             </CardContent>
           </Card>
         )}

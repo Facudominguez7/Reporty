@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { updateSession } from "./middleware"
 
 const mocks = vi.hoisted(() => ({
+  getClaims: vi.fn(),
   getUser: vi.fn(),
   getSession: vi.fn(),
   signOut: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
-    auth: { getUser: mocks.getUser, getSession: mocks.getSession, signOut: mocks.signOut },
+    auth: { getClaims: mocks.getClaims, getUser: mocks.getUser, getSession: mocks.getSession, signOut: mocks.signOut },
     from: mocks.from,
   }),
 }))
@@ -24,7 +25,38 @@ describe("updateSession without a session", () => {
   beforeEach(() => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321")
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon")
-    mocks.getUser.mockReset().mockResolvedValue({ data: { user: null } })
+    mocks.getClaims.mockReset().mockResolvedValue({ data: null, error: null })
+    mocks.getUser.mockReset()
+  })
+
+  it("validates the session from the token without calling Supabase Auth", async () => {
+    await updateSession(request("/reportes/67"))
+
+    expect(mocks.getClaims).toHaveBeenCalledTimes(1)
+    expect(mocks.getUser).not.toHaveBeenCalled()
+  })
+
+  it("treats a token that makes getClaims throw as no session instead of failing the request", async () => {
+    // getClaims rethrows non-Auth errors such as "JWT has expired" or an invalid alg claim.
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    mocks.getClaims.mockRejectedValue(new Error("JWT has expired"))
+
+    const protegida = await updateSession(request("/dashboard"))
+    const publica = await updateSession(request("/reportes/67"))
+
+    expect(protegida.status).toBe(307)
+    expect(protegida.headers.get("location")).toBe(`http://localhost:3000/auth?next=${encodeURIComponent("/dashboard")}`)
+    expect(publica.headers.get("location")).toBeNull()
+    expect(publica.headers.get("x-middleware-next")).toBe("1")
+  })
+
+  it("treats a token that fails verification as no session", async () => {
+    mocks.getClaims.mockResolvedValue({ data: null, error: { message: "invalid JWT" } })
+
+    const response = await updateSession(request("/dashboard"))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get("location")).toBe(`http://localhost:3000/auth?next=${encodeURIComponent("/dashboard")}`)
   })
 
   it("lets visitors open a report detail instead of sending them to /auth", async () => {
@@ -61,18 +93,26 @@ describe("updateSession without a session", () => {
 const HORA = 60 * 60 * 1000
 const DIA = 24 * HORA
 
+/** Arma el claim amr de una sesión autenticada hace `ms`. */
+const amrDeHace = (ms: number) => [{ method: "password", timestamp: Math.floor((Date.now() - ms) / 1000) }]
+
+/** Arma un access token sin firma con el payload indicado. */
+const tokenConPayload = (payload: Record<string, unknown>) =>
+  `e30.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.firma`
+
 /** Arma un access token sin firma cuyo claim amr indica cuándo se autenticó el usuario. */
-const tokenAutenticadoHace = (ms: number) => {
-  const payload = { amr: [{ method: "password", timestamp: Math.floor((Date.now() - ms) / 1000) }] }
-  return `e30.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.firma`
-}
+const tokenAutenticadoHace = (ms: number) => tokenConPayload({ amr: amrDeHace(ms) })
+
+/** Simula los claims ya verificados de un usuario autenticado hace `ms`. */
+const claimsDeHace = (ms: number, anonimo = false) => ({
+  data: { claims: { sub: "u1", is_anonymous: anonimo, amr: amrDeHace(ms) } },
+  error: null,
+})
 
 describe("updateSession with an expiring session", () => {
   /** Simula un usuario con sesión iniciada hace `ms` y el rol indicado en `profiles`. */
   const conSesion = ({ ms, rolId, anonimo = false }: { ms: number; rolId: number | null; anonimo?: boolean }) => {
-    mocks.getUser.mockResolvedValue({
-      data: { user: { id: "u1", is_anonymous: anonimo, last_sign_in_at: new Date(Date.now() - ms).toISOString() } },
-    })
+    mocks.getClaims.mockResolvedValue(claimsDeHace(ms, anonimo))
     mocks.getSession.mockResolvedValue({ data: { session: { access_token: tokenAutenticadoHace(ms) } } })
     mocks.perfil.mockResolvedValue(
       rolId === null ? { data: null, error: { message: "fallo" } } : { data: { rol_id: rolId }, error: null },
@@ -82,6 +122,7 @@ describe("updateSession with an expiring session", () => {
   beforeEach(() => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321")
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon")
+    mocks.getClaims.mockReset()
     mocks.getUser.mockReset()
     mocks.getSession.mockReset()
     mocks.signOut.mockReset().mockResolvedValue({ error: null })
@@ -146,6 +187,28 @@ describe("updateSession with an expiring session", () => {
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" })
   })
 
+  it("reads the expiry from the verified token without calling Supabase Auth", async () => {
+    conSesion({ ms: 31 * DIA, rolId: 2 })
+
+    await updateSession(request("/dashboard"))
+
+    expect(mocks.getUser).not.toHaveBeenCalled()
+  })
+
+  it("falls back to the last sign-in from Supabase Auth when the token has no amr claim", async () => {
+    mocks.getClaims.mockResolvedValue({ data: { claims: { sub: "u1", is_anonymous: false } }, error: null })
+    mocks.getSession.mockResolvedValue({ data: { session: { access_token: tokenConPayload({}) } } })
+    mocks.getUser.mockResolvedValue({
+      data: { user: { id: "u1", is_anonymous: false, last_sign_in_at: new Date(Date.now() - 31 * DIA).toISOString() } },
+    })
+    mocks.perfil.mockResolvedValue({ data: { rol_id: 2 }, error: null })
+
+    await updateSession(request("/mapa"))
+
+    expect(mocks.getUser).toHaveBeenCalledTimes(1)
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" })
+  })
+
   it("lets an expired visitor keep browsing public pages without a session", async () => {
     conSesion({ ms: 31 * DIA, rolId: 2 })
 
@@ -161,9 +224,7 @@ describe("updateSession when revoking an expired session fails", () => {
   beforeEach(() => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321")
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon")
-    mocks.getUser.mockReset().mockResolvedValue({
-      data: { user: { id: "u1", is_anonymous: false, last_sign_in_at: new Date(Date.now() - 31 * DIA).toISOString() } },
-    })
+    mocks.getClaims.mockReset().mockResolvedValue(claimsDeHace(31 * DIA))
     mocks.getSession.mockReset().mockResolvedValue({ data: { session: { access_token: tokenAutenticadoHace(31 * DIA) } } })
     mocks.signOut.mockReset().mockResolvedValue({ error: { message: "network" } })
     mocks.perfil.mockReset().mockResolvedValue({ data: { rol_id: 2 }, error: null })

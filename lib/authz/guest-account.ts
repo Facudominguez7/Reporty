@@ -17,6 +17,6 @@ export const MIN_PASSWORD_LENGTH = 6
  * @param user - Current Supabase user.
  * @returns `true` for permanent accounts whose linked email has no password yet.
  */
-export function needsPasswordSetup(user: User | null | undefined): boolean {
+export function needsPasswordSetup(user: Pick<User, "is_anonymous" | "user_metadata"> | null | undefined): boolean {
   return Boolean(user) && !isAnonymousUser(user) && user?.user_metadata?.[PASSWORD_PENDING_METADATA_KEY] === true
 }

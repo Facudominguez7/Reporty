@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   signInWithOAuth: vi.fn(),
   getUser: vi.fn(),
   updateUser: vi.fn(),
+  refreshSession: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   revalidatePath: vi.fn(),
   redirect: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("@/utils/supabase/server", () => ({
       signInWithOAuth: mocks.signInWithOAuth,
       getUser: mocks.getUser,
       updateUser: mocks.updateUser,
+      refreshSession: mocks.refreshSession,
       resetPasswordForEmail: mocks.resetPasswordForEmail,
     },
   }),
@@ -261,6 +263,34 @@ describe("weak password feedback", () => {
       error: "La contraseña debe tener al menos 8 caracteres.",
     })
     expect(mocks.redirect).not.toHaveBeenCalled()
+  })
+
+  it("refreshes the session after saving the password so the token stops marking it pending", async () => {
+    mocks.getUser.mockResolvedValueOnce({ data: { user: { id: "u1", email: "ana@example.com", is_anonymous: false } }, error: null })
+    mocks.updateUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null })
+    mocks.refreshSession.mockResolvedValueOnce({ data: { session: {} }, error: null })
+    const form = new FormData()
+    form.set("password", "secreta123")
+    form.set("confirm_password", "secreta123")
+
+    await crearContrasenaCuenta(undefined, form)
+
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1)
+    expect(mocks.updateUser.mock.invocationCallOrder[0]).toBeLessThan(mocks.refreshSession.mock.invocationCallOrder[0])
+    expect(mocks.redirect).toHaveBeenCalledWith("/mis-reportes?cuenta=lista")
+  })
+
+  it("still finishes when refreshing the session fails, since the password is already saved", async () => {
+    mocks.getUser.mockResolvedValueOnce({ data: { user: { id: "u1", email: "ana@example.com", is_anonymous: false } }, error: null })
+    mocks.updateUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null })
+    mocks.refreshSession.mockResolvedValueOnce({ data: { session: null }, error: { message: "network" } })
+    const form = new FormData()
+    form.set("password", "secreta123")
+    form.set("confirm_password", "secreta123")
+
+    await crearContrasenaCuenta(undefined, form)
+
+    expect(mocks.redirect).toHaveBeenCalledWith("/mis-reportes?cuenta=lista")
   })
 })
 

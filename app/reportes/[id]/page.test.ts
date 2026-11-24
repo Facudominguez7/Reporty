@@ -5,6 +5,7 @@ import { crearComentarioAction } from "./actions"
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
+  getClaims: vi.fn(),
   getCategorias: vi.fn(),
   getPrioridades: vi.fn(),
   estadoFotografias: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock("@/lib/moderation/estado-publico.server", () => ({
   tieneRevisionRechazoPendiente: mocks.tieneRevisionRechazoPendiente,
 }))
 vi.mock("@/utils/supabase/server", () => ({
-  createClient: async () => ({ auth: { getUser: mocks.getUser } }),
+  createClient: async () => ({ auth: { getUser: mocks.getUser, getClaims: mocks.getClaims } }),
 }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => ({}) }))
 vi.mock("@/lib/use-cases/reportes", async (importOriginal) => ({
@@ -64,11 +65,25 @@ function signInAs(roleId: number, isAnonymous = false) {
   mocks.verificarEsAdmin.mockResolvedValue({ isAdmin: roleId === ROLE.ADMIN })
 }
 
+/**
+ * Answers getClaims with the user each test configures on getUser, without recording a getUser
+ * call: the page reads the verified token claims and only the actions call Supabase Auth.
+ */
+async function claimsDelUsuarioConfigurado() {
+  const respuesta = await mocks.getUser.getMockImplementation()?.()
+  const usuario = respuesta?.data?.user
+  return usuario
+    ? { data: { claims: { sub: usuario.id, is_anonymous: usuario.is_anonymous } }, error: null }
+    : { data: null, error: null }
+}
+
 const renderPage = () => ReporteDetallePage({ params: Promise.resolve({ id: "5" }) })
 
 describe("ReporteDetallePage", () => {
   beforeEach(() => {
     vi.stubEnv("CUADRILLAS_ENABLED", undefined)
+    mocks.getUser.mockReset()
+    mocks.getClaims.mockReset().mockImplementation(claimsDelUsuarioConfigurado)
     mocks.crearComentarioWorkflow.mockReset().mockResolvedValue({ success: true, data: {} })
     mocks.getCategorias.mockReset().mockResolvedValue([{ id: 1, nombre: "Otros" }])
     mocks.getPrioridades.mockReset().mockResolvedValue([{ id: 2, nombre: "Alta" }])
@@ -189,16 +204,38 @@ describe("ReporteDetallePage", () => {
 
     const page = await renderPage()
 
-    expect(mocks.getUser).toHaveBeenCalledTimes(1)
+    expect(mocks.getClaims).toHaveBeenCalledTimes(1)
+    expect(mocks.getUser).not.toHaveBeenCalled()
     expect(mocks.getUserRoleContext).toHaveBeenCalledTimes(1)
     expect(mocks.verificarEsAdmin).not.toHaveBeenCalled()
     expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), "user-1", 5, ROLE.CIUDADANO)
     expect(mocks.obtenerSeccionReparacion).toHaveBeenCalledWith(5, 1, "autor-5", {
-      usuario: { id: "user-1", is_anonymous: false },
+      usuario: expect.objectContaining({ id: "user-1", is_anonymous: false }),
       rolId: ROLE.CIUDADANO,
     })
     expect(page.props.puedeVotar).toBe(true)
     expect(page.props.isAdmin).toBe(false)
+  })
+
+  it("confirma con Supabase Auth la sesión de un operador antes de cargar el panel interno", async () => {
+    vi.stubEnv("CUADRILLAS_ENABLED", "true")
+    signInAs(ROLE.OPERADOR)
+
+    await renderPage()
+
+    expect(mocks.getUser).toHaveBeenCalledTimes(1)
+    expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), "user-1", 5, ROLE.OPERADOR)
+  })
+
+  it("no carga el panel interno si Supabase Auth ya no reconoce la sesión del operador", async () => {
+    vi.stubEnv("CUADRILLAS_ENABLED", "true")
+    signInAs(ROLE.OPERADOR)
+    mocks.getClaims.mockResolvedValue({ data: { claims: { sub: "user-1", is_anonymous: false } }, error: null })
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: { message: "session revoked" } })
+
+    await renderPage()
+
+    expect(mocks.obtenerGestionOperativaDetalle).toHaveBeenCalledWith(expect.anything(), null, 5, null)
   })
 
   it("reconoce al admin con el mismo rol leído una sola vez", async () => {
