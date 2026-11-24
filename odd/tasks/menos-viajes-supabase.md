@@ -53,3 +53,8 @@
 - **L6:** el embed `autor:public_profiles(username)` devuelve la misma respuesta que `main`: 362 puntos, 356 con autor, mismo hash. Las props del detalle anónimo (reportes 1, 13, 11, 2, 221 y 999999) son idénticas a `main`.
 - **L7:** si falla la lectura del rol, `main` ya dejaba votar a un usuario registrado (`puedeVotarReportes` con rol `undefined`). No se cambia acá.
 - **L8:** issues #308 (detalle) y #309 (mapa) quedan cubiertos por esta rama. Los otros, #310–#313, necesitan medición antes de implementarse.
+- **L9 (verificación independiente):**
+  - Sin bloqueos. S2 y S4 se cumplen: el salto del proxy solo aplica a la ruta exacta, que no lee la sesión; `isAdmin` equivale a `verificarEsAdmin`; el rol y el usuario salen solo de la sesión del servidor; la moderación y el número de reclamo se muestran en las mismas condiciones; los embeds usan la misma vista con el mismo cliente.
+  - Nota aplicada (36f7520): la relación queda fijada por columna (`public_profiles!usuario_id`), así otra clave foránea hacia `profiles` no vuelve ambiguo el embed. Se verificó con anon en producción.
+  - Notas sin cambio: un id numérico inexistente dispara igual las 3 consultas de moderación, y sus resultados se descartan. Si alguien solo mueve el mapa, el vencimiento absoluto de la sesión se aplica en la siguiente página que abra.
+- **L10 (comparación con `main`, servidor aparte, base local):** respuestas idénticas en 4 zonas del mapa (puntos a zoom 18, 15 y 13, y grupos) y en las props de 7 fichas anónimas (1, 13, 11, 2, 221, 63 y 999999).
