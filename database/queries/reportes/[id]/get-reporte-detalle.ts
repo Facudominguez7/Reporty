@@ -23,7 +23,7 @@ const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
       prioridades (nombre),
       estados (id, nombre),
       fotos_reporte (${includeCanonicalImageFields ? "id, url, bucket, path, thumbnail_url, thumbnail_bucket, thumbnail_path" : "id, url"}),
-      profiles:public_profiles(username)
+      profiles:public_profiles!usuario_id(username)
     `
 
 export type ReportNameRelation = { nombre: string | null } | { nombre: string | null }[] | null

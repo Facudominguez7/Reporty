@@ -52,7 +52,7 @@ export async function getHistorialEstados(
       *,
       estado_anterior:estados!historial_estados_estado_anterior_id_fkey(id, nombre),
       estado_nuevo:estados!historial_estados_estado_nuevo_id_fkey(id, nombre),
-      perfil:public_profiles(username)
+      perfil:public_profiles!usuario_id(username)
     `)
     .eq("reporte_id", reporteId)
     .order("created_at", { ascending: false });

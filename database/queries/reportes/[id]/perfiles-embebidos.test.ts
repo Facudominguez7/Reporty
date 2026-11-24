@@ -51,7 +51,7 @@ describe("perfiles en la misma consulta del detalle", () => {
     const { data } = await getReporteDetalle(clienteFalso(), "5")
 
     expect(estado.tablas).toEqual(["reportes"])
-    expect(estado.selects[0]).toContain("profiles:public_profiles(username)")
+    expect(estado.selects[0]).toContain("profiles:public_profiles!usuario_id(username)")
     expect(data?.profiles).toEqual({ username: "ana" })
   })
 
@@ -72,7 +72,7 @@ describe("perfiles en la misma consulta del detalle", () => {
     const { data } = await getComentariosReporte(clienteFalso(), "5")
 
     expect(estado.tablas).toEqual(["comentarios_reporte"])
-    expect(estado.selects[0]).toContain("perfil:public_profiles(username)")
+    expect(estado.selects[0]).toContain("perfil:public_profiles!usuario_id(username)")
     expect(data).toEqual([
       { id: 1, usuario_id: "u1", contenido: "a", profiles: { username: "ana" } },
       { id: 2, usuario_id: "u2", contenido: "b", profiles: { username: "Usuario" } },
@@ -89,7 +89,7 @@ describe("perfiles en la misma consulta del detalle", () => {
     const { data } = await getHistorialEstados(clienteFalso(), "5")
 
     expect(estado.tablas).toEqual(["historial_estados"])
-    expect(estado.selects[0]).toContain("perfil:public_profiles(username)")
+    expect(estado.selects[0]).toContain("perfil:public_profiles!usuario_id(username)")
     expect(data).toEqual([
       { id: 1, usuario_id: "u1", usuario: { username: "ana" } },
       { id: 2, usuario_id: "u2", usuario: { username: null } },

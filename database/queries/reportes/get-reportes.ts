@@ -254,7 +254,8 @@ type ImageSelectMode = "thumbnail" | "canonical" | "legacy"
  * @param imageSelectMode - Columnas de imagen que existen en la base.
  * @param conAutor - Si trae el nombre del autor en la misma consulta. PostgREST lo une por la
  *   relación `usuario_id` → `public_profiles`, con la misma RLS de la vista: así no hace falta un
- *   segundo viaje a Supabase solo para los nombres.
+ *   segundo viaje a Supabase solo para los nombres. La relación se fija por la columna
+ *   (`!usuario_id`) para que otra clave foránea hacia `profiles` no la vuelva ambigua.
  * @returns La lista de columnas y relaciones para `select`.
  */
 const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean) => `id,
@@ -272,7 +273,7 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean
         ? "url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path"
         : imageSelectMode === "canonical"
           ? "url,bucket,path"
-          : "url"})${conAutor ? ",\n      autor:public_profiles(username)" : ""}`
+          : "url"})${conAutor ? ",\n      autor:public_profiles!usuario_id(username)" : ""}`
 
 /**
  * Construye la consulta filtrada y paginada para el formato de imágenes solicitado.

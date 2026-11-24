@@ -40,7 +40,7 @@ export async function getComentariosReporte(
       contenido,
       tipo_aporte,
       created_at,
-      perfil:public_profiles(username)
+      perfil:public_profiles!usuario_id(username)
     `
     )
     .eq("reporte_id", reporteId)

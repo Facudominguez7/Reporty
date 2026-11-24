@@ -92,7 +92,7 @@ describe("getReportMapData", () => {
 
     const selects = mocks.calls.filter(([metodo]) => metodo === "select").map(([, columnas]) => String(columnas))
     expect(selects).toHaveLength(2)
-    for (const columnas of selects) expect(columnas).toContain("autor:public_profiles(username)")
+    for (const columnas of selects) expect(columnas).toContain("autor:public_profiles!usuario_id(username)")
     expect(mocks.getPublicProfiles).not.toHaveBeenCalled()
     expect(cards.data[0].author).toBe("Author")
     expect(map.data[0].author).toBe("Author")
