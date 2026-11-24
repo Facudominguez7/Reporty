@@ -81,4 +81,15 @@
   - Tiempos en la base: `reportes_revision_rechazo` tarda 0,02 ms de media en `pg_stat_statements`, pero 448 ms de `origin_time`. El costo es de red, no de Postgres.
   - **Hallazgo nuevo:** el detalle lanza 8 consultas a la vez y el Worker solo deja 6 esperando cabeceras ([límites de Workers](https://developers.cloudflare.com/workers/platform/limits/#simultaneous-open-connections)). `reportes_vote_summary` y la lectura de SEO salen ~165 ms después. Eso explica por qué el detalle en HTML mejoró solo ~5 %. Queda como issue #315 (P1).
   - Cierre: S1–S7 cubiertos. Las mejoras que todavía no tienen medición quedan en #310–#313 y #315.
+- **L13 (medición después del deploy de la #317, 2026-11-24, merge d96ce40):**
+  - **Consultas en los edge logs**, con un pedido aislado a `/reportes/181`: 7 en total. Las 6 independientes salen en el mismo milisegundo y ninguna queda en cola; `evidencias_reparacion` sale después porque depende del reporte. Antes eran 9, con 2 en cola, y en la línea de base, 10.
+  - **`medir.sh`**, tres corridas de 30 pedidos. Mediana del p50 del tiempo total (línea de base → después de la #314 → después de la #317):
+    - Detalle HTML: 610 → ~577 → ~511 ms (−16 % sobre la línea de base).
+    - Detalle RSC: 837 → ~590 → ~444 ms (−47 % sobre la línea de base).
+  - **Rutas que esta PR no toca**, sin cambios fuera del ruido:
+    - API del mapa: ~263 ms.
+    - `/mapa`: ~421 ms en HTML y ~410 ms en RSC.
+    - `/reportes`: ~281 ms en HTML y ~284 ms en RSC.
+    - `/` y `/comunidad` siguen saliendo de caché.
+  - #315 queda resuelta. La lectura duplicada que planteaba #313 también.
 
