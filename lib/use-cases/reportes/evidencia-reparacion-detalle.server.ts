@@ -24,7 +24,7 @@ import { createClient } from "@/utils/supabase/server"
 import { obtenerUsuarioDeLectura } from "@/lib/auth/usuario-de-lectura"
 import {
   UMBRAL_CONFIRMACIONES_REPARACION,
-  puedeInformarReparacion,
+  mostrarParticipacionReparacion,
   type TipoVerificacionReparacion,
 } from "./evidencia-reparacion"
 
@@ -150,7 +150,7 @@ function motivoSinParticipacion(
   if (!usuario) return "sesion"
   if (usuario.id === autorId) return "autor"
   if (esRolOperador(rolId)) return "operador"
-  if (!puedeInformarReparacion(usuario, rolId)) return "cuenta"
+  if (!mostrarParticipacionReparacion(usuario, rolId)) return "cuenta"
   return null
 }
 
@@ -226,7 +226,7 @@ async function leerSeccion(
   const puedeInformar = Boolean(
     entrada.reporteEstadoId === REPORT_STATE_IDS.PENDIENTE
     && !hayEvidenciaActiva
-    && puedeInformarReparacion(entrada.usuario, entrada.rolId),
+    && mostrarParticipacionReparacion(entrada.usuario, entrada.rolId),
   )
   const esAutorDelReporte = Boolean(
     entrada.usuario && entrada.reporteAutorId && entrada.usuario.id === entrada.reporteAutorId,

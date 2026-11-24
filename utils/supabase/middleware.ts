@@ -44,10 +44,18 @@ export async function updateSession(request: NextRequest) {
   // project's ES256 key, so it does not call Supabase Auth on every request (issue #310).
   // It does not see a session revoked elsewhere until the access token expires; mutations keep
   // calling auth.getUser() for that reason.
-  const { data: datosClaims, error: errorClaims } = await supabase.auth.getClaims()
-  const claims = errorClaims ? null : datosClaims?.claims ?? null
+  // getClaims rethrows errors that are not AuthErrors (an expired or malformed token, an invalid
+  // alg claim). getUser returned those as errors, so a broken cookie counts as no session here
+  // too instead of failing every request, /auth included.
+  let claims: Record<string, unknown> | null = null
+  try {
+    const { data: datosClaims, error: errorClaims } = await supabase.auth.getClaims()
+    claims = errorClaims ? null : datosClaims?.claims ?? null
+  } catch (error) {
+    console.error("No se pudo verificar la sesión en el proxy:", error)
+  }
   let user: { id: string; is_anonymous: boolean } | null =
-    claims?.sub ? { id: claims.sub, is_anonymous: claims.is_anonymous === true } : null
+    typeof claims?.sub === 'string' && claims.sub ? { id: claims.sub, is_anonymous: claims.is_anonymous === true } : null
 
   // Absolute session expiry (issue #180): 30 days for regular users, 24 hours for admins.
   // Anonymous guest sessions are exempt. The profile is read only when the session is old

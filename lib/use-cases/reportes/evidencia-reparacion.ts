@@ -163,13 +163,31 @@ export function esRolHabilitadoParaReparacion(rolId: number | null | undefined) 
  * Participante habilitado: cuenta registrada, no anónima y con el correo confirmado.
  * Administración queda habilitada (L21); el operador municipal y el invitado no (S15).
  *
- * @param usuario - Usuario devuelto por `auth.getUser()` (las mutaciones, con `email_confirmed_at`)
- *   o por los claims verificados de la sesión (las lecturas, con `correo_confirmado`, que solo
- *   decide qué se muestra); nunca datos del cliente.
+ * @param usuario - Usuario devuelto por `auth.getUser()`; nunca datos del cliente ni de los claims.
  * @param rolId - `rol_id` del perfil en la base.
  * @returns `true` cuando la cuenta puede informar y verificar reparaciones.
  */
 export function puedeInformarReparacion(
+  usuario: Pick<User, "is_anonymous" | "email_confirmed_at"> | null | undefined,
+  rolId: number | null | undefined,
+) {
+  return canParticipateInCommunity(usuario, rolId)
+    && !esRolOperador(rolId)
+    && Boolean(usuario?.email_confirmed_at)
+}
+
+/**
+ * Versión de `puedeInformarReparacion` para decidir qué se muestra en la ficha.
+ *
+ * Acepta el usuario de los claims verificados de la sesión, cuyo `correo_confirmado` sale de
+ * metadatos que el propio usuario puede editar (issue #310). Por eso es solo para la vista:
+ * las mutaciones usan `puedeInformarReparacion` con el usuario de `auth.getUser()`.
+ *
+ * @param usuario - Usuario de la sesión (claims o `auth.getUser()`).
+ * @param rolId - `rol_id` del perfil en la base.
+ * @returns `true` cuando la ficha debe ofrecer informar o verificar la reparación.
+ */
+export function mostrarParticipacionReparacion(
   usuario: (Pick<User, "is_anonymous"> & { email_confirmed_at?: string | null; correo_confirmado?: boolean }) | null | undefined,
   rolId: number | null | undefined,
 ) {

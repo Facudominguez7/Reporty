@@ -36,6 +36,20 @@ describe("updateSession without a session", () => {
     expect(mocks.getUser).not.toHaveBeenCalled()
   })
 
+  it("treats a token that makes getClaims throw as no session instead of failing the request", async () => {
+    // getClaims rethrows non-Auth errors such as "JWT has expired" or an invalid alg claim.
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    mocks.getClaims.mockRejectedValue(new Error("JWT has expired"))
+
+    const protegida = await updateSession(request("/dashboard"))
+    const publica = await updateSession(request("/reportes/67"))
+
+    expect(protegida.status).toBe(307)
+    expect(protegida.headers.get("location")).toBe(`http://localhost:3000/auth?next=${encodeURIComponent("/dashboard")}`)
+    expect(publica.headers.get("location")).toBeNull()
+    expect(publica.headers.get("x-middleware-next")).toBe("1")
+  })
+
   it("treats a token that fails verification as no session", async () => {
     mocks.getClaims.mockResolvedValue({ data: null, error: { message: "invalid JWT" } })
 

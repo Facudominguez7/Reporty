@@ -43,3 +43,9 @@ Supuesto verificado: la clave actual del proyecto es ECC (P-256) y la HS256 qued
   - Documentación: sección «Session checks: reads vs writes» en `supabase/access-matrix.md`. `AGENTS.md` y `CLAUDE.md` se actualizaron, pero están en `.gitignore`.
   - Verificación: `pnpm test` 3142 pasan y 3 fallan; las 3 fallas son de `app/mascotas/nueva/resultado-navegacion.test.ts` y ya fallaban en la base (verificado con `git stash`). `tsc`: 2 errores, los mismos que en la base, en pruebas que este cambio no toca. `eslint` sin advertencias en los archivos cambiados.
   - Próximo paso: PR, deploy y T4 (medición).
+- **L4 (verificación independiente, riesgo ítem 2):** S1–S5 PASS, sin regresiones de seguridad. Un bloqueante y una observación aplicada:
+  - **B1 (robustez):** `getClaims` relanza los errores que no son AuthError (token vencido o malformado, `alg` inválido), mientras que `getUser` los devolvía como error. Con una cookie dañada, el proxy daba 500 en todas las rutas, `/auth` incluida. Corrección: try/catch que lo trata como sesión inexistente. Prueba de borde: RED → GREEN.
+  - **Observación aplicada:** `puedeInformarReparacion` vuelve a aceptar solo `email_confirmed_at` (mutaciones), y la vista usa `mostrarParticipacionReparacion`. Así una mutación no puede satisfacerse con metadatos editables. Una prueba lo fija.
+  - **Observaciones no aplicadas:**
+    - `/mascotas/[id]` lee la propiedad y el rol con el cliente de servicio, pero solo para mostrar botones; las acciones vuelven a verificar con `getUser`.
+    - Los avisos con `email` pueden mostrar el correo anterior hasta que se refresca el token (≤1 h).
