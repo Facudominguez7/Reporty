@@ -15,7 +15,6 @@ import { createClient } from "@/utils/supabase/server"
 import { createPublicClient } from "@/utils/supabase/public"
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 import type { ZonaMapa } from "@/lib/map/zona"
-import { getPublicProfilesByIds, indexPublicProfilesById } from "@/database/queries/profiles"
 import { obtenerEstadoOperativoPublicoPorReporte } from "@/database/queries/cuadrillas"
 import { cuadrillasHabilitadas } from "@/lib/features"
 import {
@@ -249,7 +248,17 @@ function mapReportToDashboardItem(report: ReporteDB): DashboardUserReport {
 
 type ImageSelectMode = "thumbnail" | "canonical" | "legacy"
 
-const buildReportesSelect = (imageSelectMode: ImageSelectMode) => `id,
+/**
+ * Arma el `select` del listado y del mapa.
+ *
+ * @param imageSelectMode - Columnas de imagen que existen en la base.
+ * @param conAutor - Si trae el nombre del autor en la misma consulta. PostgREST lo une por la
+ *   relación `usuario_id` → `public_profiles`, con la misma RLS de la vista: así no hace falta un
+ *   segundo viaje a Supabase solo para los nombres. La relación se fija por la columna
+ *   (`!usuario_id`) para que otra clave foránea hacia `profiles` no la vuelva ambigua.
+ * @returns La lista de columnas y relaciones para `select`.
+ */
+const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean) => `id,
       usuario_id,
       titulo,
       descripcion,
@@ -264,13 +273,22 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode) => `id,
         ? "url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path"
         : imageSelectMode === "canonical"
           ? "url,bucket,path"
-          : "url"})`
+          : "url"})${conAutor ? ",\n      autor:public_profiles!usuario_id(username)" : ""}`
 
-/** Construye la consulta filtrada y paginada para el formato de imágenes solicitado. */
+/**
+ * Construye la consulta filtrada y paginada para el formato de imágenes solicitado.
+ *
+ * @param supabase - Cliente con el que se lee (público o con sesión).
+ * @param filtros - Filtros ya normalizados, con límite y desplazamiento.
+ * @param imageSelectMode - Columnas de imagen que existen en la base.
+ * @param conAutor - Si trae el nombre del autor en la misma consulta.
+ * @returns La consulta de PostgREST lista para esperar.
+ */
 async function fetchReportes(
   supabase: SupabaseClient,
   filtros: Required<Pick<FiltrosReportes, "soloConCoordenadas" | "limite" | "offset">> & FiltrosReportes,
   imageSelectMode: ImageSelectMode,
+  conAutor: boolean,
 ) {
   const {
     search,
@@ -288,7 +306,7 @@ async function fetchReportes(
 
   // Con zona, la función de PostGIS filtra por área con el índice espacial y devuelve filas de
   // `reportes`: el mismo select y los mismos filtros se encadenan encima.
-  const seleccion = buildReportesSelect(imageSelectMode)
+  const seleccion = buildReportesSelect(imageSelectMode, conAutor)
   const desdeTabla = () => supabase.from("reportes").select(seleccion)
   // Para PostgREST las dos ramas son la misma consulta; el tipo de la RPC solo deja de exponer
   // los filtros después de `select`, aunque en ejecución los acepta igual.
@@ -404,14 +422,14 @@ export async function getReportes(
     offset,
   }
 
-  let { data, error } = await fetchReportes(supabase, normalizedFilters, "thumbnail")
+  let { data, error } = await fetchReportes(supabase, normalizedFilters, "thumbnail", includeAuthors)
 
   if (error && isMissingReportImageColumnsError(error)) {
-    ;({ data, error } = await fetchReportes(supabase, normalizedFilters, "canonical"))
+    ;({ data, error } = await fetchReportes(supabase, normalizedFilters, "canonical", includeAuthors))
   }
 
   if (error && isMissingReportImageColumnsError(error)) {
-    ;({ data, error } = await fetchReportes(supabase, normalizedFilters, "legacy"))
+    ;({ data, error } = await fetchReportes(supabase, normalizedFilters, "legacy", includeAuthors))
   }
 
   // fetchReportes asks for one extra row: if it came back, there is another page.
@@ -419,28 +437,19 @@ export async function getReportes(
   const hasMore = rows.length > limite
   const pageRows = hasMore ? rows.slice(0, limite) : rows
 
-  // Both lookups only need the ids of this page, so they run at the same time.
-  const [{ data: publicProfiles }, estadosOperativos] = await Promise.all([
-    includeAuthors
-      ? getPublicProfilesByIds(
-          supabase,
-          pageRows.map((report) => report.usuario_id ?? ""),
-        )
-      : Promise.resolve({ data: [] }),
-    // Without crews there is no operational state to show, so the lookup is skipped.
-    cuadrillasHabilitadas()
-      ? obtenerEstadoOperativoPublicoPorReporte(
-          supabase,
-          pageRows.map((report) => report.id),
-        )
-      : new Map<number, never>(),
-  ])
-  const profilesById = indexPublicProfilesById(publicProfiles)
+  // El autor ya viene en la misma fila. Without crews there is no operational state to show,
+  // so the lookup is skipped.
+  const estadosOperativos = cuadrillasHabilitadas()
+    ? await obtenerEstadoOperativoPublicoPorReporte(
+        supabase,
+        pageRows.map((report) => report.id),
+      )
+    : new Map<number, never>()
 
   const resolvedData = pageRows.map((report: ReporteDBRaw) => ({
     ...report,
     autor: report.usuario_id
-      ? { username: profilesById.get(report.usuario_id)?.username ?? null }
+      ? { username: (includeAuthors ? getSingleUsername(report.autor) : null) ?? null }
       : null,
     fotos: resolveReportImageRows(report.fotos),
   }))
@@ -666,7 +675,7 @@ export async function getDashboardUserReports(
   const fetchDashboardReports = async (imageSelectMode: ImageSelectMode) => {
     let query = supabase
       .from("reportes")
-      .select(buildReportesSelect(imageSelectMode))
+      .select(buildReportesSelect(imageSelectMode, false))
       .eq("usuario_id", userId)
       .is("deleted_at", null)
 

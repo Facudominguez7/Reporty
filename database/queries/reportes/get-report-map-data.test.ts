@@ -84,15 +84,33 @@ describe("getReportMapData", () => {
     expect(result.data).toMatchObject([{ id: 7, title: "Bache" }])
   })
 
-  it("keeps authors for the existing card and map callers", async () => {
-    mocks.rows.push({ ...pendingRow, usuario_id: "user-1" })
+  it("trae el autor en la misma consulta, sin un segundo viaje a public_profiles", async () => {
+    mocks.rows.push({ ...pendingRow, usuario_id: "user-1", autor: { username: "Author" } })
 
     const cards = await getReportCardData()
     const map = await getReportMapData()
 
-    expect(mocks.getPublicProfiles).toHaveBeenCalledTimes(2)
+    const selects = mocks.calls.filter(([metodo]) => metodo === "select").map(([, columnas]) => String(columnas))
+    expect(selects).toHaveLength(2)
+    for (const columnas of selects) expect(columnas).toContain("autor:public_profiles!usuario_id(username)")
+    expect(mocks.getPublicProfiles).not.toHaveBeenCalled()
     expect(cards.data[0].author).toBe("Author")
     expect(map.data[0].author).toBe("Author")
+  })
+
+  it("muestra «Anónimo» si el reporte no tiene perfil público", async () => {
+    mocks.rows.push({ ...pendingRow, usuario_id: "user-1", autor: null })
+
+    const map = await getReportMapData()
+
+    expect(map.data[0].author).toBe("Anónimo")
+  })
+
+  it("no pide el autor cuando las tarjetas lo descartan", async () => {
+    await getReportCardData({}, { includeAuthors: false })
+
+    const columnas = mocks.calls.find(([metodo]) => metodo === "select")?.[1]
+    expect(String(columnas)).not.toContain("public_profiles")
   })
 
   it("keeps only pending reports in the query when asked to", async () => {

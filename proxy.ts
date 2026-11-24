@@ -13,8 +13,16 @@ const RUTA_CUADRILLAS = '/dashboard/cuadrillas'
 const RUTAS_ESTATICAS_SIN_SESION = new Set(['/', '/terminos', '/privacidad', '/eliminar-cuenta', '/crear'])
 
 /**
+ * Endpoints públicos que leen con el cliente anónimo y nunca miran la sesión. El mapa pide uno
+ * por cada zona que recorre la persona: refrescar la sesión ahí sumaba una llamada a Supabase
+ * Auth (~170 ms) a cada zona. La sesión se sigue refrescando en las páginas.
+ */
+const APIS_PUBLICAS_SIN_SESION = new Set(['/api/mapa/reportes'])
+
+/**
  * Corre antes de cada ruta: apaga las rutas de cuadrillas deshabilitadas, deja pasar sin sesión
- * las páginas estáticas públicas y refresca la sesión de Supabase en el resto.
+ * las páginas estáticas públicas y la API pública del mapa, y refresca la sesión de Supabase en
+ * el resto.
  *
  * @param request - Pedido entrante.
  * @returns La respuesta que continúa, reescribe o redirige el pedido.
@@ -22,7 +30,7 @@ const RUTAS_ESTATICAS_SIN_SESION = new Set(['/', '/terminos', '/privacidad', '/e
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (RUTAS_ESTATICAS_SIN_SESION.has(pathname)) {
+  if (RUTAS_ESTATICAS_SIN_SESION.has(pathname) || APIS_PUBLICAS_SIN_SESION.has(pathname)) {
     return NextResponse.next()
   }
 

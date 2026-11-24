@@ -5,7 +5,6 @@ import {
   type ResolvedReportImageRow,
   resolveReportImageRows,
 } from "@/lib/media/report-images";
-import { getPublicProfile } from "@/database/queries/profiles";
 import { getReporteVoteSummary, type ReporteVoteSummary } from "./votos";
 
 const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
@@ -23,7 +22,8 @@ const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
       categorias (nombre),
       prioridades (nombre),
       estados (id, nombre),
-      fotos_reporte (${includeCanonicalImageFields ? "id, url, bucket, path, thumbnail_url, thumbnail_bucket, thumbnail_path" : "id, url"})
+      fotos_reporte (${includeCanonicalImageFields ? "id, url, bucket, path, thumbnail_url, thumbnail_bucket, thumbnail_path" : "id, url"}),
+      profiles:public_profiles!usuario_id(username)
     `
 
 export type ReportNameRelation = { nombre: string | null } | { nombre: string | null }[] | null
@@ -68,9 +68,10 @@ export type ReporteDetalle = ReporteDetalleView
 export async function getReporteDetalle(
   supabase: SupabaseClient,
   reporteId: string,
-  usuarioId?: string | null,
+  usuarioId?: string | null | PromiseLike<string | null | undefined>,
 ) {
-  // The vote summary only needs the report id, so it loads at the same time as the report row.
+  // The vote counts start now; only the visitor's own-vote lookup waits for the user id, which
+  // may still be loading. The report row below never waits for it.
   const voteSummaryPromise = getReporteVoteSummary(supabase, reporteId, usuarioId)
   // Unused when the report lookup fails; the handler keeps that path free of unhandled rejections.
   voteSummaryPromise.catch(() => {})
@@ -99,16 +100,9 @@ export async function getReporteDetalle(
   }
 
   const reporte = (data ?? null) as ReporteDetalleRow | null
-  const [publicProfileResult, voteSummaryResult] = await Promise.all([
-    reporte?.usuario_id
-      ? getPublicProfile(supabase, reporte.usuario_id)
-      : Promise.resolve({ data: null, error: null }),
-    voteSummaryPromise,
-  ])
-
-  if (publicProfileResult.error) {
-    console.error("Error al obtener autor público del reporte:", publicProfileResult.error)
-  }
+  // El autor llega en la misma fila (relación usuario_id → public_profiles), sin otro viaje.
+  const autor = Array.isArray(reporte?.profiles) ? reporte.profiles[0] : reporte?.profiles
+  const voteSummaryResult = await voteSummaryPromise
 
   if (voteSummaryResult.error) {
     console.error("Error al obtener resumen de votos del reporte:", voteSummaryResult.error)
@@ -118,9 +112,7 @@ export async function getReporteDetalle(
     data: reporte
       ? {
           ...reporte,
-          profiles: publicProfileResult.data
-            ? { username: publicProfileResult.data.username }
-            : null,
+          profiles: autor ? { username: autor.username } : null,
           fotos_reporte: resolveReportImageRows(reporte.fotos_reporte),
           votos: voteSummaryResult.data,
         } satisfies ReporteDetalleView

@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { sumarPuntos, PUNTOS } from "@/database/queries/puntos";
-import { getPublicProfilesByIds, indexPublicProfilesById } from "@/database/queries/profiles";
+import { getPublicProfilesByIds, indexPublicProfilesById, nombreDePerfil } from "@/database/queries/profiles";
 
 export type Comentario = {
   id: number;
@@ -17,18 +17,6 @@ export type Comentario = {
         username: string;
       }[];
 };
-
-function attachPublicProfilesToComments<T extends { usuario_id: string }>(
-  comments: T[],
-  profilesById: Map<string, { username: string | null }>,
-) {
-  return comments.map((comment) => ({
-    ...comment,
-    profiles: {
-      username: profilesById.get(comment.usuario_id)?.username ?? "Usuario",
-    },
-  }));
-}
 
 /**
  * Recupera los comentarios no eliminados de un reporte, ordenados por fecha de creación ascendente.
@@ -51,7 +39,8 @@ export async function getComentariosReporte(
       usuario_id,
       contenido,
       tipo_aporte,
-      created_at
+      created_at,
+      perfil:public_profiles!usuario_id(username)
     `
     )
     .eq("reporte_id", reporteId)
@@ -63,14 +52,13 @@ export async function getComentariosReporte(
     return { data: [], error };
   }
 
-  const { data: profiles } = await getPublicProfilesByIds(
-    supabase,
-    (data ?? []).map((comment) => comment.usuario_id),
-  );
-  const profilesById = indexPublicProfilesById(profiles);
-
+  // El autor de cada comentario llega en la misma consulta (relación usuario_id →
+  // public_profiles), sin un segundo viaje a Supabase.
   return {
-    data: attachPublicProfilesToComments(data || [], profilesById),
+    data: (data ?? []).map(({ perfil, ...comentario }) => ({
+      ...comentario,
+      profiles: { username: nombreDePerfil(perfil) ?? "Usuario" },
+    })),
     error: null,
   };
 }
