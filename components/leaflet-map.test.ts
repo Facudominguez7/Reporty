@@ -10,10 +10,20 @@ const mocks = vi.hoisted(() => {
   const markerOptions: Array<{ title?: string; alt?: string; icon?: { html?: string } }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
-  const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
-  const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), getLayers: vi.fn(() => []) }
-  const marker = { bindPopup: vi.fn(), on: vi.fn() }
-  return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, marker, refIndex: 0 }
+  const map = {
+    setView: vi.fn(() => calls.push("setView")), on: vi.fn(), once: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(),
+    getBounds: vi.fn(() => ({ getWest: () => -55.95, getSouth: () => -27.4, getEast: () => -55.85, getNorth: () => -27.35 })),
+    getZoom: vi.fn(() => 15),
+  }
+  const cluster = {
+    addTo: vi.fn(), zoomToShowLayer: vi.fn(), hasLayer: vi.fn(() => true), off: vi.fn(() => calls.push("cluster.off")), clearLayers: vi.fn(() => calls.push("clearLayers")), addLayer: vi.fn(() => calls.push("addLayer")), removeLayer: vi.fn(() => calls.push("removeLayer")), getLayers: vi.fn(() => []),
+    // Los lotes cuentan como un addLayer/removeLayer por marcador, para comparar con lo de antes.
+    addLayers: vi.fn((capas: unknown[]) => capas.forEach(() => cluster.addLayer())),
+    removeLayers: vi.fn((capas: unknown[]) => capas.forEach(() => cluster.removeLayer())),
+  }
+  const capaGrupos = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn() }
+  const marker = { bindPopup: vi.fn(), on: vi.fn(), once: vi.fn(), openPopup: vi.fn(), getLatLng: vi.fn(() => [-27.36, -55.9]) }
+  return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, capaGrupos, marker, refIndex: 0 }
 })
 
 vi.mock("react", async (importOriginal) => {
@@ -33,6 +43,7 @@ vi.mock("leaflet", () => ({
     map: () => mocks.map,
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
+    layerGroup: () => mocks.capaGrupos,
     marker: (_coordinates: unknown, options: { title?: string; alt?: string; icon?: { html?: string } }) => { mocks.markerOptions.push(options); return mocks.marker },
     divIcon: (icon: { className: string; html: string; iconSize?: [number, number] }) => { mocks.icons.push(icon); return icon },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
@@ -51,6 +62,11 @@ const report = {
 function render(reports: Parameters<typeof LeafletMap>[0]["reports"]) {
   mocks.refIndex = 0
   renderToStaticMarkup(createElement(LeafletMap, { reports }))
+}
+
+/** Contenido de un popup: el de los reportes se arma recién al abrirlo (es una función). */
+function contenidoPopup(contenido: unknown): string {
+  return typeof contenido === "function" ? (contenido as () => string)() : (contenido as string)
 }
 
 describe("LeafletMap initial view", () => {
@@ -109,7 +125,7 @@ describe("LeafletMap initial view", () => {
     // Rerender with a pet while the imperative map instance is active.
     mocks.refIndex = 0
     renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: "Gato <script>", description: `Blanca & "curiosa"`, status: "Encontrada", createdAt: "2026-01-02", phone: `123" onclick="x`, image: "javascript:alert(1)", coordinates: [-27.36, -55.89] }] }))
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     expect(popup.trim()).toMatch(/^<a href="\/mascotas\/9"[^>]*>[\s\S]*<\/a>$/)
     expect(popup).toContain("display:block;min-width:250px")
     expect(popup.match(/^\s*<a[^>]*>/)?.[0]).not.toMatch(/\b(?:tabindex|onclick|onkeydown)\s*=/i)
@@ -134,10 +150,10 @@ describe("LeafletMap initial view", () => {
   it("matches incident popup layout while linking the entire pet content", () => {
     vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
     render([{ ...report, image: "/report.jpg" }])
-    const incidentPopup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const incidentPopup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     mocks.refIndex = 0
     renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: 'Gato "<mimo>"', description: "A&".repeat(60), status: "Perdida", createdAt: "2026-01-02", phone: '<123>', image: '/foto?x="&y=1', coordinates: [-27.36, -55.89] }] }))
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     for (const style of ["min-width:250px;max-width:270px", "font-size:15px;font-weight:700", "margin-bottom:10px;overflow:hidden;border-radius:10px", "width:100%;height:124px;object-fit:cover", "min-height:26px", "padding-top:10px;border-top:1px solid var(--border)"]) {
       expect(incidentPopup).toContain(style)
       expect(popup).toContain(style)
@@ -223,7 +239,7 @@ describe("LeafletMap initial view", () => {
     render([])
     expect(mocks.map.setView).toHaveBeenLastCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
     expect(mocks.map.setView).toHaveBeenCalledTimes(2)
-    expect(mocks.cluster.clearLayers).toHaveBeenCalledTimes(2)
+    expect(mocks.cluster.removeLayer).toHaveBeenCalledOnce()
   })
 
   it("marca con aro violeta y escudo los reportes tomados por la Defensoría, sin revelar el número", () => {
@@ -239,7 +255,7 @@ describe("LeafletMap initial view", () => {
 
     // El popup distingue la toma pero nunca muestra el número de reclamo (S9): sin rótulo
     // «Reclamo Nº» ni píldora con el número.
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     expect(popup).toContain("Tomado por la Defensoría del Pueblo")
     expect(popup).toMatch(/Creado el \d/)
     expect(popup).not.toContain("Reclamo")
@@ -253,7 +269,7 @@ describe("LeafletMap initial view", () => {
     const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
     expect(html).toContain("Tomado por la Defensoría del Pueblo")
     expect(html).toContain('title="Con cuadrilla asignada" style="position:absolute;top:-3px;left:-3px;')
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     expect(popup).toContain("En progreso · Cuadrilla Norte")
   })
 
@@ -263,5 +279,139 @@ describe("LeafletMap initial view", () => {
     const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
     expect(html).toContain("Con cuadrilla asignada")
     expect(html).not.toContain("Tomado por la Defensoría del Pueblo")
+  })
+
+  describe("carga por zona (#281)", () => {
+    const otro = { ...report, id: 2, coordinates: [-27.37, -55.9] as [number, number] }
+    const grupo = { lat: -27.37, lon: -55.9, cantidad: 412, limites: { oeste: -55.91, sur: -27.38, este: -55.89, norte: -27.36 } }
+
+    function renderZona(props: Partial<Parameters<typeof LeafletMap>[0]>) {
+      mocks.refIndex = 0
+      renderToStaticMarkup(createElement(LeafletMap, { reports: [], onCambioZona: vi.fn(), ...props }))
+    }
+
+    it("avisa la zona visible y el zoom cuando el mapa termina de moverse", () => {
+      const onCambioZona = vi.fn()
+      renderZona({ onCambioZona })
+
+      const alMover = mocks.map.on.mock.calls.find(([evento]) => evento === "moveend")?.[1] as () => void
+      alMover()
+
+      expect(onCambioZona).toHaveBeenCalledWith({ oeste: -55.95, sur: -27.4, este: -55.85, norte: -27.35 }, 15)
+    })
+
+    it("suma y quita marcadores por ID sin redibujar los que siguen", () => {
+      renderZona({ reports: [report] })
+      mocks.cluster.addLayer.mockClear()
+
+      renderZona({ reports: [report, otro] })
+      expect(mocks.cluster.addLayer).toHaveBeenCalledOnce()
+      expect(mocks.cluster.removeLayer).not.toHaveBeenCalled()
+      expect(mocks.cluster.clearLayers).not.toHaveBeenCalled()
+
+      renderZona({ reports: [otro] })
+      expect(mocks.cluster.removeLayer).toHaveBeenCalledOnce()
+      expect(mocks.cluster.addLayer).toHaveBeenCalledOnce()
+    })
+
+    it("redibuja un marcador cuyo reporte cambió", () => {
+      renderZona({ reports: [report] })
+      mocks.cluster.addLayer.mockClear()
+
+      renderZona({ reports: [{ ...report, estadoId: 2, status: "Reparado" }] })
+
+      expect(mocks.cluster.removeLayer).toHaveBeenCalledOnce()
+      expect(mocks.cluster.addLayer).toHaveBeenCalledOnce()
+      expect(mocks.markerOptions.at(-1)?.icon?.html).toContain("repair-aura")
+    })
+
+    it("mover el mapa no lo vuelve a encuadrar", () => {
+      renderZona({ reports: [report] })
+      renderZona({ reports: [otro] })
+      renderZona({ reports: [] })
+
+      expect(mocks.map.fitBounds).not.toHaveBeenCalled()
+      expect(mocks.map.setView).toHaveBeenCalledOnce()
+    })
+
+    it("al cambiar a la capa de mascotas se sigue encuadrando en las mascotas", () => {
+      const mascota = { id: 5, species: "Perro", status: "Perdida", phone: "1", description: "", createdAt: "2026-01-01", coordinates: [-27.36, -55.9] as [number, number], image: null }
+      renderZona({ reports: [report] })
+      renderZona({ reports: [], mascotas: [mascota] as never })
+
+      expect(mocks.map.setView).toHaveBeenCalledTimes(2)
+    })
+
+    it("con muchos reportes los suma al mapa en un solo lote y arma cada popup recién al abrirlo", () => {
+      const muchos = Array.from({ length: 50 }, (_, i) => ({ ...report, id: 100 + i }))
+      renderZona({ reports: muchos })
+
+      expect(mocks.cluster.addLayers).toHaveBeenCalledOnce()
+      expect(mocks.cluster.addLayers.mock.calls[0][0]).toHaveLength(50)
+      expect(typeof mocks.marker.bindPopup.mock.calls[0][0]).toBe("function")
+
+      renderZona({ reports: muchos.slice(10) })
+      expect(mocks.cluster.removeLayers).toHaveBeenCalledOnce()
+      expect(mocks.cluster.removeLayers.mock.calls[0][0]).toHaveLength(10)
+    })
+
+    it("al desmontar cancela lo pendiente del grupo antes de vaciarlo (si no, el foco en curso rompe la página)", () => {
+      renderZona({ reports: [report] })
+      mocks.calls.length = 0
+
+      for (const limpiar of mocks.cleanups) limpiar()
+
+      expect(mocks.calls.indexOf("cluster.off")).toBeGreaterThanOrEqual(0)
+      expect(mocks.calls.indexOf("cluster.off")).toBeLessThan(mocks.calls.indexOf("clearLayers"))
+    })
+
+    it("si llega una zona antes de abrir el popup del reporte en foco, lo vuelve a intentar", () => {
+      const foco = { reporteId: report.id, lat: -27.36, lon: -55.9 }
+      renderZona({ reports: [report], focoReporte: foco })
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledOnce()
+
+      renderZona({ reports: [report, otro], focoReporte: foco })
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledTimes(2)
+
+      // Abierto el popup, las zonas siguientes ya no lo tocan.
+      const alAbrir = mocks.marker.once.mock.calls.find(([evento]) => evento === "popupopen")?.[1] as () => void
+      alAbrir()
+      renderZona({ reports: [otro, report], focoReporte: foco })
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledTimes(2)
+    })
+
+    it("si el usuario mueve el mapa antes de que se abra el popup del foco, no lo arrastra de vuelta", () => {
+      const foco = { reporteId: report.id, lat: -27.36, lon: -55.9 }
+      renderZona({ reports: [report], focoReporte: foco })
+
+      const alArrastrar = mocks.map.once.mock.calls.find(([evento]) => evento === "dragstart")?.[1] as () => void
+      alArrastrar()
+      renderZona({ reports: [report, otro], focoReporte: foco })
+
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledOnce()
+    })
+
+    it("dibuja los grupos con su cantidad y al tocar uno se acerca a sus límites", () => {
+      renderZona({ grupos: [grupo] })
+
+      expect(mocks.capaGrupos.addLayer).toHaveBeenCalledOnce()
+      const icono = mocks.markerOptions.at(-1)?.icon?.html ?? ""
+      expect(icono).toContain("412")
+      expect(mocks.markerOptions.at(-1)?.title).toBe("412 reportes en esta zona")
+
+      const tocar = mocks.marker.on.mock.calls.findLast(([evento]) => evento === "click")?.[1] as () => void
+      tocar()
+      expect(mocks.map.fitBounds).toHaveBeenCalledWith([[-27.38, -55.91], [-27.36, -55.89]], { padding: [24, 24] })
+    })
+
+    it("al pasar de grupos a puntos borra los grupos", () => {
+      renderZona({ grupos: [grupo] })
+      mocks.capaGrupos.clearLayers.mockClear()
+
+      renderZona({ reports: [report], grupos: [] })
+
+      expect(mocks.capaGrupos.clearLayers).toHaveBeenCalled()
+      expect(mocks.capaGrupos.addLayer).toHaveBeenCalledOnce()
+    })
   })
 })

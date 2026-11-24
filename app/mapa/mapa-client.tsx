@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { preconnect } from "react-dom"
 import dynamic from "next/dynamic"
 import Link from "next/link"
@@ -18,7 +18,9 @@ import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { MascotasOnboardingModal, OnboardingModal } from "@/components/onboarding-modal"
 import { IntroEntrada } from "@/components/intro-entrada"
-import type { ReportMapItem } from "@/database/queries/reportes/get-reportes"
+import type { ContenidoZonaMapa, FiltrosMapa } from "@/database/queries/reportes/mapa-por-zona"
+import { useContenidoZonaMapa } from "@/components/map/use-contenido-zona"
+import { AvisoCargaZona } from "@/components/map/aviso-carga-zona"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
 import type { FocoReporte } from "@/lib/map/foco-reporte"
@@ -41,7 +43,8 @@ const MapContainer = dynamic(loadMapContainer, {
 const MAP_MIN_HEIGHT_PX = 512
 
 type MapaClientProps = {
-  reportes: ReportMapItem[]
+  /** Lo que el servidor cargó para la primera vista: puntos, o grupos si la zona es densa. */
+  contenidoInicial: ContenidoZonaMapa
   categorias: { id: number; nombre: string }[]
   estados: { id: number; nombre: string }[]
   prioridades: { id: number; nombre: string }[]
@@ -130,7 +133,40 @@ export function PetLayerError({ error }: { error: string | null }) {
   return <div role="alert" className="absolute left-1/2 top-20 z-30 w-[min(92vw,32rem)] -translate-x-1/2 rounded-lg border border-destructive/30 bg-card/95 p-3 text-sm text-destructive shadow-lg">No se pudieron cargar las mascotas: {error}</div>
 }
 
-export function MapaClient({ reportes, mascotas, categorias, estados, prioridades, error, petError, capaInicial = "reportes", focoReporte = null }: MapaClientProps) {
+/** Lista vacía estable para cuando la zona llega como grupos. */
+const SIN_PUNTOS: never[] = []
+
+type MapaPorZonaProps = {
+  contenidoInicial: ContenidoZonaMapa
+  filtros: FiltrosMapa
+  mascotas: MascotaMapa[]
+  layer: "reportes" | "mascotas"
+  focoReporte: FocoReporte | null
+}
+
+/**
+ * Mapa con carga por zona (#281). El estado de la zona vive acá y no en `MapaClient`: así cada
+ * zona que llega redibuja solo el mapa, no los filtros, diálogos y botones de la página.
+ */
+function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }: MapaPorZonaProps) {
+  const { contenido, alCambiarZona, estado, reintentar } = useContenidoZonaMapa(contenidoInicial, filtros)
+  return (
+    <>
+    {layer === "reportes" && <AvisoCargaZona estado={estado} onReintentar={reintentar} />}
+    <MapContainer
+      reports={contenido.tipo === "puntos" ? contenido.reportes : SIN_PUNTOS}
+      grupos={contenido.tipo === "grupos" ? contenido.grupos : undefined}
+      onCambioZona={alCambiarZona}
+      mascotas={mascotas}
+      layer={layer}
+      showLegend
+      focoReporte={focoReporte}
+    />
+    </>
+  )
+}
+
+export function MapaClient({ contenidoInicial, mascotas, categorias, estados, prioridades, error, petError, capaInicial = "reportes", focoReporte = null }: MapaClientProps) {
   // The map tiles are the largest paint of this page. Rendering this hint during SSR
   // puts it in the document head, so the tile connection opens while the map code downloads.
   preconnect(MAP_TILE_ORIGIN)
@@ -155,11 +191,22 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
   const activeFilters = layer === "mascotas"
     ? [searchParams.get("searchMascota"), searchParams.get("tipoMascota"), searchParams.get("estadoMascota")].filter(Boolean).length
     : [searchParams.get("search"), searchParams.get("categoria"), searchParams.get("estado"), searchParams.get("prioridad")].filter(Boolean).length
-  const mascotasFiltradas = filtrarMascotasMapa(mascotas, {
-    tipo: searchParams.get("tipoMascota") ?? "all",
-    estado: searchParams.get("estadoMascota") ?? "all",
-    search: searchParams.get("searchMascota") ?? "",
-  })
+  const tipoMascota = searchParams.get("tipoMascota") ?? "all"
+  const estadoMascota = searchParams.get("estadoMascota") ?? "all"
+  const searchMascota = searchParams.get("searchMascota") ?? ""
+  // Memorizada: el mapa solo redibuja las mascotas cuando cambia la lista, no en cada carga de zona.
+  const mascotasFiltradas = useMemo(
+    () => filtrarMascotasMapa(mascotas, { tipo: tipoMascota, estado: estadoMascota, search: searchMascota }),
+    [mascotas, tipoMascota, estadoMascota, searchMascota],
+  )
+
+  // Mapa por zona (#281): cada movimiento pide los reportes de la zona visible con estos filtros.
+  const filtrosZona: FiltrosMapa = {
+    search: searchParams.get("search") ?? undefined,
+    categoria: searchParams.get("categoria") ?? undefined,
+    estado: searchParams.get("estado") ?? undefined,
+    prioridad: searchParams.get("prioridad") ?? undefined,
+  }
 
   const activeFiltersLabel = `${activeFilters} filtro${activeFilters === 1 ? "" : "s"} activo${activeFilters === 1 ? "" : "s"}`
 
@@ -212,7 +259,13 @@ export function MapaClient({ reportes, mascotas, categorias, estados, prioridade
             </Alert>
           </div>
         ) : (
-          <MapContainer reports={reportes} mascotas={mascotasFiltradas} layer={layer} showLegend focoReporte={focoReporte} />
+          <MapaPorZona
+            contenidoInicial={contenidoInicial}
+            filtros={filtrosZona}
+            mascotas={mascotasFiltradas}
+            layer={layer}
+            focoReporte={focoReporte}
+          />
         )}
       </div>
 

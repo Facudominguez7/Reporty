@@ -13,6 +13,8 @@ import { filtroBusquedaDefensoria, obtenerIdBusquedaDefensoria } from "@/databas
 
 import { createClient } from "@/utils/supabase/server"
 import { createPublicClient } from "@/utils/supabase/public"
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
+import type { ZonaMapa } from "@/lib/map/zona"
 import { getPublicProfilesByIds, indexPublicProfilesById } from "@/database/queries/profiles"
 import { obtenerEstadoOperativoPublicoPorReporte } from "@/database/queries/cuadrillas"
 import { cuadrillasHabilitadas } from "@/lib/features"
@@ -64,8 +66,21 @@ export type FiltrosReportes = {
   filtroDefensoria?: { vista: "pendientes" | "tomados"; busqueda: string }
   /** Restringe los resultados a estos IDs, además del filtro por nombre de estado. */
   estadosPermitidos?: readonly number[]
+  /** Solo los reportes dentro de este rectángulo (mapa por zona, #281). */
+  zona?: ZonaMapa
   limite?: number
   offset?: number
+}
+
+/** Opciones de lectura de `getReportes`. */
+type OpcionesLecturaReportes = {
+  /** Trae el nombre público de cada autor. */
+  includeAuthors?: boolean
+  /**
+   * Lee sin la sesión del visitante (rol anon). El resultado es igual para todos, así que se
+   * puede cachear en una respuesta pública. Solo para datos públicos.
+   */
+  publico?: boolean
 }
 
 export type ReportMapItem = {
@@ -253,7 +268,7 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode) => `id,
 
 /** Construye la consulta filtrada y paginada para el formato de imágenes solicitado. */
 async function fetchReportes(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   filtros: Required<Pick<FiltrosReportes, "soloConCoordenadas" | "limite" | "offset">> & FiltrosReportes,
   imageSelectMode: ImageSelectMode,
 ) {
@@ -266,13 +281,23 @@ async function fetchReportes(
     soloPendientes,
     filtroDefensoria,
     estadosPermitidos,
+    zona,
     limite,
     offset,
   } = filtros
 
-  let query = supabase
-    .from("reportes")
-    .select(buildReportesSelect(imageSelectMode))
+  // Con zona, la función de PostGIS filtra por área con el índice espacial y devuelve filas de
+  // `reportes`: el mismo select y los mismos filtros se encadenan encima.
+  const seleccion = buildReportesSelect(imageSelectMode)
+  const desdeTabla = () => supabase.from("reportes").select(seleccion)
+  // Para PostgREST las dos ramas son la misma consulta; el tipo de la RPC solo deja de exponer
+  // los filtros después de `select`, aunque en ejecución los acepta igual.
+  const origen = zona
+    ? (supabase
+        .rpc("reportes_en_zona", { oeste: zona.oeste, sur: zona.sur, este: zona.este, norte: zona.norte }, { get: true })
+        .select(seleccion) as unknown as ReturnType<typeof desdeTabla>)
+    : desdeTabla()
+  let query = origen
     .is("deleted_at", null)
 
   if (search && search.trim() !== "") {
@@ -346,8 +371,11 @@ async function fetchReportes(
  *   - `limite`: número máximo de resultados (por defecto 12)
  * @returns Objeto con `data` — lista de reportes (`ReporteDB[]`) o `null`, y `error` — el error devuelto por Supabase o `null`.
  */
-export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthors = true } = {}) {
-  const supabase = await createClient()
+export async function getReportes(
+  filtros: FiltrosReportes = {},
+  { includeAuthors = true, publico = false }: OpcionesLecturaReportes = {},
+) {
+  const supabase: SupabaseClient = publico ? createPublicClient() : await createClient()
   const {
     search,
     categoria,
@@ -357,6 +385,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     soloPendientes = false,
     filtroDefensoria,
     estadosPermitidos,
+    zona,
     limite = 12,
     offset = 0
   } = filtros
@@ -370,6 +399,7 @@ export async function getReportes(filtros: FiltrosReportes = {}, { includeAuthor
     soloPendientes,
     filtroDefensoria,
     estadosPermitidos,
+    zona,
     limite,
     offset,
   }
@@ -531,11 +561,18 @@ export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefen
   }
 }
 
-export async function getReportMapData(filtros: FiltrosReportes = {}) {
-  const { data, error, estadosOperativos } = await getReportes({
+/**
+ * Reportes con coordenadas listos para el mapa, con su estado operativo.
+ *
+ * @param filtros - Filtros del listado; con `zona`, solo los de ese rectángulo.
+ * @param opciones - `publico: true` lee sin sesión para poder cachear la respuesta.
+ * @returns `data` con los marcadores, `error` y `hasMore` (había más que `limite`).
+ */
+export async function getReportMapData(filtros: FiltrosReportes = {}, opciones: OpcionesLecturaReportes = {}) {
+  const { data, error, estadosOperativos, hasMore } = await getReportes({
     ...filtros,
     soloConCoordenadas: true,
-  })
+  }, opciones)
 
   const mapItems = data
     .map(mapReportToMapItem)
@@ -547,6 +584,74 @@ export async function getReportMapData(filtros: FiltrosReportes = {}) {
   // se consulta en la ficha (autor o Defensoría) y en el panel autorizado de la Defensoría.
   return {
     data: conEstadoOperativo,
+    error,
+    hasMore,
+  }
+}
+
+/** Grupo de reportes de una celda del mapa: centro real, cantidad y límites. */
+export type GrupoMapa = {
+  lat: number
+  lon: number
+  cantidad: number
+  limites: ZonaMapa
+}
+
+type FilaGrupoMapa = {
+  lat: number
+  lon: number
+  cantidad: number
+  oeste: number
+  sur: number
+  este: number
+  norte: number
+}
+
+/**
+ * Cuenta los reportes de la zona por celda de grilla, con los mismos filtros que los puntos
+ * del mapa (estados, categoría, prioridad y búsqueda), así un grupo nunca cuenta reportes
+ * que el filtro excluiría. Lee sin sesión: el resultado es público y cacheable.
+ *
+ * @param parametros.zona - Rectángulo ya ajustado al mapa.
+ * @param parametros.celda - Lado de la celda en grados.
+ * @param parametros.estados - IDs de estado permitidos.
+ * @returns `data` con los grupos y `error`.
+ */
+export async function getGruposEnZona({
+  zona,
+  celda,
+  estados,
+  search,
+  categoria,
+  prioridad,
+}: Pick<FiltrosReportes, "search" | "categoria" | "prioridad"> & {
+  zona: ZonaMapa
+  celda: number
+  estados: readonly number[]
+}): Promise<{ data: GrupoMapa[]; error: PostgrestError | null }> {
+  const supabase = createPublicClient()
+  const busqueda = search && search.trim() !== "" ? search : null
+  const { data, error } = await supabase
+    .rpc("reportes_agrupados_en_zona", {
+      oeste: zona.oeste,
+      sur: zona.sur,
+      este: zona.este,
+      norte: zona.norte,
+      celda,
+      estados: [...estados],
+      categoria: resolveLookupFilterId(CATEGORY_FILTER_IDS, categoria),
+      prioridad: resolveLookupFilterId(PRIORITY_FILTER_IDS, prioridad),
+      busqueda,
+    })
+  const filas = (data ?? []) as FilaGrupoMapa[]
+
+  return {
+    data: filas.map((fila) => ({
+      lat: fila.lat,
+      lon: fila.lon,
+      cantidad: fila.cantidad,
+      limites: { oeste: fila.oeste, sur: fila.sur, este: fila.este, norte: fila.norte },
+    })),
     error,
   }
 }

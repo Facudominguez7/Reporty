@@ -26,6 +26,8 @@ import {
 } from "@/lib/map/initial-view"
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
+import type { ZonaMapa } from "@/lib/map/zona"
+import type { GrupoMapa } from "@/database/queries/reportes/get-reportes"
 
 interface Report {
   id: number
@@ -50,6 +52,13 @@ export interface LeafletMapProps {
   mascotas?: MascotaMapa[]
   /** Reporte al que el mapa se acerca y abre su popup en la primera vista. */
   focoReporte?: FocoReporte | null
+  /** Grupos de reportes que manda el servidor en zonas densas (#281). */
+  grupos?: GrupoMapa[]
+  /**
+   * Carga por zona (#281): se llama con la zona visible y el zoom cada vez que el mapa termina
+   * de moverse. Con esta prop el mapa no se vuelve a encuadrar cuando cambian los reportes.
+   */
+  onCambioZona?: (zona: ZonaMapa, zoom: number) => void
 }
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
@@ -78,6 +87,27 @@ const reajustarPopupAlCargarImagenes = (evento: { popup: { update: () => void; g
     if (!imagen.complete) imagen.addEventListener("load", () => evento.popup.update(), { once: true })
   }
 }
+
+/**
+ * Ícono de un grupo del servidor: un círculo con la cantidad, más grande cuantos más reportes
+ * tiene. Usa los mismos colores que los grupos que arma Leaflet en el navegador.
+ */
+const crearIconoGrupoZona = (cantidad: number) => {
+  const lado = cantidad > 1000 ? 60 : cantidad > 100 ? 52 : 44
+  const color = cantidad > 100 ? "var(--map-heat-high)" : cantidad > 25 ? "var(--map-heat-medium)" : "var(--map-heat-low)"
+  return L.divIcon({
+    className: "zona-grupo-icon",
+    html: `<div style="background-color:${color};width:${lado}px;height:${lado}px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--map-marker-foreground);font-weight:bold;font-size:14px;border:3px solid var(--map-marker-stroke);box-shadow:var(--elevation-soft);">${cantidad.toLocaleString("es-AR")}</div>`,
+    iconSize: [lado, lado],
+    iconAnchor: [lado / 2, lado / 2],
+  })
+}
+
+/** Lista vacía estable: un `[]` nuevo en cada render redibujaría los grupos sin motivo. */
+const SIN_GRUPOS: GrupoMapa[] = []
+
+/** Firma de un reporte: si cambia cualquier dato que se dibuja, el marcador se rehace. */
+const firmaReporte = (report: Report) => JSON.stringify(report)
 
 const createClusterIconHTML = (count: number): string => {
   const size = count > 10 ? 50 : count > 5 ? 40 : 30
@@ -346,16 +376,49 @@ function enfocarReporte(
 }
 
 /**
+ * Recuerda el marcador en foco hasta que su popup se abra, para reintentarlo si llega otra
+ * zona antes. Si el usuario arrastra el mapa, se olvida: no hay que llevarlo de vuelta a un
+ * lugar del que se fue.
+ *
+ * @param map - Mapa de Leaflet.
+ * @param marcador - Marcador del reporte en foco, si está en la zona.
+ * @param pendienteRef - Ref donde queda el marcador mientras su popup no se abrió.
+ */
+function seguirFoco(map: L.Map, marcador: L.Marker | null, pendienteRef: { current: L.Marker | null }) {
+  if (!marcador) return
+  pendienteRef.current = marcador
+  const olvidar = () => {
+    if (pendienteRef.current === marcador) pendienteRef.current = null
+  }
+  marcador.once("popupopen", olvidar)
+  map.once("dragstart", olvidar)
+}
+
+/**
  * Mapa principal de Leaflet con reportes y mascotas agrupados en clusters.
  *
  * @param focoReporte - Reporte al que la primera vista se acerca y abre su popup.
  */
-export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null }: LeafletMapProps) {
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null)
   const hasInitialViewRef = useRef(false)
+  // Marcadores dibujados por ID de reporte, con la firma de los datos con que se dibujaron.
+  const marcadoresReporteRef = useRef(new Map<number, { marcador: L.Marker; firma: string }>())
+  // Lista de mascotas ya dibujada y sus marcadores: solo se rehacen si cambia la lista.
+  const mascotasDibujadasRef = useRef<{ lista: MascotaMapa[] | null; marcadores: L.Marker[] }>({ lista: null, marcadores: [] })
+  // Callback de selección con el que se dibujaron los marcadores; si cambia, se rehacen todos.
+  const seleccionDibujadaRef = useRef<LeafletMapProps["onSeleccionarReporte"] | null>(null)
+  const capaGruposRef = useRef<L.LayerGroup | null>(null)
+  // El mapa se crea una sola vez: el evento lee siempre el callback más reciente desde esta ref.
+  const onCambioZonaRef = useRef(onCambioZona)
+  // Marcador del reporte en foco cuyo popup todavía no se abrió (ver `seguirFoco`).
+  const focoPendienteRef = useRef<L.Marker | null>(null)
+  useEffect(() => {
+    onCambioZonaRef.current = onCambioZona
+  })
 
   const iconsByPriority = useMemo(() => {
     // Aro violeta alrededor de todo el punto (S8): la gente ve en el mapa que la Defensoría
@@ -483,8 +546,21 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       },
     })
 
+    // Los grupos del servidor van en su propia capa: no se mezclan con los grupos de Leaflet.
+    const capaGrupos = L.layerGroup()
+    const marcadoresReporte = marcadoresReporteRef.current
+
     tileLayer.addTo(map)
     clusterGroup.addTo(map)
+    capaGrupos.addTo(map)
+
+    // Carga por zona: avisa la zona visible cada vez que el mapa termina de moverse.
+    map.on("moveend", () => {
+      const avisar = onCambioZonaRef.current
+      if (!avisar) return
+      const limites = map.getBounds()
+      avisar({ oeste: limites.getWest(), sur: limites.getSouth(), este: limites.getEast(), norte: limites.getNorth() }, map.getZoom())
+    })
 
     // La vista inicial ya toca el límite norte: con los límites activos Leaflet no puede
     // desplazar el mapa para mostrar un popup alto. Se liberan mientras hay uno abierto y,
@@ -509,12 +585,21 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     mapRef.current = map
     tileLayerRef.current = tileLayer
     clusterGroupRef.current = clusterGroup
+    capaGruposRef.current = capaGrupos
 
     return () => {
       container.removeEventListener("error", handlePetImageError, true)
+      // Cancela lo pendiente del grupo (por ejemplo, el acercamiento al reporte en foco): si
+      // termina después de vaciarlo, markercluster busca un marcador sin grupo y la página falla.
+      clusterGroupRef.current?.off()
       clusterGroupRef.current?.clearLayers()
       clusterGroupRef.current = null
       tileLayerRef.current = null
+      capaGruposRef.current = null
+      marcadoresReporte.clear()
+      mascotasDibujadasRef.current = { lista: null, marcadores: [] }
+      seleccionDibujadaRef.current = null
+      focoPendienteRef.current = null
 
       map.remove()
       mapRef.current = null
@@ -543,33 +628,66 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       hasInitialViewRef.current = true
     }
 
-    clusterGroup.clearLayers()
+    const marcadores = marcadoresReporteRef.current
+    // Si cambió el callback de selección, los clics viejos quedarían colgados: se rehace todo.
+    if (seleccionDibujadaRef.current !== onSeleccionarReporte) {
+      for (const { marcador } of marcadores.values()) clusterGroup.removeLayer(marcador)
+      marcadores.clear()
+      seleccionDibujadaRef.current = onSeleccionarReporte
+    }
+
+    // Diferencia por ID: los reportes que siguen igual conservan su marcador (y su popup abierto).
+    // Los marcadores que salen y los que entran se pasan al grupo en lote: de a uno, el grupo se
+    // recalcula cada vez y con cientos de reportes el mapa se traba.
+    const vigentes = new Set(reports.map((report) => report.id))
+    const quitar: L.Marker[] = []
+    const sumar: L.Marker[] = []
+    for (const [id, { marcador }] of marcadores) {
+      if (vigentes.has(id)) continue
+      quitar.push(marcador)
+      marcadores.delete(id)
+    }
 
     const visibleItems = reports.length ? reports : mascotas
     let marcadorEnFoco: L.Marker | null = null
     for (const report of reports) {
+      const firma = firmaReporte(report)
+      const dibujado = marcadores.get(report.id)
+      if (dibujado?.firma === firma) {
+        if (focoReporte?.reporteId === report.id) marcadorEnFoco = dibujado.marcador
+        continue
+      }
+      if (dibujado) quitar.push(dibujado.marcador)
+
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
         icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo), senalEstadoMapa(report.estadoId)),
       })
 
-      const popupContent = createPopupContent(
-        report,
-        getStatusColor(report.status),
-        getPriorityColor(report.priority),
-        getCategoryColor()
+      // El popup se arma recién al abrirlo: armar cientos que nadie abre trababa cada carga.
+      marker.bindPopup(
+        () => createPopupContent(report, getStatusColor(report.status), getPriorityColor(report.priority), getCategoryColor()),
+        OPCIONES_POPUP,
       )
-
-      marker.bindPopup(popupContent, OPCIONES_POPUP)
       if (onSeleccionarReporte) {
         marker.on("click", () => onSeleccionarReporte(report.id))
       }
-      clusterGroup.addLayer(marker)
+      sumar.push(marker)
+      marcadores.set(report.id, { marcador: marker, firma })
       if (focoReporte?.reporteId === report.id) {
         marcadorEnFoco = marker
       }
     }
 
-    for (const pet of mascotas) {
+    if (quitar.length) clusterGroup.removeLayers(quitar)
+    if (sumar.length) clusterGroup.addLayers(sumar)
+
+    const mascotasDibujadas = mascotasDibujadasRef.current
+    const mascotasCambiaron = mascotasDibujadas.lista !== mascotas
+    if (mascotasCambiaron) {
+      for (const marcador of mascotasDibujadas.marcadores) clusterGroup.removeLayer(marcador)
+      mascotasDibujadasRef.current = { lista: mascotas, marcadores: [] }
+    }
+    for (const pet of mascotasCambiaron ? mascotas : []) {
       if (!Number.isSafeInteger(pet.id) || pet.id <= 0) continue
       const imageUrl = toSafeImageUrl(pet.image)
       const statusLabel = getPetStatusAdjective(pet.status)
@@ -596,12 +714,28 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
         </a>`
       marker.bindPopup(popup, OPCIONES_POPUP)
       clusterGroup.addLayer(marker)
+      mascotasDibujadasRef.current.marcadores.push(marker)
     }
 
     if (isInitialView) {
       if (focoReporte) {
         enfocarReporte(map, clusterGroup, focoReporte, marcadorEnFoco)
+        seguirFoco(map, marcadorEnFoco, focoPendienteRef)
       }
+      return
+    }
+
+    // Acercarse al foco mueve el mapa y trae otra zona; al reacomodarse los marcadores la
+    // animación de markercluster se pierde y el popup no se abre. Se reintenta hasta abrirlo.
+    const pendiente = focoPendienteRef.current
+    if (pendiente && clusterGroup.hasLayer(pendiente)) {
+      clusterGroup.zoomToShowLayer(pendiente, () => pendiente.openPopup())
+    }
+
+    // Con carga por zona los reportes cambian porque el mapa se movió: no se re-encuadra.
+    // Solo se encuadra, como antes, al pasar a la capa de mascotas.
+    const pasoAMascotas = reports.length === 0 && mascotas.length > 0 && mascotasCambiaron
+    if (onCambioZona && !pasoAMascotas) {
       return
     }
 
@@ -624,7 +758,30 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
 
     map.fitBounds(bounds.pad(INITIAL_MAP_VIEW_CONFIG.padding))
-  }, [getIcon, onSeleccionarReporte, reports, mascotas, focoReporte])
+  }, [getIcon, onSeleccionarReporte, reports, mascotas, focoReporte, onCambioZona])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const capaGrupos = capaGruposRef.current
+    if (!map || !capaGrupos) return
+
+    capaGrupos.clearLayers()
+    for (const grupo of grupos) {
+      const etiqueta = `${grupo.cantidad} reportes en esta zona`
+      const marcador = L.marker([grupo.lat, grupo.lon], {
+        icon: crearIconoGrupoZona(grupo.cantidad),
+        title: etiqueta,
+        alt: etiqueta,
+        keyboard: true,
+      })
+      // Al tocarlo, el mapa se acerca justo a los reportes del grupo; la nueva zona se pide sola.
+      marcador.on("click", () => {
+        const { oeste, sur, este, norte } = grupo.limites
+        map.fitBounds([[sur, oeste], [norte, este]], { padding: [24, 24] })
+      })
+      capaGrupos.addLayer(marcador)
+    }
+  }, [grupos])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }
