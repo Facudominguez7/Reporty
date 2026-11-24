@@ -1,0 +1,665 @@
+<title>Mapa por zona con PostGIS · Reporty</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: columna de lectura de 1080px; capas apiladas, diagramas a ancho completo, tablas con scroll propio. */
+  :root {
+    --bg: #f5f7f6;
+    --panel: #ffffff;
+    --panel-2: #eef2f0;
+    --line: #d3ddd8;
+    --fg: #14201b;
+    --muted: #55655e;
+    --accent: #11815c;      /* verde Reporty: lo nuevo, lo elegido */
+    --accent-soft: #dff2ea;
+    --violet: #6d4bd1;
+    --warn: #9a5b00;
+    --warn-soft: #fbf0dc;
+    --danger: #b3261e;
+    --danger-soft: #fbe4e2;
+    --code-bg: #e9efec;
+    --catastro: #c46a1d;    /* naranja de las manzanas del WMS */
+    --font-body: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1512; --panel: #141f1b; --panel-2: #1a2823; --line: #2c3d36; --fg: #e6efeb; --muted: #9db0a8;
+      --accent: #4fd3a0; --accent-soft: #163a2d; --violet: #a891f5; --warn: #f0b75a; --warn-soft: #33270f;
+      --danger: #ff8a80; --danger-soft: #3a1a18; --code-bg: #1b2924; --catastro: #f0a660; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1512; --panel: #141f1b; --panel-2: #1a2823; --line: #2c3d36; --fg: #e6efeb; --muted: #9db0a8;
+    --accent: #4fd3a0; --accent-soft: #163a2d; --violet: #a891f5; --warn: #f0b75a; --warn-soft: #33270f;
+    --danger: #ff8a80; --danger-soft: #3a1a18; --code-bg: #1b2924; --catastro: #f0a660; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--font-body); }
+  main {
+    max-width: 1080px; margin: 0 auto;
+    padding-block: 48px 80px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { line-height: 1.2; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2rem, 4.6vw, 3.2rem); letter-spacing: -0.035em; font-weight: 700; }
+  h2 { font-size: 1.55rem; letter-spacing: -0.02em; font-weight: 650; }
+  h3 { font-size: 1.05rem; font-weight: 600; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  pre { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; overflow-x: auto; font: 13px/1.55 var(--font-mono); }
+  pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  section { margin-top: 64px; display: flex; flex-direction: column; gap: 18px; }
+  .eyebrow { color: var(--accent); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.74rem; }
+  .lead { font-size: 1.1rem; color: var(--muted); max-width: 68ch; }
+  .prose { max-width: 72ch; color: var(--muted); }
+  .prose strong { color: var(--fg); }
+  .nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  .nav a { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; text-decoration: none; font-size: 0.82rem; color: var(--fg); background: var(--panel); }
+  .nav a:hover, .nav a:focus-visible { border-color: var(--accent); outline: none; }
+
+  .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .fact { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .fact b { font-size: 1.5rem; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .fact span { color: var(--muted); font-size: 0.86rem; line-height: 1.4; }
+
+  .note { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 14px 18px; border-radius: 4px 10px 10px 4px; font-size: 0.94rem; }
+  .note strong { color: var(--warn); }
+  .note.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+  .note.danger strong { color: var(--danger); }
+
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .svg-wrap { overflow-x: auto; }
+  figure svg { display: block; width: 100%; min-width: 640px; height: auto; color: var(--fg); }
+  figcaption { color: var(--muted); font-size: 0.9rem; max-width: 80ch; }
+  .d-box { fill: var(--panel-2); stroke: var(--line); stroke-width: 1.5; }
+  .d-new { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  .d-ext { fill: var(--panel); stroke: var(--catastro); stroke-width: 1.5; }
+  .d-bad { fill: none; stroke: var(--danger); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .d-zone { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 5; }
+  .d-wall { stroke: var(--danger); stroke-width: 2; stroke-dasharray: 7 5; }
+  .d-line { stroke: currentColor; stroke-width: 1.5; fill: none; }
+  .d-line-new { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  .d-line-ext { stroke: var(--catastro); stroke-width: 1.8; fill: none; }
+  .d-grid { stroke: var(--line); stroke-width: 1; }
+  .d-t { fill: currentColor; font: 500 12.5px var(--font-body); }
+  .d-ts { fill: var(--muted); font: 400 11.5px var(--font-body); }
+  .d-tm { fill: var(--muted); font: 400 11px var(--font-mono); }
+  .d-tb { fill: currentColor; font: 650 13px var(--font-body); }
+  .d-ta { fill: var(--accent); font: 600 11.5px var(--font-body); }
+  .d-tc { fill: var(--catastro); font: 600 11.5px var(--font-body); }
+  .d-tr { fill: var(--danger); font: 600 11.5px var(--font-body); }
+  .d-dot { fill: var(--accent); }
+  .d-dot-old { fill: var(--danger); }
+  .d-blob { fill: var(--accent); fill-opacity: 0.22; stroke: var(--accent); stroke-width: 1.5; }
+
+  .layers { display: flex; flex-direction: column; gap: 10px; }
+  .layer { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .layer > div { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .layer-name { font-size: 0.76rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+  .layer-name small { display: block; color: var(--muted); letter-spacing: 0; text-transform: none; font-weight: 400; font-size: 0.82rem; margin-top: 2px; }
+  .layer p { color: var(--muted); font-size: 0.93rem; }
+  .files { display: flex; flex-wrap: wrap; gap: 6px; }
+  .files code { font-size: 0.78rem; }
+  .files code.new { background: var(--accent-soft); color: var(--accent); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; min-width: 680px; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .card p, .card li { color: var(--muted); font-size: 0.93rem; }
+  ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  li::marker { color: var(--accent); }
+  .pill { display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; padding: 2px 9px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+  .pill.risk { color: var(--warn); }
+  .pill.ok { color: var(--accent); }
+  .pill.no { color: var(--danger); }
+
+  .phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .phase { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .phase .tag { font: 500 0.78rem var(--font-mono); color: var(--accent); }
+  .phase .tag.ext { color: var(--catastro); }
+  .phase p { color: var(--muted); font-size: 0.9rem; }
+  .phase .pill { align-self: flex-start; }
+
+  footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; }
+
+  @media (max-width: 820px) {
+    .facts, .phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two { grid-template-columns: 1fr; }
+    .layer { grid-template-columns: 1fr; gap: 8px; }
+  }
+  @media (max-width: 440px) {
+    .facts, .phases { grid-template-columns: 1fr; }
+    main { padding-block: 32px 56px; }
+  }
+</style>
+
+<main>
+  <header class="stack">
+    <div class="eyebrow">Reporty · #281 + Catastro · propuesta de arquitectura</div>
+    <h1>Mapa por zona con PostGIS</h1>
+    <p class="lead">PostGIS pasa a resolver todo lo geográfico de Reporty: el mapa carga por zona y agrupa en el servidor, «Cerca mío» mide distancias en la base, y los duplicados, los municipios y las zonas calientes dejan de calcularse a mano. Encima del mapa se suma una capa catastral opcional del WMS oficial de Misiones, y los barrios de la IDE de Posadas quedan en PostGIS para asociar cada reporte a su barrio.</p>
+    <nav class="nav" aria-label="Secciones">
+      <a href="#hoy">Situación actual</a><a href="#postgis">PostGIS en todo</a><a href="#cambio">Mapa por zona</a><a href="#agrupamiento">Agrupamiento</a><a href="#cerca">Cerca mío</a><a href="#catastro">Capa catastral</a><a href="#territorio">Barrios</a><a href="#sql">SQL</a><a href="#contrato">Endpoints</a><a href="#seguridad">Seguridad</a><a href="#fases">Fases</a><a href="#abierto">A verificar</a>
+    </nav>
+  </header>
+
+  <section id="hoy">
+    <h2>Situación actual</h2>
+    <div class="facts">
+      <div class="fact"><b>100</b><span>reportes como máximo por carga del mapa, los más nuevos de toda la ciudad</span></div>
+      <div class="fact"><b>83</b><span>reportes visibles en prod al 24/11/2026: 80 pendientes y 3 reparados</span></div>
+      <div class="fact"><b>4</b><span>lugares que hoy calculan geografía a mano en TypeScript o leyendo toda la tabla</span></div>
+      <div class="fact"><b>17.6</b><span>versión de Postgres en prod; PostGIS 3.3.7 disponible, sin instalar</span></div>
+    </div>
+    <p class="prose">Reporty no usa Google Maps: el mapa es <strong>Leaflet con teselas de Carto</strong>, en EPSG:3857. Ninguna tabla tiene índice sobre <code>lat</code>/<code>lon</code>, y el mapa está acotado a Posadas con zoom mínimo 13, así que el peor caso del mapa es «toda la ciudad con zoom 13».</p>
+  </section>
+
+  <section id="postgis">
+    <h2>PostGIS en todo lo geográfico</h2>
+    <p class="prose"><strong>Decisión: opción A.</strong> <code>lat</code>/<code>lon</code> siguen siendo las columnas que se escriben y <code>ubicacion</code> se calcula sola a partir de ellas. Ninguna escritura cambia, la migración es aditiva y toda la capacidad de PostGIS queda disponible en las consultas.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Uso</th><th>Hoy</th><th>Con PostGIS</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Mapa</strong></td><td>Los 100 más nuevos de la ciudad, sin filtro geográfico.</td><td><code>reportes_en_zona</code> con índice GiST, y <code>reportes_agrupados_en_zona</code> con <code>ST_SnapToGrid</code> cuando hay más de 300 en pantalla.</td></tr>
+          <tr><td><strong>Cerca mío</strong></td><td>No existe.</td><td><code>cerca_de</code> con <code>ST_DWithin</code> y <code>ST_Distance</code> en metros, para reportes y mascotas a la vez.</td></tr>
+          <tr><td><strong>Duplicados al crear</strong></td><td><code>buscar-cercanos.ts</code> arma un rectángulo, trae 50 filas y mide con semiverseno en TS.</td><td><code>reportes_duplicados_cerca</code>: <code>ST_DWithin</code> de 100 m, ordenado por <code>ST_Distance</code>. <code>clasificarDuplicado</code> conserva sus reglas.</td></tr>
+          <tr><td><strong>Municipio del reporte</strong></td><td><code>report-coverage.ts</code> recorre los polígonos del GeoJSON del repo en TS.</td><td>Tabla <code>territorio.municipios</code> cargada desde ese mismo GeoJSON, con <code>ST_Covers</code>. La regla de borde (punto sobre el límite = sin municipio) se replica y se prueba.</td></tr>
+          <tr><td><strong>Zonas con más reportes</strong> (panel Interesado)</td><td>Trae <strong>todos</strong> los reportes y redondea en JS a unos 100 m.</td><td><code>zonas_con_mas_reportes</code> agrupa en SQL y devuelve solo las N zonas.</td></tr>
+          <tr><td><strong>Mascotas</strong></td><td>El mapa carga todas; <code>mascotas_perdidas</code> tiene <code>lat</code>/<code>lon</code> sin índice.</td><td>La misma columna generada con índice; entran en «Cerca mío». La capa del mapa sigue cargando completa hasta que lo justifique el volumen.</td></tr>
+          <tr><td><strong>Barrio del reporte</strong></td><td>No existe.</td><td><code>territorio.barrios</code> (IDE Posadas, ODbL) con <code>ST_Covers</code>: base de #282 Mi barrio. Ver <a href="#territorio">Barrios</a>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="cambio">
+    <h2>Mapa por zona: qué cambia en el camino de los datos</h2>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 900 380" role="img" aria-label="Hoy el servidor pide los 100 reportes más nuevos de toda la ciudad. Con PostGIS el navegador pide la zona visible a un endpoint, que usa un índice espacial y devuelve puntos o grupos según la cantidad.">
+          <defs>
+            <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+            <marker id="fl-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+          </defs>
+          <text class="d-tb" x="20" y="28">Hoy</text>
+          <rect class="d-box" x="20" y="44" width="190" height="58" rx="10"/>
+          <text class="d-t" x="115" y="69" text-anchor="middle">/mapa (servidor)</text>
+          <text class="d-ts" x="115" y="87" text-anchor="middle">una sola carga al abrir</text>
+          <line class="d-line" x1="210" y1="73" x2="340" y2="73" marker-end="url(#fl)"/>
+          <text class="d-ts" x="275" y="64" text-anchor="middle">limite: 100</text>
+          <rect class="d-box" x="340" y="44" width="210" height="58" rx="10"/>
+          <text class="d-t" x="445" y="69" text-anchor="middle">getReportes</text>
+          <text class="d-tm" x="445" y="87" text-anchor="middle">order created_at desc</text>
+          <line class="d-line" x1="550" y1="73" x2="680" y2="73" marker-end="url(#fl)"/>
+          <text class="d-ts" x="615" y="64" text-anchor="middle">lee toda la tabla</text>
+          <rect class="d-box" x="680" y="44" width="200" height="58" rx="10"/>
+          <text class="d-t" x="780" y="69" text-anchor="middle">reportes</text>
+          <text class="d-ts" x="780" y="87" text-anchor="middle">sin índice de ubicación</text>
+          <rect class="d-bad" x="340" y="116" width="540" height="30" rx="8"/>
+          <text class="d-tr" x="610" y="136" text-anchor="middle">el reporte 101.º no llega, aunque esté a la vista y siga pendiente</text>
+          <line x1="20" y1="172" x2="880" y2="172" class="d-grid"/>
+          <text class="d-tb" x="20" y="204">Con PostGIS</text>
+          <rect class="d-new" x="20" y="220" width="190" height="72" rx="10"/>
+          <text class="d-t" x="115" y="246" text-anchor="middle">Mapa en el navegador</text>
+          <text class="d-ts" x="115" y="264" text-anchor="middle">al mover o hacer zoom</text>
+          <text class="d-ts" x="115" y="280" text-anchor="middle">espera 250 ms y cancela</text>
+          <line class="d-line-new" x1="210" y1="256" x2="340" y2="256" marker-end="url(#fl-v)"/>
+          <text class="d-ta" x="275" y="246" text-anchor="middle">GET zona + zoom</text>
+          <rect class="d-new" x="340" y="220" width="210" height="72" rx="10"/>
+          <text class="d-t" x="445" y="246" text-anchor="middle">/api/mapa/reportes</text>
+          <text class="d-ts" x="445" y="264" text-anchor="middle">valida, recorta a Posadas,</text>
+          <text class="d-ts" x="445" y="280" text-anchor="middle">fija estados 1 · 4 · 2</text>
+          <line class="d-line-new" x1="550" y1="240" x2="680" y2="240" marker-end="url(#fl-v)"/>
+          <text class="d-ta" x="615" y="231" text-anchor="middle">≤ 300 en la zona</text>
+          <rect class="d-new" x="680" y="206" width="200" height="58" rx="10"/>
+          <text class="d-t" x="780" y="231" text-anchor="middle">reportes_en_zona</text>
+          <text class="d-ts" x="780" y="249" text-anchor="middle">índice GiST · puntos</text>
+          <path class="d-line-new" d="M550 276 L615 276 L615 326 L680 326" marker-end="url(#fl-v)"/>
+          <text class="d-ta" x="608" y="300" text-anchor="end">más de 300</text>
+          <rect class="d-new" x="680" y="298" width="200" height="58" rx="10"/>
+          <text class="d-t" x="780" y="323" text-anchor="middle">reportes_agrupados_en_zona</text>
+          <text class="d-ts" x="780" y="341" text-anchor="middle">conteo por celda · grupos</text>
+        </svg>
+      </div>
+      <figcaption>Arriba, el flujo de hoy: una consulta sin filtro geográfico, cortada a los 100 más nuevos. Abajo, el navegador pide la zona visible; el endpoint devuelve puntos mientras entren hasta 300, y grupos por celda cuando hay más.</figcaption>
+    </figure>
+    <div class="layers">
+      <div class="layer">
+        <div class="layer-name">Base de datos<small>migración aditiva</small></div>
+        <div>
+          <p>PostGIS en el esquema <code>extensions</code>. Columna generada <code>ubicacion geography(Point, 4326)</code> en <code>reportes</code> y <code>mascotas_perdidas</code>, con índice GiST parcial para las filas vivas. Esquema nuevo <code>territorio</code> para municipios y barrios.</p>
+          <div class="files"><code class="new">supabase/migrations/…_postgis_base.sql</code><code class="new">supabase/migrations/…_territorio.sql</code><code class="new">supabase/tests/postgis_*.sql</code></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Funciones SQL<small>security invoker</small></div>
+        <div>
+          <p><code>reportes_en_zona</code> devuelve <code>setof public.reportes</code> y solo filtra por área, así que PostgREST deja encadenar el <code>select</code> y los filtros de hoy. Las demás (<code>reportes_agrupados_en_zona</code>, <code>cerca_de</code>, <code>reportes_duplicados_cerca</code>, <code>zonas_con_mas_reportes</code>, <code>municipio_de</code>, <code>barrio_de</code>) devuelven solo las columnas que su pantalla necesita.</p>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Consultas<small>database/queries</small></div>
+        <div>
+          <p><code>getReportesEnZona</code> reutiliza <code>buildReportesSelect</code>, el respaldo de formatos de imagen, <code>mapReportToMapItem</code> y <code>adjuntarEstadoOperativo</code>. La traducción de filtros a IDs (<code>resolveLookupFilterId</code>) se comparte entre puntos y grupos, así un grupo nunca cuenta reportes que el filtro excluiría.</p>
+          <div class="files"><code class="new">database/queries/reportes/en-zona.ts</code><code class="new">database/queries/territorio/</code><code>database/queries/reportes/nuevo/buscar-cercanos.ts</code><code>database/queries/interesado/estadisticas-interesado.ts</code></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Endpoints<small>route handlers</small></div>
+        <div>
+          <p><code>GET /api/mapa/reportes</code>: público y cacheable. Recorta la zona a <code>POSADAS_BOUNDS</code>, redondea los bordes a la grilla de teselas y fija los estados 1 · 4 · 2. <code>POST /api/mapa/cerca</code>: la coordenada va en el cuerpo (no en la URL, que queda en logs), con <code>Cache-Control: no-store</code>.</p>
+          <div class="files"><code class="new">app/api/mapa/reportes/route.ts</code><code class="new">app/api/mapa/cerca/route.ts</code><code class="new">lib/map/zona.ts</code></div>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="layer-name">Mapa<small>cliente</small></div>
+        <div>
+          <p><code>useReportesEnZona</code> escucha <code>moveend</code>, espera 250 ms, cancela con <code>AbortController</code> y recuerda las zonas pedidas. <code>LeafletMap</code> suma y quita marcadores por ID sin redibujar. Los grupos del servidor usan el ícono de agrupamiento actual y, al tocarlos, el mapa se acerca a sus límites.</p>
+          <div class="files"><code class="new">components/map/use-reportes-en-zona.ts</code><code>components/leaflet-map.tsx</code><code>app/mapa/mapa-client.tsx</code><code>app/mapa/page.tsx</code></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="agrupamiento">
+    <h2>Puntos o grupos: lo decide la cantidad, no el zoom</h2>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 900 330" role="img" aria-label="Con pocos reportes en pantalla se dibuja cada punto. Con más de 300, el servidor divide la zona en celdas y devuelve un círculo con la cantidad por celda.">
+          <text class="d-tb" x="20" y="26">Zoom 16 · 42 reportes en la zona</text>
+          <text class="d-ts" x="20" y="44">El endpoint devuelve puntos; el navegador agrupa los que se superponen.</text>
+          <rect class="d-box" x="20" y="58" width="400" height="250" rx="10"/>
+          <circle class="d-dot" cx="70" cy="100" r="6"/><circle class="d-dot" cx="118" cy="132" r="6"/><circle class="d-dot" cx="96" cy="190" r="6"/>
+          <circle class="d-dot" cx="160" cy="88" r="6"/><circle class="d-dot" cx="210" cy="150" r="6"/><circle class="d-dot" cx="246" cy="112" r="6"/>
+          <circle class="d-dot" cx="182" cy="236" r="6"/><circle class="d-dot" cx="276" cy="210" r="6"/><circle class="d-dot" cx="320" cy="96" r="6"/>
+          <circle class="d-dot" cx="352" cy="168" r="6"/><circle class="d-dot" cx="384" cy="250" r="6"/><circle class="d-dot" cx="300" cy="276" r="6"/>
+          <circle class="d-dot" cx="132" cy="276" r="6"/><circle class="d-dot" cx="58" cy="252" r="6"/>
+          <circle class="d-dot-old" cx="236" cy="268" r="7"/>
+          <text class="d-tr" x="248" y="292">pendiente de mayo: visible</text>
+          <text class="d-tb" x="480" y="26">Zoom 13 · 1.240 reportes en la zona (ejemplo)</text>
+          <text class="d-ts" x="480" y="44">El endpoint devuelve grupos: cantidad por celda de la grilla.</text>
+          <rect class="d-box" x="480" y="58" width="400" height="250" rx="10"/>
+          <g class="d-grid">
+            <line x1="580" y1="58" x2="580" y2="308"/><line x1="680" y1="58" x2="680" y2="308"/><line x1="780" y1="58" x2="780" y2="308"/>
+            <line x1="480" y1="141" x2="880" y2="141"/><line x1="480" y1="224" x2="880" y2="224"/>
+          </g>
+          <circle class="d-blob" cx="536" cy="104" r="16"/><text class="d-t" x="536" y="108" text-anchor="middle">38</text>
+          <circle class="d-blob" cx="640" cy="92" r="22"/><text class="d-t" x="640" y="96" text-anchor="middle">164</text>
+          <circle class="d-blob" cx="724" cy="178" r="30"/><text class="d-t" x="724" y="182" text-anchor="middle">412</text>
+          <circle class="d-blob" cx="626" cy="186" r="24"/><text class="d-t" x="626" y="190" text-anchor="middle">231</text>
+          <circle class="d-blob" cx="828" cy="110" r="18"/><text class="d-t" x="828" y="114" text-anchor="middle">87</text>
+          <circle class="d-blob" cx="540" cy="262" r="20"/><text class="d-t" x="540" y="266" text-anchor="middle">126</text>
+          <circle class="d-blob" cx="740" cy="270" r="22"/><text class="d-t" x="740" y="274" text-anchor="middle">158</text>
+          <circle class="d-blob" cx="836" cy="252" r="12"/><text class="d-t" x="836" y="256" text-anchor="middle">24</text>
+        </svg>
+      </div>
+      <figcaption>Cada círculo se ubica en el centro real de sus reportes y lleva sus límites: al tocarlo, el mapa se acerca justo a esa área. Los números del panel derecho son de ejemplo; con los 83 reportes de hoy siempre se verían puntos.</figcaption>
+    </figure>
+    <div class="two">
+      <div class="card">
+        <h3>Regla de decisión</h3>
+        <ul>
+          <li>El endpoint pide 301 filas a <code>reportes_en_zona</code>.</li>
+          <li>Si llegan 300 o menos, responde <code>{"tipo":"puntos"}</code>: una sola consulta en el caso habitual.</li>
+          <li>Si llegan 301, responde <code>{"tipo":"grupos"}</code> con <code>reportes_agrupados_en_zona</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Tamaño de celda</h3>
+        <ul>
+          <li>La mitad del ancho de una tesela: <code>360 / 2^zoom / 2</code> grados.</li>
+          <li>En zoom 13 son celdas de unos 2,2 km de ancho sobre Posadas.</li>
+          <li>Al acercarse, las celdas se achican hasta que la zona entra en el umbral y vuelven los puntos.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="cerca">
+    <h2>Cerca mío</h2>
+    <p class="prose"><strong>Automático, sin botón.</strong> Al abrir <code>/mapa</code>, si la persona ya dio permiso de ubicación, el mapa se centra en ella, dibuja un círculo de 500 m y muestra los reportes y mascotas cercanos, ordenados por distancia en metros calculada por PostGIS. Si todavía no dio permiso, se le pide en ese momento. Reutiliza <code>buscarUbicacionPrecisa</code>, que hoy solo usa el formulario de nuevo reporte.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Estado del permiso al abrir el mapa</th><th>Qué pasa</th></tr></thead>
+        <tbody>
+          <tr><td><code>granted</code> (ya lo dio)</td><td>Sin preguntar nada: centra el mapa en la persona a zoom 16, dibuja su punto y el círculo, y muestra el panel «5 reportes cerca tuyo».</td></tr>
+          <tr><td><code>prompt</code> (nunca respondió)</td><td>Pide el permiso al abrir el mapa: diálogo del navegador en la web, diálogo nativo de Android en la app (delegación de ubicación ya activa en la TWA). Si acepta, sigue como <code>granted</code>. Si cierra el diálogo sin responder, no se vuelve a pedir en esa sesión.</td></tr>
+          <tr><td><code>denied</code> (lo negó)</td><td>El mapa abre como hoy. Un aviso chico y descartable explica cómo activar la ubicación en el navegador o en Android; se muestra una sola vez.</td></tr>
+          <tr><td>Sin Permissions API (navegadores viejos)</td><td>Llama directo a la geolocalización: el navegador decide si pregunta.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="two">
+      <div class="card">
+        <h3>Cuándo no se mueve el mapa</h3>
+        <ul>
+          <li>Si se llegó desde un reporte (<code>/mapa?reporte=…</code>): manda el foco del reporte. Solo se dibuja el punto de la persona.</li>
+          <li>Si la persona ya movió el mapa antes de que llegue la ubicación: se respeta su vista.</li>
+          <li>Si está fuera de Posadas: no se centra y el panel dice «Estás fuera de Posadas».</li>
+          <li>Se toma <strong>una lectura por visita</strong>, sin seguimiento continuo: no gasta batería ni registra recorridos.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>El costo de pedir al abrir</h3>
+        <p>Pedir el permiso sin contexto baja la tasa de aceptación, y si la persona lo niega, el navegador ya no deja volver a preguntar: tiene que activarlo a mano en la configuración. Chrome además silencia el diálogo en sitios donde la gente lo cierra seguido. Para acotarlo, el pedido ocurre solo en <code>/mapa</code> (nunca en el inicio ni en otras páginas) y como máximo una vez por sesión. #280 (métricas) debería medir la tasa de aceptación.</p>
+      </div>
+    </div>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 900 230" role="img" aria-label="El teléfono redondea la ubicación a unos 10 metros y la envía en el cuerpo de un POST. El servidor la usa para una consulta ST_DWithin y no la guarda.">
+          <defs>
+            <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+          </defs>
+          <rect class="d-new" x="20" y="60" width="220" height="80" rx="10"/>
+          <text class="d-t" x="130" y="88" text-anchor="middle">Teléfono</text>
+          <text class="d-ts" x="130" y="106" text-anchor="middle">buscarUbicacionPrecisa ±18 m</text>
+          <text class="d-ts" x="130" y="122" text-anchor="middle">redondea a 4 decimales (~10 m)</text>
+          <line class="d-line-new" x1="240" y1="100" x2="380" y2="100" marker-end="url(#fl2)"/>
+          <text class="d-ta" x="310" y="90" text-anchor="middle">POST cuerpo</text>
+          <text class="d-tm" x="310" y="118" text-anchor="middle">{lat, lon, radio}</text>
+          <rect class="d-new" x="380" y="60" width="210" height="80" rx="10"/>
+          <text class="d-t" x="485" y="88" text-anchor="middle">/api/mapa/cerca</text>
+          <text class="d-ts" x="485" y="106" text-anchor="middle">valida Posadas y radio</text>
+          <text class="d-ts" x="485" y="122" text-anchor="middle">no-store · sin logs de la coordenada</text>
+          <line class="d-line-new" x1="590" y1="100" x2="700" y2="100" marker-end="url(#fl2)"/>
+          <rect class="d-new" x="700" y="60" width="180" height="80" rx="10"/>
+          <text class="d-t" x="790" y="88" text-anchor="middle">cerca_de</text>
+          <text class="d-ts" x="790" y="106" text-anchor="middle">ST_DWithin + ST_Distance</text>
+          <text class="d-ts" x="790" y="122" text-anchor="middle">reportes y mascotas</text>
+          <path class="d-line-new" d="M790 140 L790 186 L130 186 L130 140" marker-end="url(#fl2)"/>
+          <text class="d-ta" x="460" y="178" text-anchor="middle">lista ordenada: tipo, id, metros</text>
+          <line class="d-wall" x1="400" y1="30" x2="880" y2="30"/>
+          <text class="d-tr" x="640" y="22" text-anchor="middle">nada de esto se guarda: ni base, ni cookie, ni caché</text>
+        </svg>
+      </div>
+      <figcaption>La coordenada sale del teléfono ya redondeada a unos 10 m y solo dentro del cuerpo del pedido. El servidor la usa para una única consulta y la descarta; la respuesta no se cachea.</figcaption>
+    </figure>
+    <div class="two">
+      <div class="card">
+        <h3>Comportamiento</h3>
+        <ul>
+          <li>Radio de 500 m; el panel permite pasar a 300 m o 1 km. El servidor acepta como máximo 2 km.</li>
+          <li>El panel arranca compacto («5 reportes cerca tuyo») para no tapar el mapa, y se expande al tocarlo.</li>
+          <li>Si la precisión supera 50 m (<code>esUbicacionAproximada</code>), la lista lo avisa: «Ubicación aproximada».</li>
+          <li>Sin resultados: «No hay reportes a menos de 500 m» y un botón para ampliar a 1 km.</li>
+          <li>Sin señal o sin respuesta en 6 segundos: el mapa sigue como siempre, sin mensaje de error.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Por qué en el servidor</h3>
+        <p>Con <code>ST_DWithin</code> la distancia es exacta en metros y la lista sale ordenada de la base, sin depender de cuántos reportes haya en la zona. Es la misma función que van a necesitar #284 (alertas del barrio), #286 (verificar cerca mío) y #288 (Android: avisar al pasar cerca). El costo es que la coordenada viaja al servidor: se compensa redondeándola, mandándola en el cuerpo y no guardándola nunca.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="catastro">
+    <h2>Capa catastral (WMS de Catastro de Misiones)</h2>
+    <p class="prose">Una capa opcional, apagada por defecto, que dibuja manzanas y parcelas oficiales encima del mapa. El WMS es solo <strong>imagen</strong>: sirve para ver, no para consultar. Nada de lo que muestra entra a PostGIS.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Comprobado el 24/11/2026</th><th>Resultado</th></tr></thead>
+        <tbody>
+          <tr><td><code>https://servicios.catastro.misiones.gov.ar</code></td><td><span class="pill no">falla</span> El certificado solo cubre <code>www.servicios.catastro.misiones.gov.ar</code>: cualquier navegador lo rechaza.</td></tr>
+          <tr><td><code>https://www.servicios.catastro.misiones.gov.ar/geoserver/wms</code></td><td><span class="pill ok">funciona</span> HTTPS válido hasta el 08/01/2027. Es la URL a usar: sin contenido mixto.</td></tr>
+          <tr><td>Proyecciones</td><td>Nativa EPSG:22177. El WMS acepta <strong>EPSG:3857</strong>, la misma de las teselas del mapa.</td></tr>
+          <tr><td>Capas WMS (8, todas consultables)</td><td><code>mapa:manzanas</code>, <code>mapa:parcelas</code>, <code>mapa:parcela_urbana</code>, <code>mapa:parcela_urbana_v2</code>, <code>mapa:parcela_rural</code>, <code>mapa:calles</code>, <code>mapa:curvas</code>, <code>mapa:edafologico</code>.</td></tr>
+          <tr><td>Tesela 256 px sobre el centro de Posadas</td><td><code>mapa:manzanas</code> zoom 16 y 17: PNG transparente, con número de manzana, en unos 0,9 s. <code>mapa:parcelas</code>: vacía en zoom 16, visible desde zoom 17, en unos 1,0 s.</td></tr>
+          <tr><td>Caché de teselas (WMTS)</td><td>Existe <code>mapa:BaseCatastral_t</code> en EPSG:900913 (equivale a 3857), siempre servida desde caché. Es <strong>opaca</strong>: taparía el mapa base, así que no sirve como capa superpuesta.</td></tr>
+          <tr><td>Estilos anunciados</td><td><code>mapa:parcela_s_v2</code> figura en las capacidades pero devuelve un error: <em>«The style specifies an attribute named 'key', not found»</em>. Se usan solo los estilos por defecto, probados.</td></tr>
+          <tr><td>WFS público</td><td><span class="pill ok">existe</span> WFS 2.0 con las mismas 8 capas y salida GeoJSON. Campos: parcelas y manzanas <code>cca</code>, <code>etiqueta</code> y geometría; calles <code>toponimia</code> y <code>tipo</code>. Sin datos de titulares. 448.956 parcelas, 27.465 manzanas.</td></tr>
+          <tr><td>CORS</td><td>Las respuestas no traen <code>Access-Control-Allow-Origin</code>. Las teselas cargan igual como <code>&lt;img&gt;</code>; un <code>fetch</code> desde el navegador (GetFeatureInfo, WFS) no.</td></tr>
+          <tr><td>Condiciones de uso</td><td><span class="pill risk">sin licencia explícita</span> <code>Fees</code> y <code>AccessConstraints</code> dicen <code>NONE</code>, pero son los valores por defecto de GeoServer (el título y el resumen del servicio también lo son). No equivalen a una licencia.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note danger"><strong>Para avisarle a Catastro:</strong> el WFS anuncia operaciones de escritura (<code>Transaction</code>, <code>LockFeature</code>, <code>CreateStoredQuery</code>). No se probaron. Reporty no las usa ni las va a usar.</div>
+    <figure>
+      <div class="svg-wrap">
+        <svg viewBox="0 0 900 250" role="img" aria-label="Las teselas catastrales van directo del navegador al WMS de Catastro como imágenes, sin pasar por Reporty. Los reportes siguen su propio camino a Supabase. Si Catastro falla, solo se apaga la capa.">
+          <defs>
+            <marker id="fl3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--catastro)"/></marker>
+            <marker id="fl4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--accent)"/></marker>
+          </defs>
+          <rect class="d-new" x="20" y="80" width="220" height="90" rx="10"/>
+          <text class="d-t" x="130" y="108" text-anchor="middle">Mapa (Leaflet)</text>
+          <text class="d-ts" x="130" y="126" text-anchor="middle">capa base Carto · 3857</text>
+          <text class="d-ts" x="130" y="142" text-anchor="middle">+ L.tileLayer.wms opcional</text>
+          <text class="d-ts" x="130" y="158" text-anchor="middle">+ marcadores de Reporty</text>
+          <line class="d-line-ext" x1="240" y1="100" x2="600" y2="60" marker-end="url(#fl3)"/>
+          <text class="d-tc" x="420" y="66" text-anchor="middle">&lt;img&gt; GetMap 256 px · EPSG:3857 · sin CORS</text>
+          <rect class="d-ext" x="600" y="24" width="280" height="70" rx="10"/>
+          <text class="d-t" x="740" y="52" text-anchor="middle">WMS Catastro Misiones</text>
+          <text class="d-tm" x="740" y="72" text-anchor="middle">www.servicios.catastro…/wms</text>
+          <line class="d-line-new" x1="240" y1="150" x2="600" y2="190" marker-end="url(#fl4)"/>
+          <text class="d-ta" x="420" y="196" text-anchor="middle">/api/mapa/reportes (sin cambios)</text>
+          <rect class="d-new" x="600" y="160" width="280" height="62" rx="10"/>
+          <text class="d-t" x="740" y="188" text-anchor="middle">Reporty + Supabase</text>
+          <text class="d-ts" x="740" y="206" text-anchor="middle">no conoce la capa catastral</text>
+          <text class="d-tr" x="740" y="120" text-anchor="middle">Catastro caído → se apaga la capa y avisa;</text>
+          <text class="d-tr" x="740" y="136" text-anchor="middle">el mapa y los reportes siguen igual</text>
+        </svg>
+      </div>
+      <figcaption>Las teselas catastrales nunca pasan por los servidores de Reporty: no hay proxy, así que no hay superficie de SSRF ni copia de los datos. Los dos caminos son independientes, y la falla de uno no toca al otro.</figcaption>
+    </figure>
+    <div class="two">
+      <div class="card">
+        <h3>Cómo se integra</h3>
+        <ul>
+          <li><strong>Sin proxy.</strong> <code>L.tileLayer.wms</code> pide directo a <code>https://www.servicios.catastro.misiones.gov.ar/geoserver/wms</code> con <code>version=1.3.0</code>, <code>crs=EPSG:3857</code>, <code>format=image/png</code>, <code>transparent=true</code>.</li>
+          <li><strong>Selector «Catastro»</strong> junto al de Incidentes / Mascotas, con dos opciones: Manzanas (desde zoom 15) y Parcelas (desde zoom 17, porque antes el estilo no dibuja nada). Apagado por defecto; la elección se recuerda como la capa preferida.</li>
+          <li><strong>Carga bajo demanda.</strong> La capa no existe hasta que se activa; Leaflet pide solo las teselas visibles y ya las cachea el navegador.</li>
+          <li><strong>Debajo de los marcadores</strong>, con opacidad 0,6, para que los reportes sigan legibles.</li>
+          <li><strong>Atribución:</strong> «Catastro de la Provincia de Misiones» en el control de Leaflet.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Errores, móvil y TWA</h3>
+        <ul>
+          <li>Ante un error, GeoServer responde XML con estado 200; el navegador no lo puede dibujar como imagen y Leaflet dispara <code>tileerror</code>. Con 4 errores seguidos la capa se apaga y aparece «El mapa catastral no responde. Probá más tarde».</li>
+          <li>La tesela fallida se reemplaza por una transparente: nunca aparece un ícono de imagen rota.</li>
+          <li>La CSP actual ya permite imágenes <code>https:</code>. Se agrega el host explícito a <code>img-src</code> para cuando la política deje de ser solo reporte.</li>
+          <li>El service worker solo atiende pedidos del mismo origen: <strong>no guarda teselas de Catastro</strong>.</li>
+          <li>La TWA es Chrome: mismo comportamiento que la web móvil. Se prueba en Android con datos móviles, con la capa activa.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><strong>Fuera de alcance por ahora:</strong> tocar una parcela para ver su código catastral. Necesita GetFeatureInfo o WFS desde el servidor, porque el servicio no tiene CORS. Se puede hacer con un route handler de host fijo y parámetros numéricos validados (sin SSRF), sin guardar nada, pero conviene esperar una respuesta de Catastro sobre las condiciones de uso.</div>
+  </section>
+
+  <section id="territorio">
+    <h2>Barrios: asociar reportes a entidades territoriales</h2>
+    <p class="prose">PostGIS solo procesa geometrías vectoriales con licencia verificada. Las parcelas de Catastro no la tienen. La <strong>IDE de Posadas</strong> (GeoNode de la Municipalidad) sí publica licencia por capa; estas son las relevantes:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Capa (WFS IDE Posadas)</th><th>Licencia publicada</th><th>Uso en Reporty</th></tr></thead>
+        <tbody>
+          <tr><td><code>geonode:Barrios_SMU0</code><br><span class="d-ts">Barrios Posadas SMU (uso actual), enero de 2026</span></td><td><span class="pill ok">ODbL</span> Atribución: Secretaría de Movilidad Urbana, Dirección SIG-IDE.</td><td>Se importa a <code>territorio.barrios</code> con su fecha y atribución. Se puede guardar y procesar; si se publica una versión modificada, va con la misma licencia.</td></tr>
+          <tr><td><code>geonode:DELEGACIONES_MUNICIPALES_POSADAS_20250</code></td><td><span class="pill risk">contradictoria</span> Dice dominio público, pero su restricción declara derechos de autor.</td><td>No se importa hasta que la Municipalidad lo aclare.</td></tr>
+          <tr><td><code>geonode:posadas_limites0</code></td><td><span class="pill no">sin licencia</span> La restricción pide permiso formal.</td><td>No se importa. Para el límite municipal se sigue usando el GeoJSON que ya está en el repo.</td></tr>
+          <tr><td>Parcelas y manzanas de Catastro (WFS)</td><td><span class="pill no">sin licencia explícita</span></td><td>Solo se ven, vía WMS. No se almacenan ni se replican.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="two">
+      <div class="card">
+        <h3>Qué habilita</h3>
+        <ul>
+          <li>«Barrio» en la ficha del reporte y en el panel de Defensoría, calculado con <code>barrio_de(ubicacion)</code>.</li>
+          <li>#282 Mi barrio: elegir un barrio en vez de dibujar un radio, con <code>ST_Covers</code>.</li>
+          <li>Estadísticas por barrio para el panel Interesado.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Cómo se carga</h3>
+        <ul>
+          <li>Un script de importación pide el WFS en GeoJSON una vez, transforma de EPSG:5348 a 4326 con <code>ST_Transform</code> y registra versión, fecha y atribución.</li>
+          <li>El barrio se calcula en la consulta, no se guarda en <code>reportes</code>: si la Municipalidad actualiza los límites, alcanza con reimportar.</li>
+          <li>La atribución se muestra donde aparezca el barrio.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="sql">
+    <h2>Borrador de la migración base</h2>
+    <p class="prose">Es un borrador para revisar la forma. Antes de aplicarlo en prod se prueba en la base local, en particular que Postgres acepte la columna generada con el cast a <code>geography</code>.</p>
+<pre><code>create extension if not exists postgis with schema extensions;
+
+-- lat/lon siguen siendo la fuente: la ubicación se deriva y nunca se escribe a mano.
+alter table public.reportes
+  add column ubicacion extensions.geography(Point, 4326)
+  generated always as (
+    case when lat is not null and lon is not null
+      then extensions.st_setsrid(extensions.st_makepoint(lon, lat), 4326)::extensions.geography
+    end
+  ) stored;
+create index reportes_ubicacion_gist on public.reportes using gist (ubicacion) where deleted_at is null;
+-- Lo mismo para public.mascotas_perdidas, con su índice parcial sobre las publicaciones vivas.
+
+-- Solo el filtro espacial: el select y los demás filtros se encadenan desde PostgREST.
+create or replace function public.reportes_en_zona(
+  oeste double precision, sur double precision, este double precision, norte double precision
+) returns setof public.reportes
+language sql stable security invoker set search_path = ''
+as $$
+  select r.* from public.reportes r
+  where r.deleted_at is null
+    and r.ubicacion operator(extensions.&amp;&amp;)
+        extensions.st_makeenvelope(oeste, sur, este, norte, 4326)::extensions.geography
+$$;
+
+-- Cerca mío: reportes y mascotas a menos de radio_m metros, ordenados por distancia.
+create or replace function public.cerca_de(
+  lat double precision, lon double precision, radio_m integer, estados int[]
+) returns table (tipo text, id bigint, metros integer)
+language sql stable security invoker set search_path = ''
+as $$
+  with punto as (
+    select extensions.st_setsrid(extensions.st_makepoint(lon, lat), 4326)::extensions.geography as g
+  )
+  select 'reporte', r.id, round(extensions.st_distance(r.ubicacion, p.g))::int
+  from public.reportes r, punto p
+  where r.deleted_at is null and r.estado_id = any (estados)
+    and extensions.st_dwithin(r.ubicacion, p.g, least(radio_m, 2000))
+  union all
+  select 'mascota', m.id, round(extensions.st_distance(m.ubicacion, p.g))::int
+  from public.mascotas_perdidas_publicas m, punto p
+  where extensions.st_dwithin(m.ubicacion, p.g, least(radio_m, 2000))
+  order by 3
+  limit 100
+$$;
+
+-- reportes_agrupados_en_zona: ST_SnapToGrid sobre ubicacion::geometry, agrupado por celda,
+--   con centroide, cantidad y extensión por grupo (los filtros llegan como IDs ya resueltos).
+-- reportes_duplicados_cerca, zonas_con_mas_reportes, municipio_de y barrio_de siguen el mismo patrón.</code></pre>
+    <p class="prose">La vista <code>mascotas_perdidas_publicas</code> se recrea para exponer <code>ubicacion</code> con las mismas columnas y el mismo filtro de moderación que tiene hoy.</p>
+  </section>
+
+  <section id="contrato">
+    <h2>Endpoints</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>Entrada</th><th>Reglas</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /api/mapa/reportes</code></td><td><code>zona=oeste,sur,este,norte</code>, <code>zoom</code> (13–18), y los filtros de hoy: <code>search</code>, <code>categoria</code>, <code>estado</code>, <code>prioridad</code></td><td>Recorte a <code>POSADAS_BOUNDS</code>; zona vacía responde 400. <code>estado</code> solo achica la lista fija 1 · 4 · 2, nunca agrega Rechazado. <code>Cache-Control: public, s-maxage=30, stale-while-revalidate=60</code>.</td></tr>
+          <tr><td><code>POST /api/mapa/cerca</code></td><td>Cuerpo JSON <code>{lat, lon, radio}</code></td><td><code>lat</code>/<code>lon</code> dentro de <code>POSADAS_BOUNDS</code>, redondeadas a 4 decimales; <code>radio</code> 100–2000 m. <code>Cache-Control: no-store</code>. La coordenada nunca se escribe en logs.</td></tr>
+        </tbody>
+      </table>
+    </div>
+<pre><code>// GET /api/mapa/reportes
+{ "tipo": "puntos", "reportes": [ { "id": 214, "coordinates": [-27.3712, -55.8961], "estadoId": 1, ... } ] }
+{ "tipo": "grupos", "grupos": [ { "lat": -27.369, "lon": -55.902, "cantidad": 164,
+  "limites": [-55.913, -27.377, -55.894, -27.361] } ] }
+
+// POST /api/mapa/cerca
+{ "resultados": [ { "tipo": "reporte", "id": 214, "metros": 85 }, { "tipo": "mascota", "id": 31, "metros": 240 } ] }</code></pre>
+  </section>
+
+  <section id="seguridad">
+    <h2>Seguridad y privacidad</h2>
+    <div class="two">
+      <div class="card">
+        <h3>Lo que se mantiene</h3>
+        <ul>
+          <li>Todas las funciones son <code>security invoker</code>: aplica la misma RLS de hoy y no abren datos nuevos.</li>
+          <li><code>search_path = ''</code> y nombres calificados con esquema, como el resto de las RPC del proyecto.</li>
+          <li>El número de reclamo de Defensoría sigue sin llegar al mapa.</li>
+          <li>Los grupos y «Cerca mío» devuelven solo IDs, conteos y distancias: ningún dato de autor.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Lo que hay que saber</h3>
+        <ul>
+          <li>La RLS ya permite hoy leer reportes Rechazados consultando la base directo. No es nuevo; por eso los estados del mapa los fija el endpoint.</li>
+          <li>Ningún endpoint arma URLs con datos del usuario hacia terceros: la capa catastral va directo del navegador, sin proxy.</li>
+          <li>La única coordenada de una persona que llega al servidor es la de «Cerca mío», redondeada, y no se guarda. Al ser automático, viaja en cada visita al mapa con permiso dado: una lectura por visita, nunca seguimiento continuo.</li>
+          <li>Datos de Catastro: solo visualización. Barrios: guardados con su licencia ODbL y su atribución.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="fases">
+    <h2>Fases de implementación</h2>
+    <div class="phases">
+      <div class="phase"><span class="tag">PR 1 · base</span><h3>PostGIS y mapa por zona</h3><p>Extensión, columnas e índices en reportes y mascotas, <code>reportes_en_zona</code> y <code>reportes_agrupados_en_zona</code>, con pruebas SQL.</p><span class="pill risk">cambia el esquema</span></div>
+      <div class="phase"><span class="tag">PR 2 · servidor</span><h3>Endpoint del mapa</h3><p><code>getReportesEnZona</code>, <code>getGruposEnZona</code>, Zod, redondeo a la grilla y el umbral de 300.</p></div>
+      <div class="phase"><span class="tag">PR 3 · mapa</span><h3>Carga por zona</h3><p>Hook con espera y cancelación, marcadores incrementales, grupos y primera carga en el servidor.</p></div>
+      <div class="phase"><span class="tag">PR 4 · cerca mío</span><h3>Reportes y mascotas cerca</h3><p><code>cerca_de</code>, <code>POST /api/mapa/cerca</code>, ubicación automática al abrir el mapa según el estado del permiso, círculo y panel de cercanos.</p></div>
+      <div class="phase"><span class="tag">PR 5 · consultas</span><h3>Duplicados y zonas</h3><p><code>reportes_duplicados_cerca</code> y <code>zonas_con_mas_reportes</code> reemplazan los cálculos en TS. Comparación de resultados antes y después.</p></div>
+      <div class="phase"><span class="tag">PR 6 · municipios</span><h3>Cobertura en PostGIS</h3><p><code>territorio.municipios</code> desde el GeoJSON del repo, <code>municipio_de</code> con la regla de borde; el aviso a organismos y los contactos lo usan.</p><span class="pill risk">cambia a quién se avisa</span></div>
+      <div class="phase"><span class="tag ext">PR 7 · catastro</span><h3>Capa catastral</h3><p>Selector, <code>L.tileLayer.wms</code> sin proxy, umbrales de zoom, manejo de errores, atribución y documentación.</p></div>
+      <div class="phase"><span class="tag">PR 8 · barrios</span><h3>Territorio</h3><p>Importación de <code>Barrios_SMU0</code> con licencia y fecha, <code>barrio_de</code> y el barrio en la ficha. Base de #282.</p></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Criterio de aceptación</th><th>Cómo se comprueba</th></tr></thead>
+        <tbody>
+          <tr><td>#281: un pendiente antiguo sigue visible en su zona aun con más de 100 reportes recientes en otras áreas.</td><td>Prueba SQL con 150 reportes recientes en el centro y uno viejo en Villa Sarita: la zona de Villa Sarita lo devuelve.</td></tr>
+          <tr><td>#281: no aparecen eliminados, rechazados ni contenido no público.</td><td>Prueba SQL de <code>deleted_at</code> y prueba del endpoint con <code>estado=Rechazado</code>: devuelve vacío.</td></tr>
+          <tr><td>La suma de los grupos coincide con la cantidad de puntos para los mismos filtros.</td><td>Prueba SQL con filtros combinados.</td></tr>
+          <tr><td>Cerca mío ordena por distancia real y respeta el radio.</td><td>Prueba SQL con puntos a 90, 480 y 520 m de un punto conocido.</td></tr>
+          <tr><td>La ubicación se usa sola según el permiso, sin pisar el foco de un reporte ni la vista que eligió la persona.</td><td>Pruebas del hook con los estados <code>granted</code>, <code>prompt</code> y <code>denied</code>, con foco de reporte, con el mapa movido antes de la lectura y con una ubicación fuera de Posadas.</td></tr>
+          <tr><td>Duplicados y municipios dan el mismo resultado que hoy.</td><td>Las pruebas actuales de <code>duplicados</code> y <code>report-coverage</code> corren contra la versión PostGIS, incluido el caso de punto sobre el límite.</td></tr>
+          <tr><td>Si Catastro no responde, Reporty funciona igual.</td><td>Prueba del mapa con <code>tileerror</code> simulado: la capa se apaga, aparece el aviso y los marcadores no cambian.</td></tr>
+          <tr><td>La capa catastral es opcional y se recuerda.</td><td>Prueba del selector: apagada por defecto, se activa, persiste al recargar.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="abierto">
+    <h2>A verificar antes de implementar</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Supuesto</th><th>Por qué importa</th><th>Cómo se verifica</th></tr></thead>
+        <tbody>
+          <tr><td>Postgres acepta la columna generada con <code>::geography</code>.</td><td>Una columna generada exige funciones inmutables; si el cast no lo es, hace falta una columna normal mantenida por trigger.</td><td>Aplicar la migración en la base local.</td></tr>
+          <tr><td>PostgREST deja encadenar <code>select</code> con relaciones sobre una RPC que devuelve <code>setof reportes</code>.</td><td>Todo el reuso de la capa de consultas del mapa depende de esto.</td><td>Una consulta local con el <code>select</code> completo de <code>buildReportesSelect</code>.</td></tr>
+          <tr><td>Cloudflare respeta <code>s-maxage</code> en una ruta de API servida por Workers.</td><td>Sin caché, cada movimiento del mapa llega a Supabase. Funciona igual, pero escala peor.</td><td>Encabezado <code>cf-cache-status</code> en el deploy de prueba.</td></tr>
+          <tr><td>Condiciones de uso del WMS y del WFS de Catastro.</td><td>Sin licencia explícita, la capa se limita a visualización y no se guarda nada.</td><td>Consulta escrita a la Dirección General de Catastro de Misiones.</td></tr>
+          <tr><td>Licencia de Delegaciones y del límite municipal.</td><td>Sin aclaración no se importan.</td><td>Consulta a la Dirección SIG-IDE de la Municipalidad de Posadas.</td></tr>
+          <tr><td>Rendimiento de la capa catastral con datos móviles.</td><td>Cada tesela tarda unos 0,8 a 1 s en el servidor de Catastro.</td><td>Prueba en un Android real dentro de la TWA.</td></tr>
+          <tr><td>El advisor de Supabase no marca la extensión ni las funciones.</td><td>Evita advertencias de seguridad nuevas.</td><td><code>get_advisors</code> después de aplicar la migración.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Propuesta del 24/11/2026, armada sobre <code>main</code> en <code>ed63b51</code>, los datos de producción y las respuestas reales de los servicios de Catastro de Misiones y de la IDE de Posadas consultados ese día. Issue: #281.</footer>
+</main>
