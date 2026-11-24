@@ -1,10 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 import {
   isMissingReportImageColumnsError,
   type ReportImageRow,
   type ResolvedReportImageRow,
   resolveReportImageRows,
 } from "@/lib/media/report-images";
+import { createPublicClient } from "@/utils/supabase/public";
 import { getReporteVoteSummary, type ReporteVoteSummary } from "./votos";
 
 const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
@@ -60,6 +62,40 @@ type ReporteDetalleView = Omit<ReporteDetalleRow, "fotos_reporte"> & {
 export type ReporteDetalle = ReporteDetalleView
 
 /**
+ * Lee la fila publicada de un reporte con sus relaciones, una sola vez por pedido.
+ *
+ * La comparten la página del detalle y `generateMetadata` (vía `getReporteSeo`): `cache` de React
+ * hace que, dentro de un mismo pedido, las dos reciban la misma lectura en lugar de pedir la fila
+ * dos veces. Usa el cliente público (rol anónimo) porque la fila es igual para todos: la RLS de
+ * `reportes` solo filtra `deleted_at is null`, igual para `anon` y `authenticated`.
+ *
+ * @param reporteId - ID del reporte, tal como llega en la URL.
+ * @returns `data` con la fila o `null` si no existe; `error` si la lectura falló.
+ */
+export const leerFilaReporte = cache(async (reporteId: string) => {
+  const cliente = createPublicClient()
+  let { data, error } = await cliente
+    .from("reportes")
+    .select(buildReporteDetalleSelect(true))
+    .eq("id", reporteId)
+    .is("deleted_at", null)
+    .returns<ReporteDetalleRow[]>()
+    .maybeSingle()
+
+  if (error && isMissingReportImageColumnsError(error)) {
+    ({ data, error } = await cliente
+      .from("reportes")
+      .select(buildReporteDetalleSelect(false))
+      .eq("id", reporteId)
+      .is("deleted_at", null)
+      .returns<ReporteDetalleRow[]>()
+      .maybeSingle())
+  }
+
+  return { data: (data ?? null) as ReporteDetalleRow | null, error }
+})
+
+/**
  * Recupera el registro completo de un reporte identificado por su ID, incluyendo relaciones relacionadas.
  *
  * @param reporteId - ID del reporte a recuperar
@@ -76,30 +112,17 @@ export async function getReporteDetalle(
   // Unused when the report lookup fails; the handler keeps that path free of unhandled rejections.
   voteSummaryPromise.catch(() => {})
 
-  let { data, error } = await supabase
-    .from("reportes")
-    .select(buildReporteDetalleSelect(true))
-    .eq("id", reporteId)
-    .is("deleted_at", null)
-    .returns<ReporteDetalleRow>()
-    .single();
-
-  if (error && isMissingReportImageColumnsError(error)) {
-    ({ data, error } = await supabase
-      .from("reportes")
-      .select(buildReporteDetalleSelect(false))
-      .eq("id", reporteId)
-      .is("deleted_at", null)
-      .returns<ReporteDetalleRow>()
-      .single())
-  }
+  // The row comes from the per-request shared read, so the metadata does not fetch it again.
+  const { data: fila, error: errorFila } = await leerFilaReporte(reporteId)
+  // `maybeSingle` returns no error for a missing row; the page expects one, as with `single`.
+  const error = errorFila ?? (fila ? null : { message: "Reporte no encontrado", code: "PGRST116" })
 
   if (error) {
     console.error("Error al obtener reporte:", error);
     return { data: null, error };
   }
 
-  const reporte = (data ?? null) as ReporteDetalleRow | null
+  const reporte = fila
   // El autor llega en la misma fila (relación usuario_id → public_profiles), sin otro viaje.
   const autor = Array.isArray(reporte?.profiles) ? reporte.profiles[0] : reporte?.profiles
   const voteSummaryResult = await voteSummaryPromise

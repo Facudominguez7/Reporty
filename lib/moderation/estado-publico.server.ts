@@ -2,33 +2,26 @@ import "server-only"
 import { hayRevisionRechazoPendiente } from "@/database/queries/reportes/[id]/revision-rechazo"
 import { createAdminClient } from "@/utils/supabase/admin"
 
-/** Public status only: never return moderation rows, reasons or private object paths. */
-export async function tieneFotografiaPendiente(reporteId: number): Promise<boolean> {
+/**
+ * Estado público de las fotografías de un reporte, leído en una sola consulta: si alguna espera
+ * moderación y si alguna fue aprobada explícitamente (lo que habilita las acciones de contacto).
+ * Solo expone dos booleanos; nunca filas, motivos ni rutas privadas.
+ *
+ * @param reporteId - Reporte a consultar.
+ * @returns `{ pendiente, aprobada }`; ambos en `false` si la consulta falla.
+ */
+export async function estadoFotografias(reporteId: number): Promise<{ pendiente: boolean; aprobada: boolean }> {
   try {
-    const { count, error } = await createAdminClient()
+    const { data, error } = await createAdminClient()
       .from("moderacion_imagenes")
-      .select("id", { count: "exact", head: true })
+      .select("decision")
       .eq("reporte_id", reporteId)
-      .eq("decision", "REVIEW")
-      .limit(1)
-    return !error && (count ?? 0) > 0
+      .in("decision", ["REVIEW", "APPROVED"])
+    if (error || !data) return { pendiente: false, aprobada: false }
+    const decisiones = new Set(data.map((fila: { decision: string }) => fila.decision))
+    return { pendiente: decisiones.has("REVIEW"), aprobada: decisiones.has("APPROVED") }
   } catch {
-    return false
-  }
-}
-
-/** Exposes only a boolean; contact actions require an explicitly approved image. */
-export async function tieneFotografiaAprobada(reporteId: number): Promise<boolean> {
-  try {
-    const { count, error } = await createAdminClient()
-      .from("moderacion_imagenes")
-      .select("id", { count: "exact", head: true })
-      .eq("reporte_id", reporteId)
-      .eq("decision", "APPROVED")
-      .limit(1)
-    return !error && (count ?? 0) > 0
-  } catch {
-    return false
+    return { pendiente: false, aprobada: false }
   }
 }
 
