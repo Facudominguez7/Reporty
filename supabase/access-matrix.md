@@ -47,6 +47,19 @@ The former `POST /api/send-notification` and `POST /api/send-status-notification
 5. Since `reportes` is a public bucket, remove `storage.objects` listing policies before tightening table RLS any further.
 6. `public.public_profiles` runs with `security_invoker = false` (set explicitly by migration `20260422170000_restore_public_profiles_public_projection.sql`, confirmed on the live database). This corrects an earlier version of this note that claimed the opposite. With `security_invoker = true` and `public.profiles` under owner-only RLS, the view would evaluate RLS as the caller: anonymous visitors and other users would see zero rows instead of the public author/ranking columns, breaking home ranking, comments, and report authors for everyone but the row owner. Safety instead comes from the view's column allowlist (no `email`, no `rol_id`; only the boolean `es_invitado`, since migration `20261020120100_public_profiles_drop_rol_id.sql`), the same pattern followed by `public.reportes_estado_operativo_publico` and `public.reportes_linea_tiempo_operativa_publica` below. The column allowlist only protects reads: the view is auto-updatable and writes through it run as its owner, bypassing `profiles` RLS. Write safety therefore depends on `anon` and `authenticated` holding no INSERT/UPDATE/DELETE grant on it, which migration `20261019180000_revoke_public_write_grants.sql` enforces.
 
+## Session checks: reads vs writes (issue #310)
+
+The project signs access tokens with an asymmetric ES256 key, so `auth.getClaims()` verifies them in the Worker without calling Supabase Auth. `auth.getUser()` costs one trip to Auth (p50 ~165 ms from the Worker) but also detects a session revoked elsewhere, a deleted user or a ban before the access token expires (at most 1 h).
+
+| Path | Session check | Why |
+|---|---|---|
+| Proxy (`utils/supabase/middleware.ts`) | `getClaims` | Runs on every request. Route guards then read the role from `profiles` with RLS. |
+| Read-only pages: report detail, `/mis-reportes`, `/dashboard`, `/mascotas/nueva`, `/mascotas/[id]`, `/auth/nueva-contrasena` | `getClaims` (`obtenerUsuarioDeLectura`) | PostgREST already accepts the same JWT until it expires, so a claims check opens nothing new for reads made with the user's session. |
+| Server actions and route handlers that write | `getUser` | A revoked session must not write. |
+| Staff pages that read with `createAdminClient()` (`/admin/*`, `/defensoria`, crews) and the crew panel in the report detail | `getUser` / `sesionVigenteEnAuth` | The role check is the only gate before the service client, so a revoked staff session must not keep reading. |
+
+Claims do not carry `email_confirmed_at`, `new_email` or `last_sign_in_at`. Pages that need them read them from Auth (only guests read `new_email`). `user_metadata.email_verified` is only used to decide what to show. After `updateUser` with the user's own session, the action calls `refreshSession()` so the claims do not stay stale.
+
 ## Anonymous guest identities (migration `20261019120000_anonymous_guest_identities.sql`)
 
 Supabase anonymous users use the `authenticated` Postgres role, so a valid user is never proof of a permanent account.
@@ -55,7 +68,7 @@ Supabase anonymous users use the `authenticated` Postgres role, so a valid user 
 |---|---|---|---|
 | View map and public reports | Yes | Yes | Public RLS reads |
 | Create reports and attach a photo | Yes | Yes (admin, ciudadano) | `crearReporteAction` + `REPORT_CREATOR_ROLE_IDS` + rate limit |
-| See own reports (`/mis-reportes`) | Yes, same browser | Yes | Server Component filtered by `auth.getUser()` id |
+| See own reports (`/mis-reportes`) | Yes, same browser | Yes | Server Component filtered by the user id from the verified token claims (`auth.getClaims()`) |
 | Earn points / appear in ranking or member count | No | Yes | `adjust_profile_points_atomic` skips role 5; ranking/count queries exclude role 5 |
 | Comment and vote | No | Yes | `canParticipateInCommunity` in server actions + restrictive vote RLS |
 | Dashboard / crew operations | No | By role | Role checks (role 5 is in no staff list); guests are redirected to `/mis-reportes` |

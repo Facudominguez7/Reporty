@@ -18,9 +18,9 @@ Supuesto verificado: la clave actual del proyecto es ECC (P-256) y la HS256 qued
 
 | ID | Tarea | Specs | Ruta | Estado | Evidencia |
 |----|-------|-------|------|--------|-----------|
-| T1 | Proxy con `getClaims`, con respaldo de `getUser` si falta `amr` | S1, S2 | inline | pendiente | Riesgo: ítem 2 (autenticación) |
-| T2 | Helper de usuario desde claims y páginas de lectura | S3, S4 | inline | pendiente | Riesgo: ítem 2 (autenticación) |
-| T3 | Refrescar la sesión al crear la contraseña | S5 | inline | pendiente | |
+| T1 | Proxy con `getClaims`, con respaldo de `getUser` si falta `amr` | S1, S2 | inline | hecho | 7b60880. RED 15/15 → GREEN 16/16. Riesgo: ítem 2 (autenticación) |
+| T2 | Helper de usuario desde claims y páginas de lectura | S3, S4 | inline | hecho | 750362d. Riesgo: ítem 2 (autenticación) |
+| T3 | Refrescar la sesión al crear la contraseña | S5 | inline | hecho | 6c53472. RED 1 → GREEN 83/83 |
 | T4 | Medición después del deploy | S6 | inline | pendiente | |
 
 ## Log
@@ -33,3 +33,13 @@ Supuesto verificado: la clave actual del proyecto es ECC (P-256) y la HS256 qued
   - `getClaims` no detecta la revocación hasta que vence el access token (≤1 h). PostgREST y RLS ya aceptan el mismo JWT hasta su vencimiento, así que en las lecturas con sesión no se abre nada nuevo. Por eso las páginas de staff, que leen con el cliente de servicio, quedan con `getUser` (S4).
   - `updateUser` conserva el access token anterior, y con él los claims viejos. La única acción que cambia metadatos con la sesión del propio usuario es `crearContrasenaCuenta` (S5).
   - Excluido del alcance: los `getUser` del navegador (`/reportes/nuevo`, `/auth`) no pasan por el Worker.
+- **L3 (implementación, 2026-11-24):**
+  - T1: el proxy usa `getClaims`. Si el token no trae `amr`, llama a `getUser` solo para leer `last_sign_in_at`. Un token que no verifica cuenta como sesión inexistente.
+  - T2: `lib/auth/usuario-de-lectura.ts` (`obtenerUsuarioDeLectura`, `usuarioDesdeClaims`, `sesionVigenteEnAuth`). Dos hallazgos durante la migración:
+    - `email_confirmed_at` no viaja en el token. Se usa `user_metadata.email_verified`: en producción lo tienen los 116 confirmados y ninguno de los 4 sin confirmar, que además no tienen sesión. Solo decide qué se muestra; la acción y la RPC siguen exigiendo `email_confirmed_at`.
+    - `new_email` tampoco viaja. `/mis-reportes` lo sigue leyendo de Auth, solo para invitados.
+  - T2, S4 aplicado dentro del detalle: quien opera cuadrillas confirma su sesión con `sesionVigenteEnAuth` antes de cargar el panel interno, porque se lee con el cliente de servicio.
+  - T3: `crearContrasenaCuenta` llama a `refreshSession()` después de `updateUser`. Si el refresco falla, el flujo termina igual.
+  - Documentación: sección «Session checks: reads vs writes» en `supabase/access-matrix.md`. `AGENTS.md` y `CLAUDE.md` se actualizaron, pero están en `.gitignore`.
+  - Verificación: `pnpm test` 3142 pasan y 3 fallan; las 3 fallas son de `app/mascotas/nueva/resultado-navegacion.test.ts` y ya fallaban en la base (verificado con `git stash`). `tsc`: 2 errores, los mismos que en la base, en pruebas que este cambio no toca. `eslint` sin advertencias en los archivos cambiados.
+  - Próximo paso: PR, deploy y T4 (medición).
