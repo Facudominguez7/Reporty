@@ -18,13 +18,13 @@
 
 | ID | Qué | Specs | Ruta | Estado | Commit / evidencia |
 |---|---|---|---|---|---|
-| T1 | Medición de base en producción, después de revertir la #306 | S3 | inline | pendiente | |
-| T2 | Issues priorizados con los hallazgos medidos | S1, S5 | inline | pendiente | |
-| T3 | Mapa y su API: traer el autor en la misma consulta (relación PostgREST) | S2, S7 | inline | pendiente | |
-| T4 | API del mapa: el proxy no refresca la sesión en `/api/mapa/reportes` (no la usa) | S2, S4, S7 | inline | pendiente | Riesgo: ítem 2 (autenticación) |
-| T5 | Detalle: autor, comentarios e historial con su perfil en la misma consulta | S2, S7 | inline | pendiente | |
-| T6 | Detalle: un solo `getUser` y una sola lectura del rol por pedido; la consulta principal no espera al usuario | S2, S7 | inline | pendiente | |
-| T7 | Detalle: moderación, revisión y evidencia en paralelo con la consulta principal | S2, S7 | inline | pendiente | |
+| T1 | Medición de base en producción, después de revertir la #306 | S3 | inline | hecho | L5 |
+| T2 | Issues priorizados con los hallazgos medidos | S1, S5 | inline | hecho | #308–#313 |
+| T3 | Mapa y su API: traer el autor en la misma consulta (relación PostgREST) | S2, S7 | inline | hecho | 30d1680 |
+| T4 | API del mapa: el proxy no refresca la sesión en `/api/mapa/reportes` (no la usa) | S2, S4, S7 | inline | hecho | 4b65abf. Riesgo: ítem 2 (autenticación) |
+| T5 | Detalle: autor, comentarios e historial con su perfil en la misma consulta | S2, S7 | inline | hecho | a89f694 |
+| T6 | Detalle: un solo `getUser` y una sola lectura del rol por pedido; la consulta principal no espera al usuario | S2, S7 | inline | hecho | 66a4cee. Riesgo: ítem 2 (permisos) |
+| T7 | Detalle: moderación, revisión y evidencia en paralelo con la consulta principal | S2, S7 | inline | hecho | 66a4cee |
 | T8 | Medición después del deploy y cierre | S3 | inline | pendiente | |
 
 ## Log
@@ -38,3 +38,18 @@
   - **Mapa y su API:** `reportes_en_zona` y después `public_profiles`, 2 viajes en serie.
   - **Relación PostgREST verificada:** con anon, `autor:public_profiles(username)` funciona sobre `reportes`, `comentarios_reporte`, `historial_estados` y la RPC `reportes_en_zona`.
 - **L4:** la ubicación del Worker en `aws:us-east-2` (PR #306) dio un resultado mixto: el detalle mejoró −260 ms y el inicio empeoró +180 ms. Se revirtió en la PR #307.
+- **L5 (línea de base, 2026-11-24, después de la #307):** `medir.sh`, 20 pedidos anónimos por ruta, en ms (TTFB p50/p95 · total p50/p95):
+  - Estático: 43/73 · 50/79, con `cf-cache-status: HIT`.
+  - `/api/mapa/reportes`: 424/457 · 430/462, sin `cf-cache-status`.
+  - `/mapa` HTML: 44/75 · 589/655.
+  - `/mapa` RSC: 96/113 · 619/655.
+  - `/reportes/181` HTML: 90/114 · 610/1006.
+  - `/reportes/181` RSC: 100/159 · 837/1164.
+  - `/reportes` RSC: 47/65 · 244/567.
+  - `/`: 81/97 · 86/103, con `x-nextjs-cache: HIT`.
+  - `/comunidad` HTML: 100/138 · 121/159, con STALE.
+
+  Consultas por pedido anónimo: detalle 10 (3 tandas), `/mapa` 3, API del mapa 2.
+- **L6:** el embed `autor:public_profiles(username)` devuelve la misma respuesta que `main`: 362 puntos, 356 con autor, mismo hash. Las props del detalle anónimo (reportes 1, 13, 11, 2, 221 y 999999) son idénticas a `main`.
+- **L7:** si falla la lectura del rol, `main` ya dejaba votar a un usuario registrado (`puedeVotarReportes` con rol `undefined`). No se cambia acá.
+- **L8:** issues #308 (detalle) y #309 (mapa) quedan cubiertos por esta rama. Los otros, #310–#313, necesitan medición antes de implementarse.
