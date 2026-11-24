@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { getReportCardData, getReportMapData } from "./get-reportes"
+import { getGruposEnZona, getReportCardData, getReportMapData } from "./get-reportes"
 
 const mocks = vi.hoisted(() => {
   const calls: unknown[][] = []
@@ -25,10 +25,19 @@ const mocks = vi.hoisted(() => {
 })
 
 vi.mock("next/cache", () => ({ unstable_cache: (load: unknown) => load }))
-vi.mock("@/utils/supabase/server", () => ({
-  createClient: async () => ({ from: (tabla: string) => { mocks.tablasConsultadas.push(tabla); return mocks.builder } }),
-}))
-vi.mock("@/utils/supabase/public", () => ({ createPublicClient: vi.fn() }))
+/** Cliente falso: registra la tabla o la RPC consultada y devuelve el builder que graba llamadas. */
+function clienteFalso(origen: string) {
+  return {
+    from: (tabla: string) => { mocks.tablasConsultadas.push(`${origen}:${tabla}`); return mocks.builder },
+    rpc: (funcion: string, ...args: unknown[]) => {
+      mocks.tablasConsultadas.push(`${origen}:rpc:${funcion}`)
+      mocks.calls.push(["rpc", funcion, ...args])
+      return mocks.builder
+    },
+  }
+}
+vi.mock("@/utils/supabase/server", () => ({ createClient: async () => clienteFalso("sesion") }))
+vi.mock("@/utils/supabase/public", () => ({ createPublicClient: () => clienteFalso("publico") }))
 vi.mock("@/database/queries/profiles", () => ({
   getPublicProfilesByIds: mocks.getPublicProfiles,
   indexPublicProfilesById: (profiles: Array<{ id: string; username: string }> | null) => new Map((profiles ?? []).map((profile) => [profile.id, profile])),
@@ -156,5 +165,85 @@ describe("getReportMapData", () => {
     for (const item of data) {
       expect(item).not.toHaveProperty("numeroReclamo")
     }
+  })
+})
+
+describe("mapa por zona (#281)", () => {
+  const zona = { oeste: -55.95, sur: -27.4, este: -55.85, norte: -27.35 }
+
+  beforeEach(() => {
+    mocks.calls.length = 0
+    mocks.rows.length = 0
+    mocks.tablasConsultadas.length = 0
+    mocks.obtenerEstadoOperativo.mockReset().mockResolvedValue(new Map())
+    mocks.getPublicProfiles.mockReset().mockResolvedValue({ data: [] })
+  })
+
+  it("con zona consulta reportes_en_zona y encadena el mismo select, filtros y límite", async () => {
+    mocks.rows.push(pendingRow)
+
+    const { data } = await getReportMapData({ zona, categoria: "Bache", estadosPermitidos: [1, 4, 2], limite: 300 })
+
+    expect(mocks.tablasConsultadas).toEqual(["sesion:rpc:reportes_en_zona"])
+    expect(mocks.calls[0]).toEqual(["rpc", "reportes_en_zona", zona, { get: true }])
+    expect(mocks.calls).toContainEqual(["eq", "categoria_id", 1])
+    expect(mocks.calls).toContainEqual(["in", "estado_id", [1, 4, 2]])
+    expect(mocks.calls).toContainEqual(["is", "deleted_at", null])
+    expect(mocks.calls).toContainEqual(["range", 0, 300])
+    expect(data.map((report) => report.id)).toEqual([7])
+  })
+
+  it("sin zona sigue leyendo la tabla, como antes", async () => {
+    await getReportMapData({})
+
+    expect(mocks.tablasConsultadas).toEqual(["sesion:reportes"])
+  })
+
+  it("informa si había más reportes que el límite", async () => {
+    mocks.rows.push(pendingRow, { ...pendingRow, id: 8 })
+
+    const { data, hasMore } = await getReportMapData({ zona, limite: 1 })
+
+    expect(hasMore).toBe(true)
+    expect(data).toHaveLength(1)
+  })
+
+  it("con publico lee sin la sesión del visitante", async () => {
+    await getReportMapData({ zona }, { publico: true })
+
+    expect(mocks.tablasConsultadas).toEqual(["publico:rpc:reportes_en_zona"])
+  })
+
+  it("los grupos usan los mismos filtros traducidos a IDs y devuelven límites", async () => {
+    mocks.rows.push({ lat: -27.37, lon: -55.9, cantidad: 12, oeste: -55.91, sur: -27.38, este: -55.89, norte: -27.36 })
+
+    const { data, error } = await getGruposEnZona({
+      zona,
+      celda: 0.01,
+      estados: [1, 4, 2],
+      categoria: "Bache",
+      prioridad: "Alta",
+      search: "luz",
+    })
+
+    expect(mocks.tablasConsultadas).toEqual(["publico:rpc:reportes_agrupados_en_zona"])
+    expect(mocks.calls[0]).toEqual(["rpc", "reportes_agrupados_en_zona", {
+      ...zona,
+      celda: 0.01,
+      estados: [1, 4, 2],
+      categoria: 1,
+      prioridad: 1,
+      busqueda: "luz",
+    }])
+    expect(error).toBeNull()
+    expect(data).toEqual([{ lat: -27.37, lon: -55.9, cantidad: 12, limites: { oeste: -55.91, sur: -27.38, este: -55.89, norte: -27.36 } }])
+  })
+
+  it("sin filtros los grupos mandan nulos, no textos vacíos", async () => {
+    await getGruposEnZona({ zona, celda: 0.01, estados: [1], search: "  " })
+
+    expect(mocks.calls[0]).toEqual(["rpc", "reportes_agrupados_en_zona", {
+      ...zona, celda: 0.01, estados: [1], categoria: null, prioridad: null, busqueda: null,
+    }])
   })
 })
