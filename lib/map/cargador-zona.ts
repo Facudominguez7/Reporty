@@ -59,7 +59,8 @@ type OpcionesCargadorZona = {
  * Crea un cargador de zonas.
  *
  * @returns `pedir` (programa la carga de una zona), `cancelar` (descarta lo pendiente),
- *   `reintentar` (vuelve a pedir la última zona ya) y `olvidar` (borra las zonas recordadas).
+ *   `reintentar` (vuelve a pedir la última zona ya), `revalidar` (la vuelve a pedir si venció)
+ *   y `olvidar` (borra las zonas recordadas).
  */
 export function crearCargadorZona({ obtener, alCargar, alFallar, alCambiarEstado, esperaMs = ESPERA_ZONA_MS }: OpcionesCargadorZona) {
   const recordadas = new Map<string, { contenido: ContenidoZonaMapa; guardadaEn: number }>()
@@ -73,6 +74,11 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, alCambiarEstado
     espera = null
     enCurso?.abort()
     enCurso = null
+  }
+
+  /** Indica si una zona recordada todavía no venció. */
+  function vigente(guardada: { guardadaEn: number }) {
+    return Date.now() - guardada.guardadaEn < VIGENCIA_ZONA_MS
   }
 
   /** Guarda una zona y olvida la más vieja si hay demasiadas. */
@@ -93,7 +99,11 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, alCambiarEstado
     const guardada = recordadas.get(url)
     if (guardada) {
       alCargar(guardada.contenido)
-      if (Date.now() - guardada.guardadaEn < VIGENCIA_ZONA_MS) return
+      if (vigente(guardada)) {
+        // Los datos ya están: no puede quedar visible un error o un «cargando» anterior.
+        alCambiarEstado?.("listo")
+        return
+      }
     }
 
     const controlador = new AbortController()
@@ -123,7 +133,12 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, alCambiarEstado
   function pedir(zona: ZonaMapa, zoom: number, filtros: FiltrosMapa) {
     cancelar()
     const url = urlZonaMapa(zona, zoom, filtros)
-    if (!url) return
+    if (!url) {
+      // Fuera de Posadas no hay nada que pedir: lo cancelado no puede quedar «cargando».
+      ultimaUrl = null
+      alCambiarEstado?.("listo")
+      return
+    }
     ultimaUrl = url
     espera = setTimeout(() => {
       espera = null
@@ -139,12 +154,23 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, alCambiarEstado
     void cargar(ultimaUrl)
   }
 
+  /**
+   * Vuelve a pedir la zona visible si lo recordado ya venció, por ejemplo cuando el usuario
+   * vuelve a la app con el mapa quieto. Si hay una carga en curso o programada, no hace nada.
+   */
+  function revalidar() {
+    if (!ultimaUrl || espera || enCurso) return
+    const guardada = recordadas.get(ultimaUrl)
+    if (guardada && vigente(guardada)) return
+    void cargar(ultimaUrl)
+  }
+
   /** Olvida las zonas recordadas, por ejemplo cuando el servidor manda datos nuevos. */
   function olvidar() {
     recordadas.clear()
   }
 
-  return { pedir, cancelar, reintentar, olvidar }
+  return { pedir, cancelar, reintentar, revalidar, olvidar }
 }
 
 /**
@@ -158,4 +184,30 @@ export async function obtenerZonaMapa(url: string, senal: AbortSignal): Promise<
   const respuesta = await fetch(url, { signal: senal })
   if (!respuesta.ok) throw new Error(`Mapa por zona: ${respuesta.status}`)
   return (await respuesta.json()) as ContenidoZonaMapa
+}
+
+/**
+ * Escucha cuándo el usuario vuelve a la app (la pestaña se vuelve visible o la ventana recupera
+ * el foco), para revalidar la zona aunque el mapa no se haya movido. En el celular es lo
+ * habitual: se deja la app en segundo plano y se vuelve más tarde.
+ *
+ * @param alVolver - Se llama cada vez que el usuario vuelve.
+ * @param ventana - Dónde escuchar `focus`; por defecto, `window`.
+ * @param documento - Dónde escuchar `visibilitychange`; por defecto, `document`.
+ * @returns Función para dejar de escuchar.
+ */
+export function alVolverALaApp(
+  alVolver: () => void,
+  ventana: EventTarget = window,
+  documento: EventTarget & { visibilityState: DocumentVisibilityState } = document,
+) {
+  const alCambiarVisibilidad = () => {
+    if (documento.visibilityState === "visible") alVolver()
+  }
+  documento.addEventListener("visibilitychange", alCambiarVisibilidad)
+  ventana.addEventListener("focus", alVolver)
+  return () => {
+    documento.removeEventListener("visibilitychange", alCambiarVisibilidad)
+    ventana.removeEventListener("focus", alVolver)
+  }
 }

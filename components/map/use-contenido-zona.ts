@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import type { ContenidoZonaMapa, FiltrosMapa } from "@/database/queries/reportes/mapa-por-zona"
-import { crearCargadorZona, obtenerZonaMapa, type EstadoCargaZona } from "@/lib/map/cargador-zona"
+import { alVolverALaApp, crearCargadorZona, obtenerZonaMapa, type EstadoCargaZona } from "@/lib/map/cargador-zona"
 import type { ZonaMapa } from "@/lib/map/zona"
 
 /**
@@ -43,6 +43,9 @@ export function useContenidoZonaMapa(inicial: ContenidoZonaMapa, filtros: Filtro
   })
 
   useEffect(() => () => cargador.cancelar(), [cargador])
+
+  // Con el mapa quieto la zona no se vuelve a pedir: al volver a la app se revalida si venció.
+  useEffect(() => alVolverALaApp(cargador.revalidar), [cargador])
 
   // Con otros filtros, la zona que se está viendo se vuelve a pedir.
   const { search, categoria, estado, prioridad } = filtros

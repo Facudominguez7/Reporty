@@ -12,7 +12,13 @@ import { cargarZonaMapa } from "@/database/queries/reportes/mapa-por-zona"
 import { MAP_MAX_ZOOM, POSADAS_MIN_ZOOM } from "@/lib/map/initial-view"
 import { ajustarZonaAlMapa, leerZona } from "@/lib/map/zona"
 
-const CACHE_PUBLICA = "public, s-maxage=30, stale-while-revalidate=60"
+/**
+ * Caché de las respuestas correctas. El navegador no recibe `stale-while-revalidate`: con esa
+ * directiva Chrome devolvía la copia vieja mientras pedía otra en segundo plano, y el mapa no
+ * veía los reportes nuevos al revalidar una zona. La CDN sí la recibe, por `CDN-Cache-Control`.
+ */
+const CACHE_NAVEGADOR = "public, s-maxage=30"
+const CACHE_CDN = "public, max-age=30, stale-while-revalidate=60"
 
 const filtroOpcional = z.string().trim().max(100).optional()
 
@@ -55,7 +61,7 @@ export async function GET(request: NextRequest) {
       console.error("Error al cargar el mapa por zona:", errorConsulta)
       return error("No se pudieron cargar los reportes", 500)
     }
-    return NextResponse.json(data, { headers: { "Cache-Control": CACHE_PUBLICA } })
+    return NextResponse.json(data, { headers: { "Cache-Control": CACHE_NAVEGADOR, "CDN-Cache-Control": CACHE_CDN } })
   } catch (excepcion) {
     console.error("Error en API /api/mapa/reportes:", excepcion)
     return error("Error interno del servidor", 500)

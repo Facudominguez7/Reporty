@@ -24,7 +24,10 @@ describe("GET /api/mapa/reportes", () => {
       filtros: { search: "bache", categoria: "Bache", estado: "Pendiente", prioridad: "Alta" },
     })
     expect(respuesta.status).toBe(200)
-    expect(respuesta.headers.get("Cache-Control")).toBe("public, s-maxage=30, stale-while-revalidate=60")
+    // El navegador no recibe stale-while-revalidate: con esa directiva devolvía la copia vieja
+    // y el mapa no veía reportes nuevos al revalidar. La CDN sí la usa.
+    expect(respuesta.headers.get("Cache-Control")).toBe("public, s-maxage=30")
+    expect(respuesta.headers.get("CDN-Cache-Control")).toBe("public, max-age=30, stale-while-revalidate=60")
     expect(await respuesta.json()).toEqual({ tipo: "puntos", reportes: [{ id: 7 }] })
   })
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 
 import type { ContenidoZonaMapa } from "@/database/queries/reportes/mapa-por-zona"
 
-import { crearCargadorZona, urlZonaMapa } from "./cargador-zona"
+import { alVolverALaApp, crearCargadorZona, urlZonaMapa } from "./cargador-zona"
 
 const zona = { oeste: -55.9003, sur: -27.3803, este: -55.8901, norte: -27.3701 }
 const puntos = { tipo: "puntos" as const, reportes: [] }
@@ -138,6 +138,70 @@ describe("crearCargadorZona", () => {
     expect(alCambiarEstado.mock.calls.map(([e]) => e)).toEqual(["cargando", "listo", "cargando", "error"])
   })
 
+  it("una zona recordada y vigente deja el estado en listo aunque antes haya fallado otra", async () => {
+    const alCambiarEstado = vi.fn()
+    obtener.mockResolvedValueOnce(puntos).mockRejectedValueOnce(new Error("sin red"))
+    const cargador = crearCargadorZona({ obtener, alCargar, alCambiarEstado })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.pedir(zona, 16, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(alCambiarEstado.mock.calls.at(-1)?.[0]).toBe("listo")
+  })
+
+  it("si se cancela una carga yendo a una zona recordada, no queda cargando", async () => {
+    const alCambiarEstado = vi.fn()
+    const cargador = crearCargadorZona({ obtener, alCargar, alCambiarEstado })
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+
+    obtener.mockImplementationOnce((_url, senal) => new Promise((_resolver, rechazar) => {
+      senal.addEventListener("abort", () => rechazar(new DOMException("Abortado", "AbortError")))
+    }))
+    cargador.pedir(zona, 16, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(alCambiarEstado.mock.calls.at(-1)?.[0]).toBe("listo")
+  })
+
+  it("si se cancela una carga yendo fuera de Posadas, no queda cargando", async () => {
+    const alCambiarEstado = vi.fn()
+    obtener.mockImplementationOnce((_url, senal) => new Promise((_resolver, rechazar) => {
+      senal.addEventListener("abort", () => rechazar(new DOMException("Abortado", "AbortError")))
+    }))
+    const cargador = crearCargadorZona({ obtener, alCargar, alCambiarEstado })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.pedir({ oeste: -58, sur: -30, este: -57.5, norte: -29.5 }, 15, {})
+
+    expect(alCambiarEstado.mock.calls.at(-1)?.[0]).toBe("listo")
+  })
+
+  it("revalidar vuelve a pedir la zona visible solo si ya venció", async () => {
+    const nuevo = { tipo: "puntos" as const, reportes: [{ id: 9 }] as never[] }
+    obtener.mockResolvedValueOnce(puntos).mockResolvedValueOnce(nuevo)
+    const cargador = crearCargadorZona({ obtener, alCargar })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.revalidar()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(obtener).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(30_000)
+    cargador.revalidar()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(obtener).toHaveBeenCalledTimes(2)
+    expect(alCargar).toHaveBeenLastCalledWith(nuevo)
+  })
+
   it("reintentar vuelve a pedir la última zona sin esperar", async () => {
     obtener.mockRejectedValueOnce(new Error("sin red")).mockResolvedValueOnce(puntos)
     const cargador = crearCargadorZona({ obtener, alCargar })
@@ -180,5 +244,26 @@ describe("crearCargadorZona", () => {
     await vi.advanceTimersByTimeAsync(300)
 
     expect(obtener).not.toHaveBeenCalled()
+  })
+})
+
+describe("alVolverALaApp", () => {
+  it("avisa cuando la pestaña vuelve a estar visible o la ventana recupera el foco, y se puede dejar de escuchar", () => {
+    const ventana = new EventTarget()
+    const documento = Object.assign(new EventTarget(), { visibilityState: "hidden" as DocumentVisibilityState })
+    const alVolver = vi.fn()
+    const dejar = alVolverALaApp(alVolver, ventana, documento)
+
+    documento.dispatchEvent(new Event("visibilitychange"))
+    expect(alVolver).not.toHaveBeenCalled()
+
+    documento.visibilityState = "visible"
+    documento.dispatchEvent(new Event("visibilitychange"))
+    ventana.dispatchEvent(new Event("focus"))
+    expect(alVolver).toHaveBeenCalledTimes(2)
+
+    dejar()
+    ventana.dispatchEvent(new Event("focus"))
+    expect(alVolver).toHaveBeenCalledTimes(2)
   })
 })
