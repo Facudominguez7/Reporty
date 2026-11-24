@@ -2,8 +2,8 @@
  * Página del mapa interactivo de reportes
  * 
  * Este componente Server Component se encarga de:
- * - Cargar reportes reales desde Supabase con sus coordenadas y filtros, solo los pendientes:
- *   el mapa muestra únicamente problemas abiertos (reparados y rechazados siguen en /reportes)
+ * - Cargar reportes pendientes y reparados con coordenadas desde Supabase.
+ *   Los reportes rechazados no se muestran en el mapa.
  * - Renderizar el MapaClient con los datos
  * - Manejar los searchParams para los filtros
  */
@@ -16,13 +16,14 @@ import { pageMetadata } from "@/lib/seo/site"
 import { cookies } from "next/headers"
 import { COOKIE_CAPA_PREFERIDA, normalizarCapa } from "@/lib/preferencias/capa"
 import { leerFocoReporte } from "@/lib/map/foco-reporte"
+import { REPORT_STATE_IDS } from "@/lib/authz/catalog"
 
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = pageMetadata({
   title: "Mapa de problemas urbanos en Posadas",
   description:
-    "Mirá en el mapa los problemas urbanos pendientes que vecinos de Posadas, Misiones, reportaron cerca tuyo.",
+    "Mirá en el mapa los problemas urbanos pendientes y reparados que vecinos de Posadas, Misiones, reportaron cerca tuyo.",
   path: "/mapa",
 })
 
@@ -63,8 +64,8 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
       estado,
       prioridad,
       limite: 100, // Más reportes para el mapa
-      // Pendientes + tomados por la Defensoría (S8): un reporte tomado no desaparece del mapa.
-      soloDefensoria: true,
+      // Pendientes, tomados por la Defensoría (aro violeta) y reparados (aura verde).
+      estadosPermitidos: [REPORT_STATE_IDS.PENDIENTE, REPORT_STATE_IDS.TOMADO_DEFENSORIA, REPORT_STATE_IDS.REPARADO],
     }),
     getCategorias(),
     getPrioridades(),
@@ -75,7 +76,6 @@ export default async function MapaPage({ searchParams }: MapaPageProps) {
     <MapaClient
       reportes={reportes ?? []}
       categorias={categorias ?? []}
-      // Todo el mapa está en Pendiente, así que no hay estado por el cual filtrar.
       estados={[]}
       prioridades={prioridades ?? []}
       mascotas={mascotas ?? []}

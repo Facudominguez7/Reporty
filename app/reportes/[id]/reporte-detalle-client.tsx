@@ -1037,12 +1037,12 @@ export function ReporteDetalleClient({
                   <DefensoriaTomarSeccion reporteId={reporte.id} />
                 )}
                 {fechaCambioEstado && isReporteCerrado && (
-                  <div className={`mt-3 inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium ${getNameFromRelation(reporte.estados).toLowerCase() === 'reparado'
+                  <div className={`mt-3 inline-flex w-full items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-medium sm:w-auto ${getNameFromRelation(reporte.estados).toLowerCase() === 'reparado'
                     ? 'tone-success-inline'
                     : 'tone-danger-inline'
                   }`}>
                     <Clock className="size-3.5 shrink-0" />
-                    <span className="flex flex-col">
+                    <span className="flex flex-col sm:flex-row sm:gap-2">
                       <span>
                         {getNameFromRelation(reporte.estados)} el{" "}
                         {dayjs
@@ -1051,7 +1051,8 @@ export function ReporteDetalleClient({
                           .format("DD/MM/YYYY [a las] HH:mm")}
                       </span>
                       {tiempoReparacion && (
-                        <span className="border-t border-current/20">
+                        <span>
+                          <span className="hidden sm:inline" aria-hidden="true"> · </span>
                           Arreglado en {tiempoReparacion}
                         </span>
                       )}
@@ -1431,7 +1432,7 @@ export function ReporteDetalleClient({
           if (abierta && avisoComentar.visible) avisoComentar.descartar();
           setMenuFlotanteAbierto(abierta);
         }}
-        aviso={avisoComentar.visible ? <AvisoComentar onCerrar={avisoComentar.descartar} /> : undefined}
+        aviso={avisoComentar.visible ? <AvisoComentar onCerrar={avisoComentar.descartar} reparado={evidenciaReparacion?.evidencia?.estado === "reparado"} /> : undefined}
       />
     </div>
   );

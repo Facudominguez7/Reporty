@@ -58,6 +58,12 @@ describe("sesión del encabezado leída en el navegador", () => {
     expect(desuscribir).toHaveBeenCalledTimes(1)
   })
 
+  it("vuelve a consultar la sesión cuando cambia la ruta", () => {
+    const codigo = readFileSync(new URL("./header-sesion.ts", import.meta.url), "utf8")
+    expect(codigo).toMatch(/usePathname\(\)/)
+    expect(codigo).toMatch(/\[pathname\]/)
+  })
+
   it("el encabezado del layout no lee cookies en el servidor, así las páginas públicas pueden ser estáticas", () => {
     const codigo = readFileSync(new URL("./header.tsx", import.meta.url), "utf8")
 

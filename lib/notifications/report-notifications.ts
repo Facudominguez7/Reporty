@@ -79,7 +79,7 @@ type OrganismoEmailParams = {
 
 type AdminReviewEmailParams = {
   supabase: SupabaseClient;
-  tipo: "foto" | "reporte";
+  tipo: "foto" | "reporte" | "reparacion";
   reviewId: string;
   reporteId: number;
   reporteTitulo: string;
@@ -343,10 +343,12 @@ export async function sendAdminReviewNotificationEmail({ supabase, tipo, reviewI
 
   const resend = getResendClient();
   const reviewUrl = `${getAppUrl()}/admin/moderacion${tipo === "reporte" ? "?tipo=reportes" : ""}`;
-  const asunto = tipo === "foto" ? "Fotografía pendiente de revisión" : "Reporte pendiente de revisión";
-  const descripcion = tipo === "foto"
-    ? `La fotografía del reporte N.º ${reporteId} necesita una revisión manual.`
-    : `El reporte N.º ${reporteId} alcanzó el umbral de votos “No existe” y necesita una revisión manual.`;
+  const asunto = tipo === "reparacion" ? "Nueva evidencia de reparación" : tipo === "foto" ? "Fotografía pendiente de revisión" : "Reporte pendiente de revisión";
+  const descripcion = tipo === "reparacion"
+    ? `Se cargó una evidencia de reparación para el reporte N.º ${reporteId}.`
+    : tipo === "foto"
+      ? `La fotografía del reporte N.º ${reporteId} necesita una revisión manual.`
+      : `El reporte N.º ${reporteId} alcanzó el umbral de votos “No existe” y necesita una revisión manual.`;
 
   await Promise.all(destinatarios.map((admin) => {
     const email = admin.email!.trim();
@@ -357,7 +359,7 @@ export async function sendAdminReviewNotificationEmail({ supabase, tipo, reviewI
       html: renderEmailLayout({
         assetBaseUrl: getAppUrl(),
         title: asunto,
-        kicker: tipo === "foto" ? "Revisión de fotografía" : "Revisión de reporte",
+        kicker: tipo === "reparacion" ? "Evidencia de reparación" : tipo === "foto" ? "Revisión de fotografía" : "Revisión de reporte",
         preheader: `${asunto}: ${reporteTitulo}.`,
         heading: asunto,
         body: [emailParagraph(escapeHtml(descripcion)), emailPanel({ eyebrow: `Reporte N.º ${reporteId}`, title: reporteTitulo }), emailButton("Abrir cola de revisión", reviewUrl)].join("\n"),

@@ -96,6 +96,18 @@ describe("getReportMapData", () => {
     expect(data.map((report) => report.id)).toEqual([7])
   })
 
+  it("aplica la lista de estados del mapa antes del límite y entrega los reparados", async () => {
+    mocks.rows.push(pendingRow, { ...pendingRow, id: 8, estado: { nombre: "Reparado" } })
+
+    const { data, error } = await getReportMapData({ estadosPermitidos: [1, 2] })
+
+    const indiceEstados = mocks.calls.findIndex(([metodo, columna]) => metodo === "in" && columna === "estado_id")
+    expect(mocks.calls[indiceEstados]).toEqual(["in", "estado_id", [1, 2]])
+    expect(indiceEstados).toBeLessThan(mocks.calls.findIndex(([metodo]) => metodo === "range"))
+    expect(error).toBeNull()
+    expect(data).toMatchObject([{ id: 7, status: "Pendiente" }, { id: 8, status: "Reparado" }])
+  })
+
   it("keeps every state when only pending reports are not requested", async () => {
     await getReportMapData({ categoria: "Bache" })
 

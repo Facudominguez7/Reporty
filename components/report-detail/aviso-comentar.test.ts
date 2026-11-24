@@ -25,6 +25,13 @@ describe("aviso para informar una reparación", () => {
     expect(html).toContain("Entendido")
   })
 
+  it("invita solo a consultar la evidencia cuando el reporte está reparado", () => {
+    const html = renderToStaticMarkup(createElement(AvisoComentar, { onCerrar: () => {}, reparado: true }))
+
+    expect(html).toContain("consultar la evidencia")
+    expect(html).not.toContain("informar una reparación")
+  })
+
   it("se muestra junto al botón flotante cerrado y desaparece al abrir el menú", () => {
     const aviso = createElement(AvisoComentar, { onCerrar: () => {} })
     const cerrado = renderToStaticMarkup(createElement(AccionesFlotantes, { acciones, abierta: false, onCambiarAbierta: () => {}, aviso }))

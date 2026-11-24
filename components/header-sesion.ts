@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import type { Session, User } from "@supabase/supabase-js"
 
 import { createClient } from "@/utils/supabase/client"
@@ -47,8 +48,9 @@ export function suscribirUsuarioDeSesion(auth: AuthDeEncabezado, alCambiar: (usu
  */
 export function useUsuarioDeSesion(): User | null | undefined {
   const [usuario, setUsuario] = useState<User | null | undefined>(undefined)
+  const pathname = usePathname()
 
-  useEffect(() => suscribirUsuarioDeSesion(createClient().auth, setUsuario), [])
+  useEffect(() => suscribirUsuarioDeSesion(createClient().auth, setUsuario), [pathname])
 
   return usuario
 }

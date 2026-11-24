@@ -31,7 +31,7 @@ import {
   type ResultadoImagenEvidenciaReparacion,
   moderarYGuardarImagenEvidenciaReparacion,
 } from "@/lib/moderation/imagenes-reporte.server"
-import { sendRepairReviewCancelledEmail, sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
+import { sendAdminReviewNotificationEmail, sendRepairReviewCancelledEmail, sendStatusNotificationEmail } from "@/lib/notifications/report-notifications"
 import { parseFraseImpugnacion, parseFraseReparacion } from "@/lib/reportes/frases-reparacion"
 import { getReportContext } from "./detail-mutations"
 
@@ -559,6 +559,11 @@ export async function informarReparacionWorkflow(
     // Los bytes privados no quedaron confirmados: informar éxito dejaría el reporte
     // con una evidencia activa que nadie puede verificar (S1, S12).
     return { success: false, error: MENSAJE_CARGA_EVIDENCIA_INCOMPLETA }
+  }
+  try {
+    await sendAdminReviewNotificationEmail({ supabase, tipo: "reparacion", reviewId: resultado.evidenciaId, reporteId, reporteTitulo: `Reporte N.º ${reporteId}` })
+  } catch (error) {
+    console.error("Error al notificar nueva evidencia de reparación:", error)
   }
   return {
     success: true,

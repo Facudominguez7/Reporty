@@ -412,7 +412,7 @@ describe("evidencia de reparación en el pipeline de moderación", () => {
 
     expect(resultado).toMatchObject({ evidenciaId: "evidencia-1", estado: "REVIEW", publicada: false })
     expect(resultado.motivos).toEqual(["La fotografía de la reparación quedó privada y pendiente de revisión."])
-    expect(notificarRevisionAdmin).toHaveBeenCalledOnce()
+    expect(notificarRevisionAdmin).not.toHaveBeenCalled()
     expect(enviarAviso).not.toHaveBeenCalled()
     expect(e.eventos).not.toContain("subir:reportes")
   })

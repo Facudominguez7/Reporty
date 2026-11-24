@@ -76,8 +76,8 @@ describe("direcciones en Defensoría", () => {
 
   it("conserva las coordenadas del mapa público sin consultar direcciones", async () => {
     mocks.reportes.push({ ...fila, direccion: "Av. Freyre 123, Santa Fe" })
-    const resultado = await getReportMapData({ soloDefensoria: true, limite: 100 })
-    expect(mocks.operaciones).toContainEqual(["in", "estado_id", [1, 4]])
+    const resultado = await getReportMapData({ estadosPermitidos: [1, 4, 2], limite: 100 })
+    expect(mocks.operaciones).toContainEqual(["in", "estado_id", [1, 4, 2]])
     expect(mocks.operaciones).toContainEqual(["range", 0, 100])
     expect(resultado.data[0].location).toBe("Lat -27.4000, Lon -55.9000")
     expect(mocks.operaciones.filter(([operacion]) => operacion === "order")).toEqual([

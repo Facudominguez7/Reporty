@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react"
-import { Check, Camera, X, type LucideIcon } from "lucide-react"
+import { Camera, X, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -253,7 +253,7 @@ export function AccionesFlotantes({
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         )}
       >
-        {abierta ? <X className="size-[1.375rem]" aria-hidden="true" /> : <Check className="size-[1.375rem]" aria-hidden="true" />}
+        {abierta ? <X className="size-[1.375rem]" aria-hidden="true" /> : <Camera className="size-[1.375rem]" aria-hidden="true" />}
       </button>
     </div>
   )

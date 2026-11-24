@@ -26,8 +26,10 @@ describe("MapaPage", () => {
     mocks.getMascotasMapa.mockReset().mockResolvedValue({ data: [], error: null })
   })
 
-  it("loads pending and Defensoría-taken reports on the map, keeping the URL filters", async () => {
-    await MapaPage({ searchParams: Promise.resolve({ search: "bache", categoria: "Baches" }) })
+  it("pide pendientes, tomados por la Defensoría y reparados sin perder los filtros de la URL", async () => {
+    const reparado = { id: 42, status: "Reparado" }
+    mocks.getReportMapData.mockResolvedValue({ data: [reparado], error: null })
+    const pagina = await MapaPage({ searchParams: Promise.resolve({ search: "bache", categoria: "Baches" }) })
 
     expect(mocks.getReportMapData).toHaveBeenCalledWith({
       search: "bache",
@@ -35,9 +37,9 @@ describe("MapaPage", () => {
       estado: undefined,
       prioridad: undefined,
       limite: 100,
-      // S8: pendientes + tomados por la Defensoría; un reporte tomado no desaparece del mapa.
-      soloDefensoria: true,
+      estadosPermitidos: [1, 4, 2],
     })
+    expect(pagina.props.reportes).toEqual([reparado])
   })
 
   it("passes pet-query errors separately so they cannot replace incident data", async () => {
@@ -47,7 +49,7 @@ describe("MapaPage", () => {
     expect(page.props.petError).toBe("pet read denied")
   })
 
-  it("does not offer a state filter, since every report on the map is pending", async () => {
+  it("mantiene oculto el selector de estado en el mapa", async () => {
     const page = await MapaPage({ searchParams: Promise.resolve({}) })
 
     expect(page.props.estados).toEqual([])
