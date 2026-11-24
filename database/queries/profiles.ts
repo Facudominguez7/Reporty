@@ -20,6 +20,20 @@ function dedupeUserIds(userIds: string[]) {
   return Array.from(new Set(userIds.filter(Boolean)));
 }
 
+/**
+ * Lee el nombre de un perfil público traído como relación de PostgREST, que puede llegar como
+ * objeto, como lista de uno o vacío.
+ *
+ * @param perfil - Valor de la relación `public_profiles(username)`.
+ * @returns El nombre de usuario, o `null` si no hay perfil o no tiene nombre.
+ */
+export function nombreDePerfil(
+  perfil: { username: string | null } | { username: string | null }[] | null | undefined,
+): string | null {
+  const unico = Array.isArray(perfil) ? perfil[0] : perfil;
+  return unico?.username ?? null;
+}
+
 export function indexPublicProfilesById(profiles: PublicProfile[] | null | undefined) {
   return new Map((profiles ?? []).map((profile) => [profile.id, profile]));
 }
