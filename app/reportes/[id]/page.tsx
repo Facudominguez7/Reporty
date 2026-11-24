@@ -83,8 +83,10 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
       console.error("Error al cargar el rol del visitante:", rolError);
       return null;
     });
+    // Fail closed: if the role could not be read, the vote buttons stay hidden. Every profile has a
+    // role (rol_id defaults to Ciudadano), so a null role here means the lookup failed.
     const rolesVisitantePromise = Promise.all([userPromise, rolIdPromise]).then(([user, rolId]) => ({
-      puedeVotar: user ? puedeVotarReportes(user, rolId) : false,
+      puedeVotar: user && rolId !== null ? puedeVotarReportes(user, rolId) : false,
       esDefensoria: esDefensoria(rolId),
     }));
     // A failed management load must only hide the operational panel, never the report itself,

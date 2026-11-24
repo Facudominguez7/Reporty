@@ -70,9 +70,9 @@ export async function getReporteDetalle(
   reporteId: string,
   usuarioId?: string | null | PromiseLike<string | null | undefined>,
 ) {
-  // The vote summary only needs the report id and, to mark the visitor's own votes, the user id.
-  // The user id may still be loading: the report row below never waits for it.
-  const voteSummaryPromise = Promise.resolve(usuarioId).then((id) => getReporteVoteSummary(supabase, reporteId, id))
+  // The vote counts start now; only the visitor's own-vote lookup waits for the user id, which
+  // may still be loading. The report row below never waits for it.
+  const voteSummaryPromise = getReporteVoteSummary(supabase, reporteId, usuarioId)
   // Unused when the report lookup fails; the handler keeps that path free of unhandled rejections.
   voteSummaryPromise.catch(() => {})
 

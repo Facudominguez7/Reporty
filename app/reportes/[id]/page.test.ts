@@ -219,6 +219,18 @@ describe("ReporteDetallePage", () => {
     const page = await renderPage()
 
     expect(page.props.isAdmin).toBe(false)
+    expect(page.props.puedeVotar).toBe(false)
+    expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
+  })
+
+  it("oculta los votos si la lectura del rol lanza una excepción", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1", is_anonymous: false } } })
+    mocks.getUserRoleContext.mockRejectedValue(new Error("red caída"))
+
+    const page = await renderPage()
+
+    expect(page.props.puedeVotar).toBe(false)
+    expect(page.props.isAdmin).toBe(false)
     expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
   })
 

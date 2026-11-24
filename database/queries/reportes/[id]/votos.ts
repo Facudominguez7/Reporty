@@ -96,21 +96,31 @@ async function getVotePresence(
   };
 }
 
+/**
+ * Resume los votos de un reporte: los conteos públicos y, si hay usuario, si ya votó.
+ *
+ * @param supabase - Cliente con el que se leen los votos.
+ * @param reporteId - ID del reporte.
+ * @param usuarioId - ID del visitante, o una promesa que lo resuelve. Los conteos no lo esperan:
+ *   arrancan enseguida y solo la consulta de los votos propios espera al usuario.
+ * @returns Conteos y presencia del voto propio, con el primer error encontrado.
+ */
 export async function getReporteVoteSummary(
   supabase: SupabaseClient,
   reporteId: string,
-  usuarioId?: string | null,
+  usuarioId?: string | null | PromiseLike<string | null | undefined>,
 ) {
-  // The counts and the current user's vote presence are independent, so they load together.
-  const [countsResult, presences] = await Promise.all([
-    getVoteAggregateCounts(supabase, reporteId),
-    usuarioId
+  // The counts never depend on the visitor, so they start right away.
+  const countsPromise = getVoteAggregateCounts(supabase, reporteId);
+  const presencesPromise = Promise.resolve(usuarioId).then((id) =>
+    id
       ? Promise.all([
-          getVotePresence(supabase, "votos_no_existe", reporteId, usuarioId),
-          getVotePresence(supabase, "votos_reparado", reporteId, usuarioId),
+          getVotePresence(supabase, "votos_no_existe", reporteId, id),
+          getVotePresence(supabase, "votos_reparado", reporteId, id),
         ])
       : null,
-  ]);
+  );
+  const [countsResult, presences] = await Promise.all([countsPromise, presencesPromise]);
 
   if (countsResult.error) {
     console.error("Error al obtener resumen agregado de votos:", countsResult.error);
