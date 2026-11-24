@@ -58,3 +58,8 @@
   - Nota aplicada (36f7520): la relación queda fijada por columna (`public_profiles!usuario_id`), así otra clave foránea hacia `profiles` no vuelve ambiguo el embed. Se verificó con anon en producción.
   - Notas sin cambio: un id numérico inexistente dispara igual las 3 consultas de moderación, y sus resultados se descartan. Si alguien solo mueve el mapa, el vencimiento absoluto de la sesión se aplica en la siguiente página que abra.
 - **L10 (comparación con `main`, servidor aparte, base local):** respuestas idénticas en 4 zonas del mapa (puntos a zoom 18, 15 y 13, y grupos) y en las props de 7 fichas anónimas (1, 13, 11, 2, 221, 63 y 999999).
+- **L11 (revisión de la PR #314):**
+  - P2, se aplica: si la lectura del rol lanza una excepción, `main` ocultaba los votos y la rama los mostraba. Ahora la ficha oculta los votos cada vez que el rol no se pudo leer. No cambia nada para quien tiene rol, porque `rol_id` vale 2 por defecto y no hay perfiles sin rol. Esto también corrige lo que se anotó en L7.
+  - P3, se aplica: el conteo de votos arranca sin esperar la sesión. Solo la consulta de los votos propios espera al usuario.
+  - P3, sin cambio: las 3 consultas de moderación con un id inexistente se aceptan como costo de la paralelización.
+
