@@ -18,7 +18,7 @@ import { HowToUseDialog } from "@/components/how-to-use-dialog"
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
 import { MascotasOnboardingModal, OnboardingModal } from "@/components/onboarding-modal"
 import { IntroEntrada } from "@/components/intro-entrada"
-import type { ContenidoZonaMapa } from "@/database/queries/reportes/mapa-por-zona"
+import type { ContenidoZonaMapa, FiltrosMapa } from "@/database/queries/reportes/mapa-por-zona"
 import { useContenidoZonaMapa } from "@/components/map/use-contenido-zona"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
@@ -135,6 +135,33 @@ export function PetLayerError({ error }: { error: string | null }) {
 /** Lista vacía estable para cuando la zona llega como grupos. */
 const SIN_PUNTOS: never[] = []
 
+type MapaPorZonaProps = {
+  contenidoInicial: ContenidoZonaMapa
+  filtros: FiltrosMapa
+  mascotas: MascotaMapa[]
+  layer: "reportes" | "mascotas"
+  focoReporte: FocoReporte | null
+}
+
+/**
+ * Mapa con carga por zona (#281). El estado de la zona vive acá y no en `MapaClient`: así cada
+ * zona que llega redibuja solo el mapa, no los filtros, diálogos y botones de la página.
+ */
+function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }: MapaPorZonaProps) {
+  const { contenido, alCambiarZona } = useContenidoZonaMapa(contenidoInicial, filtros)
+  return (
+    <MapContainer
+      reports={contenido.tipo === "puntos" ? contenido.reportes : SIN_PUNTOS}
+      grupos={contenido.tipo === "grupos" ? contenido.grupos : undefined}
+      onCambioZona={alCambiarZona}
+      mascotas={mascotas}
+      layer={layer}
+      showLegend
+      focoReporte={focoReporte}
+    />
+  )
+}
+
 export function MapaClient({ contenidoInicial, mascotas, categorias, estados, prioridades, error, petError, capaInicial = "reportes", focoReporte = null }: MapaClientProps) {
   // The map tiles are the largest paint of this page. Rendering this hint during SSR
   // puts it in the document head, so the tile connection opens while the map code downloads.
@@ -170,14 +197,12 @@ export function MapaClient({ contenidoInicial, mascotas, categorias, estados, pr
   )
 
   // Mapa por zona (#281): cada movimiento pide los reportes de la zona visible con estos filtros.
-  const { contenido, alCambiarZona } = useContenidoZonaMapa(contenidoInicial, {
+  const filtrosZona: FiltrosMapa = {
     search: searchParams.get("search") ?? undefined,
     categoria: searchParams.get("categoria") ?? undefined,
     estado: searchParams.get("estado") ?? undefined,
     prioridad: searchParams.get("prioridad") ?? undefined,
-  })
-  const reportesZona = contenido.tipo === "puntos" ? contenido.reportes : SIN_PUNTOS
-  const gruposZona = contenido.tipo === "grupos" ? contenido.grupos : undefined
+  }
 
   const activeFiltersLabel = `${activeFilters} filtro${activeFilters === 1 ? "" : "s"} activo${activeFilters === 1 ? "" : "s"}`
 
@@ -230,13 +255,11 @@ export function MapaClient({ contenidoInicial, mascotas, categorias, estados, pr
             </Alert>
           </div>
         ) : (
-          <MapContainer
-            reports={reportesZona}
-            grupos={gruposZona}
-            onCambioZona={alCambiarZona}
+          <MapaPorZona
+            contenidoInicial={contenidoInicial}
+            filtros={filtrosZona}
             mascotas={mascotasFiltradas}
             layer={layer}
-            showLegend
             focoReporte={focoReporte}
           />
         )}
