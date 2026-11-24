@@ -20,9 +20,19 @@ function redirectSignal(destination: string): never {
   throw new Error(`REDIRECT:${destination}`)
 }
 
+/** Converts a simulated getUser result into the equivalent getClaims answer. */
+function claimsDe(result: { data?: { user: { id: string; is_anonymous: boolean } | null }; error?: Error | null }) {
+  const usuario = result.data?.user
+  if (result.error || !usuario) return { data: null, error: result.error ?? null }
+  return { data: { claims: { sub: usuario.id, is_anonymous: usuario.is_anonymous } }, error: null }
+}
+
 function mockAuth(result: { data?: { user: typeof registeredUser | typeof guestUser | null }; error?: Error | null }, throws?: Error) {
   createClient.mockResolvedValue({
-    auth: { getUser: throws ? vi.fn().mockRejectedValue(throws) : vi.fn().mockResolvedValue(result) },
+    auth: {
+      getClaims: throws ? vi.fn().mockRejectedValue(throws) : vi.fn().mockResolvedValue(claimsDe(result)),
+      getUser: vi.fn().mockRejectedValue(new Error("the page must not call Supabase Auth")),
+    },
   })
 }
 

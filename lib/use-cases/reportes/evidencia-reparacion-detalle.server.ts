@@ -21,6 +21,7 @@ import { getPublicProfile } from "@/database/queries/profiles"
 import { resolveReportImageThumbnailUrl, resolveReportImageUrl } from "@/lib/media/report-images"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
+import { obtenerUsuarioDeLectura } from "@/lib/auth/usuario-de-lectura"
 import {
   UMBRAL_CONFIRMACIONES_REPARACION,
   puedeInformarReparacion,
@@ -28,6 +29,15 @@ import {
 } from "./evidencia-reparacion"
 
 /** Los tres estados que puede mostrar la ficha del reporte (S11). */
+/**
+ * Visitante de la ficha: el usuario de los claims verificados de la sesión o el de
+ * `auth.getUser()`. Sus datos solo deciden qué se muestra; las acciones vuelven a comprobarlos.
+ */
+export type UsuarioVisitante = Pick<User, "id" | "is_anonymous"> & {
+  email_confirmed_at?: string | null
+  correo_confirmado?: boolean
+}
+
 export type EstadoVisibleReparacion = "informada" | "en_verificacion" | "reparado"
 
 /**
@@ -133,7 +143,7 @@ function elegirEvidencia(filas: FilaEvidencia[]): FilaEvidencia | null {
  * Administración sí participa como cualquier cuenta habilitada (L21).
  */
 function motivoSinParticipacion(
-  usuario: Pick<User, "id" | "is_anonymous" | "email_confirmed_at"> | null,
+  usuario: UsuarioVisitante | null,
   rolId: number | null,
   autorId: string,
 ): MotivoSinParticipacion | null {
@@ -196,7 +206,7 @@ async function leerSeccion(
     reporteId: number
     reporteEstadoId: number
     reporteAutorId: string | null
-    usuario: Pick<User, "id" | "is_anonymous" | "email_confirmed_at"> | null
+    usuario: UsuarioVisitante | null
     rolId: number | null
   },
 ): Promise<SeccionReparacionVista | null> {
@@ -294,15 +304,14 @@ export async function obtenerSeccionReparacion(
   reporteId: number,
   reporteEstadoId: number,
   reporteAutorId: string | null = null,
-  visitante?: { usuario: User | null; rolId: number | null },
+  visitante?: { usuario: UsuarioVisitante | null; rolId: number | null },
 ): Promise<SeccionReparacionVista | null> {
   try {
     let usuario = visitante?.usuario ?? null
     let rolId = visitante?.rolId ?? null
     if (!visitante) {
       const sesion = await createClient()
-      const { data } = await sesion.auth.getUser()
-      usuario = data.user ?? null
+      usuario = await obtenerUsuarioDeLectura(sesion)
       // El rol se lee del perfil de la base con la sesión, nunca del navegador.
       rolId = usuario
         ? (await getUserRoleContext(sesion, usuario.id)).data?.roleId ?? null

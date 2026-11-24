@@ -7,6 +7,7 @@ import type {
 import { getDashboardUserReports, type DashboardUserReport, type FiltrosReportes } from "@/database/queries/reportes/get-reportes"
 import { getUserRoleContext } from "@/lib/authz/roles"
 import { createClient } from "@/utils/supabase/server"
+import { obtenerUsuarioDeLectura } from "@/lib/auth/usuario-de-lectura"
 
 export type DashboardAnalyticsData = {
   totalReportes: number
@@ -45,9 +46,7 @@ export async function getDashboardPageData(
   filtros: Pick<FiltrosReportes, "search" | "categoria" | "estado" | "prioridad"> = {},
 ): Promise<DashboardPageData> {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await obtenerUsuarioDeLectura(supabase)
 
   if (!user) {
     return {

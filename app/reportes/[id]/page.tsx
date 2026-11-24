@@ -13,7 +13,8 @@ import {
 import { getEstados } from "@/database/queries/admin/index"
 import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo";
 import { REPORT_STATE_IDS, ROLE_IDS } from "@/lib/authz/catalog";
-import { esDefensoria, getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
+import { esDefensoria, getUserRoleContext, puedeOperarCuadrillas, puedeVotarReportes } from "@/lib/authz/roles";
+import { obtenerUsuarioDeLectura, sesionVigenteEnAuth } from "@/lib/auth/usuario-de-lectura";
 import { cuadrillasHabilitadas } from "@/lib/features";
 import { estadoFotografias, tieneRevisionRechazoPendiente } from "@/lib/moderation/estado-publico.server";
 import { obtenerSeccionReparacion } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
@@ -55,7 +56,8 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
     const reporteIdNumerico = parseReporteId(id);
 
     // Loads that only need the report id start right away, at the same time as the user lookup.
-    const userPromise = supabase.auth.getUser().then(({ data }) => data.user);
+    // The user comes from the verified token claims, without a trip to Supabase Auth (#310).
+    const userPromise = obtenerUsuarioDeLectura(supabase);
     const usuarioIdPromise = userPromise.then((user) => user?.id ?? null);
     const comentariosPromise = getComentariosReporte(supabase, id);
     const historialPromise = getHistorialEstados(supabase, id);
@@ -94,7 +96,17 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
     const gestionPromise =
       cuadrillasHabilitadas() && reporteIdNumerico !== null
         ? Promise.all([userPromise, rolIdPromise])
-            .then(([user, rolId]) => obtenerGestionOperativaDetalle(supabase, user?.id ?? null, reporteIdNumerico, rolId))
+            .then(async ([user, rolId]) => {
+              // Crew staff read internal data with the service client, so their session is confirmed
+              // with Supabase Auth first: a revoked staff session must not keep seeing it (#310, S4).
+              const vigente = user && puedeOperarCuadrillas(rolId) ? await sesionVigenteEnAuth(supabase, user.id) : true;
+              return obtenerGestionOperativaDetalle(
+                supabase,
+                vigente ? user?.id ?? null : null,
+                reporteIdNumerico,
+                vigente ? rolId : null,
+              );
+            })
             .catch((gestionError) => {
               console.error("Error al cargar la gestión operativa:", gestionError);
               return null;

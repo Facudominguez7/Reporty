@@ -93,7 +93,25 @@ function crearSesion(usuario: UsuarioDePrueba | null, rolId: number | null = ROL
   consultaPerfil.eq = () => consultaPerfil
   consultaPerfil.single = async () => ({ data: { rol_id: rolId, roles: null }, error: null })
   return {
-    auth: { getUser: async () => ({ data: { user: usuario } }) },
+    // The section reads the verified token claims; Supabase Auth marks a confirmed email with
+    // user_metadata.email_verified. Calling getUser here would be the trip #310 removed.
+    auth: {
+      getClaims: async () => ({
+        data: usuario
+          ? {
+              claims: {
+                sub: usuario.id,
+                is_anonymous: usuario.is_anonymous,
+                user_metadata: { email_verified: Boolean(usuario.email_confirmed_at) },
+              },
+            }
+          : null,
+        error: null,
+      }),
+      getUser: async () => {
+        throw new Error("the read path must not call Supabase Auth")
+      },
+    },
     from: () => consultaPerfil,
   }
 }
