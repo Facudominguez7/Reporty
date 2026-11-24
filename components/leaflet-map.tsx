@@ -376,6 +376,25 @@ function enfocarReporte(
 }
 
 /**
+ * Recuerda el marcador en foco hasta que su popup se abra, para reintentarlo si llega otra
+ * zona antes. Si el usuario arrastra el mapa, se olvida: no hay que llevarlo de vuelta a un
+ * lugar del que se fue.
+ *
+ * @param map - Mapa de Leaflet.
+ * @param marcador - Marcador del reporte en foco, si está en la zona.
+ * @param pendienteRef - Ref donde queda el marcador mientras su popup no se abrió.
+ */
+function seguirFoco(map: L.Map, marcador: L.Marker | null, pendienteRef: { current: L.Marker | null }) {
+  if (!marcador) return
+  pendienteRef.current = marcador
+  const olvidar = () => {
+    if (pendienteRef.current === marcador) pendienteRef.current = null
+  }
+  marcador.once("popupopen", olvidar)
+  map.once("dragstart", olvidar)
+}
+
+/**
  * Mapa principal de Leaflet con reportes y mascotas agrupados en clusters.
  *
  * @param focoReporte - Reporte al que la primera vista se acerca y abre su popup.
@@ -395,6 +414,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const capaGruposRef = useRef<L.LayerGroup | null>(null)
   // El mapa se crea una sola vez: el evento lee siempre el callback más reciente desde esta ref.
   const onCambioZonaRef = useRef(onCambioZona)
+  // Marcador del reporte en foco cuyo popup todavía no se abrió (ver `seguirFoco`).
+  const focoPendienteRef = useRef<L.Marker | null>(null)
   useEffect(() => {
     onCambioZonaRef.current = onCambioZona
   })
@@ -568,6 +589,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
 
     return () => {
       container.removeEventListener("error", handlePetImageError, true)
+      // Cancela lo pendiente del grupo (por ejemplo, el acercamiento al reporte en foco): si
+      // termina después de vaciarlo, markercluster busca un marcador sin grupo y la página falla.
+      clusterGroupRef.current?.off()
       clusterGroupRef.current?.clearLayers()
       clusterGroupRef.current = null
       tileLayerRef.current = null
@@ -575,6 +599,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       marcadoresReporte.clear()
       mascotasDibujadasRef.current = { lista: null, marcadores: [] }
       seleccionDibujadaRef.current = null
+      focoPendienteRef.current = null
 
       map.remove()
       mapRef.current = null
@@ -612,10 +637,14 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     }
 
     // Diferencia por ID: los reportes que siguen igual conservan su marcador (y su popup abierto).
+    // Los marcadores que salen y los que entran se pasan al grupo en lote: de a uno, el grupo se
+    // recalcula cada vez y con cientos de reportes el mapa se traba.
     const vigentes = new Set(reports.map((report) => report.id))
+    const quitar: L.Marker[] = []
+    const sumar: L.Marker[] = []
     for (const [id, { marcador }] of marcadores) {
       if (vigentes.has(id)) continue
-      clusterGroup.removeLayer(marcador)
+      quitar.push(marcador)
       marcadores.delete(id)
     }
 
@@ -628,29 +657,29 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
         if (focoReporte?.reporteId === report.id) marcadorEnFoco = dibujado.marcador
         continue
       }
-      if (dibujado) clusterGroup.removeLayer(dibujado.marcador)
+      if (dibujado) quitar.push(dibujado.marcador)
 
       const marker = L.marker([report.coordinates[0], report.coordinates[1]], {
         icon: getIcon(report.priority, report.category, Boolean(report.estadoOperativo), senalEstadoMapa(report.estadoId)),
       })
 
-      const popupContent = createPopupContent(
-        report,
-        getStatusColor(report.status),
-        getPriorityColor(report.priority),
-        getCategoryColor()
+      // El popup se arma recién al abrirlo: armar cientos que nadie abre trababa cada carga.
+      marker.bindPopup(
+        () => createPopupContent(report, getStatusColor(report.status), getPriorityColor(report.priority), getCategoryColor()),
+        OPCIONES_POPUP,
       )
-
-      marker.bindPopup(popupContent, OPCIONES_POPUP)
       if (onSeleccionarReporte) {
         marker.on("click", () => onSeleccionarReporte(report.id))
       }
-      clusterGroup.addLayer(marker)
+      sumar.push(marker)
       marcadores.set(report.id, { marcador: marker, firma })
       if (focoReporte?.reporteId === report.id) {
         marcadorEnFoco = marker
       }
     }
+
+    if (quitar.length) clusterGroup.removeLayers(quitar)
+    if (sumar.length) clusterGroup.addLayers(sumar)
 
     const mascotasDibujadas = mascotasDibujadasRef.current
     const mascotasCambiaron = mascotasDibujadas.lista !== mascotas
@@ -691,8 +720,16 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     if (isInitialView) {
       if (focoReporte) {
         enfocarReporte(map, clusterGroup, focoReporte, marcadorEnFoco)
+        seguirFoco(map, marcadorEnFoco, focoPendienteRef)
       }
       return
+    }
+
+    // Acercarse al foco mueve el mapa y trae otra zona; al reacomodarse los marcadores la
+    // animación de markercluster se pierde y el popup no se abre. Se reintenta hasta abrirlo.
+    const pendiente = focoPendienteRef.current
+    if (pendiente && clusterGroup.hasLayer(pendiente)) {
+      clusterGroup.zoomToShowLayer(pendiente, () => pendiente.openPopup())
     }
 
     // Con carga por zona los reportes cambian porque el mapa se movió: no se re-encuadra.

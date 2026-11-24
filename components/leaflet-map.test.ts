@@ -11,13 +11,18 @@ const mocks = vi.hoisted(() => {
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
   const map = {
-    setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(),
+    setView: vi.fn(() => calls.push("setView")), on: vi.fn(), once: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(),
     getBounds: vi.fn(() => ({ getWest: () => -55.95, getSouth: () => -27.4, getEast: () => -55.85, getNorth: () => -27.35 })),
     getZoom: vi.fn(() => 15),
   }
-  const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), removeLayer: vi.fn(() => calls.push("removeLayer")), getLayers: vi.fn(() => []) }
+  const cluster = {
+    addTo: vi.fn(), zoomToShowLayer: vi.fn(), hasLayer: vi.fn(() => true), off: vi.fn(() => calls.push("cluster.off")), clearLayers: vi.fn(() => calls.push("clearLayers")), addLayer: vi.fn(() => calls.push("addLayer")), removeLayer: vi.fn(() => calls.push("removeLayer")), getLayers: vi.fn(() => []),
+    // Los lotes cuentan como un addLayer/removeLayer por marcador, para comparar con lo de antes.
+    addLayers: vi.fn((capas: unknown[]) => capas.forEach(() => cluster.addLayer())),
+    removeLayers: vi.fn((capas: unknown[]) => capas.forEach(() => cluster.removeLayer())),
+  }
   const capaGrupos = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn() }
-  const marker = { bindPopup: vi.fn(), on: vi.fn() }
+  const marker = { bindPopup: vi.fn(), on: vi.fn(), once: vi.fn(), openPopup: vi.fn(), getLatLng: vi.fn(() => [-27.36, -55.9]) }
   return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, capaGrupos, marker, refIndex: 0 }
 })
 
@@ -57,6 +62,11 @@ const report = {
 function render(reports: Parameters<typeof LeafletMap>[0]["reports"]) {
   mocks.refIndex = 0
   renderToStaticMarkup(createElement(LeafletMap, { reports }))
+}
+
+/** Contenido de un popup: el de los reportes se arma recién al abrirlo (es una función). */
+function contenidoPopup(contenido: unknown): string {
+  return typeof contenido === "function" ? (contenido as () => string)() : (contenido as string)
 }
 
 describe("LeafletMap initial view", () => {
@@ -115,7 +125,7 @@ describe("LeafletMap initial view", () => {
     // Rerender with a pet while the imperative map instance is active.
     mocks.refIndex = 0
     renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: "Gato <script>", description: `Blanca & "curiosa"`, status: "Encontrada", createdAt: "2026-01-02", phone: `123" onclick="x`, image: "javascript:alert(1)", coordinates: [-27.36, -55.89] }] }))
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     expect(popup.trim()).toMatch(/^<a href="\/mascotas\/9"[^>]*>[\s\S]*<\/a>$/)
     expect(popup).toContain("display:block;min-width:250px")
     expect(popup.match(/^\s*<a[^>]*>/)?.[0]).not.toMatch(/\b(?:tabindex|onclick|onkeydown)\s*=/i)
@@ -140,10 +150,10 @@ describe("LeafletMap initial view", () => {
   it("matches incident popup layout while linking the entire pet content", () => {
     vi.stubGlobal("window", { location: { origin: "https://reporty.test" } })
     render([{ ...report, image: "/report.jpg" }])
-    const incidentPopup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const incidentPopup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     mocks.refIndex = 0
     renderToStaticMarkup(createElement(LeafletMap, { reports: [], mascotas: [{ id: 9, species: 'Gato "<mimo>"', description: "A&".repeat(60), status: "Perdida", createdAt: "2026-01-02", phone: '<123>', image: '/foto?x="&y=1', coordinates: [-27.36, -55.89] }] }))
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     for (const style of ["min-width:250px;max-width:270px", "font-size:15px;font-weight:700", "margin-bottom:10px;overflow:hidden;border-radius:10px", "width:100%;height:124px;object-fit:cover", "min-height:26px", "padding-top:10px;border-top:1px solid var(--border)"]) {
       expect(incidentPopup).toContain(style)
       expect(popup).toContain(style)
@@ -245,7 +255,7 @@ describe("LeafletMap initial view", () => {
 
     // El popup distingue la toma pero nunca muestra el número de reclamo (S9): sin rótulo
     // «Reclamo Nº» ni píldora con el número.
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     expect(popup).toContain("Tomado por la Defensoría del Pueblo")
     expect(popup).toMatch(/Creado el \d/)
     expect(popup).not.toContain("Reclamo")
@@ -259,7 +269,7 @@ describe("LeafletMap initial view", () => {
     const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
     expect(html).toContain("Tomado por la Defensoría del Pueblo")
     expect(html).toContain('title="Con cuadrilla asignada" style="position:absolute;top:-3px;left:-3px;')
-    const popup = mocks.marker.bindPopup.mock.calls.at(-1)?.[0] as string
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
     expect(popup).toContain("En progreso · Cuadrilla Norte")
   })
 
@@ -330,6 +340,55 @@ describe("LeafletMap initial view", () => {
       renderZona({ reports: [], mascotas: [mascota] as never })
 
       expect(mocks.map.setView).toHaveBeenCalledTimes(2)
+    })
+
+    it("con muchos reportes los suma al mapa en un solo lote y arma cada popup recién al abrirlo", () => {
+      const muchos = Array.from({ length: 50 }, (_, i) => ({ ...report, id: 100 + i }))
+      renderZona({ reports: muchos })
+
+      expect(mocks.cluster.addLayers).toHaveBeenCalledOnce()
+      expect(mocks.cluster.addLayers.mock.calls[0][0]).toHaveLength(50)
+      expect(typeof mocks.marker.bindPopup.mock.calls[0][0]).toBe("function")
+
+      renderZona({ reports: muchos.slice(10) })
+      expect(mocks.cluster.removeLayers).toHaveBeenCalledOnce()
+      expect(mocks.cluster.removeLayers.mock.calls[0][0]).toHaveLength(10)
+    })
+
+    it("al desmontar cancela lo pendiente del grupo antes de vaciarlo (si no, el foco en curso rompe la página)", () => {
+      renderZona({ reports: [report] })
+      mocks.calls.length = 0
+
+      for (const limpiar of mocks.cleanups) limpiar()
+
+      expect(mocks.calls.indexOf("cluster.off")).toBeGreaterThanOrEqual(0)
+      expect(mocks.calls.indexOf("cluster.off")).toBeLessThan(mocks.calls.indexOf("clearLayers"))
+    })
+
+    it("si llega una zona antes de abrir el popup del reporte en foco, lo vuelve a intentar", () => {
+      const foco = { reporteId: report.id, lat: -27.36, lon: -55.9 }
+      renderZona({ reports: [report], focoReporte: foco })
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledOnce()
+
+      renderZona({ reports: [report, otro], focoReporte: foco })
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledTimes(2)
+
+      // Abierto el popup, las zonas siguientes ya no lo tocan.
+      const alAbrir = mocks.marker.once.mock.calls.find(([evento]) => evento === "popupopen")?.[1] as () => void
+      alAbrir()
+      renderZona({ reports: [otro, report], focoReporte: foco })
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledTimes(2)
+    })
+
+    it("si el usuario mueve el mapa antes de que se abra el popup del foco, no lo arrastra de vuelta", () => {
+      const foco = { reporteId: report.id, lat: -27.36, lon: -55.9 }
+      renderZona({ reports: [report], focoReporte: foco })
+
+      const alArrastrar = mocks.map.once.mock.calls.find(([evento]) => evento === "dragstart")?.[1] as () => void
+      alArrastrar()
+      renderZona({ reports: [report, otro], focoReporte: foco })
+
+      expect(mocks.cluster.zoomToShowLayer).toHaveBeenCalledOnce()
     })
 
     it("dibuja los grupos con su cantidad y al tocar uno se acerca a sus límites", () => {
