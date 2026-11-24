@@ -15,7 +15,7 @@ import { getCategorias, getPrioridades } from "@/database/queries/reportes/nuevo
 import { REPORT_STATE_IDS, ROLE_IDS } from "@/lib/authz/catalog";
 import { esDefensoria, getUserRoleContext, puedeVotarReportes } from "@/lib/authz/roles";
 import { cuadrillasHabilitadas } from "@/lib/features";
-import { tieneFotografiaAprobada, tieneFotografiaPendiente, tieneRevisionRechazoPendiente } from "@/lib/moderation/estado-publico.server";
+import { estadoFotografias, tieneRevisionRechazoPendiente } from "@/lib/moderation/estado-publico.server";
 import { obtenerSeccionReparacion } from "@/lib/use-cases/reportes/evidencia-reparacion-detalle.server";
 import { obtenerGestionOperativaDetalle } from "@/lib/use-cases/cuadrillas/detalle-operativo";
 import { ReporteDetalleClient, type ReporteDetalleInicial } from "./reporte-detalle-client";
@@ -62,14 +62,14 @@ async function cargarDetalle(id: string): Promise<ReporteDetalleInicial> {
     // The report row does not wait for the session: only its vote-presence lookup needs the user.
     const reportePromise = getReporteDetalle(supabase, id, usuarioIdPromise);
     // Moderation and the rejection review only need the id, so they start now too. Their result is
-    // used only if the report exists, and the review only while the report is open.
+    // used only if the report exists, and the review only while the report is open. Both photo
+    // states come from one query: a Worker lets only six requests wait for headers at a time, and
+    // this page already starts six.
     const moderacionPromise =
       reporteIdNumerico !== null
-        ? Promise.all([
-            tieneFotografiaPendiente(reporteIdNumerico),
-            tieneFotografiaAprobada(reporteIdNumerico),
-            tieneRevisionRechazoPendiente(reporteIdNumerico),
-          ])
+        ? Promise.all([estadoFotografias(reporteIdNumerico), tieneRevisionRechazoPendiente(reporteIdNumerico)]).then(
+            ([fotografias, revision]) => [fotografias.pendiente, fotografias.aprobada, revision] as const,
+          )
         : Promise.resolve([false, false, false] as const);
     // The role is read once per request, from the server session, and shared by voting, the admin
     // tools, the crew panel and the repair section. A failed lookup means "no role": the vote

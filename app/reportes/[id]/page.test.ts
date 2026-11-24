@@ -7,8 +7,7 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   getCategorias: vi.fn(),
   getPrioridades: vi.fn(),
-  tieneFotografiaPendiente: vi.fn(),
-  tieneFotografiaAprobada: vi.fn(),
+  estadoFotografias: vi.fn(),
   tieneRevisionRechazoPendiente: vi.fn(),
   getUserRoleContext: vi.fn(),
   verificarEsAdmin: vi.fn(),
@@ -21,8 +20,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./reporte-detalle-client", () => ({ ReporteDetalleClient: () => null }))
 vi.mock("@/lib/moderation/estado-publico.server", () => ({
-  tieneFotografiaPendiente: mocks.tieneFotografiaPendiente,
-  tieneFotografiaAprobada: mocks.tieneFotografiaAprobada,
+  estadoFotografias: mocks.estadoFotografias,
   tieneRevisionRechazoPendiente: mocks.tieneRevisionRechazoPendiente,
 }))
 vi.mock("@/utils/supabase/server", () => ({
@@ -76,8 +74,7 @@ describe("ReporteDetallePage", () => {
     mocks.getPrioridades.mockReset().mockResolvedValue([{ id: 2, nombre: "Alta" }])
     mocks.getReporteDetalle.mockReset().mockResolvedValue({ data: { id: 5, estado_id: 1, usuario_id: "autor-5" }, error: null })
     mocks.getNumeroReclamoDefensoria.mockReset().mockResolvedValue("RE-2026-77")
-    mocks.tieneFotografiaPendiente.mockReset().mockResolvedValue(false)
-    mocks.tieneFotografiaAprobada.mockReset().mockResolvedValue(false)
+    mocks.estadoFotografias.mockReset().mockResolvedValue({ pendiente: false, aprobada: false })
     mocks.tieneRevisionRechazoPendiente.mockReset().mockResolvedValue(false)
     mocks.obtenerGestionOperativaDetalle.mockReset().mockResolvedValue({
       puedeOperar: false,
@@ -94,10 +91,11 @@ describe("ReporteDetallePage", () => {
 
   it("passes only the pending boolean to anonymous visitors", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
-    mocks.tieneFotografiaPendiente.mockResolvedValue(true)
+    mocks.estadoFotografias.mockResolvedValue({ pendiente: true, aprobada: false })
     const page = await renderPage()
     expect(page.props.fotografiaPendiente).toBe(true)
-    expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
+    expect(page.props.puedeContactar).toBe(false)
+    expect(mocks.estadoFotografias).toHaveBeenCalledWith(5)
     expect(page.props.reporte).toEqual({ id: 5, estado_id: 1, usuario_id: "autor-5" })
   })
 
@@ -136,10 +134,11 @@ describe("ReporteDetallePage", () => {
 
   it("allows contact actions only when an image was explicitly approved", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
-    mocks.tieneFotografiaAprobada.mockResolvedValue(true)
+    mocks.estadoFotografias.mockResolvedValue({ pendiente: false, aprobada: true })
     const page = await renderPage()
     expect(page.props.puedeContactar).toBe(true)
-    expect(mocks.tieneFotografiaAprobada).toHaveBeenCalledWith(5)
+    expect(page.props.fotografiaPendiente).toBe(false)
+    expect(mocks.estadoFotografias).toHaveBeenCalledWith(5)
   })
 
   it("lets a citizen vote while crews are turned off", async () => {
@@ -244,8 +243,9 @@ describe("ReporteDetallePage", () => {
     await new Promise((resolver) => setTimeout(resolver, 0))
 
     expect(mocks.getReporteDetalle).toHaveBeenCalledTimes(1)
-    expect(mocks.tieneFotografiaPendiente).toHaveBeenCalledWith(5)
-    expect(mocks.tieneFotografiaAprobada).toHaveBeenCalledWith(5)
+    // A single moderation query: the Worker lets only six requests wait for headers at a time.
+    expect(mocks.estadoFotografias).toHaveBeenCalledTimes(1)
+    expect(mocks.estadoFotografias).toHaveBeenCalledWith(5)
     expect(mocks.tieneRevisionRechazoPendiente).toHaveBeenCalledWith(5)
 
     resolverUsuario({ data: { user: null } })
@@ -265,8 +265,7 @@ describe("ReporteDetallePage", () => {
 
   it("no muestra datos de moderación si el reporte no existe", async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
-    mocks.tieneFotografiaPendiente.mockResolvedValue(true)
-    mocks.tieneFotografiaAprobada.mockResolvedValue(true)
+    mocks.estadoFotografias.mockResolvedValue({ pendiente: true, aprobada: true })
     mocks.getReporteDetalle.mockResolvedValue({ data: null, error: { message: "no existe" } })
 
     const page = await renderPage()

@@ -5,6 +5,9 @@ import { getComentariosReporte } from "./comentarios"
 import { getReporteDetalle } from "./get-reporte-detalle"
 import { getHistorialEstados } from "./historial-estados"
 
+// The report row is read with the cookie-less public client, shared with the SEO metadata.
+vi.mock("@/utils/supabase/public", () => ({ createPublicClient: () => clienteFalso() }))
+
 vi.mock("./votos", () => ({
   getReporteVoteSummary: vi.fn().mockResolvedValue({ data: { total: 0 }, error: null }),
 }))
@@ -32,8 +35,18 @@ function clienteFalso() {
         return builder
       }
       builder.single = async () => respuesta
+      builder.maybeSingle = async () => respuesta
       builder.then = (resolver: (valor: unknown) => void) => resolver(respuesta)
       return builder
+    },
+  } as unknown as SupabaseClient
+}
+
+/** Cliente con sesión que no debe usarse para la fila del reporte: falla si se consulta. */
+function clienteSinTablas() {
+  return {
+    from(tabla: string) {
+      throw new Error(`la fila del reporte no debe leerse con el cliente de sesión (${tabla})`)
     },
   } as unknown as SupabaseClient
 }
@@ -48,7 +61,7 @@ describe("perfiles en la misma consulta del detalle", () => {
   it("trae el autor del reporte en la misma consulta, sin pedir public_profiles aparte", async () => {
     estado.filas.reportes = { id: 5, usuario_id: "u1", fotos_reporte: [], profiles: { username: "ana" } }
 
-    const { data } = await getReporteDetalle(clienteFalso(), "5")
+    const { data } = await getReporteDetalle(clienteSinTablas(), "5")
 
     expect(estado.tablas).toEqual(["reportes"])
     expect(estado.selects[0]).toContain("profiles:public_profiles!usuario_id(username)")
@@ -58,7 +71,7 @@ describe("perfiles en la misma consulta del detalle", () => {
   it("deja el autor en null si no tiene perfil público", async () => {
     estado.filas.reportes = { id: 5, usuario_id: "u1", fotos_reporte: [], profiles: null }
 
-    const { data } = await getReporteDetalle(clienteFalso(), "5")
+    const { data } = await getReporteDetalle(clienteSinTablas(), "5")
 
     expect(data?.profiles).toBeNull()
   })

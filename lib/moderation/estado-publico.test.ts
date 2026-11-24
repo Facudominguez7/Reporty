@@ -1,24 +1,43 @@
 import { describe, expect, it, vi } from "vitest"
-import { tieneFotografiaPendiente, tieneRevisionRechazoPendiente } from "./estado-publico.server"
+import { estadoFotografias, tieneRevisionRechazoPendiente } from "./estado-publico.server"
 
-const { from, eq, limit, select, maybeSingle } = vi.hoisted(() => ({
-  from: vi.fn(), eq: vi.fn(), limit: vi.fn(), select: vi.fn(), maybeSingle: vi.fn(),
+const { from, eq, enFiltro, select, maybeSingle } = vi.hoisted(() => ({
+  from: vi.fn(), eq: vi.fn(), enFiltro: vi.fn(), select: vi.fn(), maybeSingle: vi.fn(),
 }))
 vi.mock("@/utils/supabase/admin", () => ({ createAdminClient: () => ({ from }) }))
 
-describe("public pending photo status", () => {
-  it.each([1, 0])("exposes only a boolean for pending count %s", async (count) => {
-    from.mockReturnValue({ select }); select.mockReturnValue({ eq }); eq.mockReturnValue({ eq, limit })
-    limit.mockResolvedValue({ count, error: null })
-    expect(await tieneFotografiaPendiente(42)).toBe(count > 0)
+describe("estado público de las fotografías", () => {
+  /** Prepara la consulta única: select → eq(reporte_id) → in(decision) → filas. */
+  function responder(respuesta: { data: unknown; error: unknown }) {
+    from.mockReturnValue({ select }); select.mockReturnValue({ eq }); eq.mockReturnValue({ in: enFiltro })
+    enFiltro.mockResolvedValue(respuesta)
+  }
+
+  it.each([
+    [[{ decision: "REVIEW" }], { pendiente: true, aprobada: false }],
+    [[{ decision: "APPROVED" }], { pendiente: false, aprobada: true }],
+    [[{ decision: "REVIEW" }, { decision: "APPROVED" }], { pendiente: true, aprobada: true }],
+    [[], { pendiente: false, aprobada: false }],
+  ])("lee pendiente y aprobada en una sola consulta (%o)", async (filas, esperado) => {
+    responder({ data: filas, error: null })
+    expect(await estadoFotografias(42)).toEqual(esperado)
+    expect(from).toHaveBeenCalledTimes(1)
     expect(from).toHaveBeenCalledWith("moderacion_imagenes")
-    expect(select).toHaveBeenCalledWith("id", { count: "exact", head: true })
+    expect(select).toHaveBeenCalledWith("decision")
     expect(eq).toHaveBeenCalledWith("reporte_id", 42)
-    expect(eq).toHaveBeenCalledWith("decision", "REVIEW")
+    expect(enFiltro).toHaveBeenCalledWith("decision", ["REVIEW", "APPROVED"])
+    from.mockClear()
   })
-  it("does not claim a pending photo on query failure", async () => {
-    limit.mockResolvedValue({ count: null, error: { message: "private detail" } })
-    expect(await tieneFotografiaPendiente(42)).toBe(false)
+
+  it("no afirma nada si la consulta falla", async () => {
+    responder({ data: null, error: { message: "private detail" } })
+    expect(await estadoFotografias(42)).toEqual({ pendiente: false, aprobada: false })
+  })
+
+  it("no afirma nada si la consulta lanza una excepción", async () => {
+    from.mockImplementation(() => { throw new Error("red caída") })
+    expect(await estadoFotografias(42)).toEqual({ pendiente: false, aprobada: false })
+    from.mockReset()
   })
 })
 
