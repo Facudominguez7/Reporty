@@ -10,10 +10,15 @@ const mocks = vi.hoisted(() => {
   const markerOptions: Array<{ title?: string; alt?: string; icon?: { html?: string } }> = []
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
-  const map = { setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn() }
-  const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), getLayers: vi.fn(() => []) }
+  const map = {
+    setView: vi.fn(() => calls.push("setView")), on: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(),
+    getBounds: vi.fn(() => ({ getWest: () => -55.95, getSouth: () => -27.4, getEast: () => -55.85, getNorth: () => -27.35 })),
+    getZoom: vi.fn(() => 15),
+  }
+  const cluster = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn(() => calls.push("addLayer")), removeLayer: vi.fn(() => calls.push("removeLayer")), getLayers: vi.fn(() => []) }
+  const capaGrupos = { addTo: vi.fn(), clearLayers: vi.fn(), addLayer: vi.fn() }
   const marker = { bindPopup: vi.fn(), on: vi.fn() }
-  return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, marker, refIndex: 0 }
+  return { calls, icons, refs, listeners, markerOptions, cleanups, container, map, cluster, capaGrupos, marker, refIndex: 0 }
 })
 
 vi.mock("react", async (importOriginal) => {
@@ -33,6 +38,7 @@ vi.mock("leaflet", () => ({
     map: () => mocks.map,
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
+    layerGroup: () => mocks.capaGrupos,
     marker: (_coordinates: unknown, options: { title?: string; alt?: string; icon?: { html?: string } }) => { mocks.markerOptions.push(options); return mocks.marker },
     divIcon: (icon: { className: string; html: string; iconSize?: [number, number] }) => { mocks.icons.push(icon); return icon },
     latLngBounds: () => ({ isValid: () => true, getNorthEast: () => ({ equals: () => true }), getSouthWest: () => ({}), getCenter: () => [1, 2] }),
@@ -223,7 +229,7 @@ describe("LeafletMap initial view", () => {
     render([])
     expect(mocks.map.setView).toHaveBeenLastCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
     expect(mocks.map.setView).toHaveBeenCalledTimes(2)
-    expect(mocks.cluster.clearLayers).toHaveBeenCalledTimes(2)
+    expect(mocks.cluster.removeLayer).toHaveBeenCalledOnce()
   })
 
   it("marca con aro violeta y escudo los reportes tomados por la Defensoría, sin revelar el número", () => {
@@ -263,5 +269,90 @@ describe("LeafletMap initial view", () => {
     const html = mocks.markerOptions.at(-1)?.icon?.html ?? ""
     expect(html).toContain("Con cuadrilla asignada")
     expect(html).not.toContain("Tomado por la Defensoría del Pueblo")
+  })
+
+  describe("carga por zona (#281)", () => {
+    const otro = { ...report, id: 2, coordinates: [-27.37, -55.9] as [number, number] }
+    const grupo = { lat: -27.37, lon: -55.9, cantidad: 412, limites: { oeste: -55.91, sur: -27.38, este: -55.89, norte: -27.36 } }
+
+    function renderZona(props: Partial<Parameters<typeof LeafletMap>[0]>) {
+      mocks.refIndex = 0
+      renderToStaticMarkup(createElement(LeafletMap, { reports: [], onCambioZona: vi.fn(), ...props }))
+    }
+
+    it("avisa la zona visible y el zoom cuando el mapa termina de moverse", () => {
+      const onCambioZona = vi.fn()
+      renderZona({ onCambioZona })
+
+      const alMover = mocks.map.on.mock.calls.find(([evento]) => evento === "moveend")?.[1] as () => void
+      alMover()
+
+      expect(onCambioZona).toHaveBeenCalledWith({ oeste: -55.95, sur: -27.4, este: -55.85, norte: -27.35 }, 15)
+    })
+
+    it("suma y quita marcadores por ID sin redibujar los que siguen", () => {
+      renderZona({ reports: [report] })
+      mocks.cluster.addLayer.mockClear()
+
+      renderZona({ reports: [report, otro] })
+      expect(mocks.cluster.addLayer).toHaveBeenCalledOnce()
+      expect(mocks.cluster.removeLayer).not.toHaveBeenCalled()
+      expect(mocks.cluster.clearLayers).not.toHaveBeenCalled()
+
+      renderZona({ reports: [otro] })
+      expect(mocks.cluster.removeLayer).toHaveBeenCalledOnce()
+      expect(mocks.cluster.addLayer).toHaveBeenCalledOnce()
+    })
+
+    it("redibuja un marcador cuyo reporte cambió", () => {
+      renderZona({ reports: [report] })
+      mocks.cluster.addLayer.mockClear()
+
+      renderZona({ reports: [{ ...report, estadoId: 2, status: "Reparado" }] })
+
+      expect(mocks.cluster.removeLayer).toHaveBeenCalledOnce()
+      expect(mocks.cluster.addLayer).toHaveBeenCalledOnce()
+      expect(mocks.markerOptions.at(-1)?.icon?.html).toContain("repair-aura")
+    })
+
+    it("mover el mapa no lo vuelve a encuadrar", () => {
+      renderZona({ reports: [report] })
+      renderZona({ reports: [otro] })
+      renderZona({ reports: [] })
+
+      expect(mocks.map.fitBounds).not.toHaveBeenCalled()
+      expect(mocks.map.setView).toHaveBeenCalledOnce()
+    })
+
+    it("al cambiar a la capa de mascotas se sigue encuadrando en las mascotas", () => {
+      const mascota = { id: 5, species: "Perro", status: "Perdida", phone: "1", description: "", createdAt: "2026-01-01", coordinates: [-27.36, -55.9] as [number, number], image: null }
+      renderZona({ reports: [report] })
+      renderZona({ reports: [], mascotas: [mascota] as never })
+
+      expect(mocks.map.setView).toHaveBeenCalledTimes(2)
+    })
+
+    it("dibuja los grupos con su cantidad y al tocar uno se acerca a sus límites", () => {
+      renderZona({ grupos: [grupo] })
+
+      expect(mocks.capaGrupos.addLayer).toHaveBeenCalledOnce()
+      const icono = mocks.markerOptions.at(-1)?.icon?.html ?? ""
+      expect(icono).toContain("412")
+      expect(mocks.markerOptions.at(-1)?.title).toBe("412 reportes en esta zona")
+
+      const tocar = mocks.marker.on.mock.calls.findLast(([evento]) => evento === "click")?.[1] as () => void
+      tocar()
+      expect(mocks.map.fitBounds).toHaveBeenCalledWith([[-27.38, -55.91], [-27.36, -55.89]], { padding: [24, 24] })
+    })
+
+    it("al pasar de grupos a puntos borra los grupos", () => {
+      renderZona({ grupos: [grupo] })
+      mocks.capaGrupos.clearLayers.mockClear()
+
+      renderZona({ reports: [report], grupos: [] })
+
+      expect(mocks.capaGrupos.clearLayers).toHaveBeenCalled()
+      expect(mocks.capaGrupos.addLayer).toHaveBeenCalledOnce()
+    })
   })
 })

@@ -20,7 +20,7 @@ Rama: `feat/mapa-por-zona` desde `main` `ad06598`. Entrega: commits por unidad d
 |---|---|---|---|---|
 | T1 (funciones SQL por zona y agrupadas, con pruebas) | S1, S2, S3, S4 | inline | hecha | ver Log L3 |
 | T2 (consulta por zona y endpoint `GET /api/mapa/reportes`) | S2, S4, S5, S6, S7 | inline | hecha | ver Log L4 |
-| T3 (mapa: carga por zona, marcadores incrementales y grupos) | S5, S6, S8 | inline | pendiente | |
+| T3 (mapa: carga por zona, marcadores incrementales y grupos) | S5, S6, S8 | inline | hecha | ver Log L5 |
 
 Ruta inline en las tres: una sola unidad de comportamiento encadenada (cada tarea depende de la anterior), sin motivo de escritor paralelo.
 
@@ -30,3 +30,4 @@ Ruta inline en las tres: una sola unidad de comportamiento encadenada (cada tare
 - L2: decisión vigente de la sesión: opción A (`lat`/`lon` fuente, `ubicacion` generada, aplicada en prod con #295), PostGIS para todo, agrupamiento en el servidor ahora.
 - L3 (T1): RED con PostGIS sin funciones («function public.reportes_en_zona(...) does not exist»), GREEN con `test-mapa-por-zona.sh`. Con `set search_path` Postgres no expande la función en línea: el plan se prueba sobre su cuerpo. PostgREST encadena `select` con relaciones, filtros, orden y límite sobre la RPC (probado como `anon` en la red de Docker). Migraciones #295 y T1 aplicadas en la base local de desarrollo.
 - L4 (T2): RED/GREEN en `lib/map/zona.test.ts` (16), `app/api/mapa/reportes/route.test.ts` (10) y `mapa-por-zona.test.ts` (4). Las 6 pruebas de zona en `get-report-map-data.test.ts` se escribieron después del cambio en `get-reportes.ts` (sin RED observado). Endpoint real contra la base local: 35 puntos en Posadas con estados 1, 2 y 4, `Cache-Control` público, `estado=Rechazado` vacío, zona inválida 400. `tsc` con los mismos 2 errores que `main`; lint sin avisos en los archivos tocados. Pendiente: verificar en el deploy si Cloudflare respeta `s-maxage` (`cf-cache-status`).
+- L5 (T3): RED/GREEN en `lib/map/cargador-zona.test.ts` (9: espera de 250 ms, cancelación, memoria de zonas, fallo sin borrar lo dibujado), `components/leaflet-map.test.ts` (7 nuevas: aviso de zona, diff por ID, redibujo si cambia el reporte, sin re-encuadre, encuadre al pasar a Mascotas, grupos y su clic) y `app/mapa/page.test.ts` (primera zona de la ciudad o del reporte en foco). Chrome real contra la base local: un pedido al abrir (35 puntos), la vista no salta al cargar, volver a zonas vistas no repite pedidos, sin errores de página; con el umbral bajado a 5 de forma temporal se vieron 11 grupos y al tocar uno el mapa se acercó y mostró el punto. Suite completa: solo fallan las 3 de `app/mascotas/nueva/resultado-navegacion.test.ts`, que fallan igual en la base. `tsc` con los 2 errores de la base.

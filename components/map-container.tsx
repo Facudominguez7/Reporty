@@ -20,6 +20,13 @@ import { getPriorityColor } from "@/components/report-card"
 import type { EstadoOperativo } from "@/lib/authz/catalog"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import type { FocoReporte } from "@/lib/map/foco-reporte"
+import type { ZonaMapa } from "@/lib/map/zona"
+import type { GrupoMapa } from "@/database/queries/reportes/get-reportes"
+
+/** Listas vacías estables para la capa que no se muestra. */
+const SIN_REPORTES: Report[] = []
+const SIN_MASCOTAS: MascotaMapa[] = []
+const SIN_GRUPOS: GrupoMapa[] = []
 
 /**
  * Interfaz que representa un reporte con sus datos para visualizar en el mapa
@@ -53,6 +60,10 @@ interface MapContainerProps {
   layer?: "reportes" | "mascotas"
   /** Reporte al que el mapa se acerca al abrir (llegada desde su detalle). */
   focoReporte?: FocoReporte | null
+  /** Grupos de reportes del servidor para zonas densas (#281). */
+  grupos?: GrupoMapa[]
+  /** Carga por zona (#281): recibe la zona visible y el zoom al terminar cada movimiento. */
+  onCambioZona?: (zona: ZonaMapa, zoom: number) => void
 }
 
 /**
@@ -62,11 +73,18 @@ interface MapContainerProps {
  * @param showLegend - Indica si se debe mostrar la leyenda de colores; por defecto `true`
  * @returns El elemento JSX que contiene el mapa y sus superposiciones (leyenda e instrucciones)
  */
-export function MapContainer({ reports, mascotas = [], layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null }: MapContainerProps) {
+export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona }: MapContainerProps) {
   return (
     <div className="relative w-full h-full">
       {/* Componente principal del mapa de Leaflet */}
-      <LeafletMap reports={layer === "reportes" ? reports : []} mascotas={layer === "mascotas" ? mascotas : []} onSeleccionarReporte={onSeleccionarReporte} focoReporte={focoReporte} />
+      <LeafletMap
+        reports={layer === "reportes" ? reports : SIN_REPORTES}
+        mascotas={layer === "mascotas" ? mascotas : SIN_MASCOTAS}
+        grupos={layer === "reportes" ? grupos : SIN_GRUPOS}
+        onSeleccionarReporte={onSeleccionarReporte}
+        focoReporte={focoReporte}
+        onCambioZona={onCambioZona}
+      />
 
       {showLegend && layer === "reportes" && (
         <aside aria-label="Leyenda del mapa" className="map-legend-card absolute bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 z-10 w-41 px-2 py-1 sm:left-5 md:w-52 md:p-3">
