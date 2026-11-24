@@ -213,7 +213,8 @@ describe("estados de la reparación", () => {
     })
 
     expect(html).toContain("Reparado")
-    expect(html).toContain("3 de 3 confirmaciones")
+    expect(html).not.toContain("3 de 3 confirmaciones")
+    expect(html).not.toContain('role="progressbar"')
     expect(html).toContain("Antes y después")
     expect(html).not.toContain("Confirmar reparación")
     expect(html).not.toContain("Impugnar")

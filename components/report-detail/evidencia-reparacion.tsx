@@ -343,14 +343,13 @@ function TarjetaEstadoEvidencia({
         {reparado && !evidencia.porAutorDelReporte && (
           <CardDescription className="text-xs md:text-sm">
             {evidencia.foto
-              ? "La reparación quedó validada y el reporte está Reparado. El antes y el después se mantienen en la ficha."
+              ? "La reparación quedó validada y el reporte está Reparado."
               : "La reparación quedó validada y el reporte está Reparado. La foto de la evidencia no llegó a publicarse, así que no hay una comparación disponible."}
           </CardDescription>
         )}
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
-        {/* El cierre del autor no pasa por la comunidad: no hay progreso que mostrar. */}
-        {!(reparado && evidencia.porAutorDelReporte) && (
+        {!reparado && (
           <ProgresoConfirmaciones hechas={evidencia.confirmaciones} umbral={umbral} />
         )}
 

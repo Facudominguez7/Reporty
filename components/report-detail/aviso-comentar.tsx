@@ -2,11 +2,11 @@
 
 /**
  * Aviso de la ficha del reporte: la primera vez que la acción de reparación está
- * disponible, explica el botón check flotante. La vista se recuerda en el navegador.
+ * disponible, explica el botón de cámara flotante. La vista se recuerda en el navegador.
  */
 
 import { useCallback, useState, useSyncExternalStore } from "react"
-import { Check } from "lucide-react"
+import { Camera } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ClaveAccionFlotante } from "./acciones-flotantes"
@@ -73,15 +73,15 @@ export function useAvisoComentar(puedeInformarReparacion: boolean) {
  *
  * @param onCerrar - Descarta el aviso para siempre.
  */
-export function AvisoComentar({ onCerrar }: { onCerrar: () => void }) {
+export function AvisoComentar({ onCerrar, reparado = false }: { onCerrar: () => void; reparado?: boolean }) {
   return (
     <aside
-      aria-label="Cómo informar una reparación"
+      aria-label={reparado ? "Cómo consultar la evidencia" : "Cómo informar una reparación"}
       className="pointer-events-auto relative mr-1 w-[min(17rem,calc(100vw-2rem))] rounded-2xl border border-border/70 bg-card p-3 text-card-foreground shadow-[var(--elevation-soft)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2"
     >
       <p className="text-sm font-semibold">¿Ya lo arreglaron?</p>
       <p className="mt-1 text-sm leading-5 text-muted-foreground">
-        Tocá el botón <Check aria-hidden="true" className="inline size-3.5 align-[-2px]" /> para informar una reparación o consultar su evidencia.
+        Tocá el botón <Camera aria-hidden="true" className="inline size-3.5 align-[-2px]" /> {reparado ? "para consultar la evidencia." : "para informar una reparación o consultar su evidencia."}
       </p>
       <div className="mt-2 flex justify-end">
         <Button type="button" size="sm" onClick={onCerrar}>
