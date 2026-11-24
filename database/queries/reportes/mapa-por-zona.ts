@@ -9,8 +9,10 @@ import {
   type FiltrosReportes,
   type GrupoMapa,
 } from "@/database/queries/reportes/get-reportes"
+import { MAP_MAX_ZOOM } from "@/lib/map/initial-view"
 import {
   MAXIMO_PUNTOS_ZONA,
+  MAXIMO_PUNTOS_ZOOM_MAXIMO,
   resolverEstadosMapa,
   tamanoCeldaGrupos,
   type ZonaMapa,
@@ -52,6 +54,16 @@ export async function cargarZonaMapa({
   }
 
   const comunes = { search: filtros.search, categoria: filtros.categoria, prioridad: filtros.prioridad }
+
+  // En el zoom máximo un grupo no se podría abrir acercándose más: siempre van puntos, y el
+  // mapa los separa en abanico si están encimados.
+  if (zoom >= MAP_MAX_ZOOM) {
+    const cercanos = await getReportMapData(
+      { ...comunes, zona, estadosPermitidos: estados, limite: MAXIMO_PUNTOS_ZOOM_MAXIMO },
+      { publico: true },
+    )
+    return { data: { tipo: "puntos", reportes: cercanos.data }, error: cercanos.error }
+  }
 
   // Se piden hasta 300 puntos: si llegan más, la zona es densa y se responde con grupos.
   // En el caso habitual alcanza con una sola consulta.

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import type { ContenidoZonaMapa, FiltrosMapa } from "@/database/queries/reportes/mapa-por-zona"
-import { crearCargadorZona, obtenerZonaMapa } from "@/lib/map/cargador-zona"
+import { crearCargadorZona, obtenerZonaMapa, type EstadoCargaZona } from "@/lib/map/cargador-zona"
 import type { ZonaMapa } from "@/lib/map/zona"
 
 /**
@@ -15,7 +15,8 @@ import type { ZonaMapa } from "@/lib/map/zona"
  *
  * @param inicial - Contenido que cargó el servidor para la primera vista.
  * @param filtros - Filtros de la URL; al cambiar se vuelve a pedir la zona actual.
- * @returns `contenido` para dibujar y `alCambiarZona` para pasarle al mapa.
+ * @returns `contenido` para dibujar, `alCambiarZona` para pasarle al mapa, `estado` de la
+ *   carga (para avisar si está cargando o falló) y `reintentar`.
  */
 export function useContenidoZonaMapa(inicial: ContenidoZonaMapa, filtros: FiltrosMapa) {
   const [contenido, setContenido] = useState(inicial)
@@ -26,7 +27,14 @@ export function useContenidoZonaMapa(inicial: ContenidoZonaMapa, filtros: Filtro
     setContenido(inicial)
   }
 
-  const [cargador] = useState(() => crearCargadorZona({ obtener: obtenerZonaMapa, alCargar: setContenido }))
+  const [estadoCarga, setEstadoCarga] = useState<EstadoCargaZona>("listo")
+  const [cargador] = useState(() =>
+    crearCargadorZona({ obtener: obtenerZonaMapa, alCargar: setContenido, alCambiarEstado: setEstadoCarga }),
+  )
+  // Datos nuevos del servidor: lo recordado de antes puede estar viejo.
+  useEffect(() => {
+    cargador.olvidar()
+  }, [cargador, inicial])
   const ultimaZonaRef = useRef<{ zona: ZonaMapa; zoom: number } | null>(null)
   // `alCambiarZona` es estable y lee los filtros vigentes desde esta ref.
   const filtrosRef = useRef(filtros)
@@ -51,5 +59,5 @@ export function useContenidoZonaMapa(inicial: ContenidoZonaMapa, filtros: Filtro
     [cargador],
   )
 
-  return { contenido, alCambiarZona }
+  return { contenido, alCambiarZona, estado: estadoCarga, reintentar: cargador.reintentar }
 }

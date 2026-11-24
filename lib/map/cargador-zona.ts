@@ -13,6 +13,15 @@ export const ESPERA_ZONA_MS = 250
 /** Zonas recordadas como máximo; al pasarse se olvida la más vieja. */
 const MAXIMO_ZONAS_RECORDADAS = 40
 
+/**
+ * Milisegundos que una zona recordada se da por vigente, igual que la caché del endpoint.
+ * Después se muestra lo guardado y se vuelve a pedir, para ver reportes nuevos o reparados.
+ */
+export const VIGENCIA_ZONA_MS = 30_000
+
+/** Estado de la carga, para que el mapa avise mientras pide o si falló. */
+export type EstadoCargaZona = "cargando" | "listo" | "error"
+
 const ORDEN_FILTROS = ["search", "categoria", "estado", "prioridad"] as const
 
 /**
@@ -42,18 +51,21 @@ type OpcionesCargadorZona = {
   obtener: (url: string, senal: AbortSignal) => Promise<ContenidoZonaMapa>
   alCargar: (contenido: ContenidoZonaMapa) => void
   alFallar?: () => void
+  alCambiarEstado?: (estado: EstadoCargaZona) => void
   esperaMs?: number
 }
 
 /**
  * Crea un cargador de zonas.
  *
- * @returns `pedir` (programa la carga de una zona) y `cancelar` (descarta lo pendiente).
+ * @returns `pedir` (programa la carga de una zona), `cancelar` (descarta lo pendiente),
+ *   `reintentar` (vuelve a pedir la última zona ya) y `olvidar` (borra las zonas recordadas).
  */
-export function crearCargadorZona({ obtener, alCargar, alFallar, esperaMs = ESPERA_ZONA_MS }: OpcionesCargadorZona) {
-  const recordadas = new Map<string, ContenidoZonaMapa>()
+export function crearCargadorZona({ obtener, alCargar, alFallar, alCambiarEstado, esperaMs = ESPERA_ZONA_MS }: OpcionesCargadorZona) {
+  const recordadas = new Map<string, { contenido: ContenidoZonaMapa; guardadaEn: number }>()
   let espera: ReturnType<typeof setTimeout> | null = null
   let enCurso: AbortController | null = null
+  let ultimaUrl: string | null = null
 
   /** Descarta la espera y el pedido en curso, si los hay. */
   function cancelar() {
@@ -66,23 +78,27 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, esperaMs = ESPE
   /** Guarda una zona y olvida la más vieja si hay demasiadas. */
   function recordar(url: string, contenido: ContenidoZonaMapa) {
     recordadas.delete(url)
-    recordadas.set(url, contenido)
+    recordadas.set(url, { contenido, guardadaEn: Date.now() })
     if (recordadas.size > MAXIMO_ZONAS_RECORDADAS) {
       const masVieja = recordadas.keys().next().value
       if (masVieja !== undefined) recordadas.delete(masVieja)
     }
   }
 
-  /** Pide la zona ya, cancelando el pedido anterior. */
+  /**
+   * Pide la zona ya, cancelando el pedido anterior. Una zona recordada y vigente se muestra
+   * sin pedir; una vencida se muestra igual mientras se vuelve a pedir.
+   */
   async function cargar(url: string) {
     const guardada = recordadas.get(url)
     if (guardada) {
-      alCargar(guardada)
-      return
+      alCargar(guardada.contenido)
+      if (Date.now() - guardada.guardadaEn < VIGENCIA_ZONA_MS) return
     }
 
     const controlador = new AbortController()
     enCurso = controlador
+    alCambiarEstado?.("cargando")
     try {
       const contenido = await obtener(url, controlador.signal)
       // Si mientras tanto se pidió otra zona, esta respuesta ya no sirve.
@@ -90,10 +106,12 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, esperaMs = ESPE
       enCurso = null
       recordar(url, contenido)
       alCargar(contenido)
+      alCambiarEstado?.("listo")
     } catch {
       if (controlador.signal.aborted) return
       enCurso = null
-      // El mapa sigue mostrando lo último que cargó.
+      // El mapa sigue mostrando lo último que cargó y avisa que esta zona no llegó.
+      alCambiarEstado?.("error")
       alFallar?.()
     }
   }
@@ -106,13 +124,27 @@ export function crearCargadorZona({ obtener, alCargar, alFallar, esperaMs = ESPE
     cancelar()
     const url = urlZonaMapa(zona, zoom, filtros)
     if (!url) return
+    ultimaUrl = url
     espera = setTimeout(() => {
       espera = null
       void cargar(url)
     }, esperaMs)
   }
 
-  return { pedir, cancelar }
+  /** Vuelve a pedir la última zona sin esperar ni usar lo recordado (tras un error). */
+  function reintentar() {
+    if (!ultimaUrl) return
+    cancelar()
+    recordadas.delete(ultimaUrl)
+    void cargar(ultimaUrl)
+  }
+
+  /** Olvida las zonas recordadas, por ejemplo cuando el servidor manda datos nuevos. */
+  function olvidar() {
+    recordadas.clear()
+  }
+
+  return { pedir, cancelar, reintentar, olvidar }
 }
 
 /**

@@ -43,6 +43,16 @@ describe("cargarZonaMapa", () => {
     expect(resultado).toEqual({ data: { tipo: "grupos", grupos: [{ cantidad: 400 }] }, error: null })
   })
 
+  it("en el zoom máximo no agrupa: devuelve los puntos, así siempre se llega a cada reporte", async () => {
+    mocks.getReportMapData.mockResolvedValue({ data: [{ id: 7 }], error: null, hasMore: true })
+
+    const resultado = await cargarZonaMapa({ zona, zoom: 18, filtros: {} })
+
+    expect(mocks.getReportMapData).toHaveBeenCalledWith(expect.objectContaining({ limite: 1000 }), { publico: true })
+    expect(mocks.getGruposEnZona).not.toHaveBeenCalled()
+    expect(resultado).toEqual({ data: { tipo: "puntos", reportes: [{ id: 7 }] }, error: null })
+  })
+
   it("pedir Rechazado no consulta nada y no devuelve reportes", async () => {
     const resultado = await cargarZonaMapa({ zona, zoom: 16, filtros: { estado: "Rechazado" } })
 

@@ -45,6 +45,15 @@ describe("ajustarZonaAlMapa", () => {
     expect(a!.sur).toBeLessThanOrEqual(-27.3803)
     expect(a!.norte).toBeGreaterThanOrEqual(-27.3701)
   })
+
+  it("es idempotente: ajustar una zona ya ajustada la deja igual (el navegador y el servidor ajustan los dos)", () => {
+    for (let zoom = 13; zoom <= 18; zoom++) {
+      for (const [oeste, sur] of [[-55.9, -27.38], [-55.95, -27.4123], [-55.8701, -27.3555]]) {
+        const una = ajustarZonaAlMapa({ oeste, sur, este: oeste + 0.01, norte: sur + 0.01 }, zoom)!
+        expect(ajustarZonaAlMapa(una, zoom)).toEqual(una)
+      }
+    }
+  })
 })
 
 describe("tamanoCeldaGrupos", () => {

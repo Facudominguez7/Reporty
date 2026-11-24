@@ -98,6 +98,59 @@ describe("crearCargadorZona", () => {
     expect(alCargar).toHaveBeenCalledTimes(2)
   })
 
+  it("una zona recordada vence a los 30 s: se muestra lo guardado y se vuelve a pedir", async () => {
+    const nuevo = { tipo: "puntos" as const, reportes: [{ id: 9 }] as never[] }
+    obtener.mockResolvedValueOnce(puntos).mockResolvedValueOnce(nuevo)
+    const cargador = crearCargadorZona({ obtener, alCargar })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    await vi.advanceTimersByTimeAsync(30_000)
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(obtener).toHaveBeenCalledTimes(2)
+    expect(alCargar.mock.calls.map(([c]) => c)).toEqual([puntos, puntos, nuevo])
+  })
+
+  it("olvidar borra las zonas recordadas", async () => {
+    const cargador = crearCargadorZona({ obtener, alCargar })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.olvidar()
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(obtener).toHaveBeenCalledTimes(2)
+  })
+
+  it("avisa cuando empieza a pedir, cuando termina y cuando falla", async () => {
+    const alCambiarEstado = vi.fn()
+    obtener.mockResolvedValueOnce(puntos).mockRejectedValueOnce(new Error("sin red"))
+    const cargador = crearCargadorZona({ obtener, alCargar, alCambiarEstado })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.pedir(zona, 16, {})
+    await vi.advanceTimersByTimeAsync(250)
+
+    expect(alCambiarEstado.mock.calls.map(([e]) => e)).toEqual(["cargando", "listo", "cargando", "error"])
+  })
+
+  it("reintentar vuelve a pedir la última zona sin esperar", async () => {
+    obtener.mockRejectedValueOnce(new Error("sin red")).mockResolvedValueOnce(puntos)
+    const cargador = crearCargadorZona({ obtener, alCargar })
+
+    cargador.pedir(zona, 15, {})
+    await vi.advanceTimersByTimeAsync(250)
+    cargador.reintentar()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(obtener).toHaveBeenCalledTimes(2)
+    expect(alCargar).toHaveBeenCalledWith(puntos)
+  })
+
   it("si falla, no cambia lo dibujado y avisa", async () => {
     const alFallar = vi.fn()
     obtener.mockRejectedValue(new Error("sin red"))

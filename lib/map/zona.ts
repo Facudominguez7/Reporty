@@ -25,6 +25,18 @@ export const ESTADOS_MAPA = [
 /** Hasta esta cantidad de reportes en la zona se dibujan puntos; con más, grupos. */
 export const MAXIMO_PUNTOS_ZONA = 300
 
+/**
+ * En el zoom máximo nunca se agrupa (no habría forma de acercarse más para ver cada reporte):
+ * se devuelven puntos, hasta esta cantidad.
+ */
+export const MAXIMO_PUNTOS_ZOOM_MAXIMO = 1000
+
+/**
+ * Tolerancia, en fracción de tesela, para que un borde ya alineado (y redondeado) no salte a
+ * la tesela vecina al ajustarlo de nuevo.
+ */
+const TOLERANCIA_TESELA = 1e-3
+
 /** Decimales con los que se redondean los bordes, para que la URL (y su caché) sea estable. */
 const DECIMALES_ZONA = 6
 
@@ -77,11 +89,16 @@ export function zonaATexto(zona: ZonaMapa) {
 export function ajustarZonaAlMapa(zona: ZonaMapa, zoom: number): ZonaMapa | null {
   const paso = anchoTesela(zoom)
   const [limiteSur, limiteOeste, limiteNorte, limiteEste] = POSADAS_BOUNDS
+  // Es idempotente: el navegador ajusta la zona y el servidor la vuelve a ajustar. Sin la
+  // tolerancia, el redondeo a 6 decimales dejaba el borde apenas fuera de la grilla y cada
+  // ajuste corría la zona una tesela más.
+  const haciaAbajo = (valor: number) => Math.floor(valor / paso + TOLERANCIA_TESELA) * paso
+  const haciaArriba = (valor: number) => Math.ceil(valor / paso - TOLERANCIA_TESELA) * paso
   const ajustada = {
-    oeste: redondear(Math.max(limiteOeste, Math.floor(zona.oeste / paso) * paso)),
-    sur: redondear(Math.max(limiteSur, Math.floor(zona.sur / paso) * paso)),
-    este: redondear(Math.min(limiteEste, Math.ceil(zona.este / paso) * paso)),
-    norte: redondear(Math.min(limiteNorte, Math.ceil(zona.norte / paso) * paso)),
+    oeste: redondear(Math.max(limiteOeste, haciaAbajo(zona.oeste))),
+    sur: redondear(Math.max(limiteSur, haciaAbajo(zona.sur))),
+    este: redondear(Math.min(limiteEste, haciaArriba(zona.este))),
+    norte: redondear(Math.min(limiteNorte, haciaArriba(zona.norte))),
   }
   if (ajustada.oeste >= ajustada.este || ajustada.sur >= ajustada.norte) return null
   return ajustada

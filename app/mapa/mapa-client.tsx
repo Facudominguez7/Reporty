@@ -20,6 +20,7 @@ import { MascotasOnboardingModal, OnboardingModal } from "@/components/onboardin
 import { IntroEntrada } from "@/components/intro-entrada"
 import type { ContenidoZonaMapa, FiltrosMapa } from "@/database/queries/reportes/mapa-por-zona"
 import { useContenidoZonaMapa } from "@/components/map/use-contenido-zona"
+import { AvisoCargaZona } from "@/components/map/aviso-carga-zona"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
 import type { FocoReporte } from "@/lib/map/foco-reporte"
@@ -148,8 +149,10 @@ type MapaPorZonaProps = {
  * zona que llega redibuja solo el mapa, no los filtros, diálogos y botones de la página.
  */
 function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }: MapaPorZonaProps) {
-  const { contenido, alCambiarZona } = useContenidoZonaMapa(contenidoInicial, filtros)
+  const { contenido, alCambiarZona, estado, reintentar } = useContenidoZonaMapa(contenidoInicial, filtros)
   return (
+    <>
+    {layer === "reportes" && <AvisoCargaZona estado={estado} onReintentar={reintentar} />}
     <MapContainer
       reports={contenido.tipo === "puntos" ? contenido.reportes : SIN_PUNTOS}
       grupos={contenido.tipo === "grupos" ? contenido.grupos : undefined}
@@ -159,6 +162,7 @@ function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }
       showLegend
       focoReporte={focoReporte}
     />
+    </>
   )
 }
 
