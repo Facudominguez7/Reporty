@@ -37,12 +37,6 @@
     // Daily biweekly-reminder run: 13:00 UTC (CRON_RECORDATORIOS in lib/cloudflare/cron-recordatorios.ts).
     "crons": ["0 6 * * SUN", "0 13 * * *"]
   },
-  "placement": {
-    // Supabase (Postgres, PostgREST and Auth) lives in AWS us-east-2. By default the Worker runs
-    // next to the visitor (Buenos Aires), and each Supabase call pays ~170 ms of round trip;
-    // a page makes several in a row. Running near the database pays that distance once.
-    "region": "aws:us-east-2"
-  },
   "observability": {
     "enabled": true
   }
