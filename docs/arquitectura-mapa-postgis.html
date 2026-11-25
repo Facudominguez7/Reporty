@@ -179,7 +179,7 @@
           <tr><td><strong>Cerca mío</strong></td><td>No existe.</td><td><code>cerca_de</code> con <code>ST_DWithin</code> y <code>ST_Distance</code> en metros, para reportes y mascotas a la vez.</td></tr>
           <tr><td><strong>Duplicados al crear</strong></td><td><code>buscar-cercanos.ts</code> arma un rectángulo, trae 50 filas y mide con semiverseno en TS.</td><td><code>reportes_duplicados_cerca</code>: <code>ST_DWithin</code> de 100 m, ordenado por <code>ST_Distance</code>. <code>clasificarDuplicado</code> conserva sus reglas. <strong>Implementado (#300):</strong> solo la ejecuta <code>service_role</code>, porque devuelve el autor de cada reporte.</td></tr>
           <tr><td><strong>Municipio del reporte</strong></td><td><code>report-coverage.ts</code> recorre los polígonos del GeoJSON del repo en TS.</td><td>Tabla <code>territorio.municipios</code> cargada desde ese mismo GeoJSON, con <code>ST_Covers</code>. La regla de borde (punto sobre el límite = sin municipio) se replica y se prueba.</td></tr>
-          <tr><td><strong>Zonas con más reportes</strong> (panel Interesado)</td><td>Trae <strong>todos</strong> los reportes y redondea en JS a unos 100 m.</td><td><code>zonas_con_mas_reportes</code> agrupa en SQL y devuelve solo las N zonas.</td></tr>
+          <tr><td><strong>Zonas con más reportes</strong> (panel Interesado)</td><td>Trae <strong>todos</strong> los reportes y redondea en JS a unos 100 m.</td><td><strong>Implementado (#302), por barrio:</strong> <code>reportes_por_barrio</code> cuenta cada reporte en su barrio (como <code>territorio.barrio_de</code>) y <code>reportes_por_categoria_y_estado</code> reparte las categorías por estado. Con celdas de 100 m ninguna juntaba más de 5 reportes y el panel no mostraba dónde se acumulan. Solo <code>authenticated</code>, con la RLS de <code>reportes</code>.</td></tr>
           <tr><td><strong>Mascotas</strong></td><td>El mapa carga todas; <code>mascotas_perdidas</code> tiene <code>lat</code>/<code>lon</code> sin índice.</td><td>La misma columna generada con índice; entran en «Cerca mío». La capa del mapa sigue cargando completa hasta que lo justifique el volumen.</td></tr>
           <tr><td><strong>Barrio del reporte</strong></td><td>No existe.</td><td><code>territorio.barrios</code> (IDE Posadas, ODbL) con <code>ST_Covers</code>: base de #282 Mi barrio. Ver <a href="#territorio">Barrios</a>.</td></tr>
         </tbody>
@@ -249,7 +249,7 @@
       <div class="layer">
         <div class="layer-name">Funciones SQL<small>security invoker</small></div>
         <div>
-          <p><code>reportes_en_zona</code> devuelve <code>setof public.reportes</code> y solo filtra por área, así que PostgREST deja encadenar el <code>select</code> y los filtros de hoy. Las demás (<code>reportes_agrupados_en_zona</code>, <code>cerca_de</code>, <code>reportes_duplicados_cerca</code>, <code>zonas_con_mas_reportes</code>, <code>municipio_de</code>, <code>barrio_de</code>) devuelven solo las columnas que su pantalla necesita.</p>
+          <p><code>reportes_en_zona</code> devuelve <code>setof public.reportes</code> y solo filtra por área, así que PostgREST deja encadenar el <code>select</code> y los filtros de hoy. Las demás (<code>reportes_agrupados_en_zona</code>, <code>cerca_de</code>, <code>reportes_duplicados_cerca</code>, <code>reportes_por_barrio</code>, <code>reportes_por_categoria_y_estado</code>, <code>municipio_de</code>, <code>barrio_de</code>) devuelven solo las columnas que su pantalla necesita.</p>
         </div>
       </div>
       <div class="layer">
@@ -567,7 +567,7 @@ $$;
 
 -- reportes_agrupados_en_zona: ST_SnapToGrid sobre ubicacion::geometry, agrupado por celda,
 --   con centroide, cantidad y extensión por grupo (los filtros llegan como IDs ya resueltos).
--- reportes_duplicados_cerca, zonas_con_mas_reportes, municipio_de y barrio_de siguen el mismo patrón.</code></pre>
+-- reportes_duplicados_cerca, reportes_por_barrio, municipio_de y barrio_de siguen el mismo patrón.</code></pre>
     <p class="prose">La vista <code>mascotas_perdidas_publicas</code> se recrea para exponer <code>ubicacion</code> con las mismas columnas y el mismo filtro de moderación que tiene hoy.</p>
   </section>
 
@@ -622,7 +622,7 @@ $$;
       <div class="phase"><span class="tag">PR 2 · servidor</span><h3>Endpoint del mapa</h3><p><code>getReportesEnZona</code>, <code>getGruposEnZona</code>, Zod, redondeo a la grilla y el umbral de 300.</p></div>
       <div class="phase"><span class="tag">PR 3 · mapa</span><h3>Carga por zona</h3><p>Hook con espera y cancelación, marcadores incrementales, grupos y primera carga en el servidor.</p></div>
       <div class="phase"><span class="tag">PR 4 · cerca mío</span><h3>Reportes y mascotas cerca</h3><p><code>cerca_de</code>, <code>POST /api/mapa/cerca</code>, ubicación automática al abrir el mapa según el estado del permiso, círculo y panel de cercanos.</p></div>
-      <div class="phase"><span class="tag">PR 5 · consultas</span><h3>Duplicados y zonas</h3><p><code>reportes_duplicados_cerca</code> y <code>zonas_con_mas_reportes</code> reemplazan los cálculos en TS. Comparación de resultados antes y después.</p></div>
+      <div class="phase"><span class="tag">PR 5 · consultas</span><h3>Duplicados y zonas</h3><p><code>reportes_duplicados_cerca</code> y <code>reportes_por_barrio</code> reemplazan los cálculos en TS. Comparación de resultados antes y después.</p></div>
       <div class="phase"><span class="tag">PR 6 · municipios</span><h3>Cobertura en PostGIS</h3><p><code>territorio.municipios</code> desde el GeoJSON del repo, <code>municipio_de</code> con la regla de borde; el aviso a organismos y los contactos lo usan.</p><span class="pill risk">cambia a quién se avisa</span></div>
       <div class="phase"><span class="tag ext">PR 7 · catastro</span><h3>Capa catastral</h3><p>Selector, <code>L.tileLayer.wms</code> sin proxy, umbrales de zoom, manejo de errores, atribución y documentación.</p></div>
       <div class="phase"><span class="tag">PR 8 · barrios</span><h3>Territorio</h3><p>Importación de <code>Barrios_SMU0</code> con licencia y fecha, <code>barrio_de</code> y el barrio en la ficha. Base de #282.</p></div>

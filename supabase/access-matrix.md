@@ -99,3 +99,9 @@ Supabase anonymous users use the `authenticated` Postgres role, so a valid user 
 - `public.reportes_duplicados_cerca(double precision, double precision, integer, double precision)` is `SECURITY INVOKER`, executable only by `service_role`. It returns the author (`usuario_id`) of each nearby report, so `anon` and `authenticated` cannot call it.
 - It returns only Pending reports of the requested category that are not deleted, within `radio_m` (1–100 m), ordered by `ST_Distance`, up to 50 rows. It rejects an invalid point, a missing category or an out-of-range radius with `invalid_parameter_value`.
 - Called only by `buscarDuplicado` (`database/queries/reportes/nuevo/buscar-cercanos.ts`) with the admin client, from the report creation flow and `buscarDuplicadoAction`. The form only receives `aAvisoDuplicado`, without the author.
+
+## Metrics by neighborhood (migration `20261125150000_metricas_por_barrio.sql`, issue #302)
+
+- `public.reportes_por_barrio()` and `public.reportes_por_categoria_y_estado()` are `SECURITY INVOKER`, executable only by `authenticated` (not `anon`, and not `service_role`, which bypasses RLS). They aggregate the reports the caller can see under `reportes` RLS and return only totals, never individual rows.
+- `reportes_por_barrio` assigns each report to the smallest `territorio.barrios` polygon that covers it (same rule as `territorio.barrio_de`), returns every neighborhood with a simplified GeoJSON geometry (public ODbL data), and one row with null `barrio_id` for reports outside every neighborhood.
+- Called from `/admin/metricas`, which only operators can open.

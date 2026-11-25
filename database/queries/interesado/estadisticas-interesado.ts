@@ -1,6 +1,12 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { contarReportesEnProgreso } from "@/database/queries/cuadrillas";
 import { cuadrillasHabilitadas } from "@/lib/features";
+import type {
+  BarrioConReportes,
+  EstadoPorCategoria,
+  GeometriaBarrio,
+  MetricasPorBarrio,
+} from "@/lib/metricas/metricas-barrios";
 
 /**
  * Tipo de datos para estadísticas por categoría
@@ -28,41 +34,46 @@ export type ZonaConReportes = {
   ultimoReporte: string;
 };
 
-/**
- * Agrupa los reportes por categoría y devuelve el conteo ordenado por cantidad.
- *
- * Asigna a cada categoría un color tomado de una paleta fija.
- *
- * @returns Arreglo de objetos ReportesPorCategoria con los campos `categoria`, `cantidad` y `color`, ordenados por `cantidad` de mayor a menor.
- */
-export async function getReportesPorCategoria(
-  supabase: SupabaseClient
-): Promise<ReportesPorCategoria[]> {
-  try {
-    const { data, error } = await supabase
-      .from("reportes")
-      .select("categoria_id, categorias (nombre)")
-      .is("deleted_at", null);
+/** Fila tal como la devuelve `reportes_por_categoria_y_estado`. */
+type FilaCategoria = {
+  categoria: string;
+  total: number;
+  pendientes: number;
+  defensoria: number;
+  reparados: number;
+  rechazados: number;
+  espera_promedio_dias: number | null;
+  pendientes_mas_90_dias: number;
+};
 
-    if (error) {
-      console.error("Error al obtener reportes por categoría:", error);
+/**
+ * Obtiene cada categoría con sus reportes repartidos por estado y la espera de los pendientes. La
+ * base agrupa con `reportes_por_categoria_y_estado` (#302): no se traen los reportes a Next.
+ *
+ * @param supabase - Cliente con la sesión del operador: la función respeta la RLS de `reportes`.
+ * @returns Categorías ordenadas por la proporción pendiente. Si la consulta falla, `[]`.
+ */
+export async function getEstadoPorCategoria(supabase: SupabaseClient): Promise<EstadoPorCategoria[]> {
+  try {
+    const { data, error } = await supabase.rpc("reportes_por_categoria_y_estado");
+
+    if (error || !data) {
+      console.error("Error al obtener reportes por categoría y estado:", error);
       return [];
     }
 
-    // Agrupar y contar por categoría
-    const categoriaMap = new Map<string, number>();
-    data.forEach((reporte: any) => {
-      const categoria = reporte.categorias?.nombre || "Sin categoría";
-      categoriaMap.set(categoria, (categoriaMap.get(categoria) || 0) + 1);
-    });
-
-    // Convertir a array y ordenar por cantidad. La presentación de colores vive en el gráfico,
-    // para reutilizar los tokens de globals.css en cualquier superficie.
-    return Array.from(categoriaMap.entries())
-      .map(([categoria, cantidad]) => ({ categoria, cantidad }))
-      .sort((a, b) => b.cantidad - a.cantidad);
+    return (data as FilaCategoria[]).map((fila) => ({
+      categoria: fila.categoria,
+      total: fila.total,
+      pendientes: fila.pendientes,
+      defensoria: fila.defensoria,
+      reparados: fila.reparados,
+      rechazados: fila.rechazados,
+      esperaPromedioDias: fila.espera_promedio_dias,
+      pendientesMas90Dias: fila.pendientes_mas_90_dias,
+    }));
   } catch (error) {
-    console.error("Error en getReportesPorCategoria:", error);
+    console.error("Error en getEstadoPorCategoria:", error);
     return [];
   }
 }
@@ -152,60 +163,53 @@ export async function getTiempoPromedioResolucion(
   }
 }
 
+/** Fila tal como la devuelve `reportes_por_barrio`; la de los reportes sin barrio trae `barrio_id` nulo. */
+type FilaBarrio = {
+  barrio_id: string | null;
+  nombre: string | null;
+  total: number;
+  pendientes: number;
+  reparados: number;
+  ultimos_30_dias: number;
+  geojson: GeometriaBarrio | null;
+};
+
 /**
- * Obtiene las zonas geográficas con más reportes agrupando reportes cercanos (~0.001° ≈ 100 m).
+ * Obtiene los reportes de cada barrio de Posadas (con o sin reportes, y su geometría para el mapa)
+ * y aparte los que no caen en ningún barrio. La base agrupa con `reportes_por_barrio` (#302): no
+ * se traen los reportes a Next.
  *
- * @returns Arreglo de zonas ordenado por cantidad descendente; cada elemento contiene `lat`, `lon`, `cantidad` y `ultimoReporte` (fecha ISO del reporte más reciente)
+ * @param supabase - Cliente con la sesión del operador: la función respeta la RLS de `reportes`.
+ * @returns Barrios ordenados por total y los reportes sin barrio. Si la consulta falla, todo en cero.
  */
-export async function getZonasConMasReportes(
-  supabase: SupabaseClient,
-  limite: number = 10
-): Promise<ZonaConReportes[]> {
+export async function getReportesPorBarrio(supabase: SupabaseClient): Promise<MetricasPorBarrio> {
+  const sinBarrio = { total: 0, pendientes: 0, reparados: 0, ultimos30Dias: 0 };
   try {
-    const { data, error } = await supabase
-      .from("reportes")
-      .select("lat, lon, created_at")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+    const { data, error } = await supabase.rpc("reportes_por_barrio");
 
     if (error || !data) {
-      console.error("Error al obtener zonas con más reportes:", error);
-      return [];
+      console.error("Error al obtener reportes por barrio:", error);
+      return { barrios: [], sinBarrio };
     }
 
-    // Agrupar reportes por proximidad (~0.001 grados ≈ 100m)
-    const precision = 0.001;
-    const zonasMap = new Map<string, ZonaConReportes>();
-
-    data.forEach((reporte: any) => {
-      const latRedondeada = Math.round(reporte.lat / precision) * precision;
-      const lonRedondeada = Math.round(reporte.lon / precision) * precision;
-      const key = `${latRedondeada},${lonRedondeada}`;
-
-      const zonaExistente = zonasMap.get(key);
-      if (zonaExistente) {
-        zonaExistente.cantidad++;
-        // Mantener la fecha del reporte más reciente
-        if (new Date(reporte.created_at) > new Date(zonaExistente.ultimoReporte)) {
-          zonaExistente.ultimoReporte = reporte.created_at;
-        }
+    const barrios: BarrioConReportes[] = [];
+    for (const fila of data as FilaBarrio[]) {
+      const conteos = {
+        total: fila.total,
+        pendientes: fila.pendientes,
+        reparados: fila.reparados,
+        ultimos30Dias: fila.ultimos_30_dias,
+      };
+      if (fila.barrio_id === null) {
+        Object.assign(sinBarrio, conteos);
       } else {
-        zonasMap.set(key, {
-          lat: latRedondeada,
-          lon: lonRedondeada,
-          cantidad: 1,
-          ultimoReporte: reporte.created_at,
-        });
+        barrios.push({ id: fila.barrio_id, nombre: fila.nombre ?? fila.barrio_id, ...conteos, geometria: fila.geojson });
       }
-    });
-
-    // Convertir a array, ordenar por cantidad y retornar los top N
-    return Array.from(zonasMap.values())
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, limite);
+    }
+    return { barrios, sinBarrio };
   } catch (error) {
-    console.error("Error en getZonasConMasReportes:", error);
-    return [];
+    console.error("Error en getReportesPorBarrio:", error);
+    return { barrios: [], sinBarrio };
   }
 }
 
