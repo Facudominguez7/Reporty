@@ -56,6 +56,13 @@ describe("proxy", () => {
     expect(mocks.updateSession).not.toHaveBeenCalled()
   })
 
+  it("no consulta la sesión al buscar cercanos, que también lee con el cliente anónimo", async () => {
+    const response = await proxy(request("/api/mapa/cerca"))
+
+    expect(response.headers.get("x-middleware-next")).toBe("1")
+    expect(mocks.updateSession).not.toHaveBeenCalled()
+  })
+
   it("sigue refrescando la sesión en las rutas que la leen, aunque se parezcan a las públicas", async () => {
     const rutas = ["/mapa", "/reportes", "/donar", "/terminos/otra", "/crear-algo", "/dashboard", "/api/mapa", "/api/mapa/reportes/otra", "/api/mascotas"]
     for (const path of rutas) await proxy(request(path))

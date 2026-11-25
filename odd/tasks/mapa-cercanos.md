@@ -26,7 +26,7 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
 | ID | Tarea | Specs | Ruta | Estado | Evidencia |
 |---|---|---|---|---|---|
 | T1 | Función `cerca_de` y su prueba SQL | S5 | inline | hecho | RED: la prueba falla sin la función; GREEN: `test-mapa-cercanos.sh` sale 0; usa los dos índices GiST |
-| T2 | Endpoint `POST /api/mapa/cerca` | S6 | inline | pendiente | |
+| T2 | Endpoint `POST /api/mapa/cerca` | S6 | inline | hecho | RED: 4 archivos sin módulo; GREEN: 23 pruebas; tsc solo con los 2 errores previos de main |
 | T3 | Ubicación al abrir el mapa: permiso, punto, círculo y centrado | S1–S4 | inline | pendiente | |
 | T4 | Panel de cercanos con radios y aviso de precisión | S7 | inline | pendiente | |
 | T5 | Migración en producción y prueba en la TWA | S8 | usuario | pendiente | |
@@ -41,3 +41,7 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
   - Las mascotas no se filtran por moderación dentro de la función: `anon` solo tiene permisos por columna sobre `mascotas_perdidas` (sin `moderacion_estado` ni `retirada_at`), así que lo decide la RLS (vigente y aprobada), igual que en `reportes_en_zona`.
   - Por eso no se concede a `service_role`, que saltea la RLS. Hubo que revocarlo explícitamente: Supabase lo concede por privilegios por defecto.
   - EXPLAIN como `anon`: `reportes_ubicacion_gist` y `mascotas_perdidas_ubicacion_gist`.
+- **L3 (T2, decisiones):**
+  - `buscarCercanos` llama a `cerca_de` por POST, sin `{ get: true }`: así la coordenada no queda en la URL que registra el gateway de Supabase. Hay una prueba que lo fija.
+  - Ante un error, el endpoint solo escribe en los logs el código y el mensaje de la consulta, o el nombre de la excepción; las pruebas verifican que la coordenada no aparezca.
+  - El proxy deja pasar `/api/mapa/cerca` sin refrescar la sesión, igual que `/api/mapa/reportes`.
