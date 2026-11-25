@@ -4,13 +4,21 @@
  * Ubicación de la persona y lo que tiene cerca, al abrir el mapa (#297).
  *
  * Corre el flujo de `iniciarUbicacionAlAbrir` una sola vez por visita y, con la ubicación, pide
- * los cercanos del radio elegido. Al cambiar el radio cancela el pedido anterior.
+ * los cercanos del radio elegido. Después sigue a la persona mientras el mapa está a la vista: el
+ * punto se mueve con cada lectura y los cercanos se vuelven a pedir cuando se alejó más de 100 m.
+ * Al cambiar el radio o el punto de búsqueda cancela el pedido anterior.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import type { EstadoCercanos } from "@/components/map/panel-cercanos"
 import { RADIO_CERCANOS_INICIAL, type ElementoCercano } from "@/lib/map/cercanos"
-import { iniciarUbicacionAlAbrir, pedirCercanos } from "@/lib/map/ubicacion-al-abrir"
+import {
+  debeActualizarCercanos,
+  iniciarUbicacionAlAbrir,
+  pedirCercanos,
+  seguirUbicacion,
+} from "@/lib/map/ubicacion-al-abrir"
+import type { PuntoGeografico } from "@/lib/reportes/duplicados"
 import { esUbicacionAproximada, type UbicacionPrecisa } from "@/lib/geolocalizacion/ubicacion-precisa"
 
 /**
@@ -21,6 +29,8 @@ import { esUbicacionAproximada, type UbicacionPrecisa } from "@/lib/geolocalizac
  */
 export function useUbicacionCercana() {
   const [ubicacion, setUbicacion] = useState<UbicacionPrecisa | null>(null)
+  // Punto de la última búsqueda de cercanos: solo cambia cuando la persona se alejó más de 100 m.
+  const [puntoBusqueda, setPuntoBusqueda] = useState<PuntoGeografico | null>(null)
   const [avisoDenegado, setAvisoDenegado] = useState(false)
   const [radio, setRadio] = useState<number>(RADIO_CERCANOS_INICIAL)
   // Resultado del último pedido que terminó, con la clave del pedido que lo trajo. Mientras la
@@ -31,7 +41,15 @@ export function useUbicacionCercana() {
     cercanos: [],
   })
   const [intento, setIntento] = useState(0)
-  const clave = ubicacion ? `${ubicacion.lat},${ubicacion.lon},${radio},${intento}` : ""
+  const clave = puntoBusqueda ? `${puntoBusqueda.lat},${puntoBusqueda.lon},${radio},${intento}` : ""
+
+  /** Guarda una lectura nueva y mueve el punto de búsqueda si la persona se alejó lo suficiente. */
+  const alUbicar = useCallback((nueva: UbicacionPrecisa) => {
+    setUbicacion(nueva)
+    setPuntoBusqueda((anterior) =>
+      anterior && !debeActualizarCercanos(anterior, nueva) ? anterior : { lat: nueva.lat, lon: nueva.lon },
+    )
+  }, [])
 
   // Una sola corrida por montaje: StrictMode repite los efectos en desarrollo y, sin esto, la
   // primera corrida marcaba el aviso como mostrado y la segunda ya no lo mostraba. Las
@@ -44,21 +62,43 @@ export function useUbicacionCercana() {
       navegador: navigator,
       almacenSesion: window.sessionStorage,
       almacenLocal: window.localStorage,
-      alUbicar: setUbicacion,
+      alUbicar,
       alAvisarDenegado: () => setAvisoDenegado(true),
     })
-  }, [])
+  }, [alUbicar])
+
+  // Con la primera ubicación ya dada (el permiso está aceptado), se sigue a la persona. Se apaga al
+  // pasar a otra app o pestaña, para no gastar batería, y se retoma al volver.
+  const hayUbicacion = ubicacion !== null
+  useEffect(() => {
+    if (!hayUbicacion || !navigator.geolocation) return
+    let detener: (() => void) | null = null
+    const actualizar = () => {
+      if (document.visibilityState === "visible") {
+        detener ??= seguirUbicacion(navigator.geolocation, alUbicar)
+      } else {
+        detener?.()
+        detener = null
+      }
+    }
+    actualizar()
+    document.addEventListener("visibilitychange", actualizar)
+    return () => {
+      document.removeEventListener("visibilitychange", actualizar)
+      detener?.()
+    }
+  }, [hayUbicacion, alUbicar])
 
   useEffect(() => {
-    if (!ubicacion) return
+    if (!puntoBusqueda) return
     const control = new AbortController()
-    pedirCercanos({ lat: ubicacion.lat, lon: ubicacion.lon, radio }, control.signal)
+    pedirCercanos({ lat: puntoBusqueda.lat, lon: puntoBusqueda.lon, radio }, control.signal)
       .then((cercanos) => setBusqueda({ clave, estado: "listo", cercanos }))
       .catch(() => {
         if (!control.signal.aborted) setBusqueda({ clave, estado: "error", cercanos: [] })
       })
     return () => control.abort()
-  }, [ubicacion, radio, clave])
+  }, [puntoBusqueda, radio, clave])
 
   const reintentar = useCallback(() => setIntento((valor) => valor + 1), [])
   const cerrarAviso = useCallback(() => setAvisoDenegado(false), [])

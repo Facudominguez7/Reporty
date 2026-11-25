@@ -17,6 +17,9 @@ export const RADIO_CERCANOS_INICIAL = 500
 export const RADIO_CERCANOS_MINIMO = 100
 export const RADIO_CERCANOS_MAXIMO = 2000
 
+/** Distancia que la persona tiene que moverse para que se vuelva a buscar lo que tiene cerca. */
+export const DISTANCIA_ACTUALIZAR_CERCANOS_M = 100
+
 /** Máximo de elementos que devuelve `cerca_de`: si llegan tantos, puede haber más. */
 export const LIMITE_CERCANOS = 100
 

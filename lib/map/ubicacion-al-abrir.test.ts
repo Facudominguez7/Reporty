@@ -6,9 +6,11 @@ import {
   CLAVE_AVISO_UBICACION_DENEGADA,
   CLAVE_UBICACION_SIN_RESPUESTA,
   debeCentrarEnPersona,
+  debeActualizarCercanos,
   debeEncuadrarRadio,
   iniciarUbicacionAlAbrir,
   pedirCercanos,
+  seguirUbicacion,
 } from "./ubicacion-al-abrir"
 
 /** Almacenamiento en memoria con la forma de `Storage` que usa el flujo. */
@@ -243,5 +245,69 @@ describe("debeEncuadrarRadio", () => {
   it("con la primera ubicación decide debeCentrarEnPersona, y si el radio no cambió no se mueve", () => {
     expect(debeEncuadrarRadio({ radioAnterior: null, radio: 500 })).toBe(false)
     expect(debeEncuadrarRadio({ radioAnterior: 500, radio: 500 })).toBe(false)
+  })
+})
+
+describe("seguirUbicacion", () => {
+  /** Geolocalización falsa que guarda el callback del seguimiento para emitir lecturas. */
+  function geoSeguimiento() {
+    let emitir: PositionCallback = () => {}
+    const geo = {
+      watchPosition: vi.fn((exito: PositionCallback) => {
+        emitir = exito
+        return 7
+      }),
+      clearWatch: vi.fn(),
+      getCurrentPosition: vi.fn(),
+    }
+    const leer = (lat: number, lon: number, precision = 10) =>
+      emitir({ coords: { latitude: lat, longitude: lon, accuracy: precision } } as GeolocationPosition)
+    return { geo, leer }
+  }
+
+  it("avisa cada lectura dentro de Posadas con alta precisión, sin seguir lecturas viejas", () => {
+    const { geo, leer } = geoSeguimiento()
+    const alMover = vi.fn()
+
+    seguirUbicacion(geo as unknown as Geolocation, alMover)
+    leer(-27.3679, -55.8964, 12)
+    leer(-27.369, -55.897, 8)
+
+    expect(geo.watchPosition).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), expect.objectContaining({ enableHighAccuracy: true }))
+    expect(alMover).toHaveBeenNthCalledWith(1, { lat: -27.3679, lon: -55.8964, precision: 12 })
+    expect(alMover).toHaveBeenNthCalledWith(2, { lat: -27.369, lon: -55.897, precision: 8 })
+  })
+
+  it("ignora las lecturas fuera de Posadas", () => {
+    const { geo, leer } = geoSeguimiento()
+    const alMover = vi.fn()
+
+    seguirUbicacion(geo as unknown as Geolocation, alMover)
+    leer(-34.6, -58.38)
+
+    expect(alMover).not.toHaveBeenCalled()
+  })
+
+  it("al detenerlo deja de usar el GPS", () => {
+    const { geo } = geoSeguimiento()
+
+    const detener = seguirUbicacion(geo as unknown as Geolocation, vi.fn())
+    detener()
+
+    expect(geo.clearWatch).toHaveBeenCalledWith(7)
+  })
+})
+
+describe("debeActualizarCercanos", () => {
+  const BUSQUEDA = { lat: -27.3679, lon: -55.8964 }
+
+  it("vuelve a buscar cuando la persona se alejó más de 100 m del punto de la última búsqueda", () => {
+    // 0,001° de latitud son unos 111 m.
+    expect(debeActualizarCercanos(BUSQUEDA, { lat: -27.3689, lon: -55.8964 })).toBe(true)
+  })
+
+  it("no vuelve a buscar con movimientos chicos", () => {
+    // Unos 56 m.
+    expect(debeActualizarCercanos(BUSQUEDA, { lat: -27.36840, lon: -55.8964 })).toBe(false)
   })
 })

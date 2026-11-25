@@ -4,18 +4,21 @@
  * Según el estado del permiso: si ya lo dio, se lee sin preguntar; si nunca respondió, se pide en
  * ese momento (y si cierra el diálogo sin responder, no se vuelve a pedir en esa sesión); si lo
  * negó, se avisa una sola vez cómo activarlo. Sin Permissions API se llama directo a la
- * geolocalización. Hay una sola lectura por visita, de 6 s como máximo, sin seguimiento continuo.
- * Si esos 6 s vencen con el diálogo de permiso abierto, se lee una vez más cuando la persona acepta.
+ * geolocalización. La primera lectura tarda 6 s como máximo; si vencen con el diálogo de permiso
+ * abierto, se lee una vez más cuando la persona acepta. Con la ubicación ya dada, `seguirUbicacion`
+ * la sigue mientras el mapa está a la vista, y lo cercano se vuelve a buscar cada 100 m.
  *
  * La lectura exacta solo se usa en el teléfono para dibujar el punto; al servidor sale redondeada
  * (`pedirCercanos`).
  */
 import type { ElementoCercano } from "@/lib/map/cercanos"
 import {
+  DISTANCIA_ACTUALIZAR_CERCANOS_M,
   TIEMPO_UBICACION_CERCANOS_MS,
   dentroDePosadas,
   redondearCoordenada,
 } from "@/lib/map/cercanos"
+import { distanciaEnMetros, type PuntoGeografico } from "@/lib/reportes/duplicados"
 import { buscarUbicacionPrecisa, type UbicacionPrecisa } from "@/lib/geolocalizacion/ubicacion-precisa"
 
 /** sessionStorage: la persona cerró el diálogo de permiso sin responder en esta sesión. */
@@ -163,6 +166,38 @@ export async function iniciarUbicacionAlAbrir({
   // Fuera de Posadas el mapa no se mueve y no hay nada cerca que buscar.
   if (!dentroDePosadas(ubicacion.lat, ubicacion.lon)) return
   alUbicar(ubicacion)
+}
+
+/**
+ * Sigue la ubicación de la persona mientras camina. Solo se usa después de la primera lectura,
+ * cuando el permiso ya está dado, así que no vuelve a abrir el diálogo.
+ *
+ * @param geolocalizacion - `navigator.geolocation` (inyectable en pruebas).
+ * @param alMover - Recibe cada lectura dentro de Posadas; las de afuera se ignoran.
+ * @returns Función que detiene el seguimiento y apaga el GPS.
+ */
+export function seguirUbicacion(geolocalizacion: Geolocation, alMover: (ubicacion: UbicacionPrecisa) => void): () => void {
+  const id = geolocalizacion.watchPosition(
+    ({ coords }) => {
+      if (!dentroDePosadas(coords.latitude, coords.longitude)) return
+      alMover({ lat: coords.latitude, lon: coords.longitude, precision: coords.accuracy })
+    },
+    // Un error suelto (sin señal un rato) no corta nada: el punto queda en la última lectura.
+    () => {},
+    { enableHighAccuracy: true, maximumAge: 5_000 },
+  )
+  return () => geolocalizacion.clearWatch(id)
+}
+
+/**
+ * Indica si la persona se movió lo suficiente para volver a buscar lo que tiene cerca.
+ *
+ * @param busqueda - Punto de la última búsqueda.
+ * @param actual - Ubicación actual.
+ * @returns `true` si se alejó más de 100 m.
+ */
+export function debeActualizarCercanos(busqueda: PuntoGeografico, actual: PuntoGeografico): boolean {
+  return distanciaEnMetros(busqueda, actual) > DISTANCIA_ACTUALIZAR_CERCANOS_M
 }
 
 /**

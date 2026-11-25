@@ -12,7 +12,7 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
   - «`denied`: el mapa abre como hoy, con un aviso chico y descartable, una sola vez, que explica cómo activarla.»
   - «Sin Permissions API: se llama directo a la geolocalización.»
 - **S3 (centrado, reescrita en L6):** «en la carga del mapa siempre debe redirigir a la ubicacion del usuario». Al llegar la ubicación se centra siempre, aunque el mapa se haya movido mientras se leía. Excepción, que la persona usuaria puede revisar: al llegar desde un reporte (`/mapa?reporte=…`) se muestra ese reporte. Fuera de Posadas no hay ubicación que mostrar.
-- **S4 (una lectura):** «Una sola lectura por visita con `buscarUbicacionPrecisa` (tiempo máximo 6 s), sin seguimiento continuo.»
+- **S4 (lectura y seguimiento, reescrita en L9):** la primera lectura usa `buscarUbicacionPrecisa`, con 6 s como máximo. Después, «si, que te siga»: el punto sigue a la persona mientras el mapa está a la vista; el mapa no se mueve solo; lo cercano se vuelve a pedir cuando se alejó más de 100 m; el GPS se apaga al pasar a otra app o pestaña. (Antes: «Una sola lectura por visita…, sin seguimiento continuo.»)
 - **S5 (función SQL):** «Función `cerca_de(lat, lon, radio_m, estados)` con `ST_DWithin` y `ST_Distance`, para reportes y mascotas.»
   - Prueba: «con puntos a 90, 480 y 520 m de un punto conocido, el radio de 500 m devuelve los dos primeros, ordenados.»
   - Supuesto: las mascotas que entran son las `perdida` visibles por RLS (la historia habla de «mascotas perdidas»). Los reportes, con los estados del mapa (pendiente, tomado por la Defensoría y reparado) y sin eliminados.
@@ -94,3 +94,14 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
   - RED: `debeEncuadrarRadio is not a function`. GREEN: 82 pruebas de `lib/map` y `components/map`.
   - WebKit con iPhone 13: al abrir, 500 m da zoom 15; 300 m, zoom 16; 1 km, zoom 14. El círculo queda entero y centrado.
 - **L8 (entorno, 2026-11-24):** el servidor de desarrollo mandaba los estáticos con `immutable`, y Safari usaba JS y CSS viejos. Commits `4577934` (la regla queda solo para producción) y `320421c` (prueba).
+- **L9 (decisión de la persona usuaria, 2026-11-24):** a «que ocurre si ia persona se mueve», respondió «si, que te siga» a la propuesta de seguir la ubicación con el mapa abierto.
+  - `seguirUbicacion` usa `watchPosition` con alta precisión e ignora las lecturas fuera de Posadas. Arranca recién con la primera ubicación, cuando el permiso ya está dado, así que no abre otro diálogo.
+  - `debeActualizarCercanos` vuelve a pedir lo cercano a más de 100 m del último punto de búsqueda; reusa `distanciaEnMetros`.
+  - El hook apaga el seguimiento con `visibilitychange` (pestaña oculta) y al desmontar.
+  - Privacidad: cada nueva búsqueda manda la coordenada redondeada, como antes; a lo sumo una cada 100 m.
+  - RED: 5 pruebas fallaron («is not a function»). GREEN: 87 pruebas de `lib/map` y `components/map`.
+  - WebKit con iPhone 13, moviendo la ubicación simulada:
+    - a 50 m, el punto se mueve y no se pide de nuevo lo cercano;
+    - a 150 m, se hace el segundo pedido (`-27.3693`, redondeado);
+    - con el mapa movido por la persona, el punto sigue moviéndose y el mapa no vuelve.
+  - No probado: el apagado al ocultar la pestaña, que solo cubre el código, sin prueba.
