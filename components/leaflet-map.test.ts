@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
   const cleanups: Array<() => void> = []
   const container = { innerHTML: "", addEventListener: vi.fn((name: string, listener: (event: unknown) => void) => listeners.set(name, listener)), removeEventListener: vi.fn((name: string) => listeners.delete(name)) }
   const map = {
-    setView: vi.fn(() => calls.push("setView")), on: vi.fn(), once: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(),
+    setView: vi.fn(() => calls.push("setView")),  on: vi.fn(), once: vi.fn(), setMaxBounds: vi.fn(), fitBounds: vi.fn(), remove: vi.fn(),
     getBounds: vi.fn(() => ({ getWest: () => -55.95, getSouth: () => -27.4, getEast: () => -55.85, getNorth: () => -27.35 })),
     getZoom: vi.fn(() => 15),
   }
@@ -40,7 +40,7 @@ vi.mock("react", async (importOriginal) => {
 vi.mock("leaflet.markercluster", () => ({}))
 vi.mock("leaflet", () => ({
   default: {
-    map: () => mocks.map,
+    map: vi.fn(() => mocks.map),
     tileLayer: () => ({ addTo: vi.fn(() => mocks.calls.push("tileLayer")) }),
     markerClusterGroup: () => mocks.cluster,
     layerGroup: () => mocks.capaGrupos,
@@ -50,6 +50,7 @@ vi.mock("leaflet", () => ({
   },
 }))
 
+import L from "leaflet"
 import LeafletMap from "./leaflet-map"
 import { INITIAL_MAP_VIEW_CONFIG } from "@/lib/map/initial-view"
 
@@ -79,6 +80,14 @@ describe("LeafletMap initial view", () => {
     mocks.markerOptions.length = 0
     mocks.cleanups.length = 0
     vi.clearAllMocks()
+  })
+
+  it("allows two extra zoom-out levels while preserving regional bounds and initial zoom", () => {
+    render([])
+    expect(L.map).toHaveBeenCalledWith(mocks.container, expect.objectContaining({
+      minZoom: 11, maxZoom: 18, maxBounds: expect.any(Object), maxBoundsViscosity: 1,
+    }))
+    expect(mocks.map.setView).toHaveBeenCalledWith(INITIAL_MAP_VIEW_CONFIG.defaultCenter, 13)
   })
 
   it("sets the initial view before adding markers and keeps their popups", () => {

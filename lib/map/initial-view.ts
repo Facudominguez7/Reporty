@@ -41,9 +41,11 @@ export const MAP_TILE_ORIGIN = process.env.NEXT_PUBLIC_CARTO_API_KEY
 /** Panning bounds for the reports map, extended east to include Candelaria. */
 export const POSADAS_BOUNDS: MapBounds = [-27.59, -56.06, -27.32, -55.6]
 
-/** Lowest zoom of the Posadas maps: zooming further out would only show the region around the city. */
+/** Minimum zoom for the initial view and regional data requests. */
 export const POSADAS_MIN_ZOOM = 13
 
+/** Interactive zoom limits; zooming out does not change the initial view. */
+export const MAP_MIN_ZOOM = 11
 export const MAP_MAX_ZOOM = 18
 
 export const INITIAL_MAP_VIEW_CONFIG: InitialMapViewConfig = {

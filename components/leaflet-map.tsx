@@ -19,10 +19,10 @@ import { categoryIconNodes, getCategoryIconNode, iconNodeToSvgMarkup } from "@/l
 import {
   INITIAL_MAP_VIEW_CONFIG,
   MAP_MAX_ZOOM,
+  MAP_MIN_ZOOM,
   MAP_TILE_ATTRIBUTION,
   MAP_TILE_URL,
   POSADAS_BOUNDS,
-  POSADAS_MIN_ZOOM,
 } from "@/lib/map/initial-view"
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
@@ -559,7 +559,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       zoomControl: true,
       maxBounds: limitesCiudad,
       maxBoundsViscosity: 1,
-      minZoom: POSADAS_MIN_ZOOM,
+      minZoom: MAP_MIN_ZOOM,
       maxZoom: MAP_MAX_ZOOM,
     })
 
