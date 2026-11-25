@@ -46,11 +46,7 @@ function IconoApple() {
   );
 }
 
-/**
- * Pantalla de bienvenida: qué es Reporty, la entrada al mapa y el aviso de que las
- * apps de Android e iOS están en camino. El aviso no enlaza a ninguna tienda porque
- * las apps todavía no están publicadas.
- */
+/** Bienvenida y acceso a las guías para agregar Reporty al celular. */
 export default function HomePage() {
   return (
     <section className="welcome-screen flex min-h-0 flex-1 items-center justify-center p-3 sm:p-6" aria-labelledby="welcome-title">
@@ -77,15 +73,15 @@ export default function HomePage() {
         </Link>
         <p className="text-xs text-primary">Posadas, Misiones</p>
         <div className="flex w-full flex-col items-center gap-2 border-t border-border pt-4">
-          <p className="text-sm font-semibold text-foreground">Próximamente en Android y iOS</p>
+          <p className="text-sm font-semibold text-foreground">Descargar Reporty</p>
           <div className="flex items-center gap-4">
-            <span data-plataforma="android" className="inline-flex">
-              <IconoAndroid />
-            </span>
+            <Link href="/instalar/android" data-plataforma="android" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              <IconoAndroid /> Android
+            </Link>
             <span aria-hidden="true" className="h-7 w-px bg-border" />
-            <span data-plataforma="ios" className="inline-flex">
-              <IconoApple />
-            </span>
+            <Link href="/instalar/ios" data-plataforma="ios" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              <IconoApple /> iPhone
+            </Link>
           </div>
         </div>
       </div>

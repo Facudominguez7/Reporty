@@ -11,9 +11,11 @@ describe("HomePage", () => {
     expect(html).toContain('href="/mapa"')
   })
 
-  it("anuncia las apps móviles como próximas, sin enlaces a tiendas que todavía no existen", () => {
+  it("enlaza las guías de instalación sin anunciar tiendas inexistentes", () => {
     const html = renderToStaticMarkup(createElement(HomePage))
-    expect(html).toContain("Próximamente en Android y iOS")
+    expect(html).toContain('href="/instalar/android"')
+    expect(html).toContain('href="/instalar/ios"')
+    expect(html).toContain("Descargar Reporty")
     expect(html).toContain('data-plataforma="android"')
     expect(html).toContain('data-plataforma="ios"')
     expect(html).not.toContain("play.google.com")
