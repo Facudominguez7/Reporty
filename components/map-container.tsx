@@ -13,7 +13,7 @@
 
 "use client"
 
-import LeafletMap from "@/components/leaflet-map"
+import LeafletMap, { type UbicacionPersonaMapa } from "@/components/leaflet-map"
 import { MousePointer2, Shield } from "lucide-react"
 
 import { getPriorityColor } from "@/components/report-card"
@@ -64,6 +64,8 @@ interface MapContainerProps {
   grupos?: GrupoMapa[]
   /** Carga por zona (#281): recibe la zona visible y el zoom al terminar cada movimiento. */
   onCambioZona?: (zona: ZonaMapa, zoom: number) => void
+  /** Punto de la persona y radio de búsqueda (#297), en las dos capas. */
+  ubicacionPersona?: UbicacionPersonaMapa | null
 }
 
 /**
@@ -73,7 +75,7 @@ interface MapContainerProps {
  * @param showLegend - Indica si se debe mostrar la leyenda de colores; por defecto `true`
  * @returns El elemento JSX que contiene el mapa y sus superposiciones (leyenda e instrucciones)
  */
-export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona }: MapContainerProps) {
+export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null }: MapContainerProps) {
   return (
     <div className="relative w-full h-full">
       {/* Componente principal del mapa de Leaflet */}
@@ -84,6 +86,7 @@ export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "report
         onSeleccionarReporte={onSeleccionarReporte}
         focoReporte={focoReporte}
         onCambioZona={onCambioZona}
+        ubicacionPersona={ubicacionPersona}
       />
 
       {showLegend && layer === "reportes" && (

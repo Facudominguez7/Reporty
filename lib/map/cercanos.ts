@@ -17,6 +17,9 @@ export const RADIO_CERCANOS_INICIAL = 500
 export const RADIO_CERCANOS_MINIMO = 100
 export const RADIO_CERCANOS_MAXIMO = 2000
 
+/** Máximo de elementos que devuelve `cerca_de`: si llegan tantos, puede haber más. */
+export const LIMITE_CERCANOS = 100
+
 /** Zoom al que el mapa se acerca a la persona. */
 export const ZOOM_CERCANOS = 16
 
@@ -68,4 +71,27 @@ export function describirDistancia(metros: number): string {
   if (redondeados < 1000) return `a ${redondeados} m`
   const kilometros = Math.round(redondeados / 100) / 10
   return `a ${kilometros.toLocaleString("es-AR")} km`
+}
+
+/**
+ * Etiqueta de un radio para el panel.
+ *
+ * @param metros - Radio en metros.
+ * @returns «300 m», «500 m» o «1 km».
+ */
+export function etiquetaRadio(metros: number): string {
+  return metros >= 1000 ? `${(metros / 1000).toLocaleString("es-AR")} km` : `${metros} m`
+}
+
+/**
+ * Nombre con el que un elemento aparece en la lista del panel.
+ *
+ * @param elemento - Reporte o mascota cercana.
+ * @returns El título del reporte, o la especie de la mascota («Perro perdido»).
+ */
+export function nombreElementoCercano(elemento: ElementoCercano): string {
+  const titulo = elemento.titulo.trim()
+  if (elemento.tipo === "reporte") return titulo || "Reporte sin título"
+  const especie = titulo === "otro" || !titulo ? "Otro animal" : titulo[0].toUpperCase() + titulo.slice(1)
+  return `${especie} perdido`
 }

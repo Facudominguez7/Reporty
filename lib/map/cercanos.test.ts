@@ -5,6 +5,8 @@ import {
   RADIOS_CERCANOS,
   dentroDePosadas,
   describirDistancia,
+  etiquetaRadio,
+  nombreElementoCercano,
   redondearCoordenada,
 } from "./cercanos"
 
@@ -30,5 +32,16 @@ describe("reglas de cercanos", () => {
     expect(describirDistancia(87.4)).toBe("a 87 m")
     expect(describirDistancia(999.6)).toBe("a 1 km")
     expect(describirDistancia(1450)).toBe("a 1,5 km")
+  })
+
+  it("nombra el radio como en el panel", () => {
+    expect(RADIOS_CERCANOS.map(etiquetaRadio)).toEqual(["300 m", "500 m", "1 km"])
+  })
+
+  it("nombra un reporte por su título y una mascota por su especie", () => {
+    expect(nombreElementoCercano({ tipo: "reporte", id: 7, titulo: "Bache en Uruguay", metros: 90 })).toBe("Bache en Uruguay")
+    expect(nombreElementoCercano({ tipo: "mascota", id: 3, titulo: "perro", metros: 200 })).toBe("Perro perdido")
+    expect(nombreElementoCercano({ tipo: "mascota", id: 4, titulo: "otro", metros: 200 })).toBe("Otro animal perdido")
+    expect(nombreElementoCercano({ tipo: "reporte", id: 8, titulo: "  ", metros: 10 })).toBe("Reporte sin título")
   })
 })

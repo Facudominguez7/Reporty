@@ -13,7 +13,8 @@ type AvisoCargaZonaProps = {
 }
 
 /**
- * Muestra el estado de la carga de la zona sobre el mapa.
+ * Muestra el estado de la carga de la zona sobre el mapa. La posición la da la columna de avisos
+ * del mapa (`MapaPorZona`), que lo apila con el panel de cercanos.
  *
  * @param estado - `cargando`, `listo` (no muestra nada) o `error`.
  * @param onReintentar - Vuelve a pedir la zona visible.
@@ -22,7 +23,7 @@ type AvisoCargaZonaProps = {
 export function AvisoCargaZona({ estado, onReintentar }: AvisoCargaZonaProps) {
   if (estado === "listo") return null
 
-  const ubicacion = "pointer-events-none absolute inset-x-0 top-[4.25rem] z-[1000] flex justify-center px-4"
+  const ubicacion = "flex justify-center"
   const superficie = "mapa-vidrio-superficie pointer-events-auto flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow-md"
 
   if (estado === "cargando") {

@@ -27,8 +27,8 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
 |---|---|---|---|---|---|
 | T1 | Función `cerca_de` y su prueba SQL | S5 | inline | hecho | RED: la prueba falla sin la función; GREEN: `test-mapa-cercanos.sh` sale 0; usa los dos índices GiST |
 | T2 | Endpoint `POST /api/mapa/cerca` | S6 | inline | hecho | RED: 4 archivos sin módulo; GREEN: 23 pruebas; tsc solo con los 2 errores previos de main |
-| T3 | Ubicación al abrir el mapa: permiso, punto, círculo y centrado | S1–S4 | inline | pendiente | |
-| T4 | Panel de cercanos con radios y aviso de precisión | S7 | inline | pendiente | |
+| T3 | Ubicación al abrir el mapa: permiso, punto, círculo y centrado | S1–S4 | inline | hecho | RED: módulo inexistente; GREEN: 13 pruebas del flujo; Chrome: 14/14 casos (ver L4) |
+| T4 | Panel de cercanos con radios y aviso de precisión | S7 | inline | hecho | RED: componentes inexistentes; GREEN: 10 pruebas del panel y el aviso; Chrome: radio 1 km y lista |
 | T5 | Migración en producción y prueba en la TWA | S8 | usuario | pendiente | |
 
 Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades paralelas independientes).
@@ -45,3 +45,21 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
   - `buscarCercanos` llama a `cerca_de` por POST, sin `{ get: true }`: así la coordenada no queda en la URL que registra el gateway de Supabase. Hay una prueba que lo fija.
   - Ante un error, el endpoint solo escribe en los logs el código y el mensaje de la consulta, o el nombre de la excepción; las pruebas verifican que la coordenada no aparezca.
   - El proxy deja pasar `/api/mapa/cerca` sin refrescar la sesión, igual que `/api/mapa/reportes`.
+- **L4 (T3 y T4, verificación y decisiones):**
+  - Lógica sin React ni Leaflet en `lib/map/ubicacion-al-abrir.ts`: permiso, una sola lectura de 6 s, Posadas, «no volver a pedir en la sesión» y aviso una sola vez. `debeCentrarEnPersona` decide el centrado.
+  - El punto: azul con borde blanco, halo que late (sin animación con `prefers-reduced-motion`) y la etiqueta «Estás acá» siempre visible. Se dibuja aunque el mapa no se mueva (foco de reporte o mapa ya movido), para cumplir S1.
+  - «Mapa movido por la persona» = cualquier `movestart` después de la primera vista. `invalidateSize` (el teléfono esconde la barra) no dispara `movestart`: está verificado en el código de Leaflet.
+  - Bug encontrado en Chrome: StrictMode repetía el efecto, la primera corrida marcaba el aviso de permiso negado y la segunda ya no lo mostraba. Se arregló con una ref que corre el flujo una vez por montaje, lo que también garantiza una sola lectura en desarrollo.
+  - El panel muestra «100+» al llegar al máximo de 100 filas de `cerca_de`. Esa prueba se escribió junto con el cambio, sin RED previo.
+  - Chrome (playwright-core con el Chrome del sistema, 390×844, contra el servidor de desarrollo y la base local con la migración aplicada), 14/14:
+    - `granted`: punto con «Estás acá», centrado a 0 px, círculo, panel «70 reportes cerca tuyo».
+    - Un solo POST sin la coordenada en la URL, redondeada a 4 decimales; el radio de 1 km manda 1000 y no mueve el mapa.
+    - Con foco de reporte, el punto queda a 795 px del centro (no centra).
+    - Precisión de 120 m: «Ubicación aproximada». Fuera de Posadas: sin punto ni pedido.
+    - `denied`: el aviso se descarta y no vuelve.
+  - Límites de esa verificación:
+    - Chrome headless convierte `prompt` en `denied`, así que «sin respuesta → no volver a pedir» quedó cubierto solo por las pruebas unitarias.
+    - El estado `denied` se simuló sobreescribiendo `permissions.query`, porque `Browser.setPermission` no aplica a contextos aislados.
+    - El caso «la persona movió el mapa antes de la lectura» no se probó en el navegador.
+    - El servidor de desarrollo de la persona usuaria servía un CSS viejo, sin las reglas nuevas; las capturas inyectan ese bloque de `globals.css`, que compila bien con `@tailwindcss/postcss`.
+  - Suite: 3188 pruebas pasan; fallan las 3 de `app/mascotas/nueva/resultado-navegacion.test.ts`, que ya fallaban en main. `tsc` solo muestra los 2 errores previos de main.

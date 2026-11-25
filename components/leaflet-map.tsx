@@ -26,6 +26,8 @@ import {
 } from "@/lib/map/initial-view"
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
+import { ZOOM_CERCANOS } from "@/lib/map/cercanos"
+import { debeCentrarEnPersona } from "@/lib/map/ubicacion-al-abrir"
 import type { ZonaMapa } from "@/lib/map/zona"
 import type { GrupoMapa } from "@/database/queries/reportes/get-reportes"
 
@@ -59,6 +61,28 @@ export interface LeafletMapProps {
    * de moverse. Con esta prop el mapa no se vuelve a encuadrar cuando cambian los reportes.
    */
   onCambioZona?: (zona: ZonaMapa, zoom: number) => void
+  /**
+   * Ubicación de la persona (#297): se dibuja su punto y el círculo del radio de búsqueda. La
+   * primera vez que llega, el mapa se centra en ella si no se llegó desde un reporte y la
+   * persona todavía no movió el mapa.
+   */
+  ubicacionPersona?: UbicacionPersonaMapa | null
+}
+
+/** Punto de la persona y radio del círculo, en metros. */
+export type UbicacionPersonaMapa = { lat: number; lon: number; radio: number }
+
+/**
+ * Ícono del punto de la persona: un círculo azul con borde blanco y un halo que late, para que se
+ * distinga de los reportes y se lea como «estás acá».
+ */
+function crearIconoPersona() {
+  return L.divIcon({
+    className: "ubicacion-persona",
+    html: '<span class="ubicacion-persona__halo" aria-hidden="true"></span><span class="ubicacion-persona__punto" aria-hidden="true"></span>',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  })
 }
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
@@ -399,7 +423,7 @@ function seguirFoco(map: L.Map, marcador: L.Marker | null, pendienteRef: { curre
  *
  * @param focoReporte - Reporte al que la primera vista se acerca y abre su popup.
  */
-export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona }: LeafletMapProps) {
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
@@ -416,6 +440,12 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const onCambioZonaRef = useRef(onCambioZona)
   // Marcador del reporte en foco cuyo popup todavía no se abrió (ver `seguirFoco`).
   const focoPendienteRef = useRef<L.Marker | null>(null)
+  // Punto y círculo de la persona (#297), en su propia capa.
+  const capaPersonaRef = useRef<L.LayerGroup | null>(null)
+  // La persona movió el mapa (o se movió al reporte en foco) después de la primera vista.
+  const mapaMovidoRef = useRef(false)
+  // Ya se decidió si centrar en la persona: se decide una sola vez, con la primera lectura.
+  const centradoDecididoRef = useRef(false)
   useEffect(() => {
     onCambioZonaRef.current = onCambioZona
   })
@@ -548,11 +578,13 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
 
     // Los grupos del servidor van en su propia capa: no se mezclan con los grupos de Leaflet.
     const capaGrupos = L.layerGroup()
+    const capaPersona = L.layerGroup()
     const marcadoresReporte = marcadoresReporteRef.current
 
     tileLayer.addTo(map)
     clusterGroup.addTo(map)
     capaGrupos.addTo(map)
+    capaPersona.addTo(map)
 
     // Carga por zona: avisa la zona visible cada vez que el mapa termina de moverse.
     map.on("moveend", () => {
@@ -586,6 +618,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     tileLayerRef.current = tileLayer
     clusterGroupRef.current = clusterGroup
     capaGruposRef.current = capaGrupos
+    capaPersonaRef.current = capaPersona
 
     return () => {
       container.removeEventListener("error", handlePetImageError, true)
@@ -596,6 +629,9 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       clusterGroupRef.current = null
       tileLayerRef.current = null
       capaGruposRef.current = null
+      capaPersonaRef.current = null
+      mapaMovidoRef.current = false
+      centradoDecididoRef.current = false
       marcadoresReporte.clear()
       mascotasDibujadasRef.current = { lista: null, marcadores: [] }
       seleccionDibujadaRef.current = null
@@ -626,6 +662,11 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       // Start tile requests while the initial markers are being prepared.
       map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
       hasInitialViewRef.current = true
+      // Desde acá, cualquier movimiento lo hizo la persona (arrastrar, acercar, tocar un grupo o
+      // un marcador) o el foco del reporte: en los dos casos el mapa ya no se centra solo.
+      map.on("movestart", () => {
+        mapaMovidoRef.current = true
+      })
     }
 
     const marcadores = marcadoresReporteRef.current
@@ -782,6 +823,43 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       capaGrupos.addLayer(marcador)
     }
   }, [grupos])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const capaPersona = capaPersonaRef.current
+    if (!map || !capaPersona) return
+
+    capaPersona.clearLayers()
+    if (!ubicacionPersona) return
+
+    const punto: L.LatLngTuple = [ubicacionPersona.lat, ubicacionPersona.lon]
+    L.circle(punto, {
+      radius: ubicacionPersona.radio,
+      color: "var(--semantic-info)",
+      weight: 1.5,
+      dashArray: "6 6",
+      fillColor: "var(--semantic-info)",
+      fillOpacity: 0.06,
+      interactive: false,
+    }).addTo(capaPersona)
+    // Por encima de los reportes, sin tapar sus clics, con la etiqueta «Estás acá» siempre visible.
+    L.marker(punto, {
+      icon: crearIconoPersona(),
+      title: "Tu ubicación",
+      alt: "Tu ubicación",
+      keyboard: false,
+      interactive: false,
+      zIndexOffset: 1000,
+    })
+      .bindTooltip("Estás acá", { permanent: true, direction: "top", offset: [0, -14], className: "ubicacion-persona__etiqueta" })
+      .addTo(capaPersona)
+
+    if (centradoDecididoRef.current) return
+    centradoDecididoRef.current = true
+    if (debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte), mapaMovidoPorPersona: mapaMovidoRef.current })) {
+      map.setView(punto, ZOOM_CERCANOS)
+    }
+  }, [ubicacionPersona, focoReporte])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }
