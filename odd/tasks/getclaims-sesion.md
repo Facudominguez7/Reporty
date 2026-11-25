@@ -21,7 +21,7 @@ Supuesto verificado: la clave actual del proyecto es ECC (P-256) y la HS256 qued
 | T1 | Proxy con `getClaims`, con respaldo de `getUser` si falta `amr` | S1, S2 | inline | hecho | 7b60880. RED 15/15 → GREEN 16/16. Riesgo: ítem 2 (autenticación) |
 | T2 | Helper de usuario desde claims y páginas de lectura | S3, S4 | inline | hecho | 750362d. Riesgo: ítem 2 (autenticación) |
 | T3 | Refrescar la sesión al crear la contraseña | S5 | inline | hecho | 6c53472. RED 1 → GREEN 83/83 |
-| T4 | Medición después del deploy | S6 | inline | pendiente | |
+| T4 | Medición después del deploy | S6 | inline | hecho | L5 |
 
 ## Log
 
@@ -49,3 +49,17 @@ Supuesto verificado: la clave actual del proyecto es ECC (P-256) y la HS256 qued
   - **Observaciones no aplicadas:**
     - `/mascotas/[id]` lee la propiedad y el rol con el cliente de servicio, pero solo para mostrar botones; las acciones vuelven a verificar con `getUser`.
     - Los avisos con `email` pueden mostrar el correo anterior hasta que se refresca el token (≤1 h).
+- **L5 (medición después del deploy de la #319, 2026-11-24, merge ce6e650):**
+  - **Métrica:** llamadas a `auth/v1/user` por cada consulta REST con sesión de usuario (`role = authenticated` en los edge logs). No depende de cuánta gente entra.
+    - Línea de base (24 h antes del deploy): 1347 llamadas sobre 1199 consultas = **1,12**.
+    - Después, en dos sesiones reales con login, refresh y navegación por el detalle, `/dashboard` y `/reportes`: 2 llamadas sobre 10 consultas = **0,2** (−82 %). La muestra es chica; conviene repetirla con 24 h de tráfico.
+  - **Firma:** todos los tokens de usuario de las últimas 24 h vienen firmados con ES256, así que `getClaims` nunca vuelve a `getUser` por un token HS256.
+  - **Lo que queda en `auth/v1/user`:** una llamada por carga completa de página con sesión. Viene de `obtenerEstadoPushAction` (server action de lectura), que `InvitacionPush` llama desde el layout raíz. Se identificó por el `POST /reportes` que coincide en los logs del Worker con cada llamada. Queda como seguimiento, porque el alcance aprobado dejó todas las server actions con `getUser`.
+  - **JWKS:** se descarga casi en cada pedido con sesión (17 veces para ~10 pedidos). La caché global de auth-js no está aguantando entre pedidos en el Worker. Igual sale de la caché de Supabase (`HIT`, 2–9 ms de `origin_time`), contra 237–257 ms de `auth/v1/user` en la misma ventana. Es otro seguimiento posible.
+  - **Rutas públicas** (`medir.sh`, 3 corridas de 30; mediana del p50 total, antes → ahora), sin cambios fuera del ruido, como se esperaba (sin sesión, `getUser` tampoco viajaba):
+    - API del mapa: ~263 → ~271 ms.
+    - `/mapa`: ~421 → ~430 ms (HTML) y ~410 → ~416 ms (RSC).
+    - Detalle: ~511 → ~453 ms (HTML) y ~444 → ~440 ms (RSC).
+    - `/reportes`: ~281 → ~291 ms (HTML) y ~284 → ~286 ms (RSC).
+  - **No medido:** el tiempo de las páginas con sesión, porque `medir.sh` es anónimo y no hay una cookie de prueba. El ahorro esperado por pedido con sesión es un viaje a Auth (~240 ms en esta ventana) en el camino crítico del proxy.
+  - Cierre: S1–S6 cubiertos.
