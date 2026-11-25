@@ -166,20 +166,15 @@ export async function iniciarUbicacionAlAbrir({
 }
 
 /**
- * Indica si el mapa se centra solo en la persona al llegar su ubicación.
+ * Indica si el mapa se centra en la persona al llegar su ubicación. Al cargar el mapa siempre se
+ * centra, aunque se haya movido mientras se leía la ubicación; la única excepción es llegar desde
+ * un reporte, porque ese enlace existe para mostrar el reporte.
  *
  * @param estado.hayFocoReporte - Se llegó desde un reporte (`/mapa?reporte=…`).
- * @param estado.mapaMovidoPorPersona - La persona ya movió el mapa antes de la lectura.
- * @returns `true` si se puede mover el mapa.
+ * @returns `true` si se centra el mapa en la persona.
  */
-export function debeCentrarEnPersona({
-  hayFocoReporte,
-  mapaMovidoPorPersona,
-}: {
-  hayFocoReporte: boolean
-  mapaMovidoPorPersona: boolean
-}): boolean {
-  return !hayFocoReporte && !mapaMovidoPorPersona
+export function debeCentrarEnPersona({ hayFocoReporte }: { hayFocoReporte: boolean }): boolean {
+  return !hayFocoReporte
 }
 
 /**

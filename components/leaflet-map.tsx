@@ -63,8 +63,7 @@ export interface LeafletMapProps {
   onCambioZona?: (zona: ZonaMapa, zoom: number) => void
   /**
    * Ubicación de la persona (#297): se dibuja su punto y el círculo del radio de búsqueda. La
-   * primera vez que llega, el mapa se centra en ella si no se llegó desde un reporte y la
-   * persona todavía no movió el mapa.
+   * primera vez que llega, el mapa se centra en ella, salvo que se haya llegado desde un reporte.
    */
   ubicacionPersona?: UbicacionPersonaMapa | null
 }
@@ -442,8 +441,6 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const focoPendienteRef = useRef<L.Marker | null>(null)
   // Punto y círculo de la persona (#297), en su propia capa.
   const capaPersonaRef = useRef<L.LayerGroup | null>(null)
-  // La persona movió el mapa (o se movió al reporte en foco) después de la primera vista.
-  const mapaMovidoRef = useRef(false)
   // Ya se decidió si centrar en la persona: se decide una sola vez, con la primera lectura.
   const centradoDecididoRef = useRef(false)
   useEffect(() => {
@@ -630,7 +627,6 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       tileLayerRef.current = null
       capaGruposRef.current = null
       capaPersonaRef.current = null
-      mapaMovidoRef.current = false
       centradoDecididoRef.current = false
       marcadoresReporte.clear()
       mascotasDibujadasRef.current = { lista: null, marcadores: [] }
@@ -662,11 +658,6 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       // Start tile requests while the initial markers are being prepared.
       map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
       hasInitialViewRef.current = true
-      // Desde acá, cualquier movimiento lo hizo la persona (arrastrar, acercar, tocar un grupo o
-      // un marcador) o el foco del reporte: en los dos casos el mapa ya no se centra solo.
-      map.on("movestart", () => {
-        mapaMovidoRef.current = true
-      })
     }
 
     const marcadores = marcadoresReporteRef.current
@@ -856,7 +847,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
 
     if (centradoDecididoRef.current) return
     centradoDecididoRef.current = true
-    if (debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte), mapaMovidoPorPersona: mapaMovidoRef.current })) {
+    if (debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })) {
       map.setView(punto, ZOOM_CERCANOS)
     }
   }, [ubicacionPersona, focoReporte])

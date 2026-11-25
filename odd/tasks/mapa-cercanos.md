@@ -10,7 +10,7 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
   - «`prompt`: se pide el permiso en ese momento (diálogo del navegador; diálogo nativo en la app Android, que ya tiene `locationDelegation` activo). Si se cierra sin responder, no se vuelve a pedir en esa sesión.»
   - «`denied`: el mapa abre como hoy, con un aviso chico y descartable, una sola vez, que explica cómo activarla.»
   - «Sin Permissions API: se llama directo a la geolocalización.»
-- **S3 (cuándo no se mueve):** «El mapa no se mueve solo si se llegó desde un reporte (`/mapa?reporte=…`), si la persona ya movió el mapa o si está fuera de Posadas.»
+- **S3 (centrado, reescrita en L6):** «en la carga del mapa siempre debe redirigir a la ubicacion del usuario». Al llegar la ubicación se centra siempre, aunque el mapa se haya movido mientras se leía. Excepción, que la persona usuaria puede revisar: al llegar desde un reporte (`/mapa?reporte=…`) se muestra ese reporte. Fuera de Posadas no hay ubicación que mostrar.
 - **S4 (una lectura):** «Una sola lectura por visita con `buscarUbicacionPrecisa` (tiempo máximo 6 s), sin seguimiento continuo.»
 - **S5 (función SQL):** «Función `cerca_de(lat, lon, radio_m, estados)` con `ST_DWithin` y `ST_Distance`, para reportes y mascotas.»
   - Prueba: «con puntos a 90, 480 y 520 m de un punto conocido, el radio de 500 m devuelve los dos primeros, ordenados.»
@@ -77,3 +77,11 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
     - Las teselas a zoom 16 revelan la zona al proveedor del mapa, lo mismo que si la persona moviera el mapa a mano.
     - No se revisó si Postgres en producción registra los parámetros de las RPC.
     - El aviso de permiso negado aparece una vez por dispositivo.
+- **L6 (corrección de la persona usuaria, 2026-11-24):** «no, no aparece. en la carga del mapa siempre debe redirigir a la ubicacion del usuario»
+  - Diagnóstico: el registro de pedidos del servidor de desarrollo muestra `/mapa` seguido de `POST /api/mapa/cerca` 200. El teléfono dio una ubicación dentro de Posadas, pero el mapa no se centró y el punto quedó fuera de la pantalla.
+  - Causa probable: antes de la lectura hubo un `movestart` (un toque de la persona o la animación de entrada), y la regla «si la persona ya movió el mapa» bloqueaba el centrado.
+  - En Chrome, con la ubicación demorada 3 s, centraba bien. El servidor de desarrollo además servía un CSS viejo; se reinició.
+  - Cambio: `debeCentrarEnPersona` solo mira el foco de reporte, y se quitó la marca de «mapa movido».
+    - RED: los tipos de la prueba nueva no compilaban.
+    - GREEN: 80 pruebas de `lib/map` y `components/map`.
+    - Chrome: arrastrando el mapa antes de que llegue la ubicación, el punto queda centrado.

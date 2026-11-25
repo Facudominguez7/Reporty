@@ -204,10 +204,12 @@ describe("ubicación al abrir el mapa", () => {
 })
 
 describe("debeCentrarEnPersona", () => {
-  it("centra solo si no se llegó desde un reporte y la persona no movió el mapa", () => {
-    expect(debeCentrarEnPersona({ hayFocoReporte: false, mapaMovidoPorPersona: false })).toBe(true)
-    expect(debeCentrarEnPersona({ hayFocoReporte: true, mapaMovidoPorPersona: false })).toBe(false)
-    expect(debeCentrarEnPersona({ hayFocoReporte: false, mapaMovidoPorPersona: true })).toBe(false)
+  it("al cargar el mapa siempre centra en la persona, aunque el mapa se haya movido antes de la lectura", () => {
+    expect(debeCentrarEnPersona({ hayFocoReporte: false })).toBe(true)
+  })
+
+  it("no centra si se llegó desde un reporte, para mostrar ese reporte", () => {
+    expect(debeCentrarEnPersona({ hayFocoReporte: true })).toBe(false)
   })
 })
 
