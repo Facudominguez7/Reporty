@@ -30,7 +30,7 @@ Objetivo: importar los barrios de la IDE de Posadas a PostGIS y mostrar el barri
 | T5 | Docs: access-matrix, AGENTS.md, arquitectura | S1–S5 | inline | hecho | lectura estructural de los tres archivos |
 | T7 | Barrio en el popup del mapa en lugar de las coordenadas | S7 | inline | hecho | RED: «function public.barrio(reportes) does not exist» y 2 pruebas de vitest; GREEN: prueba SQL y 74 pruebas; `/api/mapa/reportes` trae `barrio` |
 | T8 | Mensaje a organismos con calle y altura en lugar de coordenadas | S8 | inline | hecho | RED: 3 pruebas (borrador, props de las dos pantallas, resultado de creación); GREEN: 700 pruebas |
-| T9 | Error de hidratación de `scroll-reveal` | S9 | inline | en curso | |
+| T9 | Error de hidratación de `scroll-reveal` | S9 | inline | hecho | RED: 2 pruebas; GREEN: suite con las 3 fallas previas de `main`; Chrome limpio: 1 error de hidratación antes, 0 después |
 | T6 | Migración e importación en producción | S6 | usuario | pendiente | |
 
 Ruta: todo inline; las unidades dependen del contrato de T1 y no hay motivo de escritor.
@@ -46,3 +46,4 @@ Ruta: todo inline; las unidades dependen del contrato de T1 y no hay motivo de e
 - **L7 (pedido, 2026-11-25):** «al abrir aca debe aparecer tmb en vez de latitud y longitud» (captura del popup de un reporte en `/mapa`). Se resolvió con el campo calculado `public.barrio(reportes)` de PostgREST: el mapa lo pide en el `select` (también sobre `reportes_en_zona`) y las listas no. En el mismo mensaje vino una captura de un error de hidratación causado por `components/scroll-reveal.tsx`, que no es de esta feature.
 - **L8 (pedido, 2026-11-25):** «otra cosa que hay que arreglar acaa tmb es al momento de avisar a un organismo le llega con latitud y longitud la ubicacion en vez de la calle y altura». El texto sale de `createContactDraft` (`lib/report-contacts/contact-actions.ts`). El correo automático (`sendOrganismoNotificationEmail`) no lleva ubicación.
 - **L9 (pedido, 2026-11-25):** «ese error de hidratacion arreglalo aca tmb».
+- **L10 (T9, 2026-11-25):** causa: `components/scroll-reveal.tsx`, montado en el layout, agregaba `scroll-reveal` y `scroll-reveal-visible` a `.page-container > *` 120 ms después del `load`; si React todavía hidrataba ese contenido, el `className` no coincidía. En Chrome, un bloque «oculto» de `/donar` tenía opacidad 1: la animación `reporty-reveal-up` (fill `both`) le ganaba, así que el script no tenía efecto visible en `.page-container`. Solo se notaba en `.auth-shell`, sin animación propia. Se borró el componente y sus reglas, y `.auth-shell > *` usa la misma animación CSS.

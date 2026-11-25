@@ -281,18 +281,10 @@ body:not(:has(.admin-workspace)),
       }
     }
 
-    body:not(:has(.admin-workspace)) .scroll-reveal {
-      opacity: 0;
-      transform: translateY(1rem);
-      transition: opacity 520ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    body:not(:has(.admin-workspace)) .scroll-reveal-visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    body:not(:has(.admin-workspace)) .page-container > * {
+    /* Revelado solo con CSS: ningún script cambia clases del contenido, así React no
+       encuentra diferencias al hidratar. */
+    body:not(:has(.admin-workspace)) .page-container > *,
+    body:not(:has(.admin-workspace)) .auth-shell > * {
       animation: reporty-reveal-up 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }
 
@@ -338,15 +330,6 @@ body:not(:has(.admin-workspace)),
 
     body:not(:has(.admin-workspace)) .welcome-screen .page-container > :nth-child(4) {
       animation-delay: 230ms;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .scroll-reveal,
-    .scroll-reveal-visible {
-      opacity: 1;
-      transform: none;
-      transition: none;
     }
   }
 
