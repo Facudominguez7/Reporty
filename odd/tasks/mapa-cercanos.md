@@ -31,7 +31,7 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
 | T2 | Endpoint `POST /api/mapa/cerca` | S6 | inline | hecho | RED: 4 archivos sin módulo; GREEN: 23 pruebas; tsc solo con los 2 errores previos de main |
 | T3 | Ubicación al abrir el mapa: permiso, punto, círculo y centrado | S1–S4 | inline | hecho | RED: módulo inexistente; GREEN: 13 pruebas del flujo; Chrome: 14/14 casos (ver L4) |
 | T4 | Panel de cercanos con radios y aviso de precisión | S7 | inline | hecho | RED: componentes inexistentes; GREEN: 10 pruebas del panel y el aviso; Chrome: radio 1 km y lista |
-| T5 | Migración en producción y prueba en la TWA | S8 | usuario | pendiente | |
+| T5 | Migración en producción y prueba en la TWA | S8 | usuario | migración aplicada; falta la TWA | ver L11 |
 
 Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades paralelas independientes).
 
@@ -109,3 +109,10 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
   - Causa: al pasar a la capa de mascotas, `LeafletMap` encuadraba todas las mascotas de la ciudad.
   - Cambio: si hay ubicación de la persona, encuadra su círculo con el mismo margen (`MARGEN_CIRCULO_PERSONA`); sin ubicación, sigue como antes.
   - WebKit con iPhone 13: con el código anterior, el punto quedaba en (650, 160), fuera de la pantalla; con el cambio, en (195, 364), centrado. No hay prueba unitaria: es lógica de Leaflet sin módulo puro.
+- **L11 (T5, migración en producción y prueba en la TWA; 2026-11-24):** «aplica la migracion en prod».
+  - Se aplicó `20261125120000_mapa_cercanos.sql` en una transacción con `execute_sql`, y se registró en `supabase_migrations.schema_migrations` con la misma versión.
+  - Verificado en producción:
+    - permisos `{postgres, anon, authenticated}`; `service_role` sin `execute`; `stable`, `security invoker`;
+    - como `anon`, con radio de 1 km, devolvió 10 reportes (126 a 927 m) y 7 mascotas (324 a 954 m);
+    - un radio de 5000 m se rechaza con `22023`.
+  - El iPhone con Safari ya se probó (la persona usuaria respondió «funciona»). Falta la app de Android (TWA).
