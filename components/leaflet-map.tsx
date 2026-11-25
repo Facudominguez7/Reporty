@@ -68,6 +68,9 @@ export interface LeafletMapProps {
   ubicacionPersona?: UbicacionPersonaMapa | null
 }
 
+/** Margen al encuadrar el círculo de la persona: arriba el panel «cerca tuyo», abajo la leyenda. */
+const MARGEN_CIRCULO_PERSONA: L.FitBoundsOptions = { paddingTopLeft: [24, 160], paddingBottomRight: [24, 96] }
+
 /** Punto de la persona y radio del círculo, en metros. */
 export type UbicacionPersonaMapa = { lat: number; lon: number; radio: number }
 
@@ -445,6 +448,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const centradoDecididoRef = useRef(false)
   // Radio del círculo dibujado: si la persona elige otro, el mapa encuadra el círculo nuevo.
   const radioDibujadoRef = useRef<number | null>(null)
+  // Círculo de búsqueda dibujado: al pasar a mascotas, el mapa vuelve a encuadrarlo.
+  const circuloPersonaRef = useRef<L.Circle | null>(null)
   useEffect(() => {
     onCambioZonaRef.current = onCambioZona
   })
@@ -631,6 +636,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       capaPersonaRef.current = null
       centradoDecididoRef.current = false
       radioDibujadoRef.current = null
+      circuloPersonaRef.current = null
       marcadoresReporte.clear()
       mascotasDibujadasRef.current = { lista: null, marcadores: [] }
       seleccionDibujadaRef.current = null
@@ -773,6 +779,13 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     if (onCambioZona && !pasoAMascotas) {
       return
     }
+    // Con la ubicación de la persona, las mascotas se muestran alrededor de ella, igual que los
+    // incidentes: si no, encuadrar todas las de la ciudad la saca de su zona.
+    const circuloPersona = circuloPersonaRef.current
+    if (pasoAMascotas && circuloPersona) {
+      map.fitBounds(circuloPersona.getBounds(), MARGEN_CIRCULO_PERSONA)
+      return
+    }
 
     if (visibleItems.length === 0) {
       map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
@@ -824,6 +837,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     if (!map || !capaPersona) return
 
     capaPersona.clearLayers()
+    circuloPersonaRef.current = null
     if (!ubicacionPersona) return
 
     const punto: L.LatLngTuple = [ubicacionPersona.lat, ubicacionPersona.lon]
@@ -836,6 +850,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       fillOpacity: 0.06,
       interactive: false,
     }).addTo(capaPersona)
+    circuloPersonaRef.current = circulo
     // Por encima de los reportes, sin tapar sus clics, con la etiqueta «Estás acá» siempre visible.
     L.marker(punto, {
       icon: crearIconoPersona(),
@@ -855,8 +870,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     const centrar = primeraUbicacion && debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })
     if (centrar || debeEncuadrarRadio({ radioAnterior, radio: ubicacionPersona.radio })) {
       // El círculo entra entero en la pantalla: así achicar el radio siempre acerca el mapa y
-      // agrandarlo lo aleja. Arriba queda lugar para el panel «cerca tuyo» y abajo para la leyenda.
-      map.fitBounds(circulo.getBounds(), { paddingTopLeft: [24, 160], paddingBottomRight: [24, 96] })
+      // agrandarlo lo aleja.
+      map.fitBounds(circulo.getBounds(), MARGEN_CIRCULO_PERSONA)
     }
   }, [ubicacionPersona, focoReporte])
 

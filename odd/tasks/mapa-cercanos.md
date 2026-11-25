@@ -105,3 +105,7 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
     - a 150 m, se hace el segundo pedido (`-27.3693`, redondeado);
     - con el mapa movido por la persona, el punto sigue moviéndose y el mapa no vuelve.
   - No probado: el apagado al ocultar la pestaña, que solo cubre el código, sin prueba.
+- **L10 (pedido de la persona usuaria, 2026-11-24):** «tmb si cambias a mascotas desde el mapa es decir con ek switch no vuekve a tu ubicacion como si se hace en incidentes»
+  - Causa: al pasar a la capa de mascotas, `LeafletMap` encuadraba todas las mascotas de la ciudad.
+  - Cambio: si hay ubicación de la persona, encuadra su círculo con el mismo margen (`MARGEN_CIRCULO_PERSONA`); sin ubicación, sigue como antes.
+  - WebKit con iPhone 13: con el código anterior, el punto quedaba en (650, 160), fuera de la pantalla; con el cambio, en (195, 364), centrado. No hay prueba unitaria: es lógica de Leaflet sin módulo puro.
