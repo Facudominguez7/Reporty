@@ -8,6 +8,10 @@ import { getHistorialEstados } from "./historial-estados"
 // The report row is read with the cookie-less public client, shared with the SEO metadata.
 vi.mock("@/utils/supabase/public", () => ({ createPublicClient: () => clienteFalso() }))
 
+vi.mock("@/database/queries/territorio/barrios", () => ({
+  getBarriosDeReportes: vi.fn().mockResolvedValue(new Map()),
+}))
+
 vi.mock("./votos", () => ({
   getReporteVoteSummary: vi.fn().mockResolvedValue({ data: { total: 0 }, error: null }),
 }))

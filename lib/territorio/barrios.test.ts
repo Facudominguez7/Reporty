@@ -15,7 +15,7 @@ const registroCsw = `<?xml version="1.0"?>
 /** Respuesta del WFS con `cantidad` barrios en EPSG:5348. */
 function respuestaWfs(cantidad: number, extra: Record<string, unknown> = {}) {
   const features = Array.from({ length: cantidad }, (_, i) => ({
-    type: "Feature",
+    type: "Feature" as const,
     properties: { id: String(i + 1), _Barrio: `Barrio ${i + 1}` },
     geometry: { type: "MultiPolygon", coordinates: [] },
   }))
