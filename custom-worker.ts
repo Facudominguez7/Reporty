@@ -1,11 +1,13 @@
 /**
  * Punto de entrada del Worker: reutiliza el handler `fetch` que genera OpenNext y agrega los
- * Cron Triggers: el archivo semanal de auditoría y el recordatorio diario por correo.
+ * Cron Triggers: el archivo semanal de auditoría y el recordatorio diario por correo. Al HTML le
+ * corrige la cabecera de caché (ver `lib/cloudflare/cache-html.ts`).
  * See https://opennext.js.org/cloudflare/howtos/custom-worker
  */
 // @ts-ignore `.open-next/worker.js` is generated at build time by `opennextjs-cloudflare build`.
 import { default as handler } from "./.open-next/worker.js"
 
+import { sinCacheCompartidaDeHtml } from "./lib/cloudflare/cache-html"
 import { dispararArchivoAuditoria, type EntornoCronAuditoria } from "./lib/cloudflare/cron-auditoria"
 import { CRON_RECORDATORIOS, dispararRecordatorios } from "./lib/cloudflare/cron-recordatorios"
 
@@ -15,7 +17,10 @@ type ManejadorOpenNext = { fetch(peticion: Request, entorno: unknown, contexto: 
 const app = handler as ManejadorOpenNext
 
 export default {
-  fetch: app.fetch,
+  /** Atiende cada pedido con OpenNext y evita que las cachés compartidas guarden el HTML. */
+  async fetch(peticion: Request, entorno: unknown, contexto: ContextoEjecucion) {
+    return sinCacheCompartidaDeHtml(await app.fetch(peticion, entorno, contexto))
+  },
   /**
    * Corre la ejecución programada que corresponde al cron que disparó el evento: el recordatorio
    * diario o, para cualquier otro, el archivo de auditoría.
