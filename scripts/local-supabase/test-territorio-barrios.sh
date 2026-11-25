@@ -15,7 +15,12 @@ consultar() { docker exec "$contenedor" psql -U postgres -d postgres -Atc "$1"; 
   if [[ "$(consultar "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='reportes' and column_name='ubicacion')")" != "t" ]]; then
     emitir "$postgis"
   fi
-  # La migración usa create or replace: se aplica siempre, también sobre una base ya migrada.
+  # Si la base ya tiene los barrios, se borran dentro de la transacción para probar siempre el
+  # texto actual de la migración; el rollback final los deja como estaban.
+  if [[ "$(consultar "select to_regnamespace('territorio') is not null")" == "t" ]]; then
+    printf '%s\n' 'drop function if exists public.importar_barrios(jsonb, text, text, timestamptz, text, text);' \
+      'drop function if exists public.barrios_de_reportes(bigint[]);' 'drop schema territorio cascade;'
+  fi
   if [[ -f "$migracion" ]]; then
     emitir "$migracion"
   fi

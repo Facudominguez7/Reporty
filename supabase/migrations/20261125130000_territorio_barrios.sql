@@ -114,7 +114,8 @@ grant execute on function public.barrios_de_reportes(bigint[]) to anon, authenti
  * con `ST_Transform`; la geometría se repara con `ST_MakeValid` y se guarda como MultiPolygon.
  * Todo corre en una transacción: si algo falla, quedan los barrios anteriores.
  *
- * Lanza `invalid_parameter_value` si no hay barrios, o si alguno no tiene id, nombre o geometría.
+ * Lanza `invalid_parameter_value` si no hay barrios, si alguno no tiene id, nombre o geometría, o
+ * si alguna geometría no es un polígono.
  *
  * @returns Cuántos barrios quedaron cargados.
  */
@@ -169,6 +170,13 @@ begin
   from jsonb_array_elements(importar_barrios.barrios) f;
 
   get diagnostics cargados = row_count;
+
+  -- Una geometría que no es polígono (o que ST_MakeValid deja sin área) quedaría como un barrio
+  -- vacío. El error deshace toda la importación, incluido el borrado: quedan los barrios anteriores.
+  if exists (select 1 from territorio.barrios b where extensions.st_isempty(b.geom)) then
+    raise exception 'Hay barrios cuya geometría no es un polígono.' using errcode = 'invalid_parameter_value';
+  end if;
+
   return cargados;
 end
 $$;

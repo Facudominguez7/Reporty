@@ -80,7 +80,25 @@ select pg_temp.exigir(pg_temp.rechaza($q$select public.importar_barrios('[]'::js
   'una importación vacía se rechaza');
 select pg_temp.exigir(pg_temp.rechaza($q$select public.importar_barrios('[{"type":"Feature","properties":{"id":"9"},"geometry":null}]'::jsonb, 'f', 'v', now(), 'ODbL', 'a')$q$),
   'un barrio sin nombre o sin geometría se rechaza');
+select pg_temp.exigir(pg_temp.rechaza($q$select public.importar_barrios('[{"type":"Feature","properties":{"id":"9","_Barrio":"Punto"},"geometry":{"type":"Point","coordinates":[6500000,6960000]}}]'::jsonb, 'f', 'v', now(), 'ODbL', 'a')$q$),
+  'una geometría que no es polígono se rechaza en lugar de guardarse vacía');
 select pg_temp.exigir((select count(*) from territorio.barrios) = 1, 'una importación rechazada no borra los barrios');
+
+/** Indica si la consulta falla por cualquier motivo (la importación queda sin efecto). */
+create function pg_temp.falla(consulta text) returns boolean language plpgsql as $$
+begin
+  execute consulta;
+  return false;
+exception when others then
+  return true;
+end $$;
+
+select pg_temp.exigir(pg_temp.falla($q$select public.importar_barrios(jsonb_build_array(pg_temp.barrio('4', 'Bueno', -27.45, -55.95, 500), '{"type":"Feature","properties":{"id":"5","_Barrio":"Roto"},"geometry":{"type":"MultiPolygon","coordinates":"x"}}'::jsonb), 'f', 'v', now(), 'ODbL', 'a')$q$),
+  'una geometría con coordenadas inválidas hace fallar la importación');
+select pg_temp.exigir(pg_temp.falla($q$select public.importar_barrios(jsonb_build_array(pg_temp.barrio('4', 'Uno', -27.45, -55.95, 500), pg_temp.barrio('4', 'Otro', -27.40, -55.90, 500)), 'f', 'v', now(), 'ODbL', 'a')$q$),
+  'un id repetido hace fallar la importación');
+select pg_temp.exigir((select count(*) = 1 and min(nombre) = 'Lejano renombrado' from territorio.barrios),
+  'una importación que falla a mitad de camino deja los barrios anteriores');
 
 -- Lote por reportes: respeta la RLS de reportes y valida el tamaño.
 insert into public.estados(id,nombre) values (1,'Pendiente') on conflict (id) do nothing;
