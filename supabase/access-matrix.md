@@ -93,3 +93,9 @@ Supabase anonymous users use the `authenticated` Postgres role, so a valid user 
 - `public.barrios_de_reportes(bigint[])` is `SECURITY INVOKER`, executable by `anon` and `authenticated` (not `service_role`, which bypasses RLS). It returns the neighborhood of each report the caller can see under `reportes` RLS, up to 100 ids per call.
 - `territorio.barrio_de(geography)` is `SECURITY INVOKER` and read-only. The neighborhood is never stored in `reportes`.
 - Every screen that shows a neighborhood also shows the ODbL attribution (`components/territorio/atribucion-barrios.tsx`).
+
+## Duplicate detection (migration `20261125140000_reportes_duplicados.sql`, issue #300)
+
+- `public.reportes_duplicados_cerca(double precision, double precision, integer, double precision)` is `SECURITY INVOKER`, executable only by `service_role`. It returns the author (`usuario_id`) of each nearby report, so `anon` and `authenticated` cannot call it.
+- It returns only Pending reports of the requested category that are not deleted, within `radio_m` (1–100 m), ordered by `ST_Distance`, up to 50 rows. It rejects an invalid point, a missing category or an out-of-range radius with `invalid_parameter_value`.
+- Called only by `buscarDuplicado` (`database/queries/reportes/nuevo/buscar-cercanos.ts`) with the admin client, from the report creation flow and `buscarDuplicadoAction`. The form only receives `aAvisoDuplicado`, without the author.
