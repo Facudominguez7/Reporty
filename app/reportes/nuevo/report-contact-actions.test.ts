@@ -134,6 +134,21 @@ describe("report contact actions", () => {
     expect(detail).not.toContain("<ReportContactDialog")
   })
 
+  it("uses the saved street and number as the location instead of the coordinates", () => {
+    const draft = createContactDraft({ title: "Bache", category: "Bache", description: "Roto", latitude: -27.36708, longitude: -55.8961, address: "Bolívar 1450, Posadas", date: "2026-01-02" })
+    expect(draft).toContain("Ubicación: Bolívar 1450, Posadas")
+    expect(draft).not.toContain("-27.36708")
+    const blank = createContactDraft({ title: "Bache", category: "Bache", description: "Roto", latitude: -27, longitude: -55, address: "  ", date: "2026-01-02" })
+    expect(blank).toContain("Ubicación: -27, -55")
+  })
+
+  it("passes the saved address to the contact actions on the detail and creation screens", () => {
+    const creation = readFileSync(new URL("./page.tsx", import.meta.url), "utf8")
+    const detail = readFileSync(new URL("../[id]/reporte-detalle-client.tsx", import.meta.url), "utf8")
+    expect(detail).toMatch(/<ReportContactActions[\s\S]*?address=\{reporte.direccion\}/)
+    expect(creation).toMatch(/<ReportContactActions[\s\S]*?address=\{createdReport.direccion\}/)
+  })
+
   it("constructs editable messages and encoded links without assuming publication", () => {
     const draft = createContactDraft({ title: "Bache roto", category: "Bache", description: "Roto & peligroso", latitude: -27, longitude: -55, date: "2026-01-02" })
     expect(draft).toBe("Hola, cargué un reporte en Reporty y quisiera informarles sobre el siguiente problema para que puedan revisarlo:\n\nTítulo: Bache roto\nCategoría: Bache\nDescripción: Roto & peligroso\nUbicación: -27, -55\nFecha: 2026-01-02\n\nMuchas gracias.")

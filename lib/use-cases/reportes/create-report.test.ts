@@ -46,7 +46,7 @@ describe("crearReporteWorkflow", () => {
   it("arma el título con la categoría y la dirección, sin usar el título enviado", async () => {
     const result = await crearReporteWorkflow(supabase, { ...entrada, titulo: "Cualquier cosa" })
     expect(dobles.crearReporte).toHaveBeenCalledWith(supabase, expect.objectContaining({ titulo: "Bache en Bolívar 1450, Posadas" }))
-    expect(result).toMatchObject({ success: true, data: { titulo: "Bache en Bolívar 1450, Posadas" } })
+    expect(result).toMatchObject({ success: true, data: { titulo: "Bache en Bolívar 1450, Posadas", direccion: "Bolívar 1450, Posadas" } })
   })
   it.each([undefined, "", "ab"])("sin dirección pide un título escrito sin crear el reporte (%j)", async (titulo) => {
     dobles.obtenerDireccion.mockResolvedValue(null)

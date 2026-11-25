@@ -27,10 +27,17 @@ export async function getMunicipalityContacts(client: SupabaseClient, municipali
   return (data ?? []) as ReportContact[]
 }
 
-export function createContactDraft(input: { title: string; category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string }) {
+/**
+ * Mensaje que la persona envía al organismo por WhatsApp o correo. La ubicación es la calle y la
+ * altura guardadas del reporte; solo si no hay dirección van las coordenadas.
+ *
+ * @param input.address - `reportes.direccion` («Bolívar 1450, Posadas»), o `null` si no se encontró.
+ */
+export function createContactDraft(input: { title: string; category: string; description: string; latitude: number; longitude: number; address?: string | null; date: string; reportUrl?: string }) {
+  const ubicacion = input.address?.trim() || `${input.latitude}, ${input.longitude}`
   return [
     "Hola, cargué un reporte en Reporty y quisiera informarles sobre el siguiente problema para que puedan revisarlo:",
-    [`Título: ${input.title}`, `Categoría: ${input.category}`, `Descripción: ${input.description}`, `Ubicación: ${input.latitude}, ${input.longitude}`, `Fecha: ${input.date}`].join("\n"),
+    [`Título: ${input.title}`, `Categoría: ${input.category}`, `Descripción: ${input.description}`, `Ubicación: ${ubicacion}`, `Fecha: ${input.date}`].join("\n"),
     ...(input.reportUrl ? [`Podés consultar la información completa del reporte acá: ${input.reportUrl}`] : []),
     "Muchas gracias.",
   ].join("\n\n")

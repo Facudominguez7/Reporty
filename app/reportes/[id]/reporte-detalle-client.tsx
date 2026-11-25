@@ -1418,6 +1418,7 @@ export function ReporteDetalleClient({
             description={reporte.descripcion ?? ""}
             latitude={reporte.lat}
             longitude={reporte.lon}
+            address={reporte.direccion}
             date={parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", { timeZone: ZONA_HORARIA })}
             reportUrl={urlReporte}
             showHeading={false}
