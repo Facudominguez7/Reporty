@@ -6,7 +6,6 @@ import Header from "@/components/header";
 import { EnlacesLegales } from "@/components/legal/enlaces-legales";
 import { AvisoPushAutomatico } from "@/components/push/invitacion-push";
 import { RegistroServiceWorker } from "@/components/registro-service-worker";
-import { ScrollReveal } from "@/components/scroll-reveal";
 import { Toaster } from "@/components/ui/sonner";
 import { gaIdFromEnv } from "@/lib/analytics/google-analytics";
 import { BASE_OPEN_GRAPH, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo/site";
@@ -51,7 +50,6 @@ export default function RootLayout({
           Saltar al contenido
         </a>
         <Header />
-        <ScrollReveal />
         <main id="main-content" className="app-main">{children}<EnlacesLegales /></main>
         <Toaster richColors position="top-center" />
         <RegistroServiceWorker />

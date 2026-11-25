@@ -27,6 +27,7 @@ import {
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
 import { debeCentrarEnPersona, debeEncuadrarRadio } from "@/lib/map/ubicacion-al-abrir"
+import { ATRIBUCION_BARRIOS } from "@/lib/territorio/barrios"
 import type { ZonaMapa } from "@/lib/map/zona"
 import type { GrupoMapa } from "@/database/queries/reportes/get-reportes"
 
@@ -45,6 +46,8 @@ interface Report {
   image?: string
   estadoOperativo?: EstadoOperativo | null
   cuadrillaNombre?: string | null
+  /** Barrio del reporte (#299): reemplaza a las coordenadas en el popup, con su atribución. */
+  barrio?: string | null
 }
 
 export interface LeafletMapProps {
@@ -259,7 +262,8 @@ const createPopupContent = (
   categoryColor: string
 ): string => {
   const safeTitle = escapeHtml(report.title)
-  const safeLocation = escapeHtml(report.location)
+  // Con barrio (#299), el popup lo muestra en lugar de las coordenadas y suma la atribución ODbL.
+  const safeLocation = escapeHtml(report.barrio ? `Barrio ${report.barrio}` : report.location)
   const safeCategory = escapeHtml(report.category)
   const safePriority = escapeHtml(report.priority)
   const safeStatus = escapeHtml(report.status)
@@ -353,6 +357,7 @@ const createPopupContent = (
           <span>Creado el ${safeDate}</span>
         </span>
       </div>
+      ${report.barrio ? `<p style="margin:8px 0 0;font-size:10px;line-height:1.35;color:var(--muted-foreground);">Límites de barrios: ${escapeHtml(ATRIBUCION_BARRIOS)}</p>` : ""}
     </a>
   `
 }

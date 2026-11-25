@@ -16,6 +16,7 @@ import Link from "next/link"
 import { MapPin } from "lucide-react"
 
 import { MapLoadingSkeleton } from "@/components/loading-skeletons"
+import { AtribucionBarrios } from "@/components/territorio/atribucion-barrios"
 import { Button } from "@/components/ui/button"
 import { urlMapaConFoco } from "@/lib/map/foco-reporte"
 
@@ -121,17 +122,20 @@ export function FranjaUbicacion({
  *
  * @param reporteId - Reporte al que el mapa completo se acerca al abrir.
  * @param direccion - Calle guardada del reporte; sin ella el título son las coordenadas.
+ * @param barrio - Barrio donde cae el reporte (#299), con su atribución; sin él no se muestra nada.
  */
 export function ContenidoUbicacion({
   reporteId,
   lat,
   lon,
   direccion,
+  barrio,
 }: {
   reporteId: number
   lat: number | null
   lon: number | null
   direccion?: string | null
+  barrio?: string | null
 }) {
   if (lat === null || lon === null) {
     return (
@@ -150,9 +154,11 @@ export function ContenidoUbicacion({
         <MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">{direccion ?? "Coordenadas del reporte"}</p>
+          {barrio && <p className="text-sm text-foreground">Barrio {barrio}</p>}
           <p className="text-xs text-muted-foreground">{formatearCoordenadas(lat, lon)}</p>
         </div>
       </div>
+      {barrio && <AtribucionBarrios />}
       <Button asChild className="w-full">
         <Link href={urlMapaConFoco({ reporteId, lat, lon })}>Ver en mapa completo</Link>
       </Button>

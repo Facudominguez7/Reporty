@@ -119,3 +119,23 @@ describe("contenido de la hoja de ubicación", () => {
     expect(html).not.toContain("max-h-[min(")
   })
 })
+
+describe("barrio en la hoja de ubicación", () => {
+  it("muestra el barrio del reporte con la atribución de la IDE de Posadas", () => {
+    const html = renderToStaticMarkup(
+      createElement(ContenidoUbicacion, { reporteId: 7, lat: LAT, lon: LON, direccion: "Bolívar 1800", barrio: "Centro" }),
+    )
+
+    expect(html).toContain("Barrio Centro")
+    expect(html).toContain("Secretaría de Movilidad Urbana, Dirección SIG-IDE, Municipalidad de Posadas (ODbL)")
+  })
+
+  it("sin barrio no muestra la línea ni la atribución", () => {
+    const html = renderToStaticMarkup(
+      createElement(ContenidoUbicacion, { reporteId: 7, lat: LAT, lon: LON, direccion: "Bolívar 1800", barrio: null }),
+    )
+
+    expect(html).not.toContain("Barrio")
+    expect(html).not.toContain("ODbL")
+  })
+})

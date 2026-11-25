@@ -510,6 +510,7 @@
           <li>Un script de importación pide el WFS en GeoJSON una vez, transforma de EPSG:5348 a 4326 con <code>ST_Transform</code> y registra versión, fecha y atribución.</li>
           <li>El barrio se calcula en la consulta, no se guarda en <code>reportes</code>: si la Municipalidad actualiza los límites, alcanza con reimportar.</li>
           <li>La atribución se muestra donde aparezca el barrio.</li>
+          <li><strong>Implementado (#299):</strong> <code>scripts/territorio/importar-barrios.mjs</code> lee el WFS en <code>https://www.ide.posadas.gob.ar/geoserver/ows</code> (el certificado cubre ese host, no <code>ide.posadas.gov.ar</code>) y la fecha de la capa del catálogo CSW de la IDE (modificada el 2026-06-17). <code>public.importar_barrios</code> (solo <code>service_role</code>) reemplaza los barrios y deja una fila en <code>territorio.importaciones_barrios</code>. <code>territorio.barrio_de</code> usa <code>ST_Covers</code>; si dos barrios se superponen gana el de menor área. La ficha y Defensoría lo piden por lote con <code>public.barrios_de_reportes</code>.</li>
         </ul>
       </div>
     </div>

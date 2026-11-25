@@ -90,6 +90,8 @@ type CreatedReport = {
   /** Correos de organismos notificados a pedido de la persona. */
   correosEnviados: string[]
   createdDate: string
+  /** Calle y altura que guardó el servidor; el mensaje a los organismos la usa como ubicación. */
+  direccion: string | null
 }
 
 const getPriorityTone = (priority: string) => {
@@ -644,6 +646,7 @@ export default function NuevoReportePage() {
         imageApproved: canShowReportContacts(result.data.imageModeration?.estado, withdrawn),
         correosEnviados: result.data.correosEnviados,
         createdDate: new Date().toLocaleDateString("es-AR"),
+        direccion: result.data.direccion ?? null,
       })
       // Refresh server components so the navigation reflects the new guest session.
       router.refresh()
@@ -783,6 +786,7 @@ export default function NuevoReportePage() {
                 description={formData.description}
                 latitude={formData.lat}
                 longitude={formData.lon}
+                address={createdReport.direccion}
                 date={createdReport.createdDate}
                 reportUrl={`${window.location.origin}/reportes/${createdReport.reportId}`}
               />

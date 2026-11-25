@@ -108,6 +108,8 @@ export type CreateReportWorkflowResult = {
   correosEnviados: string[]
   /** Reporte propio eliminado al reemplazarlo; `null` si no se pidió o no se pudo eliminar. */
   reporteReemplazadoId: number | null
+  /** Calle y altura guardadas («Bolívar 1450, Posadas»); `null` si no se encontró. */
+  direccion: string | null
 }
 
 /**
@@ -228,6 +230,7 @@ export async function crearReporteWorkflow(
         isGuest,
         correosEnviados: [],
         reporteReemplazadoId,
+        direccion,
       },
     }
   }
@@ -243,6 +246,7 @@ export async function crearReporteWorkflow(
       isGuest,
       correosEnviados: [],
       reporteReemplazadoId,
+      direccion,
     },
   }
 }

@@ -1400,7 +1400,7 @@ export function ReporteDetalleClient({
         descripcion="El mapa del reporte y el acceso al mapa completo de la ciudad."
         etiquetaCerrar="Cerrar la ubicación"
       >
-        <ContenidoUbicacion reporteId={reporte.id} lat={reporte.lat} lon={reporte.lon} direccion={reporte.direccion} />
+        <ContenidoUbicacion reporteId={reporte.id} lat={reporte.lat} lon={reporte.lon} direccion={reporte.direccion} barrio={reporte.barrio} />
       </HojaReporte>
 
       <HojaReporte
@@ -1418,6 +1418,7 @@ export function ReporteDetalleClient({
             description={reporte.descripcion ?? ""}
             latitude={reporte.lat}
             longitude={reporte.lon}
+            address={reporte.direccion}
             date={parseFechaReporte(reporte.created_at).toLocaleDateString("es-AR", { timeZone: ZONA_HORARIA })}
             reportUrl={urlReporte}
             showHeading={false}

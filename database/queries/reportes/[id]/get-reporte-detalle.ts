@@ -8,6 +8,7 @@ import {
 } from "@/lib/media/report-images";
 import { createPublicClient } from "@/utils/supabase/public";
 import { getReporteVoteSummary, type ReporteVoteSummary } from "./votos";
+import { getBarriosDeReportes } from "@/database/queries/territorio/barrios";
 
 const buildReporteDetalleSelect = (includeCanonicalImageFields: boolean) => `
       id,
@@ -57,6 +58,8 @@ type ReporteDetalleRow = {
 type ReporteDetalleView = Omit<ReporteDetalleRow, "fotos_reporte"> & {
   fotos_reporte: ResolvedReportImageRow<ReportImageRow & { id: number }>[]
   votos: ReporteVoteSummary
+  /** Barrio donde cae el reporte (#299); `null` si cae fuera de todos o no se pudo calcular. */
+  barrio?: string | null
 }
 
 export type ReporteDetalle = ReporteDetalleView
@@ -99,7 +102,7 @@ export const leerFilaReporte = cache(async (reporteId: string) => {
  * Recupera el registro completo de un reporte identificado por su ID, incluyendo relaciones relacionadas.
  *
  * @param reporteId - ID del reporte a recuperar
- * @returns Un objeto con `data` y `error`. `data` contiene el reporte (campos: `id`, `titulo`, `descripcion`, `lat`, `lon`, `direccion`, `created_at`, `usuario_id`, `estado_id`, y relaciones `categorias.nombre`, `prioridades.nombre`, `estados.{id,nombre}`, `fotos_reporte.url`, `profiles.username`) o `null` si no se encontró; `error` contiene el error de la consulta o `null` si la operación tuvo éxito.
+ * @returns Un objeto con `data` y `error`. `data` contiene el reporte (campos: `id`, `titulo`, `descripcion`, `lat`, `lon`, `direccion`, `barrio` (#299), `created_at`, `usuario_id`, `estado_id`, y relaciones `categorias.nombre`, `prioridades.nombre`, `estados.{id,nombre}`, `fotos_reporte.url`, `profiles.username`) o `null` si no se encontró; `error` contiene el error de la consulta o `null` si la operación tuvo éxito.
  */
 export async function getReporteDetalle(
   supabase: SupabaseClient,
@@ -111,6 +114,13 @@ export async function getReporteDetalle(
   const voteSummaryPromise = getReporteVoteSummary(supabase, reporteId, usuarioId)
   // Unused when the report lookup fails; the handler keeps that path free of unhandled rejections.
   voteSummaryPromise.catch(() => {})
+
+  // El barrio se calcula en la base (#299) y se pide en paralelo con la fila; si falla, la ficha
+  // sale sin barrio.
+  const idNumerico = Number(reporteId)
+  const barrioPromise = Number.isSafeInteger(idNumerico)
+    ? getBarriosDeReportes(createPublicClient(), [idNumerico])
+    : Promise.resolve(new Map<number, string | null>())
 
   // The row comes from the per-request shared read, so the metadata does not fetch it again.
   const { data: fila, error: errorFila } = await leerFilaReporte(reporteId)
@@ -125,7 +135,7 @@ export async function getReporteDetalle(
   const reporte = fila
   // El autor llega en la misma fila (relación usuario_id → public_profiles), sin otro viaje.
   const autor = Array.isArray(reporte?.profiles) ? reporte.profiles[0] : reporte?.profiles
-  const voteSummaryResult = await voteSummaryPromise
+  const [voteSummaryResult, barrios] = await Promise.all([voteSummaryPromise, barrioPromise])
 
   if (voteSummaryResult.error) {
     console.error("Error al obtener resumen de votos del reporte:", voteSummaryResult.error)
@@ -138,6 +148,7 @@ export async function getReporteDetalle(
           profiles: autor ? { username: autor.username } : null,
           fotos_reporte: resolveReportImageRows(reporte.fotos_reporte),
           votos: voteSummaryResult.data,
+          barrio: barrios.get(reporte.id) ?? null,
         } satisfies ReporteDetalleView
       : null,
     error: null,

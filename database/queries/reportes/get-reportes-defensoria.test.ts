@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const mocks = vi.hoisted(() => ({ selecciones: [] as string[], reportes: [] as object[], operaciones: [] as [string, ...unknown[]][] }))
+const mocks = vi.hoisted(() => ({
+  selecciones: [] as string[],
+  reportes: [] as object[],
+  operaciones: [] as [string, ...unknown[]][],
+  barrios: vi.fn(async (_cliente: unknown, _ids: number[]) => new Map<number, string | null>()),
+}))
+
+vi.mock("@/database/queries/territorio/barrios", () => ({ getBarriosDeReportes: mocks.barrios }))
 
 vi.mock("next/cache", () => ({ unstable_cache: (cargar: unknown) => cargar }))
 vi.mock("@/utils/supabase/public", () => ({ createPublicClient: vi.fn() }))
@@ -20,6 +27,7 @@ vi.mock("@/utils/supabase/server", () => ({
             data: tabla === "reportes" ? mocks.reportes.map((reporte) => {
               const fila = { ...reporte } as Record<string, unknown>
               if (!/\bdireccion\b/.test(seleccion)) delete fila.direccion
+              if (!/\bbarrio\b/.test(seleccion)) delete fila.barrio
               return fila
             }) : [], error: null,
           })
@@ -72,6 +80,26 @@ describe("direcciones en Defensoría", () => {
     expect(resultado.error).toBeNull()
     expect(resultado.data).toMatchObject([{ direccion: "Av. Freyre 123, Santa Fe" }, { direccion: null }])
     expect(mocks.selecciones.some((seleccion) => seleccion.startsWith("reportes:") && /\bdireccion\b/.test(seleccion))).toBe(true)
+  })
+
+  it("adjunta el barrio de cada reporte, nulo si cae fuera de todos (#299)", async () => {
+    mocks.reportes.push({ ...fila, direccion: "Bolívar 1800" }, { ...fila, id: 8, direccion: null })
+    mocks.barrios.mockResolvedValueOnce(new Map([[7, "Centro"], [8, null]]))
+    const resultado = await getReportesDefensoria()
+    expect(mocks.barrios).toHaveBeenCalledWith(expect.anything(), [7, 8])
+    expect(resultado.data).toMatchObject([{ id: 7, barrio: "Centro" }, { id: 8, barrio: null }])
+  })
+
+  it("el mapa pide el barrio calculado y lo adjunta a cada punto (#299)", async () => {
+    mocks.reportes.push({ ...fila, barrio: "Centro" }, { ...fila, id: 8, barrio: null })
+    const resultado = await getReportMapData({ estadosPermitidos: [1, 4, 2], limite: 100 })
+    expect(mocks.selecciones.some((seleccion) => seleccion.startsWith("reportes:") && /\bbarrio\b/.test(seleccion))).toBe(true)
+    expect(resultado.data).toMatchObject([{ id: 7, barrio: "Centro" }, { id: 8, barrio: null }])
+  })
+
+  it("las listas no piden el barrio calculado", async () => {
+    await getReportesDefensoria()
+    expect(mocks.selecciones.some((seleccion) => /\bbarrio\b/.test(seleccion))).toBe(false)
   })
 
   it("conserva las coordenadas del mapa público sin consultar direcciones", async () => {

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { contactHref, createContactDraft, getReportContacts, type ReportContact } from "@/lib/report-contacts/contact-actions"
 import { createClient } from "@/utils/supabase/client"
 
-type Props = { title: string; category: string; description: string; latitude: number; longitude: number; date: string; reportUrl?: string; showHeading?: boolean }
+/** `address` es la dirección guardada del reporte: el mensaje la usa en lugar de las coordenadas. */
+type Props = { title: string; category: string; description: string; latitude: number; longitude: number; address?: string | null; date: string; reportUrl?: string; showHeading?: boolean }
 /** Aviso que acompaña la hoja de contactos del detalle del reporte. */
 export const CONTACT_DISCLAIMER = "Podés contactar directamente a estos organismos. Reporty no envía el mensaje ni garantiza una respuesta."
 

@@ -26,6 +26,7 @@ import {
 } from "@/lib/media/report-images"
 import { REPORT_STATE_IDS, type EstadoOperativo } from "@/lib/authz/catalog"
 import type { ReportCardData } from "@/components/lista-reportes-client"
+import { getBarriosDeReportes } from "@/database/queries/territorio/barrios"
 
 export type ReporteDB = {
   id: number
@@ -41,6 +42,8 @@ export type ReporteDB = {
   estado: { nombre: string } | null
   autor: { username: string | null } | null
   fotos: (ReportImageRow & { publicUrl?: string | null })[] | null
+  /** Barrio calculado en la base (#299); solo lo pide el mapa. */
+  barrio?: string | null
 }
 
 type ReporteDBRaw = Omit<ReporteDB, "fotos"> & {
@@ -97,6 +100,8 @@ export type ReportMapItem = {
   image?: string
   estadoOperativo?: EstadoOperativo | null
   cuadrillaNombre?: string | null
+  /** Barrio del reporte (#299); el popup lo muestra en lugar de las coordenadas. */
+  barrio?: string | null
 }
 
 export type DashboardUserReport = {
@@ -229,6 +234,7 @@ function mapReportToMapItem(report: ReporteDB): ReportMapItem | null {
     author: cardData.author,
     createdAt: cardData.createdAt,
     image: cardData.thumbnailImage ?? undefined,
+    barrio: report.barrio ?? null,
   }
 }
 
@@ -258,7 +264,7 @@ type ImageSelectMode = "thumbnail" | "canonical" | "legacy"
  *   (`!usuario_id`) para que otra clave foránea hacia `profiles` no la vuelva ambigua.
  * @returns La lista de columnas y relaciones para `select`.
  */
-const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean) => `id,
+const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean, conBarrio = false) => `id,
       usuario_id,
       titulo,
       descripcion,
@@ -273,7 +279,7 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean
         ? "url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path"
         : imageSelectMode === "canonical"
           ? "url,bucket,path"
-          : "url"})${conAutor ? ",\n      autor:public_profiles!usuario_id(username)" : ""}`
+          : "url"})${conAutor ? ",\n      autor:public_profiles!usuario_id(username)" : ""}${conBarrio ? ",\n      barrio" : ""}`
 
 /**
  * Construye la consulta filtrada y paginada para el formato de imágenes solicitado.
@@ -306,7 +312,8 @@ async function fetchReportes(
 
   // Con zona, la función de PostGIS filtra por área con el índice espacial y devuelve filas de
   // `reportes`: el mismo select y los mismos filtros se encadenan encima.
-  const seleccion = buildReportesSelect(imageSelectMode, conAutor)
+  // Solo el mapa pide coordenadas, y es el único que muestra el barrio (campo calculado, #299).
+  const seleccion = buildReportesSelect(imageSelectMode, conAutor, soloConCoordenadas)
   const desdeTabla = () => supabase.from("reportes").select(seleccion)
   // Para PostgREST las dos ramas son la misma consulta; el tipo de la RPC solo deja de exponer
   // los filtros después de `select`, aunque en ejecución los acepta igual.
@@ -534,7 +541,7 @@ export async function getReportCardData(filtros: FiltrosReportes = {}, options: 
 
 /**
  * Reportes para la bandeja de la Defensoría del Pueblo: Pendientes y Tomados, con el
- * número de reclamo y la dirección escrita adjuntos cuando existen (S5, S9).
+ * número de reclamo, la dirección escrita y el barrio (#299) adjuntos cuando existen (S5, S9).
  */
 export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefensoria?: { vista: "pendientes" | "tomados"; busqueda: string }) {
   const { data, error, hasMore } = await getReportCardData(
@@ -547,12 +554,14 @@ export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefen
   // Panel autorizado de la Defensoría: los reclamos solo son legibles por staff de la
   // Defensoría (RLS: autor o rol 6); el público ya no tiene acceso a la tabla (S9).
   const supabaseAdmin = await createClient()
-  const [{ data: reclamos }, { data: direcciones, error: errorDirecciones }] = ids.length
+  // El barrio se calcula en la base con los límites de la IDE (#299); si falla, el panel sale sin barrio.
+  const [{ data: reclamos }, { data: direcciones, error: errorDirecciones }, barriosPorReporte] = ids.length
     ? await Promise.all([
       supabaseAdmin.from("reclamos_defensoria").select("reporte_id, numero_reclamo, tomado_at").in("reporte_id", ids),
       supabaseAdmin.from("reportes").select("id, direccion").in("id", ids),
+      getBarriosDeReportes(supabaseAdmin, ids),
     ])
-    : [{ data: [] as { reporte_id: number; numero_reclamo: string; tomado_at: string }[] }, { data: [], error: null }]
+    : [{ data: [] as { reporte_id: number; numero_reclamo: string; tomado_at: string }[] }, { data: [], error: null }, new Map<number, string | null>()]
 
   if (errorDirecciones) return { data: [], error: errorDirecciones, hasMore, totalPendientes: 0 }
   const reclamosPorReporte = new Map((reclamos ?? []).map((reclamo) => [reclamo.reporte_id, reclamo]))
@@ -563,6 +572,7 @@ export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefen
       ...report,
       numeroReclamo: reclamosPorReporte.get(report.id)?.numero_reclamo ?? null,
       direccion: direccionesPorReporte.get(report.id) ?? null,
+      barrio: barriosPorReporte.get(report.id) ?? null,
     })),
     error: null,
     hasMore,
