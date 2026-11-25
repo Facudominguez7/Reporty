@@ -19,7 +19,8 @@ consultar() { docker exec "$contenedor" psql -U postgres -d postgres -Atc "$1"; 
   # texto actual de la migración; el rollback final los deja como estaban.
   if [[ "$(consultar "select to_regnamespace('territorio') is not null")" == "t" ]]; then
     printf '%s\n' 'drop function if exists public.importar_barrios(jsonb, text, text, timestamptz, text, text);' \
-      'drop function if exists public.barrios_de_reportes(bigint[]);' 'drop schema territorio cascade;'
+      'drop function if exists public.barrios_de_reportes(bigint[]);' 'drop function if exists public.barrio(public.reportes);' \
+      'drop schema territorio cascade;'
   fi
   if [[ -f "$migracion" ]]; then
     emitir "$migracion"

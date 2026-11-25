@@ -109,6 +109,27 @@ revoke all on function public.barrios_de_reportes(bigint[]) from public, anon, a
 grant execute on function public.barrios_de_reportes(bigint[]) to anon, authenticated;
 
 /**
+ * Campo calculado `barrio` de `reportes` para PostgREST: el mapa lo pide con `select=...,barrio`,
+ * también sobre `reportes_en_zona`, que devuelve filas de `reportes`. Solo ve las filas que la
+ * RLS ya dejó pasar.
+ */
+create or replace function public.barrio(reporte public.reportes)
+returns text
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select territorio.barrio_de(reporte.ubicacion)
+$$;
+
+comment on function public.barrio(public.reportes) is
+  'Campo calculado: barrio del reporte con los límites de la IDE de Posadas (#299). No se guarda.';
+
+revoke all on function public.barrio(public.reportes) from public, anon, authenticated, service_role;
+grant execute on function public.barrio(public.reportes) to anon, authenticated;
+
+/**
  * Reemplaza todos los barrios por los del GeoJSON del WFS y registra la importación. Cada
  * feature trae la geometría en EPSG:5348 (POSGAR 2007 / Argentina 6), que se convierte a 4326
  * con `ST_Transform`; la geometría se repara con `ST_MakeValid` y se guarda como MultiPolygon.

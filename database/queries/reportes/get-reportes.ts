@@ -42,6 +42,8 @@ export type ReporteDB = {
   estado: { nombre: string } | null
   autor: { username: string | null } | null
   fotos: (ReportImageRow & { publicUrl?: string | null })[] | null
+  /** Barrio calculado en la base (#299); solo lo pide el mapa. */
+  barrio?: string | null
 }
 
 type ReporteDBRaw = Omit<ReporteDB, "fotos"> & {
@@ -98,6 +100,8 @@ export type ReportMapItem = {
   image?: string
   estadoOperativo?: EstadoOperativo | null
   cuadrillaNombre?: string | null
+  /** Barrio del reporte (#299); el popup lo muestra en lugar de las coordenadas. */
+  barrio?: string | null
 }
 
 export type DashboardUserReport = {
@@ -230,6 +234,7 @@ function mapReportToMapItem(report: ReporteDB): ReportMapItem | null {
     author: cardData.author,
     createdAt: cardData.createdAt,
     image: cardData.thumbnailImage ?? undefined,
+    barrio: report.barrio ?? null,
   }
 }
 
@@ -259,7 +264,7 @@ type ImageSelectMode = "thumbnail" | "canonical" | "legacy"
  *   (`!usuario_id`) para que otra clave foránea hacia `profiles` no la vuelva ambigua.
  * @returns La lista de columnas y relaciones para `select`.
  */
-const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean) => `id,
+const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean, conBarrio = false) => `id,
       usuario_id,
       titulo,
       descripcion,
@@ -274,7 +279,7 @@ const buildReportesSelect = (imageSelectMode: ImageSelectMode, conAutor: boolean
         ? "url,bucket,path,thumbnail_url,thumbnail_bucket,thumbnail_path"
         : imageSelectMode === "canonical"
           ? "url,bucket,path"
-          : "url"})${conAutor ? ",\n      autor:public_profiles!usuario_id(username)" : ""}`
+          : "url"})${conAutor ? ",\n      autor:public_profiles!usuario_id(username)" : ""}${conBarrio ? ",\n      barrio" : ""}`
 
 /**
  * Construye la consulta filtrada y paginada para el formato de imágenes solicitado.
@@ -307,7 +312,8 @@ async function fetchReportes(
 
   // Con zona, la función de PostGIS filtra por área con el índice espacial y devuelve filas de
   // `reportes`: el mismo select y los mismos filtros se encadenan encima.
-  const seleccion = buildReportesSelect(imageSelectMode, conAutor)
+  // Solo el mapa pide coordenadas, y es el único que muestra el barrio (campo calculado, #299).
+  const seleccion = buildReportesSelect(imageSelectMode, conAutor, soloConCoordenadas)
   const desdeTabla = () => supabase.from("reportes").select(seleccion)
   // Para PostgREST las dos ramas son la misma consulta; el tipo de la RPC solo deja de exponer
   // los filtros después de `select`, aunque en ejecución los acepta igual.

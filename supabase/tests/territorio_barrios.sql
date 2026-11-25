@@ -116,6 +116,11 @@ select pg_temp.exigir(
   'el lote devuelve el barrio de cada reporte visible, nulo si cae fuera, y nada de los que la RLS oculta');
 select pg_temp.exigir(pg_temp.rechaza($q$select * from public.barrios_de_reportes(array(select generate_series(1, 101))::bigint[])$q$),
   'el lote rechaza más de 100 reportes');
+-- Campo calculado para PostgREST (`select=...,barrio`), que usa el mapa.
+select pg_temp.exigir(
+  (select jsonb_object_agg(r.id, public.barrio(r)) from public.reportes r where r.id in (-929901, -929902, -929903))
+    = '{"-929901": "Lejano renombrado", "-929902": null}'::jsonb,
+  'el campo barrio de cada reporte visible sale calculado, nulo si cae fuera');
 reset role;
 
 select pg_temp.exigir(not has_function_privilege('anon', 'public.importar_barrios(jsonb,text,text,timestamptz,text,text)', 'execute'),
@@ -127,5 +132,7 @@ select pg_temp.exigir(has_function_privilege('service_role', 'public.importar_ba
 select pg_temp.exigir(has_function_privilege('anon', 'public.barrios_de_reportes(bigint[])', 'execute'),
   'anon consulta el barrio de los reportes');
 select pg_temp.exigir(not has_table_privilege('anon', 'territorio.barrios', 'insert'), 'anon no escribe barrios');
+select pg_temp.exigir(has_function_privilege('anon', 'public.barrio(public.reportes)', 'execute'),
+  'anon puede pedir el campo barrio');
 
 select 'territorio_barrios: ok';

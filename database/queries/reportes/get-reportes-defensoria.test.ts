@@ -27,6 +27,7 @@ vi.mock("@/utils/supabase/server", () => ({
             data: tabla === "reportes" ? mocks.reportes.map((reporte) => {
               const fila = { ...reporte } as Record<string, unknown>
               if (!/\bdireccion\b/.test(seleccion)) delete fila.direccion
+              if (!/\bbarrio\b/.test(seleccion)) delete fila.barrio
               return fila
             }) : [], error: null,
           })
@@ -87,6 +88,18 @@ describe("direcciones en Defensoría", () => {
     const resultado = await getReportesDefensoria()
     expect(mocks.barrios).toHaveBeenCalledWith(expect.anything(), [7, 8])
     expect(resultado.data).toMatchObject([{ id: 7, barrio: "Centro" }, { id: 8, barrio: null }])
+  })
+
+  it("el mapa pide el barrio calculado y lo adjunta a cada punto (#299)", async () => {
+    mocks.reportes.push({ ...fila, barrio: "Centro" }, { ...fila, id: 8, barrio: null })
+    const resultado = await getReportMapData({ estadosPermitidos: [1, 4, 2], limite: 100 })
+    expect(mocks.selecciones.some((seleccion) => seleccion.startsWith("reportes:") && /\bbarrio\b/.test(seleccion))).toBe(true)
+    expect(resultado.data).toMatchObject([{ id: 7, barrio: "Centro" }, { id: 8, barrio: null }])
+  })
+
+  it("las listas no piden el barrio calculado", async () => {
+    await getReportesDefensoria()
+    expect(mocks.selecciones.some((seleccion) => /\bbarrio\b/.test(seleccion))).toBe(false)
   })
 
   it("conserva las coordenadas del mapa público sin consultar direcciones", async () => {

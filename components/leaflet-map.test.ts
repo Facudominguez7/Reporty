@@ -120,6 +120,21 @@ describe("LeafletMap initial view", () => {
     expect(mocks.map.setMaxBounds).toHaveBeenCalledTimes(2)
   })
 
+  it("shows the report neighborhood with its ODbL attribution instead of the coordinates (#299)", () => {
+    render([{ ...report, barrio: "Villa <Sarita>" }])
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
+    expect(popup).toContain("Barrio Villa &lt;Sarita&gt;")
+    expect(popup).not.toContain(">Location<")
+    expect(popup).toContain("Secretaría de Movilidad Urbana, Dirección SIG-IDE, Municipalidad de Posadas (ODbL)")
+  })
+
+  it("keeps the coordinates and no attribution when the report has no neighborhood", () => {
+    render([{ ...report, barrio: null }])
+    const popup = contenidoPopup(mocks.marker.bindPopup.mock.calls.at(-1)?.[0])
+    expect(popup).toContain(">Location<")
+    expect(popup).not.toContain("ODbL")
+  })
+
   it("renders escaped pet details inside a native detail link", () => {
     render([])
     // Rerender with a pet while the imperative map instance is active.
