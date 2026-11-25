@@ -84,3 +84,12 @@ Supabase anonymous users use the `authenticated` Postgres role, so a valid user 
 - `private.sync_profile_from_auth_user()` gives anonymous users `rol_id = 5` and promotes `5 → 2` only when `auth.users.is_anonymous` becomes false (verified email or linked identity). Other roles are never changed.
 - Visitors without a session who open `/reportes/nuevo` are redirected to `/auth?next=/reportes/nuevo`, where they choose to sign in/register or "Continuar como invitado" (`/reportes/nuevo?modo=invitado`, see `lib/routes/guest-report.ts`). Choosing guest mode creates no identity by itself.
 - The anonymous session is created only by the browser on the new-report page (`signInAnonymously`), at submit time and only without an existing session, so Supabase's per-IP anonymous sign-in limit and CAPTCHA apply to the visitor's IP. `crearReporteAction` never creates identities: it requires a validated session.
+
+## Neighborhoods (migration `20261125130000_territorio_barrios.sql`, issue #299)
+
+- Schema `territorio` is not exposed through PostgREST. `anon`, `authenticated` and `service_role` have `USAGE` on it.
+- `territorio.barrios` and `territorio.importaciones_barrios` have RLS enabled with a read-all policy for `anon` and `authenticated`: the data is public (IDE Posadas, ODbL). Only `service_role` can insert or delete, and only `public.importar_barrios` does it.
+- `public.importar_barrios(jsonb, text, text, timestamptz, text, text)` is `SECURITY INVOKER`, executable only by `service_role`. It replaces every neighborhood in one transaction and records the import (source, version, source date, license, attribution). Called only by `scripts/territorio/importar-barrios.mjs`.
+- `public.barrios_de_reportes(bigint[])` is `SECURITY INVOKER`, executable by `anon` and `authenticated` (not `service_role`, which bypasses RLS). It returns the neighborhood of each report the caller can see under `reportes` RLS, up to 100 ids per call.
+- `territorio.barrio_de(geography)` is `SECURITY INVOKER` and read-only. The neighborhood is never stored in `reportes`.
+- Every screen that shows a neighborhood also shows the ODbL attribution (`components/territorio/atribucion-barrios.tsx`).
