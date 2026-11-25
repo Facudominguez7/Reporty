@@ -186,6 +186,7 @@ function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }
       showLegend
       focoReporte={focoReporte}
       ubicacionPersona={ubicacionPersona}
+      pedidoCentrar={cerca.pedidoCentrar}
     />
     </>
   )

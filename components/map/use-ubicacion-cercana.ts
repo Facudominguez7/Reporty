@@ -6,6 +6,7 @@
  * Corre el flujo de `iniciarUbicacionAlAbrir` una sola vez por visita y, con la ubicación, pide
  * los cercanos del radio elegido. Después sigue a la persona mientras el mapa está a la vista: el
  * punto se mueve con cada lectura y los cercanos se vuelven a pedir cuando se alejó más de 100 m.
+ * Si vuelve a la app después de moverse más de 100 m, pide que el mapa se centre otra vez en ella.
  * Al cambiar el radio o el punto de búsqueda cancela el pedido anterior.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -14,6 +15,7 @@ import type { EstadoCercanos } from "@/components/map/panel-cercanos"
 import { RADIO_CERCANOS_INICIAL, type ElementoCercano } from "@/lib/map/cercanos"
 import {
   debeActualizarCercanos,
+  debeCentrarAlVolver,
   iniciarUbicacionAlAbrir,
   pedirCercanos,
   seguirUbicacion,
@@ -25,7 +27,7 @@ import { esUbicacionAproximada, type UbicacionPrecisa } from "@/lib/geolocalizac
  * Mantiene la ubicación de la persona, el radio elegido y los cercanos.
  *
  * @returns `ubicacion` (o `null` si no hay), `aproximada`, `avisoDenegado` y `cerrarAviso`,
- *   `radio` y `setRadio`, `estado` y `cercanos` de la búsqueda, y `reintentar`.
+ *   `pedidoCentrar` (crece cuando el mapa debe volver a centrarse en la persona), `radio` y `setRadio`, `estado` y `cercanos` de la búsqueda, y `reintentar`.
  */
 export function useUbicacionCercana() {
   const [ubicacion, setUbicacion] = useState<UbicacionPrecisa | null>(null)
@@ -43,8 +45,13 @@ export function useUbicacionCercana() {
   const [intento, setIntento] = useState(0)
   const clave = puntoBusqueda ? `${puntoBusqueda.lat},${puntoBusqueda.lon},${radio},${intento}` : ""
 
+  // Última lectura conocida: al salir de la app queda como referencia para decidir si, al volver,
+  // la persona se movió lo suficiente como para centrar el mapa en ella.
+  const ultimaRef = useRef<UbicacionPrecisa | null>(null)
+
   /** Guarda una lectura nueva y mueve el punto de búsqueda si la persona se alejó lo suficiente. */
   const alUbicar = useCallback((nueva: UbicacionPrecisa) => {
+    ultimaRef.current = nueva
     setUbicacion(nueva)
     setPuntoBusqueda((anterior) =>
       anterior && !debeActualizarCercanos(anterior, nueva) ? anterior : { lat: nueva.lat, lon: nueva.lon },
@@ -67,16 +74,32 @@ export function useUbicacionCercana() {
     })
   }, [alUbicar])
 
+  // Crece cada vez que el mapa tiene que volver a centrarse en la persona.
+  const [pedidoCentrar, setPedidoCentrar] = useState(0)
+
   // Con la primera ubicación ya dada (el permiso está aceptado), se sigue a la persona. Se apaga al
   // pasar a otra app o pestaña, para no gastar batería, y se retoma al volver.
   const hayUbicacion = ubicacion !== null
   useEffect(() => {
     if (!hayUbicacion || !navigator.geolocation) return
     let detener: (() => void) | null = null
+    // Ubicación con la que la persona salió de la app; `null` mientras no salió.
+    let alSalir: UbicacionPrecisa | null = null
+
+    /** Recibe cada lectura; la primera después de volver decide si el mapa se centra. */
+    const alMover = (nueva: UbicacionPrecisa) => {
+      if (alSalir) {
+        if (debeCentrarAlVolver(alSalir, nueva)) setPedidoCentrar((valor) => valor + 1)
+        alSalir = null
+      }
+      alUbicar(nueva)
+    }
+
     const actualizar = () => {
       if (document.visibilityState === "visible") {
-        detener ??= seguirUbicacion(navigator.geolocation, alUbicar)
+        detener ??= seguirUbicacion(navigator.geolocation, alMover)
       } else {
+        if (detener) alSalir = ultimaRef.current
         detener?.()
         detener = null
       }
@@ -108,6 +131,7 @@ export function useUbicacionCercana() {
     aproximada: ubicacion ? esUbicacionAproximada(ubicacion.precision) : false,
     avisoDenegado,
     cerrarAviso,
+    pedidoCentrar,
     radio,
     setRadio,
     estado: busqueda.clave === clave ? busqueda.estado : ("cargando" as const),
