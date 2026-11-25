@@ -81,6 +81,59 @@ describe("ubicación al abrir el mapa", () => {
     expect(alUbicar).toHaveBeenCalledWith(EN_POSADAS)
   })
 
+  it("si la persona tarda más de 6 s en aceptar el permiso, lee apenas lo acepta", async () => {
+    vi.useFakeTimers()
+    try {
+      // El diálogo sigue abierto: la primera lectura no recibe nada y vence a los 6 s.
+      const lecturas: PositionCallback[] = []
+      const geo = {
+        watchPosition: vi.fn((exito: PositionCallback) => { lecturas.push(exito); return lecturas.length }),
+        clearWatch: vi.fn(),
+        getCurrentPosition: vi.fn(),
+      }
+      const estado = Object.assign(new EventTarget(), { state: "prompt" as PermissionState })
+      const nav = { geolocation: geo as unknown as Geolocation, permissions: { query: vi.fn().mockResolvedValue(estado) } as unknown as Permissions }
+
+      const flujo = abrir(nav)
+      await vi.advanceTimersByTimeAsync(6000)
+      expect(alUbicar).not.toHaveBeenCalled()
+
+      // A los 9 s acepta: se lee una vez más y llega la ubicación.
+      await vi.advanceTimersByTimeAsync(3000)
+      estado.state = "granted"
+      estado.dispatchEvent(new Event("change"))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(geo.watchPosition).toHaveBeenCalledTimes(2)
+      lecturas[1]({ coords: { latitude: EN_POSADAS.lat, longitude: EN_POSADAS.lon, accuracy: EN_POSADAS.precision } } as GeolocationPosition)
+      await flujo
+
+      expect(alUbicar).toHaveBeenCalledWith(EN_POSADAS)
+      expect(sesion.getItem(CLAVE_UBICACION_SIN_RESPUESTA)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("si después de vencer el tiempo la persona niega el permiso, no vuelve a leer", async () => {
+    vi.useFakeTimers()
+    try {
+      const geo = { watchPosition: vi.fn(() => 1), clearWatch: vi.fn(), getCurrentPosition: vi.fn() }
+      const estado = Object.assign(new EventTarget(), { state: "prompt" as PermissionState })
+      const nav = { geolocation: geo as unknown as Geolocation, permissions: { query: vi.fn().mockResolvedValue(estado) } as unknown as Permissions }
+
+      const flujo = abrir(nav)
+      await vi.advanceTimersByTimeAsync(6000)
+      estado.state = "denied"
+      estado.dispatchEvent(new Event("change"))
+      await flujo
+
+      expect(geo.watchPosition).toHaveBeenCalledTimes(1)
+      expect(alUbicar).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("si se cierra el diálogo sin responder, no vuelve a pedirlo en esa sesión", async () => {
     await abrir(navegador("prompt", geolocalizacion({ codigo: 1 })))
     expect(sesion.getItem(CLAVE_UBICACION_SIN_RESPUESTA)).toBe("1")

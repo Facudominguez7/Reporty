@@ -5,6 +5,7 @@
  * ese momento (y si cierra el diálogo sin responder, no se vuelve a pedir en esa sesión); si lo
  * negó, se avisa una sola vez cómo activarlo. Sin Permissions API se llama directo a la
  * geolocalización. Hay una sola lectura por visita, de 6 s como máximo, sin seguimiento continuo.
+ * Si esos 6 s vencen con el diálogo de permiso abierto, se lee una vez más cuando la persona acepta.
  *
  * La lectura exacta solo se usa en el teléfono para dibujar el punto; al servidor sale redondeada
  * (`pedirCercanos`).
@@ -42,16 +43,37 @@ type EstadoPermiso = PermissionState | "sin-api"
  * Consulta el estado del permiso de ubicación sin pedirlo.
  *
  * @param permisos - `navigator.permissions`, si existe.
- * @returns El estado, o `sin-api` si no hay Permissions API o la consulta falla.
+ * @returns El estado y el objeto que avisa sus cambios, o `sin-api` si no hay Permissions API o
+ *   la consulta falla.
  */
-async function leerEstadoPermiso(permisos: Permissions | undefined): Promise<EstadoPermiso> {
-  if (!permisos?.query) return "sin-api"
+async function leerEstadoPermiso(
+  permisos: Permissions | undefined,
+): Promise<{ estado: EstadoPermiso; seguimiento: PermissionStatus | null }> {
+  if (!permisos?.query) return { estado: "sin-api", seguimiento: null }
   try {
-    const { state } = await permisos.query({ name: "geolocation" })
-    return state
+    const seguimiento = await permisos.query({ name: "geolocation" })
+    return { estado: seguimiento.state, seguimiento }
   } catch {
-    return "sin-api"
+    return { estado: "sin-api", seguimiento: null }
   }
+}
+
+/**
+ * Espera a que la persona responda el diálogo de permiso.
+ *
+ * @param seguimiento - Estado del permiso, que avisa con el evento `change`.
+ * @returns `true` si lo aceptó y `false` si lo negó. Si nunca responde, no termina.
+ */
+function esperarRespuestaAlPermiso(seguimiento: PermissionStatus): Promise<boolean> {
+  if (seguimiento.state !== "prompt") return Promise.resolve(seguimiento.state === "granted")
+  return new Promise((resolver) => {
+    const alCambiar = () => {
+      if (seguimiento.state === "prompt") return
+      seguimiento.removeEventListener("change", alCambiar)
+      resolver(seguimiento.state === "granted")
+    }
+    seguimiento.addEventListener("change", alCambiar)
+  })
 }
 
 /**
@@ -108,7 +130,7 @@ export async function iniciarUbicacionAlAbrir({
   const geolocalizacion = navegador.geolocation
   if (!geolocalizacion) return
 
-  const permiso = await leerEstadoPermiso(navegador.permissions)
+  const { estado: permiso, seguimiento } = await leerEstadoPermiso(navegador.permissions)
 
   if (permiso === "denied") {
     if (estaMarcado(almacenLocal, CLAVE_AVISO_UBICACION_DENEGADA)) return
@@ -120,13 +142,22 @@ export async function iniciarUbicacionAlAbrir({
   // Si ya cerró el diálogo sin responder en esta sesión, no se insiste.
   if (permiso !== "granted" && estaMarcado(almacenSesion, CLAVE_UBICACION_SIN_RESPUESTA)) return
 
+  const leer = () => buscarUbicacionPrecisa(geolocalizacion, { tiempoMaximoMs: TIEMPO_UBICACION_CERCANOS_MS })
   let ubicacion: UbicacionPrecisa
   try {
-    ubicacion = await buscarUbicacionPrecisa(geolocalizacion, { tiempoMaximoMs: TIEMPO_UBICACION_CERCANOS_MS })
+    ubicacion = await leer()
   } catch (error) {
-    const sinPermiso = (error as GeolocationPositionError | undefined)?.code === ERROR_SIN_PERMISO
-    if (sinPermiso && permiso !== "granted") marcar(almacenSesion, CLAVE_UBICACION_SIN_RESPUESTA)
-    return
+    const codigo = (error as GeolocationPositionError | undefined)?.code
+    if (codigo === ERROR_SIN_PERMISO && permiso !== "granted") marcar(almacenSesion, CLAVE_UBICACION_SIN_RESPUESTA)
+    // Los 6 s corren desde que se abre el diálogo: si vencieron sin respuesta (sin código de
+    // error), se lee una vez más apenas la persona acepta, para que igual vea su punto.
+    if (codigo !== undefined || permiso !== "prompt" || !seguimiento) return
+    if (!(await esperarRespuestaAlPermiso(seguimiento))) return
+    try {
+      ubicacion = await leer()
+    } catch {
+      return
+    }
   }
 
   // Fuera de Posadas el mapa no se mueve y no hay nada cerca que buscar.

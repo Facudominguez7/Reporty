@@ -63,3 +63,17 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
     - El caso «la persona movió el mapa antes de la lectura» no se probó en el navegador.
     - El servidor de desarrollo de la persona usuaria servía un CSS viejo, sin las reglas nuevas; las capturas inyectan ese bloque de `globals.css`, que compila bien con `@tailwindcss/postcss`.
   - Suite: 3188 pruebas pasan; fallan las 3 de `app/mascotas/nueva/resultado-navegacion.test.ts`, que ya fallaban en main. `tsc` solo muestra los 2 errores previos de main.
+- **L5 (verificador independiente, riesgo ítem 2: privacidad y permisos de la RPC):**
+  - Sin bloqueantes. S1–S7 PASS; S8 no se verificó porque necesita el teléfono.
+  - Probó como `anon` y `authenticated` dentro de una transacción revertida: radios de 90, 480 y 520 m en otra dirección; valores `±Infinity`, `NaN` y nulos; arreglos de dos dimensiones; mascotas retiradas.
+  - Permisos de la función: `{postgres, anon, authenticated}`, sin `service_role` ni `PUBLIC`.
+  - Probó el endpoint con 12 cuerpos: siempre `no-store`, sin cookies; un `estados` extra se descarta.
+  - Los rechazados que se obtienen llamando directo a la RPC ya eran públicos por la RLS de `reportes`: no es una exposición nueva.
+  - **Nota 1, aplicada:** los 6 s corrían desde que se abre el diálogo de permiso. Si la persona tardaba más en aceptar, no veía su punto. Ahora, si vencen sin respuesta, se espera el evento `change` del permiso y se lee una vez más al aceptar.
+    - RED: «si la persona tarda más de 6 s en aceptar el permiso, lee apenas lo acepta» falló.
+    - GREEN: 64 pruebas de `lib/map`.
+    - Se agregó otra prueba que fija que, si niega, no se lee de nuevo.
+  - Notas aceptadas sin cambio:
+    - Las teselas a zoom 16 revelan la zona al proveedor del mapa, lo mismo que si la persona moviera el mapa a mano.
+    - No se revisó si Postgres en producción registra los parámetros de las RPC.
+    - El aviso de permiso negado aparece una vez por dispositivo.
