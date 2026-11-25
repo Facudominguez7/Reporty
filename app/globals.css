@@ -632,6 +632,61 @@ body:not(:has(.admin-workspace)),
   }
 }
 
+/* Punto de la persona en el mapa (#297): azul con borde blanco y un halo que late, distinto de
+   los reportes, para que se lea como «estás acá». */
+@keyframes reporty-ubicacion-halo {
+  from {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.ubicacion-persona {
+  position: relative;
+}
+
+.ubicacion-persona__punto {
+  position: absolute;
+  inset: 2px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--semantic-info);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--semantic-info) 60%, transparent), var(--elevation-soft);
+}
+
+.ubicacion-persona__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--semantic-info);
+  opacity: 0.25;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ubicacion-persona__halo {
+    animation: reporty-ubicacion-halo 1.8s ease-out infinite;
+  }
+}
+
+.leaflet-tooltip.ubicacion-persona__etiqueta {
+  border: none;
+  border-radius: 999px;
+  background: var(--semantic-info);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.125rem 0.5rem;
+  box-shadow: var(--elevation-soft);
+}
+
+.leaflet-tooltip-top.ubicacion-persona__etiqueta::before {
+  border-top-color: var(--semantic-info);
+}
+
 .leaflet-control-zoom {
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;

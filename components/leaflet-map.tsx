@@ -26,6 +26,7 @@ import {
 } from "@/lib/map/initial-view"
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
+import { debeCentrarEnPersona, debeEncuadrarRadio } from "@/lib/map/ubicacion-al-abrir"
 import type { ZonaMapa } from "@/lib/map/zona"
 import type { GrupoMapa } from "@/database/queries/reportes/get-reportes"
 
@@ -59,6 +60,31 @@ export interface LeafletMapProps {
    * de moverse. Con esta prop el mapa no se vuelve a encuadrar cuando cambian los reportes.
    */
   onCambioZona?: (zona: ZonaMapa, zoom: number) => void
+  /**
+   * Ubicación de la persona (#297): se dibuja su punto y el círculo del radio de búsqueda. La
+   * primera vez que llega, el mapa se centra en ella, salvo que se haya llegado desde un reporte.
+   * Si después cambia el radio, el mapa encuadra el círculo nuevo (acerca o aleja el zoom).
+   */
+  ubicacionPersona?: UbicacionPersonaMapa | null
+}
+
+/** Margen al encuadrar el círculo de la persona: arriba el panel «cerca tuyo», abajo la leyenda. */
+const MARGEN_CIRCULO_PERSONA: L.FitBoundsOptions = { paddingTopLeft: [24, 160], paddingBottomRight: [24, 96] }
+
+/** Punto de la persona y radio del círculo, en metros. */
+export type UbicacionPersonaMapa = { lat: number; lon: number; radio: number }
+
+/**
+ * Ícono del punto de la persona: un círculo azul con borde blanco y un halo que late, para que se
+ * distinga de los reportes y se lea como «estás acá».
+ */
+function crearIconoPersona() {
+  return L.divIcon({
+    className: "ubicacion-persona",
+    html: '<span class="ubicacion-persona__halo" aria-hidden="true"></span><span class="ubicacion-persona__punto" aria-hidden="true"></span>',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  })
 }
 
 type LeafletContainer = HTMLDivElement & { _leaflet_id?: number }
@@ -399,7 +425,7 @@ function seguirFoco(map: L.Map, marcador: L.Marker | null, pendienteRef: { curre
  *
  * @param focoReporte - Reporte al que la primera vista se acerca y abre su popup.
  */
-export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona }: LeafletMapProps) {
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
@@ -416,6 +442,14 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const onCambioZonaRef = useRef(onCambioZona)
   // Marcador del reporte en foco cuyo popup todavía no se abrió (ver `seguirFoco`).
   const focoPendienteRef = useRef<L.Marker | null>(null)
+  // Punto y círculo de la persona (#297), en su propia capa.
+  const capaPersonaRef = useRef<L.LayerGroup | null>(null)
+  // Ya se decidió si centrar en la persona: se decide una sola vez, con la primera lectura.
+  const centradoDecididoRef = useRef(false)
+  // Radio del círculo dibujado: si la persona elige otro, el mapa encuadra el círculo nuevo.
+  const radioDibujadoRef = useRef<number | null>(null)
+  // Círculo de búsqueda dibujado: al pasar a mascotas, el mapa vuelve a encuadrarlo.
+  const circuloPersonaRef = useRef<L.Circle | null>(null)
   useEffect(() => {
     onCambioZonaRef.current = onCambioZona
   })
@@ -548,11 +582,13 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
 
     // Los grupos del servidor van en su propia capa: no se mezclan con los grupos de Leaflet.
     const capaGrupos = L.layerGroup()
+    const capaPersona = L.layerGroup()
     const marcadoresReporte = marcadoresReporteRef.current
 
     tileLayer.addTo(map)
     clusterGroup.addTo(map)
     capaGrupos.addTo(map)
+    capaPersona.addTo(map)
 
     // Carga por zona: avisa la zona visible cada vez que el mapa termina de moverse.
     map.on("moveend", () => {
@@ -586,6 +622,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     tileLayerRef.current = tileLayer
     clusterGroupRef.current = clusterGroup
     capaGruposRef.current = capaGrupos
+    capaPersonaRef.current = capaPersona
 
     return () => {
       container.removeEventListener("error", handlePetImageError, true)
@@ -596,6 +633,10 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       clusterGroupRef.current = null
       tileLayerRef.current = null
       capaGruposRef.current = null
+      capaPersonaRef.current = null
+      centradoDecididoRef.current = false
+      radioDibujadoRef.current = null
+      circuloPersonaRef.current = null
       marcadoresReporte.clear()
       mascotasDibujadasRef.current = { lista: null, marcadores: [] }
       seleccionDibujadaRef.current = null
@@ -738,6 +779,13 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     if (onCambioZona && !pasoAMascotas) {
       return
     }
+    // Con la ubicación de la persona, las mascotas se muestran alrededor de ella, igual que los
+    // incidentes: si no, encuadrar todas las de la ciudad la saca de su zona.
+    const circuloPersona = circuloPersonaRef.current
+    if (pasoAMascotas && circuloPersona) {
+      map.fitBounds(circuloPersona.getBounds(), MARGEN_CIRCULO_PERSONA)
+      return
+    }
 
     if (visibleItems.length === 0) {
       map.setView(INITIAL_MAP_VIEW_CONFIG.defaultCenter, INITIAL_MAP_VIEW_CONFIG.defaultZoom)
@@ -782,6 +830,50 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       capaGrupos.addLayer(marcador)
     }
   }, [grupos])
+
+  useEffect(() => {
+    const map = mapRef.current
+    const capaPersona = capaPersonaRef.current
+    if (!map || !capaPersona) return
+
+    capaPersona.clearLayers()
+    circuloPersonaRef.current = null
+    if (!ubicacionPersona) return
+
+    const punto: L.LatLngTuple = [ubicacionPersona.lat, ubicacionPersona.lon]
+    const circulo = L.circle(punto, {
+      radius: ubicacionPersona.radio,
+      color: "var(--semantic-info)",
+      weight: 1.5,
+      dashArray: "6 6",
+      fillColor: "var(--semantic-info)",
+      fillOpacity: 0.06,
+      interactive: false,
+    }).addTo(capaPersona)
+    circuloPersonaRef.current = circulo
+    // Por encima de los reportes, sin tapar sus clics, con la etiqueta «Estás acá» siempre visible.
+    L.marker(punto, {
+      icon: crearIconoPersona(),
+      title: "Tu ubicación",
+      alt: "Tu ubicación",
+      keyboard: false,
+      interactive: false,
+      zIndexOffset: 1000,
+    })
+      .bindTooltip("Estás acá", { permanent: true, direction: "top", offset: [0, -14], className: "ubicacion-persona__etiqueta" })
+      .addTo(capaPersona)
+
+    const radioAnterior = radioDibujadoRef.current
+    radioDibujadoRef.current = ubicacionPersona.radio
+    const primeraUbicacion = !centradoDecididoRef.current
+    centradoDecididoRef.current = true
+    const centrar = primeraUbicacion && debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })
+    if (centrar || debeEncuadrarRadio({ radioAnterior, radio: ubicacionPersona.radio })) {
+      // El círculo entra entero en la pantalla: así achicar el radio siempre acerca el mapa y
+      // agrandarlo lo aleja.
+      map.fitBounds(circulo.getBounds(), MARGEN_CIRCULO_PERSONA)
+    }
+  }, [ubicacionPersona, focoReporte])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }

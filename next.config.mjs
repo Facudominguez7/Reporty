@@ -51,22 +51,28 @@ const nextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: cabecerasSeguridad },
-      // Los chunks de /_next/static traen hash de contenido en el nombre: son inmutables.
-      // Sin esta regla, la cabecera global los dejaba en no-store y cada visita
-      // re-descargaba todo el JS (enlentecía el primer paint del TWA/PWA). Next no
-      // hereda las cabeceras entre reglas que matchean la misma URL: se repiten aqui.
       // El navegador tiene que revalidar sw.js en cada visita para recibir las nuevas versiones.
       {
         source: '/sw.js',
         headers: [{ key: 'Cache-Control', value: 'no-cache' }, ...cabecerasSeguridad],
       },
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-          ...cabecerasSeguridad,
-        ],
-      },
+      // En producción los chunks de /_next/static traen hash de contenido en el nombre: son
+      // inmutables. Sin esta regla, la cabecera global los dejaba en no-store y cada visita
+      // re-descargaba todo el JS (enlentecía el primer paint del TWA/PWA). Next no hereda las
+      // cabeceras entre reglas que matchean la misma URL: se repiten aquí.
+      // En desarrollo NO: el servidor de desarrollo conserva el nombre del archivo aunque cambie su
+      // contenido, y con «immutable» el navegador seguía usando el CSS y el JS viejos sin pedirlos.
+      ...(process.env.NODE_ENV === 'production'
+        ? [
+            {
+              source: '/_next/static/:path*',
+              headers: [
+                { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+                ...cabecerasSeguridad,
+              ],
+            },
+          ]
+        : []),
     ]
   },
   typescript: {

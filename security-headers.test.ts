@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import nextConfig from "./next.config.mjs"
 
@@ -23,7 +23,12 @@ describe("security headers", () => {
     expect(headers["content-security-policy-report-only"]).toContain("frame-ancestors 'none'")
   })
 
-  it("cachea inmutablemente los chunks estáticos con hash, sin aflojar seguridad", async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it("en producción cachea inmutablemente los chunks estáticos con hash, sin aflojar seguridad", async () => {
+    vi.stubEnv("NODE_ENV", "production")
     const rules = (await nextConfig.headers?.()) ?? []
     const estaticos = rules.find((rule: { source: string }) => rule.source === "/_next/static/:path*")
 
@@ -37,6 +42,19 @@ describe("security headers", () => {
     expect(cabeceras["cache-control"]).toContain("immutable")
     expect(cabeceras["cache-control"]).not.toContain("no-store")
     expect(cabeceras["x-content-type-options"]).toBe("nosniff")
+  })
+
+  it("en desarrollo no marca los estáticos como inmutables: conservan el nombre aunque cambien", async () => {
+    vi.stubEnv("NODE_ENV", "development")
+    const rules = (await nextConfig.headers?.()) ?? []
+
+    const cabecerasCache = rules
+      .filter((rule: { source: string }) => rule.source === "/:path*" || rule.source === "/_next/static/:path*")
+      .flatMap((rule: { headers: { key: string; value: string }[] }) => rule.headers)
+      .filter((header: { key: string }) => header.key.toLowerCase() === "cache-control")
+      .map((header: { value: string }) => header.value)
+    for (const valor of cabecerasCache) expect(valor).not.toContain("immutable")
+    expect(rules.some((rule: { source: string }) => rule.source === "/_next/static/:path*")).toBe(false)
   })
 
   it("mantiene la exclusión de cache solo para assets inmutables", async () => {

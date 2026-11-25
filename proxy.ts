@@ -14,10 +14,11 @@ const RUTAS_ESTATICAS_SIN_SESION = new Set(['/', '/terminos', '/privacidad', '/e
 
 /**
  * Endpoints públicos que leen con el cliente anónimo y nunca miran la sesión. El mapa pide uno
- * por cada zona que recorre la persona: refrescar la sesión ahí sumaba una llamada a Supabase
- * Auth (~170 ms) a cada zona. La sesión se sigue refrescando en las páginas.
+ * por cada zona que recorre la persona, y otro para lo que tiene cerca (#297): refrescar la
+ * sesión ahí sumaba una llamada a Supabase Auth (~170 ms) a cada pedido. La sesión se sigue
+ * refrescando en las páginas.
  */
-const APIS_PUBLICAS_SIN_SESION = new Set(['/api/mapa/reportes'])
+const APIS_PUBLICAS_SIN_SESION = new Set(['/api/mapa/reportes', '/api/mapa/cerca'])
 
 /**
  * Corre antes de cada ruta: apaga las rutas de cuadrillas deshabilitadas, deja pasar sin sesión

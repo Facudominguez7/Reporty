@@ -21,6 +21,9 @@ import { IntroEntrada } from "@/components/intro-entrada"
 import type { ContenidoZonaMapa, FiltrosMapa } from "@/database/queries/reportes/mapa-por-zona"
 import { useContenidoZonaMapa } from "@/components/map/use-contenido-zona"
 import { AvisoCargaZona } from "@/components/map/aviso-carga-zona"
+import { AvisoUbicacionDenegada } from "@/components/map/aviso-ubicacion-denegada"
+import { PanelCercanos } from "@/components/map/panel-cercanos"
+import { useUbicacionCercana } from "@/components/map/use-ubicacion-cercana"
 import type { MascotaMapa } from "@/database/queries/mascotas/mapa"
 import { getInitialMapTilePreloadScript, MAP_TILE_ORIGIN } from "@/lib/map/initial-view"
 import type { FocoReporte } from "@/lib/map/foco-reporte"
@@ -145,14 +148,35 @@ type MapaPorZonaProps = {
 }
 
 /**
- * Mapa con carga por zona (#281). El estado de la zona vive acá y no en `MapaClient`: así cada
- * zona que llega redibuja solo el mapa, no los filtros, diálogos y botones de la página.
+ * Mapa con carga por zona (#281) y lo que la persona tiene cerca (#297). Esos estados viven acá y
+ * no en `MapaClient`: así cada zona o búsqueda que llega redibuja solo el mapa, no los filtros,
+ * diálogos y botones de la página.
  */
 function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }: MapaPorZonaProps) {
   const { contenido, alCambiarZona, estado, reintentar } = useContenidoZonaMapa(contenidoInicial, filtros)
+  const cerca = useUbicacionCercana()
+  // Memorizada: el mapa solo redibuja el punto y el círculo si cambian la ubicación o el radio.
+  const ubicacionPersona = useMemo(
+    () => (cerca.ubicacion ? { lat: cerca.ubicacion.lat, lon: cerca.ubicacion.lon, radio: cerca.radio } : null),
+    [cerca.ubicacion, cerca.radio],
+  )
   return (
     <>
-    {layer === "reportes" && <AvisoCargaZona estado={estado} onReintentar={reintentar} />}
+    {/* Columna de avisos bajo las pestañas: se apilan sin taparse entre sí. */}
+    <div className="pointer-events-none absolute inset-x-0 top-[4.25rem] z-[1000] flex flex-col items-center gap-2 px-4">
+      {ubicacionPersona && (
+        <PanelCercanos
+          estado={cerca.estado}
+          cercanos={cerca.cercanos}
+          radio={cerca.radio}
+          aproximada={cerca.aproximada}
+          onCambiarRadio={cerca.setRadio}
+          onReintentar={cerca.reintentar}
+        />
+      )}
+      {cerca.avisoDenegado && <AvisoUbicacionDenegada onCerrar={cerca.cerrarAviso} />}
+      {layer === "reportes" && <AvisoCargaZona estado={estado} onReintentar={reintentar} />}
+    </div>
     <MapContainer
       reports={contenido.tipo === "puntos" ? contenido.reportes : SIN_PUNTOS}
       grupos={contenido.tipo === "grupos" ? contenido.grupos : undefined}
@@ -161,6 +185,7 @@ function MapaPorZona({ contenidoInicial, filtros, mascotas, layer, focoReporte }
       layer={layer}
       showLegend
       focoReporte={focoReporte}
+      ubicacionPersona={ubicacionPersona}
     />
     </>
   )
