@@ -717,9 +717,10 @@ body:not(:has(.admin-workspace)),
   border-bottom: none !important;
 }
 
-/* Vidrio del mapa y de los botones claros de Contactos y Cómo usar. */
+/* Vidrio convencional del mapa (avisos, instrucciones y Contactos). Los controles con
+   `.vidrio-liquido` quedan afuera: los resuelve el bloque Liquid Glass de abajo. */
 @layer components {
-  .mapa-vidrio :is(.map-legend-card, .mapa-vidrio-superficie, .leaflet-control-zoom, .mapa-vidrio-acciones button.backdrop-blur-xl) {
+  .mapa-vidrio :is(.map-legend-card, .mapa-vidrio-superficie, .mapa-vidrio-acciones button.backdrop-blur-xl):not(.vidrio-liquido) {
     background: var(--card) !important;
     border-color: var(--border) !important;
     box-shadow: var(--elevation-soft) !important;
@@ -729,13 +730,88 @@ body:not(:has(.admin-workspace)),
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     @media not (prefers-reduced-transparency: reduce) {
-      .mapa-vidrio :is(.map-legend-card, .mapa-vidrio-superficie, .leaflet-control-zoom, .mapa-vidrio-acciones button.backdrop-blur-xl) {
+      .mapa-vidrio :is(.map-legend-card, .mapa-vidrio-superficie, .mapa-vidrio-acciones button.backdrop-blur-xl):not(.vidrio-liquido) {
         background: linear-gradient(155deg, color-mix(in oklab, var(--card) 78%, transparent), color-mix(in oklab, var(--card) 60%, transparent)) !important;
         border-color: color-mix(in oklab, var(--card) 83%, var(--border)) !important;
         box-shadow: inset 0 1px 1px color-mix(in oklab, var(--card) 90%, transparent), var(--elevation-soft) !important;
         -webkit-backdrop-filter: blur(8px) saturate(160%) !important;
         backdrop-filter: blur(8px) saturate(160%) !important;
       }
+    }
+  }
+}
+
+/*
+ * Liquid Glass: superficie flotante inspirada en iOS 26. Es la única fuente del efecto;
+ * se aplica con la clase `.vidrio-liquido` y, como Leaflet crea el control de zoom por
+ * su cuenta, también a `.mapa-vidrio .leaflet-control-zoom`.
+ *
+ * - Solo pinta (fondo, color de borde, sombras y backdrop-filter): nunca cambia tamaño,
+ *   posición ni ancho de borde, así que se puede sumar a cualquier control existente.
+ * - La refracción sale de gradientes y sombras internas, sin filtros SVG ni animaciones.
+ * - Los tonos derivan de `--card` y `--foreground`: si cambia el tema (claro u oscuro),
+ *   el vidrio se adapta solo.
+ * - `!important` gana a las reglas de Leaflet y a las utilidades de las variantes de
+ *   Button, igual que el vidrio convencional de arriba.
+ */
+@layer components {
+  :where(.vidrio-liquido, .mapa-vidrio .leaflet-control-zoom) {
+    --vidrio-luz: color-mix(in oklab, var(--card) 30%, white);
+    --vidrio-tinte: color-mix(in oklab, var(--card) 70%, transparent);
+    --vidrio-sombra: color-mix(in oklab, var(--foreground) 18%, transparent);
+  }
+
+  /* Base opaca: navegadores sin backdrop-filter y quien pide menos transparencia. */
+  .vidrio-liquido,
+  .mapa-vidrio .leaflet-control-zoom {
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    box-shadow: var(--elevation-soft) !important;
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .vidrio-liquido,
+    .mapa-vidrio .leaflet-control-zoom {
+      background:
+        /* Reflejo especular arriba a la izquierda. */
+        radial-gradient(120% 90% at 18% -12%, color-mix(in oklab, var(--vidrio-luz) 58%, transparent), transparent 55%),
+        /* Luz refractada que rebota en el borde inferior. */
+        radial-gradient(90% 70% at 85% 118%, color-mix(in oklab, var(--vidrio-luz) 32%, transparent), transparent 62%),
+        /* Espesor: más claro arriba, apenas más denso abajo. */
+        linear-gradient(180deg, color-mix(in oklab, var(--vidrio-luz) 22%, transparent), transparent 46%, color-mix(in oklab, var(--foreground) 4%, transparent)),
+        var(--vidrio-tinte) !important;
+      border-color: color-mix(in oklab, var(--vidrio-luz) 62%, transparent) !important;
+      box-shadow:
+        inset 0 1px 0.5px color-mix(in oklab, var(--vidrio-luz) 88%, transparent),
+        inset 0 -1px 1px color-mix(in oklab, var(--vidrio-luz) 38%, transparent),
+        inset 0 0 0 0.5px color-mix(in oklab, var(--vidrio-luz) 30%, transparent),
+        inset 0 -10px 18px -14px var(--vidrio-sombra),
+        0 10px 28px -10px var(--vidrio-sombra),
+        0 2px 6px -2px color-mix(in oklab, var(--foreground) 10%, transparent) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(150%) brightness(1.04) !important;
+      backdrop-filter: blur(14px) saturate(150%) brightness(1.04) !important;
+    }
+
+    :is(a, button).vidrio-liquido:hover {
+      --vidrio-tinte: color-mix(in oklab, var(--card) 82%, transparent);
+    }
+
+    /* Safari no soporta prefers-reduced-transparency: la consulta queda falsa y el vidrio sigue. */
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+      .vidrio-liquido,
+      .mapa-vidrio .leaflet-control-zoom {
+        background: var(--card) !important;
+        border-color: var(--border) !important;
+        box-shadow: var(--elevation-soft) !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+    }
+  }
+
+  @media (forced-colors: active) {
+    .vidrio-liquido {
+      border-color: CanvasText !important;
     }
   }
 }

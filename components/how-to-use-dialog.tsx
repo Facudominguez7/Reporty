@@ -3,6 +3,7 @@
 import { CircleHelp } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import {
   Dialog,
   DialogClose,
@@ -28,7 +29,13 @@ const petSteps = [
   ["Publicá", "una mascota perdida desde el botón +."],
 ] as const
 
-export function HowToUseDialog({ layer }: { layer?: "reportes" | "mascotas" }) {
+/**
+ * Botón "Cómo usar" y su diálogo con los pasos de la capa activa.
+ *
+ * @param layer - Capa del mapa cuyos pasos se muestran; sin valor, los de reportes.
+ * @param className - Clases extra para el botón, por ejemplo `vidrio-liquido` sobre el mapa.
+ */
+export function HowToUseDialog({ layer, className }: { layer?: "reportes" | "mascotas"; className?: string }) {
   const isPetLayer = layer === "mascotas"
   const steps = isPetLayer ? petSteps : generalSteps
   return (
@@ -38,7 +45,7 @@ export function HowToUseDialog({ layer }: { layer?: "reportes" | "mascotas" }) {
           type="button"
           variant="liquid-glass"
           size="sm"
-          className="size-9 p-0 gap-1.5 sm:size-auto sm:px-3.5"
+          className={cn("size-9 p-0 gap-1.5 sm:size-auto sm:px-3.5", className)}
         >
           <CircleHelp className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Cómo usar</span>

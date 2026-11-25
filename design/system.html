@@ -35,6 +35,11 @@
   input.demo-in{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-subtle);font:inherit;width:220px}
   .anim-demo{display:flex;gap:24px}
   .anim-demo .box{width:120px;height:64px;border-radius:var(--radius);background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;text-align:center}
+  .glass-stage{display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:28px;border-radius:calc(var(--radius)*2);background:repeating-linear-gradient(35deg,#e9e4d8 0 14px,#f6f2ea 14px 28px),#efe9dc;background-blend-mode:multiply}
+  .vidrio-liquido{border:1px solid rgb(255 255 255 / .62);color:var(--foreground);background:radial-gradient(120% 90% at 18% -12%,rgb(255 255 255 / .58),transparent 55%),radial-gradient(90% 70% at 85% 118%,rgb(255 255 255 / .32),transparent 62%),linear-gradient(180deg,rgb(255 255 255 / .22),transparent 46%,rgb(43 42 38 / .04)),rgb(255 255 255 / .70);box-shadow:inset 0 1px .5px rgb(255 255 255 / .88),inset 0 -1px 1px rgb(255 255 255 / .38),inset 0 0 0 .5px rgb(255 255 255 / .3),inset 0 -10px 18px -14px rgb(43 42 38 / .18),0 10px 28px -10px rgb(43 42 38 / .18),0 2px 6px -2px rgb(43 42 38 / .1);-webkit-backdrop-filter:blur(14px) saturate(150%) brightness(1.04);backdrop-filter:blur(14px) saturate(150%) brightness(1.04)}
+  .glass-pill{border-radius:999px;padding:4px}
+  .glass-pill span{display:inline-block;padding:6px 14px;border-radius:999px;font-size:.85rem;font-weight:600}
+  .glass-pill span:first-child{background:var(--primary);color:var(--primary-foreground)}
   @media (prefers-reduced-motion: no-preference){
     @keyframes reveal-up{from{opacity:0;transform:translateY(1rem)}to{opacity:1;transform:translateY(0)}}
     .box:nth-child(1){animation:reveal-up 1.2s .1s both}
@@ -91,6 +96,15 @@
   <span class="icon-badge">!</span>
   <span class="card-demo" style="width:auto;padding:12px 16px;box-shadow:none;border-radius:var(--radius)"><code>.page-container: rounded-2.25rem · bg-card/88 · border-white/70</code></span>
 </div>
+
+<h2>Liquid Glass</h2>
+<div class="glass-stage">
+  <div class="vidrio-liquido glass-pill"><span>Incidentes</span><span>Mascotas</span></div>
+  <div class="vidrio-liquido" style="border-radius:999px;padding:8px 16px;font-size:.85rem;font-weight:600">77 reportes cerca tuyo ⌄</div>
+  <div class="vidrio-liquido" style="border-radius:var(--radius);padding:8px 12px;font-size:.75rem"><strong>Prioridad</strong><br>● Alta ● Media ● Baja</div>
+  <div class="vidrio-liquido" style="border-radius:999px;padding:2px 8px;font-size:.7rem;color:var(--muted-foreground)">Términos y condiciones</div>
+</div>
+<p style="font-size:.8rem;color:var(--muted-foreground);margin-top:8px"><code>.vidrio-liquido</code> · blur 14px · saturate 150% · tinte card 70% · reflejos radiales + filos internos · solo controles flotantes del mapa · opaco con reduced-transparency / contraste alto</p>
 
 <h2>Animación</h2>
 <div class="anim-demo">
