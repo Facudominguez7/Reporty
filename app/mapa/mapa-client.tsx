@@ -114,13 +114,13 @@ function MapHeaderActions({ layer }: { layer: "reportes" | "mascotas" }) {
       >
         <BotonDonarMapa />
         <ContactsDialog />
-        <HowToUseDialog layer={layer} />
+        <HowToUseDialog layer={layer} className="vidrio-liquido" />
       </div>
       <Button
         type="button"
         variant="liquid-glass"
         size="icon-sm"
-        className="relative transition-transform duration-300"
+        className="vidrio-liquido relative transition-transform duration-300"
         aria-label={expanded ? "Cerrar acciones del mapa" : "Mostrar acciones del mapa"}
         aria-expanded={expanded}
         onClick={toggleActions}
@@ -268,7 +268,7 @@ export function MapaClient({ contenidoInicial, mascotas, categorias, estados, pr
         <div className="mapa-vidrio-acciones pointer-events-auto hidden items-center gap-1 sm:flex sm:gap-2">
           <BotonDonarMapa />
           <ContactsDialog />
-          <HowToUseDialog layer={layer} />
+          <HowToUseDialog layer={layer} className="vidrio-liquido" />
         </div>
         <div className="pointer-events-auto sm:hidden">
           <MapHeaderActions layer={layer} />
@@ -298,7 +298,7 @@ export function MapaClient({ contenidoInicial, mascotas, categorias, estados, pr
 
       {/* En mobile queda centrado entre filtros y ayuda; en desktop vuelve al centro del mapa. */}
       <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 pt-[max(env(safe-area-inset-top),0rem)] sm:left-[calc(50%-6.5rem)] lg:left-1/2">
-        <div className="mapa-vidrio-superficie pointer-events-auto flex rounded-full border p-1" role="group" aria-label="Capa del mapa">
+        <div className="vidrio-liquido pointer-events-auto flex rounded-full border p-1" role="group" aria-label="Capa del mapa">
           {MAP_LAYER_OPTIONS.map(([value, label]) => <Button key={value} type="button" size="sm" className="px-2.5 sm:px-3.5" variant={layer === value ? "default" : "ghost"} aria-pressed={layer === value} onClick={() => handleLayerChange(value)}>{label}</Button>)}
         </div>
       </div>
@@ -358,7 +358,7 @@ export function MapaClient({ contenidoInicial, mascotas, categorias, estados, pr
       {/* Reporty no tiene footer: el enlace a los términos queda visible sobre la navegación inferior. */}
       <Link
         href="/terminos"
-        className="absolute bottom-[calc(var(--bottom-nav-space)+0.25rem)] left-3 z-10 rounded-full bg-card/85 px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground shadow-sm backdrop-blur underline-offset-4 hover:text-foreground hover:underline sm:left-5"
+        className="absolute bottom-[calc(var(--bottom-nav-space)+0.25rem)] left-3 z-10 vidrio-liquido rounded-full px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:left-5"
       >
         Términos y condiciones
       </Link>

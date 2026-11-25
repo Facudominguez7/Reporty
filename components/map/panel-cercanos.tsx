@@ -95,7 +95,7 @@ export function PanelCercanos({
     <section
       aria-label="Cerca tuyo"
       className={cn(
-        "mapa-vidrio-superficie pointer-events-auto border text-sm shadow-md transition-[border-radius]",
+        "vidrio-liquido pointer-events-auto border text-sm transition-[border-radius]",
         abierto ? "w-[min(92vw,22rem)] rounded-2xl p-2" : "max-w-[92vw] rounded-full",
       )}
     >

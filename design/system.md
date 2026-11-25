@@ -55,6 +55,19 @@ Alias semánticos: `--priority-high|medium|low`, `--map-heat-high|medium|low|neu
 - `.incident-list`: grilla 1 col móvil → 2 xl:3, gap 3–4.
 - Mapa: controles Leaflet con fondo `--card`, borde `--border`, radio `--radius`, zoom 2.5rem.
 
+## Liquid Glass (`.vidrio-liquido`)
+
+Superficie flotante inspirada en iOS 26, definida una sola vez en `app/globals.css`. Se usa **solo** en los controles flotantes del mapa: selector Incidentes/Mascotas, «cerca tuyo» y su desplegable, zoom (por selector `.mapa-vidrio .leaflet-control-zoom`, porque Leaflet crea el control), botón de ayuda, leyenda de prioridad y enlace de términos. No va en el mapa, la navegación inferior ni los botones verdes.
+
+- Solo pinta: fondo, color de borde, sombras y `backdrop-filter`. No cambia tamaño, posición ni ancho de borde; el elemento conserva su `border` y radio.
+- Capas: tinte `--card` 70% + reflejo especular radial arriba a la izquierda + luz refractada abajo a la derecha + gradiente de espesor; borde de luz 62%; sombras internas (filo superior, filo inferior, contorno 0.5px, espesor abajo) y dos externas suaves.
+- Filtro: `blur(14px) saturate(150%) brightness(1.04)`. Sin filtros SVG ni animaciones.
+- Variables: `--vidrio-luz` (`--card` 30% + blanco), `--vidrio-tinte`, `--vidrio-sombra` (`--foreground` 18%). Al derivar de los tokens, el vidrio sigue al tema claro u oscuro.
+- Hover en `a`/`button`: el tinte sube a 82%.
+- Accesibilidad: sin soporte de `backdrop-filter`, con `prefers-reduced-transparency: reduce` o `prefers-contrast: more` cae a `--card` opaco con `--elevation-soft`; en `forced-colors` el borde es `CanvasText`.
+- `!important` es intencional: gana a las reglas de Leaflet y a las utilidades de las variantes de `Button`.
+- El vidrio convencional anterior (`.mapa-vidrio-superficie`, blur 8px) queda para avisos, instrucciones y Contactos.
+
 ## Animación (prefers-reduced-motion: no-preference)
 
 | Keyframes | Valores |

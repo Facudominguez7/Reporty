@@ -90,7 +90,7 @@ export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "report
       />
 
       {showLegend && layer === "reportes" && (
-        <aside aria-label="Leyenda del mapa" className="map-legend-card absolute bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 z-10 w-41 px-2 py-1 sm:left-5 md:w-52 md:p-3">
+        <aside aria-label="Leyenda del mapa" className="map-legend-card vidrio-liquido absolute bottom-[calc(6.75rem+env(safe-area-inset-bottom))] left-3 z-10 w-41 px-2 py-1 sm:left-5 md:w-52 md:p-3">
           <p className="text-xs font-bold leading-tight text-foreground md:text-sm">Prioridad</p>
           <ul className="mt-0.5 flex flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] leading-tight md:mt-1 md:gap-x-2 md:text-xs">
             {(["Alta", "Media", "Baja"] as const).map((prioridad) => (
