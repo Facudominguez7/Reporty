@@ -66,6 +66,11 @@ export interface LeafletMapProps {
    * Si después cambia el radio, el mapa encuadra el círculo nuevo (acerca o aleja el zoom).
    */
   ubicacionPersona?: UbicacionPersonaMapa | null
+  /**
+   * Crece cada vez que el mapa debe volver a centrarse en la persona: cuando regresa a la app
+   * después de moverse (ver `debeCentrarAlVolver`).
+   */
+  pedidoCentrar?: number
 }
 
 /** Margen al encuadrar el círculo de la persona: arriba el panel «cerca tuyo», abajo la leyenda. */
@@ -425,7 +430,7 @@ function seguirFoco(map: L.Map, marcador: L.Marker | null, pendienteRef: { curre
  *
  * @param focoReporte - Reporte al que la primera vista se acerca y abre su popup.
  */
-export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null }: LeafletMapProps) {
+export default function LeafletMap({ reports, mascotas = [], onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null, pedidoCentrar = 0 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
@@ -446,6 +451,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const capaPersonaRef = useRef<L.LayerGroup | null>(null)
   // Ya se decidió si centrar en la persona: se decide una sola vez, con la primera lectura.
   const centradoDecididoRef = useRef(false)
+  // Último `pedidoCentrar` ya atendido: si cambia, el mapa vuelve a centrarse en la persona.
+  const pedidoAtendidoRef = useRef(pedidoCentrar)
   // Radio del círculo dibujado: si la persona elige otro, el mapa encuadra el círculo nuevo.
   const radioDibujadoRef = useRef<number | null>(null)
   // Círculo de búsqueda dibujado: al pasar a mascotas, el mapa vuelve a encuadrarlo.
@@ -867,13 +874,15 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     radioDibujadoRef.current = ubicacionPersona.radio
     const primeraUbicacion = !centradoDecididoRef.current
     centradoDecididoRef.current = true
-    const centrar = primeraUbicacion && debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })
+    const pedidoNuevo = pedidoCentrar !== pedidoAtendidoRef.current
+    pedidoAtendidoRef.current = pedidoCentrar
+    const centrar = (primeraUbicacion && debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })) || pedidoNuevo
     if (centrar || debeEncuadrarRadio({ radioAnterior, radio: ubicacionPersona.radio })) {
       // El círculo entra entero en la pantalla: así achicar el radio siempre acerca el mapa y
       // agrandarlo lo aleja.
       map.fitBounds(circulo.getBounds(), MARGEN_CIRCULO_PERSONA)
     }
-  }, [ubicacionPersona, focoReporte])
+  }, [ubicacionPersona, focoReporte, pedidoCentrar])
 
   return <div ref={containerRef} className="h-full w-full" style={{ zIndex: 0 }} />
 }

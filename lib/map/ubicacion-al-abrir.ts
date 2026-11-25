@@ -213,6 +213,19 @@ export function debeCentrarEnPersona({ hayFocoReporte }: { hayFocoReporte: boole
 }
 
 /**
+ * Indica si el mapa se vuelve a centrar en la persona cuando regresa a la app (o a la pestaña) y
+ * llega la primera lectura nueva. Solo si se movió más de 100 m mientras no la usaba: si sigue
+ * cerca, el mapa queda donde lo dejó, para no pisar lo que estaba mirando.
+ *
+ * @param antes - Última ubicación conocida antes de salir de la app.
+ * @param actual - Primera ubicación leída al volver.
+ * @returns `true` si hay que centrar el mapa en la persona.
+ */
+export function debeCentrarAlVolver(antes: PuntoGeografico, actual: PuntoGeografico): boolean {
+  return distanciaEnMetros(antes, actual) > DISTANCIA_ACTUALIZAR_CERCANOS_M
+}
+
+/**
  * Indica si la persona eligió otro radio: entonces el mapa vuelve a encuadrar el círculo, así el
  * zoom acompaña (más chico se acerca, más grande se aleja). La primera ubicación la decide
  * `debeCentrarEnPersona`.

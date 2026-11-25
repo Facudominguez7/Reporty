@@ -5,6 +5,7 @@ import type { UbicacionPrecisa } from "@/lib/geolocalizacion/ubicacion-precisa"
 import {
   CLAVE_AVISO_UBICACION_DENEGADA,
   CLAVE_UBICACION_SIN_RESPUESTA,
+  debeCentrarAlVolver,
   debeCentrarEnPersona,
   debeActualizarCercanos,
   debeEncuadrarRadio,
@@ -213,6 +214,20 @@ describe("debeCentrarEnPersona", () => {
 
   it("no centra si se llegó desde un reporte, para mostrar ese reporte", () => {
     expect(debeCentrarEnPersona({ hayFocoReporte: true })).toBe(false)
+  })
+})
+
+describe("debeCentrarAlVolver", () => {
+  const antes = { lat: -27.3671, lon: -55.8961 }
+
+  it("centra en la persona si al volver a la app está a más de 100 m de donde la dejó", () => {
+    // 0,0015° de latitud son unos 167 m.
+    expect(debeCentrarAlVolver(antes, { lat: -27.3686, lon: -55.8961 })).toBe(true)
+  })
+
+  it("no mueve el mapa si al volver sigue cerca, para no pisar lo que estaba mirando", () => {
+    // 0,0005° de latitud son unos 56 m.
+    expect(debeCentrarAlVolver(antes, { lat: -27.3676, lon: -55.8961 })).toBe(false)
   })
 })
 

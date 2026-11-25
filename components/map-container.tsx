@@ -66,6 +66,8 @@ interface MapContainerProps {
   onCambioZona?: (zona: ZonaMapa, zoom: number) => void
   /** Punto de la persona y radio de búsqueda (#297), en las dos capas. */
   ubicacionPersona?: UbicacionPersonaMapa | null
+  /** Crece cada vez que el mapa debe volver a centrarse en la persona (al volver a la app). */
+  pedidoCentrar?: number
 }
 
 /**
@@ -75,7 +77,7 @@ interface MapContainerProps {
  * @param showLegend - Indica si se debe mostrar la leyenda de colores; por defecto `true`
  * @returns El elemento JSX que contiene el mapa y sus superposiciones (leyenda e instrucciones)
  */
-export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null }: MapContainerProps) {
+export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "reportes", showLegend = true, onSeleccionarReporte, focoReporte = null, grupos = SIN_GRUPOS, onCambioZona, ubicacionPersona = null, pedidoCentrar = 0 }: MapContainerProps) {
   return (
     <div className="relative w-full h-full">
       {/* Componente principal del mapa de Leaflet */}
@@ -87,6 +89,7 @@ export function MapContainer({ reports, mascotas = SIN_MASCOTAS, layer = "report
         focoReporte={focoReporte}
         onCambioZona={onCambioZona}
         ubicacionPersona={ubicacionPersona}
+        pedidoCentrar={pedidoCentrar}
       />
 
       {showLegend && layer === "reportes" && (
