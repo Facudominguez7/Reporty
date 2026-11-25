@@ -26,8 +26,7 @@ import {
 } from "@/lib/map/initial-view"
 import { formatearFechaArgentina } from "@/lib/fechas/fecha-base"
 import { ZOOM_FOCO_REPORTE, type FocoReporte } from "@/lib/map/foco-reporte"
-import { ZOOM_CERCANOS } from "@/lib/map/cercanos"
-import { debeCentrarEnPersona } from "@/lib/map/ubicacion-al-abrir"
+import { debeCentrarEnPersona, debeEncuadrarRadio } from "@/lib/map/ubicacion-al-abrir"
 import type { ZonaMapa } from "@/lib/map/zona"
 import type { GrupoMapa } from "@/database/queries/reportes/get-reportes"
 
@@ -64,6 +63,7 @@ export interface LeafletMapProps {
   /**
    * Ubicación de la persona (#297): se dibuja su punto y el círculo del radio de búsqueda. La
    * primera vez que llega, el mapa se centra en ella, salvo que se haya llegado desde un reporte.
+   * Si después cambia el radio, el mapa encuadra el círculo nuevo (acerca o aleja el zoom).
    */
   ubicacionPersona?: UbicacionPersonaMapa | null
 }
@@ -443,6 +443,8 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
   const capaPersonaRef = useRef<L.LayerGroup | null>(null)
   // Ya se decidió si centrar en la persona: se decide una sola vez, con la primera lectura.
   const centradoDecididoRef = useRef(false)
+  // Radio del círculo dibujado: si la persona elige otro, el mapa encuadra el círculo nuevo.
+  const radioDibujadoRef = useRef<number | null>(null)
   useEffect(() => {
     onCambioZonaRef.current = onCambioZona
   })
@@ -628,6 +630,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       capaGruposRef.current = null
       capaPersonaRef.current = null
       centradoDecididoRef.current = false
+      radioDibujadoRef.current = null
       marcadoresReporte.clear()
       mascotasDibujadasRef.current = { lista: null, marcadores: [] }
       seleccionDibujadaRef.current = null
@@ -824,7 +827,7 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
     if (!ubicacionPersona) return
 
     const punto: L.LatLngTuple = [ubicacionPersona.lat, ubicacionPersona.lon]
-    L.circle(punto, {
+    const circulo = L.circle(punto, {
       radius: ubicacionPersona.radio,
       color: "var(--semantic-info)",
       weight: 1.5,
@@ -845,10 +848,15 @@ export default function LeafletMap({ reports, mascotas = [], onSeleccionarReport
       .bindTooltip("Estás acá", { permanent: true, direction: "top", offset: [0, -14], className: "ubicacion-persona__etiqueta" })
       .addTo(capaPersona)
 
-    if (centradoDecididoRef.current) return
+    const radioAnterior = radioDibujadoRef.current
+    radioDibujadoRef.current = ubicacionPersona.radio
+    const primeraUbicacion = !centradoDecididoRef.current
     centradoDecididoRef.current = true
-    if (debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })) {
-      map.setView(punto, ZOOM_CERCANOS)
+    const centrar = primeraUbicacion && debeCentrarEnPersona({ hayFocoReporte: Boolean(focoReporte) })
+    if (centrar || debeEncuadrarRadio({ radioAnterior, radio: ubicacionPersona.radio })) {
+      // El círculo entra entero en la pantalla: así achicar el radio siempre acerca el mapa y
+      // agrandarlo lo aleja. Arriba queda lugar para el panel «cerca tuyo» y abajo para la leyenda.
+      map.fitBounds(circulo.getBounds(), { paddingTopLeft: [24, 160], paddingBottomRight: [24, 96] })
     }
   }, [ubicacionPersona, focoReporte])
 

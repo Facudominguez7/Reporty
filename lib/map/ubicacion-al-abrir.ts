@@ -178,6 +178,19 @@ export function debeCentrarEnPersona({ hayFocoReporte }: { hayFocoReporte: boole
 }
 
 /**
+ * Indica si la persona eligió otro radio: entonces el mapa vuelve a encuadrar el círculo, así el
+ * zoom acompaña (más chico se acerca, más grande se aleja). La primera ubicación la decide
+ * `debeCentrarEnPersona`.
+ *
+ * @param estado.radioAnterior - Radio del círculo ya dibujado, o `null` si todavía no hay.
+ * @param estado.radio - Radio elegido, en metros.
+ * @returns `true` si hay que encuadrar el círculo.
+ */
+export function debeEncuadrarRadio({ radioAnterior, radio }: { radioAnterior: number | null; radio: number }): boolean {
+  return radioAnterior !== null && radioAnterior !== radio
+}
+
+/**
  * Pide al servidor lo que hay cerca. La coordenada sale redondeada a 4 decimales y en el cuerpo.
  *
  * @param pedido.lat - Latitud de la persona.

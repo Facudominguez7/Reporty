@@ -7,6 +7,7 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
 - **S1 (punto de la persona):** «se tiene que ver el punto de la persona para que sepa que esa es su ubicacion». El punto se ve siempre que haya una lectura dentro de Posadas, aunque el mapa no se mueva solo.
 - **S2 (permiso al abrir):** «Sin botón: al abrir `/mapa` se consulta el estado del permiso de ubicación.»
   - «`granted`: se centra el mapa en la persona a zoom 16, con su punto, un círculo de 500 m y un panel compacto «N reportes cerca tuyo».»
+  - Cambiado en L7: en vez de zoom 16 fijo, el mapa encuadra el círculo entero (zoom 15 en un iPhone para 500 m).
   - «`prompt`: se pide el permiso en ese momento (diálogo del navegador; diálogo nativo en la app Android, que ya tiene `locationDelegation` activo). Si se cierra sin responder, no se vuelve a pedir en esa sesión.»
   - «`denied`: el mapa abre como hoy, con un aviso chico y descartable, una sola vez, que explica cómo activarla.»
   - «Sin Permissions API: se llama directo a la geolocalización.»
@@ -19,6 +20,7 @@ Objetivo: al abrir `/mapa`, centrar el mapa en la persona y mostrar los reportes
   - «El endpoint rechaza coordenadas fuera de Posadas y radios fuera de rango.»
   - «La coordenada no aparece en logs ni en ninguna tabla.»
 - **S7 (panel):** «Panel compacto que se expande al tocarlo, con radios de 300 m, 500 m y 1 km; aviso «Ubicación aproximada» si la precisión supera 50 m.»
+  - L7: «cuando se aumenta o disminuye la ubicacion desde reportes cerca tuyo debe o acercar o alejar el zoom». Al cambiar el radio, el mapa encuadra el círculo nuevo.
 - **S8 (Android):** «Probado en Android dentro de la TWA.» Requiere a la persona usuaria con el teléfono.
 
 ## Tasks
@@ -85,3 +87,10 @@ Ruta: todo inline; ninguna unidad tiene un motivo de escritor (no hay unidades p
     - RED: los tipos de la prueba nueva no compilaban.
     - GREEN: 80 pruebas de `lib/map` y `components/map`.
     - Chrome: arrastrando el mapa antes de que llegue la ubicación, el punto queda centrado.
+- **L7 (pedido de la persona usuaria, 2026-11-24):** «mira el video de la prueba en taildrop, cuando se aumenta o disminuye la ubicacion desde reportes cerca tuyo debe o acercar o alejar el zoom»
+  - El video del iPhone confirma que, con el JS nuevo, el punto y el centrado andan. Al cambiar el radio, solo se redibujaba el círculo.
+  - Cambio: `debeEncuadrarRadio` detecta el cambio de radio y el mapa hace `fitBounds` del círculo, con margen para el panel y la leyenda.
+  - Al abrir también se encuadra el círculo, en vez de zoom 16 fijo. Con zoom 16, el círculo de 500 m no entraba en el iPhone (472 px en 390 px), y pasar de 500 a 300 m no cambiaba el zoom.
+  - RED: `debeEncuadrarRadio is not a function`. GREEN: 82 pruebas de `lib/map` y `components/map`.
+  - WebKit con iPhone 13: al abrir, 500 m da zoom 15; 300 m, zoom 16; 1 km, zoom 14. El círculo queda entero y centrado.
+- **L8 (entorno, 2026-11-24):** el servidor de desarrollo mandaba los estáticos con `immutable`, y Safari usaba JS y CSS viejos. Commits `4577934` (la regla queda solo para producción) y `320421c` (prueba).

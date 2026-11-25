@@ -20,8 +20,6 @@ export const RADIO_CERCANOS_MAXIMO = 2000
 /** Máximo de elementos que devuelve `cerca_de`: si llegan tantos, puede haber más. */
 export const LIMITE_CERCANOS = 100
 
-/** Zoom al que el mapa se acerca a la persona. */
-export const ZOOM_CERCANOS = 16
 
 /** Tiempo máximo de la única lectura de ubicación por visita. */
 export const TIEMPO_UBICACION_CERCANOS_MS = 6_000

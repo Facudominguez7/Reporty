@@ -6,6 +6,7 @@ import {
   CLAVE_AVISO_UBICACION_DENEGADA,
   CLAVE_UBICACION_SIN_RESPUESTA,
   debeCentrarEnPersona,
+  debeEncuadrarRadio,
   iniciarUbicacionAlAbrir,
   pedirCercanos,
 } from "./ubicacion-al-abrir"
@@ -230,5 +231,17 @@ describe("pedirCercanos", () => {
     const fetchFalso = vi.fn().mockResolvedValue(new Response("{}", { status: 500 }))
 
     await expect(pedirCercanos({ lat: -27.37, lon: -55.9, radio: 500 }, undefined, fetchFalso)).rejects.toThrow()
+  })
+})
+
+describe("debeEncuadrarRadio", () => {
+  it("al elegir otro radio, encuadra el círculo: con uno más chico se acerca y con uno más grande se aleja", () => {
+    expect(debeEncuadrarRadio({ radioAnterior: 500, radio: 300 })).toBe(true)
+    expect(debeEncuadrarRadio({ radioAnterior: 500, radio: 1000 })).toBe(true)
+  })
+
+  it("con la primera ubicación decide debeCentrarEnPersona, y si el radio no cambió no se mueve", () => {
+    expect(debeEncuadrarRadio({ radioAnterior: null, radio: 500 })).toBe(false)
+    expect(debeEncuadrarRadio({ radioAnterior: 500, radio: 500 })).toBe(false)
   })
 })
