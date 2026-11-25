@@ -47,6 +47,7 @@ export default async function DefensoriaPage({ searchParams }: { searchParams?: 
     prioridad: reporte.priority,
     estado: reporte.status,
     ubicacion: reporte.direccion?.trim() ? reporte.direccion : "Dirección no disponible",
+    barrio: reporte.barrio,
     autor: reporte.author,
     createdAt: reporte.createdAt,
     imageUrl: reporte.image,

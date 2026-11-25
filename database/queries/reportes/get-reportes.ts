@@ -26,6 +26,7 @@ import {
 } from "@/lib/media/report-images"
 import { REPORT_STATE_IDS, type EstadoOperativo } from "@/lib/authz/catalog"
 import type { ReportCardData } from "@/components/lista-reportes-client"
+import { getBarriosDeReportes } from "@/database/queries/territorio/barrios"
 
 export type ReporteDB = {
   id: number
@@ -534,7 +535,7 @@ export async function getReportCardData(filtros: FiltrosReportes = {}, options: 
 
 /**
  * Reportes para la bandeja de la Defensoría del Pueblo: Pendientes y Tomados, con el
- * número de reclamo y la dirección escrita adjuntos cuando existen (S5, S9).
+ * número de reclamo, la dirección escrita y el barrio (#299) adjuntos cuando existen (S5, S9).
  */
 export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefensoria?: { vista: "pendientes" | "tomados"; busqueda: string }) {
   const { data, error, hasMore } = await getReportCardData(
@@ -547,12 +548,14 @@ export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefen
   // Panel autorizado de la Defensoría: los reclamos solo son legibles por staff de la
   // Defensoría (RLS: autor o rol 6); el público ya no tiene acceso a la tabla (S9).
   const supabaseAdmin = await createClient()
-  const [{ data: reclamos }, { data: direcciones, error: errorDirecciones }] = ids.length
+  // El barrio se calcula en la base con los límites de la IDE (#299); si falla, el panel sale sin barrio.
+  const [{ data: reclamos }, { data: direcciones, error: errorDirecciones }, barriosPorReporte] = ids.length
     ? await Promise.all([
       supabaseAdmin.from("reclamos_defensoria").select("reporte_id, numero_reclamo, tomado_at").in("reporte_id", ids),
       supabaseAdmin.from("reportes").select("id, direccion").in("id", ids),
+      getBarriosDeReportes(supabaseAdmin, ids),
     ])
-    : [{ data: [] as { reporte_id: number; numero_reclamo: string; tomado_at: string }[] }, { data: [], error: null }]
+    : [{ data: [] as { reporte_id: number; numero_reclamo: string; tomado_at: string }[] }, { data: [], error: null }, new Map<number, string | null>()]
 
   if (errorDirecciones) return { data: [], error: errorDirecciones, hasMore, totalPendientes: 0 }
   const reclamosPorReporte = new Map((reclamos ?? []).map((reclamo) => [reclamo.reporte_id, reclamo]))
@@ -563,6 +566,7 @@ export async function getReportesDefensoria(limite = 20, offset = 0, filtroDefen
       ...report,
       numeroReclamo: reclamosPorReporte.get(report.id)?.numero_reclamo ?? null,
       direccion: direccionesPorReporte.get(report.id) ?? null,
+      barrio: barriosPorReporte.get(report.id) ?? null,
     })),
     error: null,
     hasMore,

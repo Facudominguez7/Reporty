@@ -116,6 +116,21 @@ describe("BandejaClient (toma sin salir del panel, S2/S11)", () => {
     expect(html).toContain("Dirección no disponible")
   })
 
+  it("muestra el barrio con la atribución de la IDE en el detalle (#299)", () => {
+    mocks.seleccionado = { ...pendienteAlta, barrio: "Villa Sarita" }
+    const html = renderToStaticMarkup(createElement(BandejaClient, { reportes: [mocks.seleccionado] }))
+    expect(html).toContain(">Barrio<")
+    expect(html).toContain("Villa Sarita")
+    expect(html).toContain("Secretaría de Movilidad Urbana, Dirección SIG-IDE, Municipalidad de Posadas (ODbL)")
+  })
+
+  it("sin barrio no muestra el dato ni la atribución", () => {
+    mocks.seleccionado = { ...pendienteAlta, barrio: null }
+    const html = renderToStaticMarkup(createElement(BandejaClient, { reportes: [mocks.seleccionado] }))
+    expect(html).not.toContain(">Barrio<")
+    expect(html).not.toContain("ODbL")
+  })
+
   it("muestra la misma ubicación escrita o su aviso en el detalle", () => {
     for (const ubicacion of ["Av. Freyre 123, Santa Fe", "Dirección no disponible"]) {
       const reporte = { ...pendienteAlta, ubicacion }

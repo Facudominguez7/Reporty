@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { obtenerIdBusquedaDefensoria } from "@/database/queries/reportes/filtro-defensoria"
+import { AtribucionBarrios } from "@/components/territorio/atribucion-barrios"
 
 /** Reporte de la bandeja tal como lo entrega la página del servidor. */
 export type ReporteBandeja = {
@@ -22,6 +23,8 @@ export type ReporteBandeja = {
   prioridad: string
   estado: string
   ubicacion?: string
+  /** Barrio donde cae el reporte (#299); `null` o ausente si no cae en ninguno. */
+  barrio?: string | null
   autor: string | null
   createdAt: string
   imageUrl: string | null
@@ -228,7 +231,9 @@ function DetalleReporte({ reporte, alTomar, formulario }: {
 }) {
   const fecha = new Date(reporte.createdAt).toLocaleDateString("es-AR", { dateStyle: "medium", timeZone: "America/Argentina/Buenos_Aires" })
   const datos = [
-    ["Ubicación", reporte.ubicacion || "No disponible"], ["Categoría", reporte.categoria],
+    ["Ubicación", reporte.ubicacion || "No disponible"],
+    ...(reporte.barrio ? [["Barrio", reporte.barrio]] : []),
+    ["Categoría", reporte.categoria],
     ["Prioridad", reporte.prioridad], ["Publicado", fecha], ["Autor", reporte.autor || "Anónimo"],
   ]
   return (
@@ -243,6 +248,7 @@ function DetalleReporte({ reporte, alTomar, formulario }: {
         {datos.map(([etiqueta, valor]) => <div key={etiqueta} className="min-w-0"><dt className="font-medium text-muted-foreground">{etiqueta}</dt><dd className="break-words">{valor}</dd></div>)}
         <div><dt className="font-medium text-muted-foreground">Estado</dt><dd><ChipReporte etiqueta="Estado" tono={tonoEstado(reporte.estado)} icono={null} valor={reporte.estado} /></dd></div>
       </dl>
+      {reporte.barrio && <AtribucionBarrios />}
       {reporte.numeroReclamo && <p className="rounded-[var(--radius)] bg-accent p-3 text-sm text-accent-foreground"><strong>Reclamo:</strong> {reporte.numeroReclamo}</p>}
       {reporte.estado === "Pendiente" && <div className="border-t pt-4">
         <FormularioTomarReporte reporteId={reporte.id} onTomado={(numero) => alTomar(reporte.id, numero)} formulario={formulario} />

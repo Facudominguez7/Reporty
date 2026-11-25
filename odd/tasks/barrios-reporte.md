@@ -23,7 +23,7 @@ Objetivo: importar los barrios de la IDE de Posadas a PostGIS y mostrar el barri
 | T1 | Migración `territorio` (tabla, importación, `barrio_de`, lote por reportes) y su prueba SQL | S1, S3 | inline | hecho | RED: «schema "territorio" does not exist»; GREEN: `test-territorio-barrios.sh` sale 0 |
 | T2 | Script de importación desde el WFS | S2, S5 | inline | hecho | RED: módulo inexistente; GREEN: 7 pruebas; importación real en local: 263 barrios, dos veces (ver L3) |
 | T3 | Barrio en la ficha del reporte | S4, S5 | inline | hecho | RED: módulo inexistente y «expected … to contain 'Barrio Centro'»; GREEN: 349 pruebas de queries, ficha y territorio |
-| T4 | Barrio en el panel de Defensoría | S4, S5 | inline | pendiente | |
+| T4 | Barrio en el panel de Defensoría | S4, S5 | inline | hecho | RED: «expected … to contain '>Barrio<'» y la consulta sin llamar a `getBarriosDeReportes`; GREEN: 61 pruebas; suite 3223 (3 fallas previas de `main`) |
 | T5 | Docs: access-matrix, AGENTS.md, arquitectura | S1–S5 | inline | pendiente | |
 | T6 | Migración e importación en producción | S6 | usuario | pendiente | |
 
